@@ -1,0 +1,516 @@
+/* ──────────────────────────────────────────────────────────────
+   ALMA MOVEMENT — TIPOGRAFÍAS BASE
+   Bricolage Grotesque → headings / display  (font-gulfs, font-bebas)
+   Alilato        →  body / text         (font-alilato)
+
+   Archivos propietarios en public/fonts/
+   Fallback vía Google Fonts: Jost
+   ────────────────────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;600;700;800&family=Jost:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── font-face: fuentes propietarias desde public/fonts/ ── */
+@font-face {
+  font-family: 'Gulfs';
+  src: url('/fonts/gulfs-display-normal.woff2') format('woff2'),
+       url('/fonts/gulfs-display-normal.woff') format('woff');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Alilato';
+  src: url('/fonts/Alilato-ExtraLight.ttf') format('truetype');
+  font-weight: 200 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ──────────────────────────────────────────────────────────────
+   PALETA ALMA MOVEMENT — Instagram / estudio
+   Background : #FAF9F6  (blanco rosado)
+   Primario   : #A48D78  (vino berry)
+   Acento 1   : #CBB9A4  (coral activo)
+   Acento 2   : #9C8E72  (oliva de estudio)
+   Foreground : #43392F  (espresso cálido)
+   Energía    : #C0A688  (naranja fruta)
+   Suave      : #E6DAC8  (blush floral)
+   ────────────────────────────────────────────────────────────── */
+
+/* ──────────────────────────────────────────────────────────────
+   EMIL'S EASING CURVES (animations.dev)
+   Used across the app for UI motion. Standard `ease-out` is too
+   weak; these custom curves give the punch that makes animations
+   feel intentional.
+   ────────────────────────────────────────────────────────────── */
+:root {
+  --ease-alma-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-alma-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-alma-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* Press-feedback: any [data-press] gets a subtle scale on :active.
+   Per Emil: buttons must feel responsive to press. */
+[data-press]:active {
+  transform: scale(0.97);
+}
+[data-press] {
+  transition: transform 160ms var(--ease-alma-out);
+}
+
+/* Stagger entrance: any [data-stagger-item] inside [data-stagger]
+   fades up with cascading delay. CSS-only, hardware-accelerated. */
+@keyframes alma-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+[data-stagger] [data-stagger-item] {
+  opacity: 0;
+  transform: translateY(8px);
+  animation: alma-fade-up 360ms var(--ease-alma-out) forwards;
+}
+[data-stagger] [data-stagger-item]:nth-child(1) { animation-delay: 40ms; }
+[data-stagger] [data-stagger-item]:nth-child(2) { animation-delay: 80ms; }
+[data-stagger] [data-stagger-item]:nth-child(3) { animation-delay: 120ms; }
+[data-stagger] [data-stagger-item]:nth-child(4) { animation-delay: 160ms; }
+[data-stagger] [data-stagger-item]:nth-child(5) { animation-delay: 200ms; }
+[data-stagger] [data-stagger-item]:nth-child(6) { animation-delay: 240ms; }
+[data-stagger] [data-stagger-item]:nth-child(7) { animation-delay: 280ms; }
+[data-stagger] [data-stagger-item]:nth-child(8) { animation-delay: 320ms; }
+[data-stagger] [data-stagger-item]:nth-child(n+9) { animation-delay: 360ms; }
+
+/* Hover-lift: applied to anything with [data-lift]. Cards, list items.
+   Per Emil: subtle translateY + shadow shift signals tappable. */
+[data-lift] {
+  transition: transform 280ms var(--ease-alma-out), box-shadow 280ms var(--ease-alma-out);
+  will-change: transform;
+}
+[data-lift]:hover {
+  transform: translateY(-2px);
+}
+
+/* Scale-in: dialogs, popovers. Emil-curve. */
+@keyframes alma-scale-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+[data-scale-in] {
+  animation: alma-scale-in 320ms var(--ease-alma-drawer) forwards;
+}
+
+/* Slide-up: bottom sheets, mobile toasts. */
+@keyframes alma-slide-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+[data-slide-up] {
+  animation: alma-slide-up 380ms var(--ease-alma-drawer) forwards;
+}
+
+/* Fade-in simple sin movimiento (para imágenes lazy). */
+@keyframes alma-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+[data-fade-in] {
+  animation: alma-fade-in 480ms var(--ease-alma-out) forwards;
+}
+
+/* IntersectionObserver-friendly: aplica [data-reveal] al element y
+   class .is-visible cuando entra a viewport. */
+[data-reveal] {
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity 600ms var(--ease-alma-out), transform 600ms var(--ease-alma-out);
+}
+[data-reveal].is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-press]:active { transform: none; }
+  [data-lift]:hover { transform: none; }
+  [data-stagger] [data-stagger-item],
+  [data-scale-in], [data-slide-up], [data-fade-in], [data-reveal] {
+    animation: none;
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+
+@layer base {
+  :root {
+    /* La app es de tema claro únicamente. Esto evita que el "modo oscuro
+       automático" del navegador/sistema invierta el texto de inputs y
+       botones (causa de fechas/valores que se veían en blanco). */
+    color-scheme: light;
+
+    --background: 45 29% 97%;           /* #FAF9F6 */
+    --foreground: 30 18% 22%;            /* #43392F */
+
+    --card: 0 0% 100%;                   /* #FFFFFF */
+    --card-foreground: 30 18% 22%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 30 18% 22%;
+
+    /* Primario: vino berry #A48D78 */
+    --primary: 29 19% 56%;
+    --primary-foreground: 45 29% 97%;
+
+    --secondary: 42 31% 94%;            /* #F4F1EA */
+    --secondary-foreground: 30 18% 22%;
+
+    --muted: 40 33% 91%;                 /* #F0EBE1 */
+    --muted-foreground: 30 15% 48%;      /* #8C7A68 */
+
+    /* Acento: coral activo #CBB9A4 */
+    --accent: 32 27% 72%;
+    --accent-foreground: 30 18% 22%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 35 30% 83%;                /* #E0D5C6 */
+    --input: 35 30% 83%;
+    --ring: 29 19% 56%;
+
+    --radius: 0.75rem;
+
+    /* Tokens legacy conservados para evitar refactor masivo de componentes */
+    --ophelia-purple:    30 18% 22%;     /* #43392F */
+    --ophelia-magenta:   29 19% 56%;    /* #A48D78 */
+    --ophelia-violet:    40 18% 53%;     /* #9C8E72 */
+    --ophelia-lime:      32 31% 64%;     /* #C0A688 */
+    --ophelia-cream:     45 29% 97%;    /* #FAF9F6 */
+    --ophelia-lilac:     32 27% 72%;      /* #CBB9A4 */
+    --ophelia-pinklight: 36 37% 84%;     /* #E6DAC8 */
+
+    --pink-glow: 29 19% 56%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Alilato', 'Jost', sans-serif;
+    overflow-x: hidden;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Bricolage Grotesque', 'Jost', sans-serif;
+    font-weight: 800;
+  }
+
+  .font-gulfs {
+    font-family: 'Bricolage Grotesque', 'Jost', sans-serif;
+    font-weight: 800;
+  }
+
+  .font-alilato {
+    font-family: 'Alilato', 'Jost', sans-serif;
+  }
+
+  /* Keep legacy classes working */
+  .font-bebas {
+    font-family: 'Bricolage Grotesque', 'Jost', sans-serif;
+    font-weight: 800;
+    letter-spacing: 0;
+  }
+
+  .font-syne {
+    font-family: 'Alilato', 'Jost', sans-serif;
+    font-weight: 700;
+  }
+
+  .font-dm {
+    font-family: 'Alilato', 'Jost', sans-serif;
+  }
+}
+
+/* Noise overlay */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 50;
+  opacity: 0.4;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: hsl(var(--background));
+}
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted));
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--primary));
+}
+
+/* Animations */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes jump {
+  0%, 100% { transform: translateY(0); }
+  40% { transform: translateY(-90px) scaleX(0.9); }
+  50% { transform: translateY(-100px) scaleX(1.05); }
+  70% { transform: translateY(-20px); }
+}
+
+@keyframes ring-pulse {
+  0% { opacity: 0.5; transform: scale(0.9); }
+  100% { opacity: 0; transform: scale(1.2); }
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.7); }
+}
+
+@keyframes float1 {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-30px) scale(1.05); }
+}
+
+@keyframes scroll-left {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+.animate-fade-up {
+  animation: fade-up 0.8s ease both;
+}
+
+.animate-jump {
+  animation: jump 1.8s ease-in-out infinite;
+}
+
+.animate-ring-pulse {
+  animation: ring-pulse 3s ease-out infinite;
+}
+
+.animate-pulse-dot {
+  animation: pulse-dot 2s infinite;
+}
+
+.animate-float {
+  animation: float1 8s ease-in-out infinite;
+}
+
+.animate-float-reverse {
+  animation: float1 10s ease-in-out infinite reverse;
+}
+
+.animate-scroll-left {
+  animation: scroll-left 30s linear infinite;
+}
+
+.animate-scroll-left:hover {
+  animation-play-state: paused;
+}
+
+/* Delay utilities */
+.delay-100 { animation-delay: 0.1s; }
+.delay-200 { animation-delay: 0.2s; }
+.delay-300 { animation-delay: 0.3s; }
+.delay-400 { animation-delay: 0.4s; }
+.delay-500 { animation-delay: 0.5s; }
+.delay-600 { animation-delay: 0.6s; }
+.delay-800 { animation-delay: 0.8s; }
+.delay-1000 { animation-delay: 1s; }
+
+/* ── Date/time inputs: clickable on entire field, not just the icon ── */
+input[type="date"],
+input[type="datetime-local"],
+input[type="time"] {
+  cursor: pointer;
+  position: relative;
+}
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+@layer utilities {
+  .pb-safe {
+    padding-bottom: max(env(safe-area-inset-bottom), 0px);
+  }
+
+  .admin-page {
+    width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+    padding: 1rem;
+  }
+
+  .admin-card-grid {
+    display: grid;
+    gap: 0.75rem;
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+  }
+
+  .admin-title {
+    font-size: clamp(1.25rem, 2.6vw, 1.85rem);
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+  }
+}
+
+@media (min-width: 640px) {
+  .admin-page {
+    padding: 1.25rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .admin-page {
+    padding: 1.5rem;
+  }
+
+  .admin-card-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 1023px) {
+  .admin-mobile-main {
+    overflow-x: hidden;
+  }
+}
+
+/* ──────────────────────────────────────────────────────────────
+   ALMA ADMIN — light theme overrides
+   La mayoría de páginas admin usan utilidades dark inline tipo
+   bg-white/[0.0X], text-white, border-white/[0.0X]. En vez de
+   reescribir cada página, sobreescribimos esos patrones dentro
+   del scope .alma-admin para traducirlos a la paleta cream/ink.
+   ────────────────────────────────────────────────────────────── */
+.alma-admin .text-white,
+.alma-admin .text-foreground { color: #43392F !important; }
+.alma-admin .text-white\/95 { color: rgba(46, 32, 28, 0.95) !important; }
+.alma-admin .text-white\/90 { color: rgba(46, 32, 28, 0.92) !important; }
+.alma-admin .text-white\/85 { color: rgba(46, 32, 28, 0.92) !important; }
+.alma-admin .text-white\/80 { color: rgba(46, 32, 28, 0.88) !important; }
+.alma-admin .text-white\/70 { color: rgba(46, 32, 28, 0.78) !important; }
+.alma-admin .text-white\/65 { color: rgba(46, 32, 28, 0.72) !important; }
+.alma-admin .text-white\/60 { color: rgba(46, 32, 28, 0.68) !important; }
+.alma-admin .text-white\/55 { color: rgba(46, 32, 28, 0.62) !important; }
+.alma-admin .text-white\/45 { color: rgba(46, 32, 28, 0.55) !important; }
+.alma-admin .text-white\/40 { color: rgba(46, 32, 28, 0.5) !important; }
+.alma-admin .text-white\/35 { color: rgba(46, 32, 28, 0.45) !important; }
+.alma-admin .text-white\/30 { color: rgba(46, 32, 28, 0.42) !important; }
+.alma-admin .text-white\/25 { color: rgba(46, 32, 28, 0.38) !important; }
+.alma-admin .text-white\/20 { color: rgba(46, 32, 28, 0.32) !important; }
+.alma-admin .text-muted-foreground { color: rgba(46, 32, 28, 0.55) !important; }
+
+/* Card / surface overrides — usar blanco con border crema */
+.alma-admin .bg-white\/\[0\.01\],
+.alma-admin .bg-white\/\[0\.02\],
+.alma-admin .bg-white\/\[0\.03\],
+.alma-admin .bg-white\/\[0\.04\],
+.alma-admin .bg-white\/\[0\.05\] {
+  background-color: #FFFFFF !important;
+}
+.alma-admin .bg-white\/\[0\.07\],
+.alma-admin .bg-white\/\[0\.08\] {
+  background-color: #E6DAC8 !important;
+}
+.alma-admin .bg-card { background-color: #FFFFFF !important; }
+.alma-admin .bg-secondary { background-color: #E6DAC8 !important; }
+.alma-admin .bg-background { background-color: #FAF9F6 !important; }
+
+/* Borders */
+.alma-admin .border-white\/\[0\.04\],
+.alma-admin .border-white\/\[0\.05\],
+.alma-admin .border-white\/\[0\.06\],
+.alma-admin .border-white\/\[0\.07\],
+.alma-admin .border-white\/\[0\.08\],
+.alma-admin .border-white\/10,
+.alma-admin .border-white\/15,
+.alma-admin .border-white\/20,
+.alma-admin .border-border {
+  border-color: #E0D5C6 !important;
+}
+
+/* Hover states */
+.alma-admin .hover\:bg-white\/5:hover,
+.alma-admin .hover\:bg-white\/\[0\.04\]:hover,
+.alma-admin .hover\:bg-white\/\[0\.05\]:hover,
+.alma-admin .hover\:bg-white\/\[0\.08\]:hover,
+.alma-admin .hover\:bg-white\/10:hover {
+  background-color: rgba(118, 33, 77, 0.06) !important;
+}
+.alma-admin .hover\:text-white:hover,
+.alma-admin .hover\:text-foreground:hover {
+  color: #A48D78 !important;
+}
+
+/* Skeleton loaders */
+.alma-admin [class*="bg-white/[0.05]"],
+.alma-admin .bg-muted {
+  background-color: rgba(232, 202, 193, 0.5) !important;
+}
+
+/* Inputs / placeholders */
+.alma-admin input::placeholder,
+.alma-admin textarea::placeholder,
+.alma-admin .placeholder\:text-white\/25::placeholder,
+.alma-admin .placeholder\:text-white\/30::placeholder {
+  color: rgba(46, 32, 28, 0.4) !important;
+}
+
+/* Dialog / dropdown content backgrounds (hardcoded #0f0518 etc) */
+.alma-admin .bg-\[\#0f0518\],
+.alma-admin .bg-\[\#080808\],
+.alma-admin .bg-\[\#0b0b0bcc\] {
+  background-color: #FFFFFF !important;
+}
+
+/* Radix portals for Dialog/Select/Dropdown content render at <body>, fuera
+   del scope .alma-admin. Hacemos las reglas globales — el #0f0518 solo
+   se usa en admin, así que no rompe el resto del app. */
+.bg-\[\#0f0518\] { background-color: #FFFFFF !important; color: #43392F !important; }
+.bg-\[\#0f0518\] .text-white,
+.bg-\[\#0f0518\] [class*="text-white"] { color: #43392F !important; }
+.bg-\[\#0f0518\] .border-white\/10 { border-color: #E0D5C6 !important; }
+
+/* Table rows */
+.alma-admin table tbody tr {
+  border-color: #E0D5C6 !important;
+}
+.alma-admin .border-t.border-white\/\[0\.04\],
+.alma-admin .border-b.border-white\/\[0\.04\] {
+  border-color: #F0EBE1 !important;
+}

@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e 'const {Client}=require\\(\"pg\"\\);\\(async\\(\\)=>{const c=new Client\\({connectionString:\"postgres://alma:alma@127.0.0.1:5433/alma\"}\\);await c.connect\\(\\);const r=await c.query\\(\"select email, role from users limit 3\"\\);console.log\\(r.rows\\);await c.end\\(\\)}\\)\\(\\)')",
+      "Bash(curl -s -m 8 -X POST http://localhost:8090/api/auth/login -H \"Content-Type: application/json\" -d '{\"email\":\"admin@almamovement.mx\",\"password\":\"AlmaBarre2026!\"}')",
+      "Bash(powershell -NoProfile -Command \"Start-Process 'http://localhost:8090/'\")",
+      "Bash(cp _dbserver.cjs scripts/db-local.cjs)",
+      "Bash(cp _apply_schema.cjs scripts/db-apply-schema.cjs)",
+      "Bash(rm -f _dbserver.cjs _apply_schema.cjs)",
+      "Bash(node -e 'const fs=require\\(\"fs\"\\);const f=\"DEPLOY.md\";let s=fs.readFileSync\\(f,\"utf8\"\\);const n=\\(s.match\\(/Ophelia2026!/g\\)||[]\\).length;s=s.split\\(\"Ophelia2026!\"\\).join\\(\"AlmaBarre2026!\"\\);fs.writeFileSync\\(f,s,\"utf8\"\\);console.log\\(\"DEPLOY.md: corregidas\",n,\"refs Ophelia2026! -> AlmaBarre2026!\"\\)')",
+      "Bash(node scripts/apply-theme.cjs)",
+      "Bash(mkdir -p brand)",
+      "Bash(mv \"logo alma.jpeg\" \"colores alma.jpeg\" \"logo alma.png\" \"icono alma.png\" brand/)",
+      "Bash(node scripts/build-brand.cjs)",
+      "Bash(mkdir -p docs/planning)",
+      "Bash(mv BRAND.md OPERATIONS.md PRICING.md POLICIES.md DATA-MODEL.md FEATURES.md docs/planning/)",
+      "Bash(mv DEPLOY.md DESIGN.md PRODUCT.md LOCAL-DEV.md ALMA_ANILLOS_FLUJO.md \"SISTEMAS_LEALTAD_EVENTOS_WALLETS.md\" \"SISTEMAS_LEALTAD_EVENTOS_WALLETS copy.md\" docs/)"
+    ]
+  }
+}
