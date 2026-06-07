@@ -1290,7 +1290,7 @@ const PaquetesSection = ({
         </div>
 
         <p className="reveal opacity-0 translate-y-8 transition-all duration-700 mt-6 text-[0.78rem] uppercase tracking-[0.18em] text-center" style={{ color: ALMA.cream, opacity: 0.55 }}>
-          Pagos por transferencia BBVA · Tarjeta o efectivo en estudio · Precios en MXN
+          Pagos por transferencia Banorte · Tarjeta o efectivo en estudio · Precios en MXN
         </p>
       </div>
     </section>
@@ -1302,12 +1302,12 @@ const PaquetesSection = ({
    ═══════════════════════════════════════════════════════════ */
 const PoliticasSection = () => {
   const items = [
-    { num: "01", title: "Primera vez", text: "Si eres nueva, llega 15 minutos antes. Karla te explica la barra y te muestra el espacio sin prisa." },
-    { num: "02", title: "Reservación", text: "Todas las clases requieren reserva previa. Cupo de 5 lugares por clase." },
-    { num: "03", title: "Cancelaciones", text: "Alumnas nuevas cancelan de 4 a 5 horas antes. Comunidad Alma puede cancelar hasta 2 horas antes sin penalización." },
-    { num: "04", title: "No-show", text: "Si no asistes o cancelas tarde, la clase se considera tomada y no se puede revalidar." },
-    { num: "05", title: "Pagos", text: "Transferencia BBVA · Karla Cruz · CLABE 012 700 01539444488 8. También aceptamos pago físico con tarjeta o efectivo." },
-    { num: "06", title: "Vigencia", text: "Paquetes y mensualidades tienen vigencia de 1 mes a partir de la compra." },
+    { num: "01", title: "Primera vez", text: "Si eres nueva, llega 10 minutos antes. Te mostramos el equipo y el espacio sin prisa. El uso de calcetines antiderrapantes es obligatorio." },
+    { num: "02", title: "Reservación", text: "Todas las clases requieren reserva previa. Cupo de 4 lugares en Reformer/Tower y 8 en Studio." },
+    { num: "03", title: "Cancelaciones", text: "Puedes cancelar hasta 12 horas antes de tu clase. Tras 5 clases reservadas a las que no asistas, se aplica penalización en tus puntos." },
+    { num: "04", title: "En el estudio", text: "Respeta el horario de inicio, mantén tu celular en silencio e informa antes cualquier lesión o condición médica." },
+    { num: "05", title: "Pagos", text: "Transferencia Banorte · Estefanía Torres Lanzagorta · CLABE 072298012591154950. También aceptamos pago físico con tarjeta o efectivo." },
+    { num: "06", title: "Vigencia", text: "Todos los paquetes tienen vigencia de 30 días a partir de la compra." },
     { num: "07", title: "Asistencia", text: "El check-in con QR registra tus asistencias, recompensas y progreso semanal." },
     { num: "08", title: "Comunidad", text: "Recordatorios, promociones y recompensas se comunican principalmente por WhatsApp." },
   ];

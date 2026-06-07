@@ -21,9 +21,15 @@ Plataforma de reservas, pagos, asistencias y comunidad de **Alma Movement**, est
 
 ## Pagos
 
-- Transferencia o pago físico (tarjeta/efectivo en estudio); comprobante requerido para validar.
-- **Transferencia BBVA** — titular **Karla Cruz** (founder), CLABE **012 700 01539444488 8**.
+- Transferencia o pago físico (tarjeta/efectivo en estudio); el cliente envía su comprobante y se valida manualmente.
+- **Transferencia Banorte** — titular **Estefanía Torres Lanzagorta**, CLABE **072298012591154950**, cuenta **4189143097040441**.
 - Los datos bancarios se editan en *Admin → Configuración → Pagos*.
+
+## Políticas
+
+- **Cancelación**: hasta 12 horas antes de la clase sin penalización. Tras 5 clases reservadas sin asistir, penalización con pérdida de puntos de lealtad.
+- **Vigencia**: todos los paquetes 30 días desde la compra.
+- **Reglas en estudio**: llegar 10 min antes · calcetines antiderrapantes obligatorios · respetar el horario de inicio · celular en silencio · informar previamente lesiones o condiciones médicas.
 
 ## Datos públicos
 

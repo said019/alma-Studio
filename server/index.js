@@ -77,10 +77,10 @@ const DEFAULT_GENERAL_SETTINGS = {
 };
 
 const DEFAULT_BANK_INFO = Object.freeze({
-  bank: "BBVA",
-  account_holder: "Karla Cruz",
-  account_number: "",
-  clabe: "012 700 01539444488 8",
+  bank: "Banorte",
+  account_holder: "Estefanía Torres Lanzagorta",
+  account_number: "4189143097040441",
+  clabe: "072298012591154950",
 });
 
 function digitsOnly(value) {
@@ -155,7 +155,7 @@ async function getConfiguredBankInfo(dbClient = pool) {
 }
 
 const DEFAULT_POLICIES_SETTINGS = {
-  cancellation_policy: "Alumnas nuevas pueden cancelar de 4 a 5 horas antes de la clase. Comunidad ALMA puede cancelar hasta 2 horas antes sin penalizacion. Cancelaciones tardias o no-show se consideran clase tomada.",
+  cancellation_policy: "Puedes cancelar hasta 12 horas antes de tu clase sin penalizacion. Tras 5 clases reservadas a las que no asistas, se aplica penalizacion con perdida de puntos de lealtad.",
   terms_of_service: "Al reservar o comprar en Alma Movement aceptas el reglamento interno, la vigencia mensual de paquetes, las politicas de cancelacion y el uso personal e intransferible de tus clases.",
   privacy_policy: "Tus datos se usan para gestionar reservas, pagos, asistencias, recompensas y comunicacion operativa del studio. No compartimos tu informacion personal con terceros sin autorizacion.",
 };
