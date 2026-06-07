@@ -56,15 +56,20 @@ import almaKarlaCoach from "@/assets/alma/alma-karla-coach.jpg";
    ═════════════════════════════════════════════════════════════ */
 
 /* ── Brand color roles ── */
+// Paleta Frame Pilates Lab (extraída de su sitio): greige cálido + café vino
+// + tan. Lujo terroso monocromático.
 const ALMA = {
-  cream: "#FAF9F6",
-  blush: "#E6DAC8",
-  ink: "#43392F",
-  berry: "#A48D78",
-  coral: "#CBB9A4",
-  olive: "#9C8E72",
-  orange: "#C0A688",
-  border: "#E0D5C6",
+  cream: "#E9E6DF",   // greige cálido, canvas
+  blush: "#E4D2C3",   // tan suave, superficies y CTAs claros
+  ink: "#4A3333",     // café cálido con matiz vino, texto + oscuros
+  inkDeep: "#241B1A", // café casi negro, secciones drenched (footer)
+  berry: "#8A6E60",   // café medio, acento
+  wine: "#76214D",    // reservado (sin uso en la dirección Frame)
+  coral: "#C7A892",   // tan apagado
+  olive: "#8A7C66",   // neutro cálido
+  orange: "#C7A892",  // tan apagado
+  sand: "#DCD3C5",    // neutro greige
+  border: "#D8CFC1",  // borde greige
 } as const;
 
 /* ───── Types ───── */
@@ -391,7 +396,7 @@ const Index = () => {
 
   /* ═══════════════════════════════════════════════════════════ */
   return (
-    <div className="min-h-screen text-[color:var(--ink)] [--ink:#43392F] [--cream:#FAF9F6] [--blush:#E6DAC8] [--berry:#A48D78] [--coral:#CBB9A4] [--olive:#9C8E72] [--orange:#C0A688] [--border:#E0D5C6]" style={{ backgroundColor: ALMA.cream }}>
+    <div className="min-h-screen text-[color:var(--ink)] [--ink:#4A3333] [--ink-deep:#241B1A] [--cream:#E9E6DF] [--blush:#E4D2C3] [--berry:#8A6E60] [--wine:#76214D] [--coral:#C7A892] [--olive:#8A7C66] [--orange:#C7A892] [--sand:#DCD3C5] [--border:#D8CFC1]" style={{ backgroundColor: ALMA.cream }}>
 
       {/* ═════════ NAV ═════════ */}
       <nav
@@ -505,94 +510,76 @@ const Index = () => {
       </nav>
 
       {/* ═════════ HERO ═════════ */}
-      <section id="top" className="relative pt-28 sm:pt-32 lg:pt-36">
-        <div className="mx-auto grid max-w-[1320px] grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 px-5 sm:px-8 lg:px-12 pb-16 lg:pb-24">
-          {/* Headline column */}
-          <div className="lg:col-span-7 flex flex-col justify-end">
-            <div className="flex items-center gap-3">
-              <span className="inline-block h-px w-10" style={{ backgroundColor: ALMA.coral }} />
-              <span className="text-[0.66rem] font-medium uppercase tracking-[0.34em]" style={{ color: ALMA.coral }}>
+      <section id="top" className="relative px-3 sm:px-5 lg:px-7 pt-24 sm:pt-28">
+        {/* Full-bleed: foto del estudio + titular serif sobrepuesto (dirección Frame) */}
+        <div className="relative mx-auto max-w-[1480px] overflow-hidden rounded-[26px] sm:rounded-[34px] min-h-[80vh] lg:min-h-[88vh] flex flex-col justify-end">
+          <img
+            src={HERO_PHOTOS[0]}
+            alt="Estudio de Pilates Alma Movement en Juriquilla, Querétaro"
+            className="absolute inset-0 h-full w-full object-cover"
+            loading="eager"
+            fetchPriority="high"
+          />
+          <div className="absolute inset-0" style={{ background: "linear-gradient(176deg, rgba(42,30,27,0.36) 0%, rgba(42,30,27,0.04) 32%, rgba(42,30,27,0.10) 54%, rgba(42,30,27,0.74) 100%)" }} />
+
+          <div className="relative z-10 p-6 sm:p-10 lg:p-16 max-w-[1100px]" data-stagger>
+            <div className="flex items-center gap-3" data-stagger-item>
+              <span className="inline-block h-px w-10" style={{ backgroundColor: ALMA.cream, opacity: 0.65 }} />
+              <span className="text-[0.66rem] font-medium uppercase tracking-[0.34em]" style={{ color: ALMA.cream, opacity: 0.92 }}>
                 Estudio de Pilates · Juriquilla, Querétaro
               </span>
             </div>
 
-            <h1 className="font-bebas mt-7 leading-[0.86] tracking-[-0.01em]" style={{ color: ALMA.ink, fontSize: "clamp(3rem, 9vw, 7.6rem)" }}>
-              Aquí cambias
-              <span className="block" style={{ color: ALMA.berry }}>el día,</span>
-              <span className="block italic font-alilato font-normal" style={{ color: ALMA.coral, fontSize: "clamp(2.2rem, 6vw, 5rem)", lineHeight: 1 }}>
-                no la rutina.
-              </span>
+            <h1 data-stagger-item className="font-display mt-5 leading-[0.98]" style={{ color: ALMA.cream, fontSize: "clamp(2.7rem, 7.4vw, 6.4rem)", fontWeight: 380 }}>
+              Donde el movimiento
+              <span className="block font-display-italic" style={{ color: ALMA.blush, fontWeight: 360 }}>se vuelve bienestar.</span>
             </h1>
 
-            <p className="mt-7 max-w-[44ch] text-[1.05rem] leading-[1.75] text-[color:var(--ink)]/75">
-              Cercana como una amiga en su casa. Energética como una clase de Karla. Distinta cada vez que vuelves: clases pequeñas, atención personalizada y un estudio que sabe tu nombre.
+            <p data-stagger-item className="mt-6 max-w-[48ch] text-[1.02rem] leading-[1.7]" style={{ color: ALMA.cream, opacity: 0.86 }}>
+              Pilates Reformer, Tower, Mat, Barre y Sculpt en grupos pequeños. Técnica, alineación y comunidad en un espacio pensado para que el movimiento se sienta como bienestar.
             </p>
 
-            <div className="mt-9 flex flex-wrap items-center gap-4">
+            <div data-stagger-item className="mt-9 flex flex-wrap items-center gap-4">
               <button
                 onClick={() => navigate(membershipCtaPath)}
                 data-press
-                data-lift
-                className="group inline-flex items-center gap-3 rounded-full px-7 py-4 text-[0.84rem] font-medium uppercase tracking-[0.16em]"
-                style={{ backgroundColor: ALMA.berry, color: ALMA.cream }}
+                className="group inline-flex items-center gap-3 rounded-full px-7 py-4 text-[0.82rem] font-medium uppercase tracking-[0.16em] transition-transform duration-200 will-change-transform"
+                style={{ backgroundColor: ALMA.inkDeep, color: ALMA.cream }}
               >
                 Reserva tu clase muestra
-                <span className="grid h-7 w-7 place-items-center rounded-full bg-[color:var(--cream)]/18 transition-transform group-hover:translate-x-1">
+                <span className="grid h-7 w-7 place-items-center rounded-full bg-white/15 transition-transform duration-300 group-hover:translate-x-1" style={{ transitionTimingFunction: "var(--ease-alma-out)" }}>
                   <ArrowUpRight size={13} />
                 </span>
-                <span className="ml-1 text-[0.78rem] font-normal opacity-80">$50</span>
+                <span className="ml-1 text-[0.78rem] font-normal opacity-85">$150</span>
               </button>
               <button
                 onClick={() => scrollTo("clases")}
-                className="group inline-flex items-center gap-3 bg-transparent border-0 cursor-pointer text-[0.82rem] uppercase tracking-[0.2em] text-[color:var(--ink)]/72 hover:text-[color:var(--ink)] transition-colors"
+                data-press
+                className="group inline-flex items-center gap-3 bg-transparent border-0 cursor-pointer text-[0.8rem] uppercase tracking-[0.2em] transition-colors"
+                style={{ color: ALMA.cream }}
               >
-                <span className="grid h-10 w-10 place-items-center rounded-full transition-colors group-hover:bg-[color:var(--blush)]" style={{ border: `1px solid ${ALMA.border}` }}>
+                <span className="grid h-10 w-10 place-items-center rounded-full transition-colors group-hover:bg-white/10" style={{ border: "1px solid rgba(250,249,246,0.42)" }}>
                   <Play size={12} className="ml-0.5" />
                 </span>
-                Ver clases
+                Ver disciplinas
               </button>
-            </div>
-
-            {/* Inline studio facts (no card grid) */}
-            <dl className="mt-12 grid grid-cols-3 gap-6 max-w-[520px]" data-stagger>
-              {[
-                { k: "5", l: "Lugares por clase" },
-                { k: "50min", l: "Cada sesión" },
-                { k: "Karla", l: "Te recibe" },
-              ].map((stat) => (
-                <div key={stat.l} data-stagger-item className="border-t pt-3" style={{ borderColor: ALMA.border }}>
-                  <dt className="font-bebas text-[1.85rem] leading-none" style={{ color: ALMA.berry }}>{stat.k}</dt>
-                  <dd className="mt-1 text-[0.72rem] uppercase tracking-[0.18em] text-[color:var(--ink)]/55">{stat.l}</dd>
-                </div>
-              ))}
-            </dl>
-          </div>
-
-          {/* Image column */}
-          <div className="lg:col-span-5 relative">
-            <div className="relative aspect-[4/5] sm:aspect-[3/4] lg:aspect-[4/5] overflow-hidden rounded-[28px]">
-              <img
-                src={HERO_PHOTOS[0]}
-                alt="Karla guía una clase de barre en Alma"
-                className="absolute inset-0 h-full w-full object-cover"
-                loading="eager"
-                fetchPriority="high"
-              />
-              <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(46,32,28,0) 55%, rgba(46,32,28,0.42) 100%)" }} />
-              {/* Quote sticker, coral */}
-              <div className="absolute left-4 bottom-4 sm:left-6 sm:bottom-6 max-w-[260px] rounded-2xl px-5 py-4" style={{ backgroundColor: ALMA.coral, color: ALMA.cream }}>
-                <p className="font-alilato italic text-[0.95rem] leading-[1.45]">
-                  «Pasa, te estábamos esperando.»
-                </p>
-                <p className="mt-1 text-[0.6rem] uppercase tracking-[0.28em] opacity-80">El recibimiento Alma</p>
-              </div>
-            </div>
-            {/* Decorative numeral */}
-            <div className="hidden lg:block absolute -top-3 -left-3 font-bebas leading-none select-none pointer-events-none" style={{ color: ALMA.olive, fontSize: "5.5rem", opacity: 0.85 }}>
-              01
             </div>
           </div>
         </div>
+
+        {/* Datos del estudio, sobre crema */}
+        <dl className="mx-auto max-w-[1480px] grid grid-cols-3 gap-5 sm:gap-8 px-4 sm:px-6 mt-7 sm:mt-9" data-stagger>
+          {[
+            { k: "5", l: "Disciplinas Alma" },
+            { k: "4–8", l: "Lugares por clase" },
+            { k: "50 min", l: "Cada sesión" },
+          ].map((stat) => (
+            <div key={stat.l} data-stagger-item className="border-t pt-3" style={{ borderColor: ALMA.border }}>
+              <dt className="font-display text-[1.9rem] sm:text-[2.4rem] leading-none" style={{ color: ALMA.berry, fontWeight: 400 }}>{stat.k}</dt>
+              <dd className="mt-1.5 text-[0.7rem] uppercase tracking-[0.18em] text-[color:var(--ink)]/55">{stat.l}</dd>
+            </div>
+          ))}
+        </dl>
 
         {/* Marquee strip — coral drenched */}
         <div className="overflow-hidden border-y" style={{ backgroundColor: ALMA.coral, borderColor: ALMA.coral, color: ALMA.cream }}>

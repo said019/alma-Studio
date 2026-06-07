@@ -43,3 +43,6 @@ wallet-assets/apple-pass/*.cer
 alma-paquetes-*.jpeg
 .playwright-mcp/
 .pgdata/
+ref-*.jpeg
+hero-*.jpeg
+landing-*.jpeg
