@@ -744,24 +744,9 @@ async function ensureSchema() {
     await pool.query(`ALTER TABLE packages DROP CONSTRAINT IF EXISTS packages_category_check`).catch(() => { });
     await pool.query(`ALTER TABLE packages ADD CONSTRAINT packages_category_check CHECK (category IN ('barre','jumping','pilates','mixtos'))`).catch(() => { });
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_packages_category ON packages(category)`).catch(() => { });
-    // ── Seed packages si la tabla está vacía ──────────────────────────────
-    const pkgCount = await pool.query("SELECT COUNT(*) FROM packages");
-    if (parseInt(pkgCount.rows[0].count) === 0) {
-      await pool.query(`
-        INSERT INTO packages (name, num_classes, price, category, validity_days, is_active, sort_order) VALUES
-          ('2 Clases al mes',       '2',  230,  'barre', 30, true, 1),
-          ('3 Clases al mes',       '3',  355,  'barre', 30, true, 2),
-          ('4 Clases al mes',       '4',  470,  'barre', 30, true, 3),
-          ('5 Clases al mes',       '5',  585,  'barre', 30, true, 4),
-          ('2 Clases por semana',   '8',  880,  'barre', 30, true, 5),
-          ('3 Clases por semana',   '12', 1080, 'barre', 30, true, 6),
-          ('4 Clases por semana',   '16', 1200, 'barre', 30, true, 7),
-          ('5 Clases por semana',   '20', 1300, 'barre', 30, true, 8),
-          ('Clase suelta',          '1',  125,  'barre', 30, true, 9)
-        ON CONFLICT DO NOTHING;
-      `);
-      console.log("✅ Seeded Alma Barre packages");
-    }
+    // La tabla `packages` es legacy (solo display). La landing ahora lee de
+    // `plans`. Desactivamos cualquier fila para no mostrar precios viejos.
+    await pool.query(`UPDATE packages SET is_active = false`).catch(() => { });
     // ── Seed class_types – ensure Alma Barre exists ───────────────────────
     await pool.query(`ALTER TABLE class_types DROP CONSTRAINT IF EXISTS class_types_category_check`).catch(() => { });
     await pool.query(`ALTER TABLE class_types ADD CONSTRAINT class_types_category_check CHECK (category IN ('studio','reformer_tower'))`).catch(() => { });
@@ -853,6 +838,9 @@ async function ensureSchema() {
     await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS is_visit_pack BOOLEAN DEFAULT false`).catch(() => { });
     await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS opening_price DECIMAL(10,2)`).catch(() => { });
     await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS morning_only BOOLEAN DEFAULT false`).catch(() => { });
+    // includes_video_library lo (re)añade más abajo la migración de video library,
+    // pero el seed de planes Alma lo referencia: garantízalo aquí (idempotente).
+    await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS includes_video_library BOOLEAN NOT NULL DEFAULT false`).catch(() => { });
     // Tabla de perfiles de invitada/acompañante (no socia). El cuestionario
     // inicial vive aquí y se reusa al volver con el mismo teléfono.
     await pool.query(`
@@ -914,22 +902,36 @@ async function ensureSchema() {
     // ── Migrate plans: 'mixto' class_category means both, keep as 'mixto' for logic ──
     // (mixto plans are still valid — the booking endpoint allows them on both categories)
     // ── Seed plans: ensure el lineup oficial de Alma existe si la tabla está vacía ──
-    const plCount = await pool.query("SELECT COUNT(*) FROM plans WHERE is_active = true");
-    if (parseInt(plCount.rows[0].count) === 0) {
-      await pool.query(`
-        INSERT INTO plans (name, price, currency, duration_days, class_limit, class_category, is_active, sort_order) VALUES
-          ('Barre — 2 Clases al mes',      230,  'MXN', 30, 2,  'all', true, 1),
-          ('Barre — 3 Clases al mes',      355,  'MXN', 30, 3,  'all', true, 2),
-          ('Barre — 4 Clases al mes',      470,  'MXN', 30, 4,  'all', true, 3),
-          ('Barre — 5 Clases al mes',      585,  'MXN', 30, 5,  'all', true, 4),
-          ('Barre — 2 Clases por semana',  880,  'MXN', 30, 8,  'all', true, 5),
-          ('Barre — 3 Clases por semana',  1080, 'MXN', 30, 12, 'all', true, 6),
-          ('Barre — 4 Clases por semana',  1200, 'MXN', 30, 16, 'all', true, 7),
-          ('Barre — 5 Clases por semana',  1300, 'MXN', 30, 20, 'all', true, 8),
-          ('Barre — Clase suelta',         125,  'MXN', 30, 1,  'all', true, 9)
-        ON CONFLICT DO NOTHING;
-      `);
-    }
+      // Upsert idempotente de los 17 paquetes Alma + desactivar lo heredado.
+      await pool.query(
+        `UPDATE plans SET is_active = false, updated_at = NOW() WHERE name <> ALL($1::text[])`,
+        [ALMA_PLAN_NAMES]
+      );
+      for (const p of ALMA_PLANS) {
+        const upd = await pool.query(
+          `UPDATE plans SET
+             description=$2, price=$3, opening_price=$4, currency='MXN',
+             duration_days=$5, class_limit=$6, class_category=$7, morning_only=$8,
+             is_non_repeatable=$9, repeat_key=$10, is_non_transferable=false,
+             includes_video_library=false, is_active=true, sort_order=$11, updated_at=NOW()
+           WHERE name=$1`,
+          [p.name, p.description, p.price, p.opening_price, p.duration_days,
+           p.class_limit, p.class_category, p.morning_only, p.is_non_repeatable,
+           p.repeat_key, p.sort_order]
+        );
+        if (upd.rowCount === 0) {
+          await pool.query(
+            `INSERT INTO plans
+               (name, description, price, opening_price, currency, duration_days, class_limit,
+                class_category, morning_only, is_non_repeatable, repeat_key, is_non_transferable,
+                includes_video_library, is_active, sort_order)
+             VALUES ($1,$2,$3,$4,'MXN',$5,$6,$7,$8,$9,$10,false,false,true,$11)`,
+            [p.name, p.description, p.price, p.opening_price, p.duration_days,
+             p.class_limit, p.class_category, p.morning_only, p.is_non_repeatable,
+             p.repeat_key, p.sort_order]
+          );
+        }
+      }
     // ── Backfill class_category on existing plans that have no category set ──
     await pool.query(`UPDATE plans SET class_category = 'jumping' WHERE (class_category IS NULL OR class_category = 'all') AND (name ILIKE '%jumping%' OR name ILIKE '%jump%' OR name ILIKE '%strong%' OR name ILIKE '%dance%' OR name ILIKE '%tone%' OR name ILIKE '%mindful jump%')`).catch(() => { });
     await pool.query(`UPDATE plans SET class_category = 'pilates' WHERE (class_category IS NULL OR class_category = 'all') AND (name ILIKE '%pilates%' OR name ILIKE '%mat%' OR name ILIKE '%flow%' OR name ILIKE '%hot%')`).catch(() => { });
