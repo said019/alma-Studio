@@ -6673,10 +6673,9 @@ function isAppleWebPassAvailable() {
  * Generate a .pkpass file as a Buffer for a given user.
  * Apple .pkpass = ZIP containing: pass.json, manifest.json, signature, icon.png, logo.png, strip.png
  */
-// ─── Dynamic strip renderer (Alma rings → SVG → PNG via sharp) ─────────
-// Builds a 375×123 strip image personalized for each user's ring progress.
-// Three concentric arcs (constancia / esfuerzo / conexion) fill to their
-// real progress %. The K mark sits on the left as the brand anchor.
+// ─── Dynamic strip renderer (branded SVG → PNG via sharp) ─────────
+// Builds a 375×123 strip image: marca "ALMA MOVEMENT" + plan + clases
+// restantes centrados sobre el fondo crema de la marca. Ya no dibuja anillos.
 
 const ALMA_PASS_PALETTE = {
   cream: "#FFF7F2",
@@ -6696,117 +6695,33 @@ function escapeXml(value) {
     .replace(/"/g, "&quot;");
 }
 
-function arcPath(cx, cy, radius, percent) {
-  // Build an SVG arc starting from 12 o'clock, going clockwise.
-  // For very small percents we still want a visible nub; for 100% we close the circle.
-  const pct = Math.max(0, Math.min(100, Number(percent) || 0));
-  if (pct >= 99.9) {
-    // Full circle as two semicircle arcs
-    return `M ${cx} ${cy - radius}
-            A ${radius} ${radius} 0 1 1 ${cx} ${cy + radius}
-            A ${radius} ${radius} 0 1 1 ${cx} ${cy - radius} Z`;
-  }
-  if (pct <= 0) return "";
-  const angle = (pct / 100) * 2 * Math.PI;
-  const startX = cx;
-  const startY = cy - radius;
-  const endX = cx + radius * Math.sin(angle);
-  const endY = cy - radius * Math.cos(angle);
-  const largeArc = pct > 50 ? 1 : 0;
-  return `M ${startX} ${startY} A ${radius} ${radius} 0 ${largeArc} 1 ${endX} ${endY}`;
-}
-
 function buildAlmaStripSvg(ringState, scale = 1, opts = {}) {
   const W = Math.round(375 * scale);
   const H = Math.round(123 * scale);
   const c = (n) => Math.round(n * scale);
 
-  // Pull progress percents (0-100) defensively.
-  const ring = (k) => {
-    const r = ringState?.[k] ?? {};
-    const p = Number(r.progress ?? 0);
-    const g = Number(r.goal ?? 1);
-    if (!Number.isFinite(p) || !Number.isFinite(g) || g <= 0) return 0;
-    return Math.min(100, Math.max(0, (p / g) * 100));
-  };
-  const pConstancia = ring("constancia");
-  const pEsfuerzo = ring("esfuerzo");
-  const pConexion = ring("conexion");
-  const ringsClosed = [pConstancia, pEsfuerzo, pConexion].filter((p) => p >= 100).length;
-
-  // Mode detection drives visual treatment:
-  //   welcome  → no ring fills, just track outlines, copy "Reserva tu primera clase"
-  //   complete → all 3 rings filled + halo glow on conexion (recompensa)
-  //   expired  → desaturated tracks + dim arcs, "Renueva para seguir"
-  //   default  → normal arcs at progress %
+  // Mode detection drives the secondary line copy:
+  //   welcome → sin membresía, invita a reservar la primera clase
+  //   expired → membresía vencida, invita a renovar
+  //   default → muestra plan + clases restantes / Ilimitado
   const mode = opts.mode || "default";
 
-  // Geometry
-  const iconUrl = opts.iconHref || ""; // optional embedded icon (data URI)
-  const iconSize = c(70);
-  const iconX = c(28);
-  const iconY = (H - iconSize) / 2;
+  // Plan name + clases restantes pasados por opts (cuando hay membresía).
+  const planName = String(opts.planName || "").trim();
+  const classesLabel = String(opts.classesLabel || "").trim();
 
-  const dividerX = c(132);
-  const dividerY1 = c(22);
-  const dividerY2 = H - c(22);
+  const centerX = c(187.5);
 
-  const ringCx = c(280);
-  const ringCy = Math.round(H / 2);
-  const ringStroke = c(7);
-  const ringRadii = [c(20), c(33), c(46)];
-  const ringColors = [ALMA_PASS_PALETTE.berry, ALMA_PASS_PALETTE.olive, ALMA_PASS_PALETTE.orange];
-  const ringPercents = [pConstancia, pEsfuerzo, pConexion];
+  // Línea secundaria contextual.
+  let subLabel;
+  if (mode === "welcome") subLabel = "Reserva tu primera clase";
+  else if (mode === "expired") subLabel = "Renueva para seguir";
+  else if (planName && classesLabel) subLabel = `${planName} · ${classesLabel}`;
+  else if (planName) subLabel = planName;
+  else if (classesLabel) subLabel = classesLabel;
+  else subLabel = "Tu estudio de Pilates";
 
-  // Tag text (bottom-right): contextual per mode
-  let closedLabel;
-  if (mode === "welcome") closedLabel = "Reserva tu primera clase";
-  else if (mode === "expired") closedLabel = "Renueva para seguir";
-  else if (mode === "complete") closedLabel = "3/3 · Recompensa lista";
-  else closedLabel = `${ringsClosed}/3 cerrados`;
-  const labelX = c(346);
-  const labelY = H - c(14);
-
-  // Per-mode visual params
-  const trackOpacity = mode === "expired" ? 0.08 : 0.18;
-  const arcOpacity = mode === "expired" ? 0.30 : 1;
-  const grayOnExpired = mode === "expired";
-
-  const arcs = ringRadii
-    .map((r, i) => {
-      const baseColor = ringColors[i];
-      const color = grayOnExpired ? "#7B5B52" : baseColor;
-      let pct = ringPercents[i];
-      // Welcome mode: tracks only, no arcs
-      if (mode === "welcome") pct = 0;
-      const track = `
-        <circle cx="${ringCx}" cy="${ringCy}" r="${r}"
-                fill="none" stroke="${color}" stroke-opacity="${trackOpacity}"
-                stroke-width="${ringStroke}" />`;
-      const arc = pct > 0
-        ? `<path d="${arcPath(ringCx, ringCy, r, pct)}"
-                  fill="none" stroke="${color}" stroke-opacity="${arcOpacity}"
-                  stroke-width="${ringStroke}"
-                  stroke-linecap="round"
-                  transform="rotate(-90 ${ringCx} ${ringCy})"
-                  style="filter: drop-shadow(0 ${c(0.6)}px ${c(1)}px rgba(0,0,0,0.04));" />`
-        : "";
-      return track + arc;
-    })
-    .join("");
-
-  // Halo glow exterior cuando los 3 anillos están cerrados (complete mode)
-  const haloRadius = ringRadii[ringRadii.length - 1] + c(8);
-  const halo = mode === "complete"
-    ? `<circle cx="${ringCx}" cy="${ringCy}" r="${haloRadius}"
-                fill="none" stroke="${ALMA_PASS_PALETTE.orange}"
-                stroke-opacity="0.32" stroke-width="${c(2.5)}" />
-       <circle cx="${ringCx}" cy="${ringCy}" r="${haloRadius + c(5)}"
-                fill="none" stroke="${ALMA_PASS_PALETTE.orange}"
-                stroke-opacity="0.12" stroke-width="${c(2)}" />`
-    : "";
-
-  // Soft blush wash in upper-right corner
+  // Soft blush wash in upper-right corner (consistente con la marca).
   const washGrad = `
     <radialGradient id="wash" cx="86%" cy="14%" r="80%">
       <stop offset="0%" stop-color="${ALMA_PASS_PALETTE.blush}" stop-opacity="0.55" />
@@ -6814,9 +6729,9 @@ function buildAlmaStripSvg(ringState, scale = 1, opts = {}) {
       <stop offset="100%" stop-color="${ALMA_PASS_PALETTE.cream}" stop-opacity="0" />
     </radialGradient>`;
 
-  const iconBlock = iconUrl
-    ? `<image href="${iconUrl}" x="${iconX}" y="${iconY}" width="${iconSize}" height="${iconSize}" />`
-    : "";
+  const titleY = c(56);
+  const ruleY = c(70);
+  const subY = c(92);
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
@@ -6824,16 +6739,18 @@ function buildAlmaStripSvg(ringState, scale = 1, opts = {}) {
   <defs>${washGrad}</defs>
   <rect width="${W}" height="${H}" fill="${ALMA_PASS_PALETTE.cream}" />
   <rect width="${W}" height="${H}" fill="url(#wash)" />
-  <line x1="${dividerX}" y1="${dividerY1}" x2="${dividerX}" y2="${dividerY2}"
-        stroke="${ALMA_PASS_PALETTE.ink}" stroke-opacity="0.10" stroke-width="1" />
-  ${iconBlock}
-  ${halo}
-  ${arcs}
-  <text x="${labelX}" y="${labelY}" text-anchor="end"
+  <text x="${centerX}" y="${titleY}" text-anchor="middle"
         font-family="-apple-system, system-ui, 'Helvetica Neue', sans-serif"
-        font-size="${c(8.5)}" font-weight="600"
-        letter-spacing="${c(1.6)}"
-        fill="${ALMA_PASS_PALETTE.ink}" fill-opacity="0.55">${escapeXml(closedLabel.toUpperCase())}</text>
+        font-size="${c(20)}" font-weight="700"
+        letter-spacing="${c(3.2)}"
+        fill="${ALMA_PASS_PALETTE.berry}">ALMA MOVEMENT</text>
+  <line x1="${centerX - c(36)}" y1="${ruleY}" x2="${centerX + c(36)}" y2="${ruleY}"
+        stroke="${ALMA_PASS_PALETTE.ink}" stroke-opacity="0.12" stroke-width="${c(1)}" />
+  <text x="${centerX}" y="${subY}" text-anchor="middle"
+        font-family="-apple-system, system-ui, 'Helvetica Neue', sans-serif"
+        font-size="${c(11)}" font-weight="600"
+        letter-spacing="${c(0.6)}"
+        fill="${ALMA_PASS_PALETTE.ink}" fill-opacity="0.65">${escapeXml(subLabel)}</text>
 </svg>`;
 }
 
@@ -6855,19 +6772,22 @@ function getAlmaIconDataUri() {
   return null;
 }
 
-function detectStripMode({ membership, ringState }) {
+function detectStripMode({ membership }) {
   const hasMembership = !!membership;
   if (!hasMembership) return "welcome";
   const endDate = membership?.end_date ? new Date(membership.end_date) : null;
   if (endDate && !Number.isNaN(endDate.getTime()) && endDate < new Date()) return "expired";
-  const closed = Number(ringState?.rings_closed ?? 0);
-  if (closed >= 3) return "complete";
   return "default";
 }
 
 async function buildAlmaStripPng(ringState, scale = 1, opts = {}) {
   const iconHref = getAlmaIconDataUri();
-  const svg = buildAlmaStripSvg(ringState, scale, { iconHref, mode: opts.mode || "default" });
+  const svg = buildAlmaStripSvg(ringState, scale, {
+    iconHref,
+    mode: opts.mode || "default",
+    planName: opts.planName || "",
+    classesLabel: opts.classesLabel || "",
+  });
   return await sharp(Buffer.from(svg, "utf8")).png({ compressionLevel: 9 }).toBuffer();
 }
 
@@ -6875,9 +6795,6 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
   const baseSerialNumber = buildAppleWalletSerialFromUserId(userId);
   const hasMembership = !!membership;
   const hasEventPass = !!activeEventPass;
-  // Ring state computed here so todos los field builders abajo pueden referenciarlo
-  // (con o sin membresía). Antes esto vivía solo en el route handler y daba ReferenceError.
-  const ringState = getAlmaWeeklyRingState(membership, Number(points || 0));
   const eventSerialHash = hasEventPass
     ? crypto.createHash("sha1").update(String(activeEventPass?.eventId || activeEventPass?.passCode || "")).digest("hex").slice(0, 12)
     : "";
@@ -7109,29 +7026,6 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
       label: "CLIENTE",
       value: memberDisplayName || "Miembro",
     });
-    auxiliaryFields.push({
-      key: "progress",
-      label: "ANILLOS",
-      value: `${ringState.rings_closed}/3 esta semana`,
-      changeMessage: "Tu avance: %@",
-    });
-    backFields.push(
-      {
-        key: "ring_constancia",
-        label: "Constancia",
-        value: `${ringState.constancia.progress}/${ringState.constancia.goal} · ${ringState.constancia.label}`,
-      },
-      {
-        key: "ring_esfuerzo",
-        label: "Esfuerzo",
-        value: `${ringState.esfuerzo.progress}/${ringState.esfuerzo.goal} · ${ringState.esfuerzo.label}`,
-      },
-      {
-        key: "ring_conexion",
-        label: "Conexión",
-        value: `${ringState.conexion.progress}/${ringState.conexion.goal} · ${ringState.conexion.label}`,
-      },
-    );
     // Tope semanal — visible solo si el plan lo tiene
     if (weeklyCap) {
       const remaining = Math.max(0, weeklyCap.limit - weeklyCap.used);
@@ -7188,7 +7082,7 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
       });
     }
   } else {
-    // Sin membresía activa: pase de bienvenida con CTA + anillos como meta aspiracional.
+    // Sin membresía activa: pase de bienvenida con CTA a la primera clase.
     secondaryFields.push({
       key: "estado",
       label: "ESTADO",
@@ -7198,21 +7092,6 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
       key: "muestra",
       label: "PRIMERA CLASE",
       value: "$50 · Clase muestra",
-    });
-    auxiliaryFields.push({
-      key: "ring_constancia_aux",
-      label: "CONSTANCIA",
-      value: `${ringState.constancia.progress}/${ringState.constancia.goal}`,
-    });
-    auxiliaryFields.push({
-      key: "ring_esfuerzo_aux",
-      label: "ESFUERZO",
-      value: `${ringState.esfuerzo.progress}/${ringState.esfuerzo.goal}`,
-    });
-    auxiliaryFields.push({
-      key: "ring_conexion_aux",
-      label: "CONEXIÓN",
-      value: `${ringState.conexion.progress}/${ringState.conexion.goal}`,
     });
     backFields.push(
       {
@@ -7224,11 +7103,6 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
         key: "muestra_back",
         label: "Tu primera clase",
         value: "Reserva tu clase muestra por $50 desde la app o por WhatsApp. Karla te explica la barra y te ajusta cada postura.",
-      },
-      {
-        key: "rings_intro_back",
-        label: "Tres anillos",
-        value: "Constancia (asistencia), Esfuerzo (clases intensas), Conexión (puntos comunidad). Tu pase los va llenando solo conforme vienes.",
       },
     );
     // Próximo logro como meta aspiracional para alumnas sin paquete
@@ -7288,11 +7162,6 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
           value: `${progressSummary.completionLabel} · ${progressSummary.remainingLabel}`,
         });
       }
-      backFields.unshift({
-        key: "membership_goal_back",
-        label: "ANILLOS ESTA SEMANA",
-        value: `${ringState.rings_closed}/3 cerrados`,
-      });
       const rules = [];
       if (nonTransferable) rules.push("No transferible");
       if (nonRepeatable) rules.push("No repetible");
@@ -7387,9 +7256,9 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
     : [
       {
         key: "compact_title",
-        label: hasMembership ? "ANILLOS" : "MIEMBRO",
+        label: hasMembership ? "CLASES" : "MIEMBRO",
         value: hasMembership
-          ? `${ringState.rings_closed}/3 cerrados`
+          ? truncateWalletField(progressSummary.isUnlimited ? "Ilimitado" : progressSummary.remainingLabel, 22)
           : truncateWalletField(memberDisplayName || "Miembro", 22),
       },
     ];
@@ -7593,19 +7462,22 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
   let strip3xBuffer = null;
   if (!hasEventPass) {
     try {
-      const stripMode = detectStripMode({ membership, ringState });
+      const stripMode = detectStripMode({ membership });
+      const stripPlanName = hasMembership ? planDisplayName : "";
+      const stripClassesLabel = hasMembership
+        ? (progressSummary.isUnlimited ? "Ilimitado" : progressSummary.remainingLabel)
+        : "";
+      const stripOpts = { mode: stripMode, planName: stripPlanName, classesLabel: stripClassesLabel };
       const [s1, s2, s3] = await Promise.all([
-        buildAlmaStripPng(ringState, 1, { mode: stripMode }),
-        buildAlmaStripPng(ringState, 2, { mode: stripMode }),
-        buildAlmaStripPng(ringState, 3, { mode: stripMode }),
+        buildAlmaStripPng(null, 1, stripOpts),
+        buildAlmaStripPng(null, 2, stripOpts),
+        buildAlmaStripPng(null, 3, stripOpts),
       ]);
       stripBuffer = s1;
       strip2xBuffer = s2;
       strip3xBuffer = s3;
       console.log(`[Apple Wallet] ✅ Dynamic strip rendered (mode=${stripMode})`,
-        `rings: ${ringState?.constancia?.progress ?? 0}/${ringState?.constancia?.goal ?? 1}`,
-        `${ringState?.esfuerzo?.progress ?? 0}/${ringState?.esfuerzo?.goal ?? 1}`,
-        `${ringState?.conexion?.progress ?? 0}/${ringState?.conexion?.goal ?? 1}`,
+        `plan: ${stripPlanName || "—"}`, `clases: ${stripClassesLabel || "—"}`,
       );
     } catch (err) {
       console.warn("[Apple Wallet] Dynamic strip render failed, falling back to disk:", err?.message);
@@ -7728,7 +7600,6 @@ app.get("/api/wallet/apple/pkpass", authMiddleware, async (req, res) => {
     if (!snapshot) return res.status(404).json({ message: "Usuario no encontrado" });
     const { userName, points, qrCode, membership, nextBooking } = snapshot;
     const progressSummary = getWalletProgressSummary(membership);
-    const ringState = getAlmaWeeklyRingState(membership, points);
 
     // If Apple Developer certs are configured, generate real .pkpass
     if (isAppleWalletConfigured()) {
@@ -7782,10 +7653,7 @@ app.get("/api/wallet/apple/pkpass", authMiddleware, async (req, res) => {
       : "";
     const membershipHtml = membership
       ? `<div class="field wide"><span class="label">Plan</span><span class="value">${membership.plan_name}</span></div>
-         <div class="field wide"><span class="label">Constancia</span><span class="value">${ringState.constancia.progress}/${ringState.constancia.goal} · ${ringState.constancia.label}</span></div>
-         <div class="field"><span class="label">Esfuerzo</span><span class="value">${ringState.esfuerzo.progress}/${ringState.esfuerzo.goal}</span></div>
-         <div class="field"><span class="label">Conexión</span><span class="value">${ringState.conexion.progress}/${ringState.conexion.goal}</span></div>
-         <div class="field"><span class="label">Disponibles</span><span class="value">${progressSummary.remainingLabel}</span></div>
+         <div class="field"><span class="label">Disponibles</span><span class="value">${progressSummary.isUnlimited ? "Ilimitado" : progressSummary.remainingLabel}</span></div>
          <div class="field"><span class="label">Vigencia</span><span class="value">${membership.end_date ? new Date(membership.end_date).toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" }) : "—"}</span></div>`
       : `<div class="field wide"><span class="label">Plan</span><span class="value">Sin membresía activa</span></div>`;
 
@@ -7839,9 +7707,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
   <div class="name">${userName}</div>
   <div class="sphere">
     <div class="sphere-content">
-      <div class="points-label">Anillos</div>
-      <div class="points">${ringState.rings_closed}/3</div>
-      <div class="points-sub">esta semana</div>
+      <div class="points-label">Clases</div>
+      <div class="points">${membership ? (progressSummary.isUnlimited ? "∞" : String(progressSummary.classesRemaining ?? 0)) : "—"}</div>
+      <div class="points-sub">${membership ? (progressSummary.isUnlimited ? "ilimitado" : "restantes") : "sin paquete"}</div>
     </div>
   </div>
   <div class="qr-section">
@@ -7849,7 +7717,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
       <img src="https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(qrCode)}&bgcolor=FFFFFF&color=322028" alt="QR Code" />
     </div>
   </div>
-  <div class="qr-hint">Presenta este QR al llegar. Tus anillos se actualizan con cada visita.</div>
+  <div class="qr-hint">Presenta este QR al llegar. Tu pase se actualiza con cada visita.</div>
   <div class="fields">
     ${membershipHtml}
     ${nextBookingHtml}
