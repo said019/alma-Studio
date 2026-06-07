@@ -784,18 +784,21 @@ async function ensureSchema() {
       }
     }
     // ── Seed schedule_slots si la tabla está vacía ─────────────────────────
-    const ssCount = await pool.query("SELECT COUNT(*) FROM schedule_slots");
-    if (parseInt(ssCount.rows[0].count) === 0) {
-      await pool.query(`
-        INSERT INTO schedule_slots (time_slot, day_of_week, class_type_name) VALUES
-          ('7:00 am', 1, 'Barre'), ('8:00 am', 1, 'Barre'), ('7:00 pm', 1, 'Barre'), ('8:00 pm', 1, 'Barre'),
-          ('7:00 am', 2, 'Barre'), ('8:00 am', 2, 'Barre'), ('7:00 pm', 2, 'Barre'), ('8:00 pm', 2, 'Barre'),
-          ('7:00 am', 3, 'Barre'), ('8:00 am', 3, 'Barre'), ('7:00 pm', 3, 'Barre'), ('8:00 pm', 3, 'Barre'),
-          ('7:00 am', 4, 'Barre'), ('8:00 am', 4, 'Barre'), ('7:00 pm', 4, 'Barre'), ('8:00 pm', 4, 'Barre'),
-          ('7:00 am', 5, 'Barre'), ('8:00 am', 5, 'Barre'), ('7:00 pm', 5, 'Barre'), ('8:00 pm', 5, 'Barre'),
-          ('7:00 am', 6, 'Barre'), ('8:00 am', 6, 'Barre'), ('9:00 am', 6, 'Barre')
-        ON CONFLICT DO NOTHING;
-      `);
+    const existingSlots = await pool.query(`SELECT COUNT(*)::int AS n FROM schedule_slots`);
+    if (existingSlots.rows[0].n === 0) {
+      const values = [];
+      const params = [];
+      let i = 1;
+      for (const day of ALMA_SCHEDULE_DAYS) {
+        for (const slot of ALMA_SCHEDULE_SLOTS) {
+          values.push(`($${i++}, $${i++}, NULL)`);
+          params.push(slot, day);
+        }
+      }
+      await pool.query(
+        `INSERT INTO schedule_slots (time_slot, day_of_week, class_type_name) VALUES ${values.join(", ")}`,
+        params
+      );
     }
     // ── Ensure plans columns exist ───────────────────────────────────────
     await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS description TEXT`).catch(() => { });
