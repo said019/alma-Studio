@@ -734,6 +734,7 @@ const SettingsPage = () => (
                   { key: "facebook", label: "Facebook (URL o usuario)" },
                   { key: "timezone", label: "Zona horaria (ej: America/Mexico_City)" },
                   { key: "currency", label: "Moneda (ej: MXN)" },
+                  { key: "opening_pricing_active", label: "Precios de apertura activos", type: "boolean" },
                   { key: "maintenance_mode", label: "Modo mantenimiento", type: "boolean" },
                 ]}
               />
