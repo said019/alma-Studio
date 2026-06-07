@@ -746,6 +746,7 @@ async function ensureSchema() {
     await pool.query(`UPDATE packages SET is_active = false`).catch(() => { });
     // ── Seed class_types – ensure Alma Barre exists ───────────────────────
     await pool.query(`ALTER TABLE class_types DROP CONSTRAINT IF EXISTS class_types_category_check`).catch(() => { });
+    await pool.query(`UPDATE class_types SET category = 'studio' WHERE category NOT IN ('studio','reformer_tower')`).catch(() => { });
     await pool.query(`ALTER TABLE class_types ADD CONSTRAINT class_types_category_check CHECK (category IN ('studio','reformer_tower'))`).catch(() => { });
     // Desactivar tipos heredados que no son disciplinas Alma.
     await pool.query(
@@ -904,10 +905,6 @@ async function ensureSchema() {
           );
         }
       }
-    // ── Backfill class_category on existing plans that have no category set ──
-    await pool.query(`UPDATE plans SET class_category = 'jumping' WHERE (class_category IS NULL OR class_category = 'all') AND (name ILIKE '%jumping%' OR name ILIKE '%jump%' OR name ILIKE '%strong%' OR name ILIKE '%dance%' OR name ILIKE '%tone%' OR name ILIKE '%mindful jump%')`).catch(() => { });
-    await pool.query(`UPDATE plans SET class_category = 'pilates' WHERE (class_category IS NULL OR class_category = 'all') AND (name ILIKE '%pilates%' OR name ILIKE '%mat%' OR name ILIKE '%flow%' OR name ILIKE '%hot%')`).catch(() => { });
-    await pool.query(`UPDATE plans SET class_category = 'mixto'   WHERE (class_category IS NULL OR class_category = 'all') AND name ILIKE '%mixto%'`).catch(() => { });
     // Planes de muestra/visita heredados eliminados: el catálogo Alma define
     // "Alma Studio Intro" como única clase muestra y las clases únicas Studio /
     // Reformer-Tower como sesiones sueltas. Ver server/lib/almaCatalog.js.
@@ -9512,6 +9509,8 @@ app.post("/api/admin/visit-sale", adminMiddleware, async (req, res) => {
       await dbClient.query("ROLLBACK");
       return res.status(400).json({ message: "Este plan no está marcado como paquete de visitas." });
     }
+    const _gen = await getSettingValueWithDefaults("general_settings");
+    const _eff = resolveEffectivePrice(plan, _gen?.opening_pricing_active !== false);
     const guest = await findOrCreateGuestProfile({ ...profile, hostUserId }, dbClient);
     const user = await findOrCreateGuestUser(guest, dbClient);
     const startStr = startDate ? String(startDate).slice(0, 10) : new Date().toISOString().slice(0, 10);
@@ -9529,7 +9528,7 @@ app.post("/api/admin/visit-sale", adminMiddleware, async (req, res) => {
       `INSERT INTO orders (user_id, plan_id, status, payment_method, total_amount, channel, verified_at, verified_by)
        VALUES ($1, $2, 'approved', $3, $4, 'pos_visit', NOW(), $5)
        RETURNING *`,
-      [user.id, plan.id, pm, plan.price ?? 0, req.userId || null]
+      [user.id, plan.id, pm, _eff ?? 0, req.userId || null]
     );
     await dbClient.query("COMMIT");
     return res.status(201).json({
@@ -9653,6 +9652,8 @@ app.post("/api/admin/classes/:id/walkin-visit", adminMiddleware, async (req, res
         return res.status(404).json({ message: "Plan de visita no encontrado" });
       }
       const plan = planRes.rows[0];
+      const _gen = await getSettingValueWithDefaults("general_settings");
+      const _eff = resolveEffectivePrice(plan, _gen?.opening_pricing_active !== false);
       const pm = normalizePaymentMethod(sale.paymentMethod || "cash");
       const startStr = new Date().toISOString().slice(0, 10);
       const endStr = calcMembershipEndDate(startStr, plan);
@@ -9668,7 +9669,7 @@ app.post("/api/admin/classes/:id/walkin-visit", adminMiddleware, async (req, res
         `INSERT INTO orders (user_id, plan_id, status, payment_method, total_amount, channel, verified_at, verified_by)
          VALUES ($1, $2, 'approved', $3, $4, 'pos_visit', NOW(), $5)
          RETURNING *`,
-        [user.id, plan.id, pm, plan.price ?? 0, req.userId || null]
+        [user.id, plan.id, pm, _eff ?? 0, req.userId || null]
       );
       saleOrder = orderIns.rows[0];
     }
@@ -13023,6 +13024,8 @@ app.post("/api/memberships", adminMiddleware, async (req, res) => {
     const planRes = await pool.query("SELECT * FROM plans WHERE id = $1 AND is_active = true", [planId]);
     if (!planRes.rows.length) return res.status(404).json({ message: "Plan no encontrado" });
     const plan = planRes.rows[0];
+    const _gen = await getSettingValueWithDefaults("general_settings");
+    const _eff = resolveEffectivePrice(plan, _gen?.opening_pricing_active !== false);
     const nonRepeatableConflict = await findNonRepeatablePlanConflict({ userId, plan });
     if (nonRepeatableConflict) {
       return res.status(409).json({ message: nonRepeatableConflict.message });
@@ -13070,11 +13073,11 @@ app.post("/api/memberships", adminMiddleware, async (req, res) => {
     }
 
     // ── Award loyalty points for membership purchase ────────────────────
-    if (userId && parseFloat(plan.price) > 0) {
+    if (userId && Number(_eff) > 0) {
       try {
         const cfgRes = await pool.query("SELECT value FROM settings WHERE key='loyalty_config' LIMIT 1");
         const cfg = cfgRes.rows.length ? cfgRes.rows[0].value : {};
-        const pts = Math.floor(parseFloat(plan.price) * (cfg.points_per_peso ?? 1));
+        const pts = Math.floor(Number(_eff) * (cfg.points_per_peso ?? 1));
         if (cfg.enabled !== false && pts > 0) {
           await pool.query(
             "INSERT INTO loyalty_transactions (user_id, type, points, description) VALUES ($1, 'earn', $2, $3)",
@@ -13511,7 +13514,9 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
     await client.query("BEGIN");
 
     const classRes = await client.query(
-      `SELECT c.id, c.max_capacity, c.current_bookings, c.status, c.date, ct.category AS class_category
+      `SELECT c.id, c.max_capacity, c.current_bookings, c.status, c.date, c.start_time,
+              (c.date || 'T' || c.start_time || '-06:00')::timestamptz AS starts_at,
+              ct.category AS class_category
        FROM classes c
        JOIN class_types ct ON c.class_type_id = ct.id
        WHERE c.id = $1
@@ -13555,6 +13560,10 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
       return res.status(403).json({
         message: `La membresía de la clienta no incluye clases de ${label}.`,
       });
+    }
+    if (membership.morning_only && !isWithinMorningWindow(cls.starts_at)) {
+      await client.query("ROLLBACK");
+      return res.status(403).json({ message: "Este paquete (AM Club) solo permite clases matutinas (hasta las 10:00 am)." });
     }
 
     if (!isUnlimitedClasses(lockedMembership.classes_remaining) && Number(lockedMembership.classes_remaining) <= 0) {
@@ -13658,6 +13667,8 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
           return res.status(404).json({ message: "Plan para la acompañante no encontrado" });
         }
         const plan = planRes.rows[0];
+        const _gen = await getSettingValueWithDefaults("general_settings");
+        const _eff = resolveEffectivePrice(plan, _gen?.opening_pricing_active !== false);
         const pm = normalizePaymentMethod(guestSale.paymentMethod || "cash");
         const startStr = new Date().toISOString().slice(0, 10);
         const endStr = calcMembershipEndDate(startStr, plan);
@@ -13675,7 +13686,7 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
           `INSERT INTO orders (user_id, plan_id, status, payment_method, total_amount, channel, verified_at, verified_by)
            VALUES ($1, $2, 'approved', $3, $4, 'pos_guest_sale', NOW(), $5)
            RETURNING *`,
-          [guestUser.id, plan.id, pm, plan.price ?? 0, req.userId || null]
+          [guestUser.id, plan.id, pm, _eff ?? 0, req.userId || null]
         );
         guestSaleOrder = orderIns.rows[0];
         guestMembershipId = memRow.id;
@@ -14077,6 +14088,8 @@ app.post("/api/admin/clients/manual", adminMiddleware, async (req, res) => {
       const planRes = await client.query("SELECT * FROM plans WHERE id = $1 AND is_active = true", [planId]);
       if (!planRes.rows.length) { await client.query("ROLLBACK"); return res.status(404).json({ message: "Plan no encontrado" }); }
       const plan = planRes.rows[0];
+      const _gen = await getSettingValueWithDefaults("general_settings");
+      const _eff = resolveEffectivePrice(plan, _gen?.opening_pricing_active !== false);
       const nonRepeatableConflict = await findNonRepeatablePlanConflict({ userId: user.id, plan, client });
       if (nonRepeatableConflict) {
         await client.query("ROLLBACK");
@@ -14102,7 +14115,7 @@ app.post("/api/admin/clients/manual", adminMiddleware, async (req, res) => {
           await client.query("ROLLBACK");
           return res.status(400).json({ message: "El cupón no es válido para este plan" });
         }
-        const subtotal = Number(plan.price) || 0;
+        const subtotal = Number(_eff) || 0;
         const discount = calculateDiscountAmount(dc.discount_type, Number(dc.discount_value), subtotal);
         const finalPrice = Math.max(0, subtotal - discount);
         priceNote = ` · Cupón ${dc.code}: $${subtotal} → $${finalPrice}`;

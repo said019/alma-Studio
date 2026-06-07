@@ -237,7 +237,7 @@ const Dashboard = () => {
                     Sin paquete activo
                   </h3>
                   <p className="mt-2 text-[0.92rem] leading-[1.6]" style={{ color: ALMA.ink, opacity: 0.65 }}>
-                    Cuando actives un paquete, tus anillos empiezan a contar y reservas en un tap.
+                    Cuando actives un paquete, cada clase que tomas cuenta para tu constancia y reservas en un tap.
                   </p>
                   <div className="mt-5">
                     <PrimaryButton size="sm" to="/app/checkout">Ver paquetes</PrimaryButton>

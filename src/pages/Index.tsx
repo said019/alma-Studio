@@ -330,6 +330,7 @@ const Index = () => {
         ...g,
         items: planRows
           .filter((p) => p.classCategory === g.key)
+          .filter((p) => p.name !== "Alma Studio Intro")
           .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)),
       })).filter((g) => g.items.length > 0),
     // eslint-disable-next-line react-hooks/exhaustive-deps
