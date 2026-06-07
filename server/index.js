@@ -199,7 +199,7 @@ const DEFAULT_NOTIFICATION_TEMPLATES = {
   },
   class_attended: {
     subject: "Check-in registrado",
-    body: "Listo, {firstName}. Tenemos tu check-in de {class}. Tus anillos en el pase ya se movieron. Buena clase. ✨",
+    body: "Listo, {firstName}. Tenemos tu check-in de {class}. Buena clase. ✨",
   },
 
   // ── Membresía y pagos ───────────────────────────────────────────
@@ -237,10 +237,6 @@ const DEFAULT_NOTIFICATION_TEMPLATES = {
   },
 
   // ── Lealtad y eventos ──────────────────────────────────────────
-  rings_closed: {
-    subject: "3 anillos cerrados",
-    body: "{firstName}, cerraste tus 3 anillos esta semana. 💫 Tu pase Alma ya muestra la recompensa. Pasa por ella en recepción cuando vengas.",
-  },
   points_earned: {
     subject: "Sumaste puntos",
     body: "{firstName}, sumaste {points} puntos Alma. Total: {totalPoints}. Canjéalos cuando se te antoje desde la app.",
@@ -257,19 +253,19 @@ const DEFAULT_NOTIFICATION_TEMPLATES = {
   // ── Motivación por asistencia (auto, max 1/día por user) ────────
   motivation_first_class_week: {
     subject: "Arrancando la semana",
-    body: "{firstName}, arrancas la semana 💪. {classesThisWeek} de {weekGoal} para cerrar tus anillos.",
+    body: "{firstName}, arrancas la semana 💪. {classesThisWeek} de {weekGoal} clases esta semana. Vas muy bien.",
   },
   motivation_almost_ringed: {
     subject: "Te falta una",
-    body: "{firstName}, te falta 1 clase para cerrar tus anillos esta semana. Reserva la siguiente desde la app.",
+    body: "{firstName}, te falta 1 clase para cumplir tu meta de la semana. Reserva la siguiente desde la app.",
   },
   motivation_streak_2_weeks: {
     subject: "Dos semanas seguidas",
-    body: "{firstName}, 2 semanas seguidas con anillos cerrados. Vas con todo. ✨",
+    body: "{firstName}, 2 semanas seguidas asistiendo a clase. Vas con todo. ✨",
   },
   motivation_streak_4_weeks: {
     subject: "Un mes completo",
-    body: "{firstName}, 1 mes completo cerrando anillos. Eso es disciplina real.",
+    body: "{firstName}, 1 mes completo asistiendo cada semana. Eso es disciplina real.",
   },
   motivation_streak_8_weeks: {
     subject: "Imparable",
@@ -4366,14 +4362,12 @@ app.get("/api/wallet/pass", authMiddleware, async (req, res) => {
     }
     // QR data: user ID encoded
     const qrData = Buffer.from(req.userId).toString("base64");
-    const rings = await getAlmaWeeklyRingStateForUser(req.userId, membership, total);
     return res.json({
       data: {
         user_name: userName,
         points: total,
         qr_code: qrData,
         membership,
-        rings,
         next_booking: nextBooking,
         event_passes: passesRes.rows.map((row) => ({
           id: row.id,
@@ -4390,65 +4384,6 @@ app.get("/api/wallet/pass", authMiddleware, async (req, res) => {
     });
   } catch (err) {
     console.error("Wallet/pass error:", err);
-    return res.status(500).json({ message: "Error interno" });
-  }
-});
-
-// GET /api/me/rings
-app.get("/api/me/rings", authMiddleware, async (req, res) => {
-  try {
-    const snapshot = await getWalletSnapshotForUser(req.userId).catch(() => null);
-    const current = await getAlmaWeeklyRingStateForUser(
-      req.userId,
-      snapshot?.membership || null,
-      snapshot?.points || 0,
-    );
-    let history = [];
-    try {
-      const historyRes = await pool.query(
-        `SELECT week_start,
-                constancia_progress,
-                constancia_goal,
-                esfuerzo_progress,
-                esfuerzo_goal,
-                conexion_progress,
-                conexion_goal,
-                rings_closed,
-                reward_unlocked,
-                reward_claimed_at,
-                source
-           FROM ring_states
-          WHERE user_id = $1
-          ORDER BY week_start DESC
-          LIMIT 12`,
-        [req.userId],
-      );
-      history = historyRes.rows.map((row) => ({
-        week_start: row.week_start,
-        constancia: {
-          progress: Number(row.constancia_progress || 0),
-          goal: Number(row.constancia_goal || 1),
-        },
-        esfuerzo: {
-          progress: Number(row.esfuerzo_progress || 0),
-          goal: Number(row.esfuerzo_goal || 1),
-        },
-        conexion: {
-          progress: Number(row.conexion_progress || 0),
-          goal: Number(row.conexion_goal || 10),
-        },
-        rings_closed: Number(row.rings_closed || 0),
-        reward_unlocked: parseBooleanFlag(row.reward_unlocked),
-        reward_claimed_at: row.reward_claimed_at || null,
-        source: row.source || "ring_states",
-      }));
-    } catch (historyErr) {
-      console.warn("[Rings] History unavailable:", historyErr?.message || historyErr);
-    }
-
-    return res.json({ data: { current, history } });
-  } catch (err) {
-    console.error("GET /api/me/rings error:", err);
     return res.status(500).json({ message: "Error interno" });
   }
 });
@@ -4879,7 +4814,6 @@ function prettyTemplateKey(key) {
     renewal_reminder: "Recordatorio de renovación",
     transfer_rejected: "Comprobante rechazado",
     video_access_granted: "Acceso a videos otorgado",
-    rings_closed: "3 anillos cerrados",
     points_earned: "Sumaste puntos",
     reward_redeemed: "Recompensa canjeada",
     event_registered: "Inscrita al evento",
@@ -4907,7 +4841,6 @@ function humanizeMotivationKey(key) {
   if (key.startsWith("motivation_")) return "Te enviamos un mensaje motivacional al WhatsApp.";
   if (key.startsWith("promo_")) return "Te enviamos una promoción al WhatsApp.";
   if (key === "class_attended") return "Tenemos tu check-in.";
-  if (key === "rings_closed") return "Cerraste tus 3 anillos esta semana.";
   if (key === "points_earned") return "Sumaste puntos a tu cuenta.";
   if (key === "reward_redeemed") return "Canjeaste una recompensa.";
   if (key === "event_registered") return "Quedaste inscrita a un evento.";
@@ -4915,71 +4848,6 @@ function humanizeMotivationKey(key) {
   if (key.startsWith("membership_") || key === "renewal_reminder") return "Estado de tu paquete.";
   return "Recibiste una notificación.";
 }
-
-// GET /api/admin/rings/users/:id
-app.get("/api/admin/rings/users/:id", adminMiddleware, async (req, res) => {
-  try {
-    const userId = req.params.id;
-    const historyRes = await pool.query(
-      `SELECT week_start,
-              constancia_progress,
-              constancia_goal,
-              esfuerzo_progress,
-              esfuerzo_goal,
-              conexion_progress,
-              conexion_goal,
-              rings_closed,
-              reward_unlocked,
-              reward_claimed_at,
-              source,
-              updated_at
-         FROM ring_states
-        WHERE user_id = $1
-        ORDER BY week_start DESC
-        LIMIT 12`,
-      [userId],
-    );
-    const eventsRes = await pool.query(
-      `SELECT id, points_awarded, event_type, description, occurred_at, created_at
-         FROM community_events
-        WHERE user_id = $1
-        ORDER BY occurred_at DESC
-        LIMIT 20`,
-      [userId],
-    );
-    return res.json({
-      data: {
-        current: historyRes.rows[0] || null,
-        history: historyRes.rows,
-        communityEvents: eventsRes.rows,
-      },
-    });
-  } catch (err) {
-    console.error("GET admin/rings/users/:id error:", err);
-    return res.status(500).json({ message: "Error interno" });
-  }
-});
-
-// POST /api/admin/rings/community-events
-app.post("/api/admin/rings/community-events", adminMiddleware, async (req, res) => {
-  try {
-    const userId = req.body.userId || req.body.user_id;
-    const pointsAwarded = Math.max(1, Number(req.body.pointsAwarded ?? req.body.points_awarded ?? 1));
-    const eventType = String(req.body.eventType ?? req.body.event_type ?? "community").trim() || "community";
-    const description = String(req.body.description ?? "").trim() || null;
-    if (!userId) return res.status(400).json({ message: "userId requerido" });
-    const r = await pool.query(
-      `INSERT INTO community_events (user_id, points_awarded, event_type, description, created_by)
-       VALUES ($1,$2,$3,$4,$5)
-       RETURNING *`,
-      [userId, pointsAwarded, eventType, description, req.userId || null],
-    );
-    return res.status(201).json({ data: camelRow(r.rows[0]) });
-  } catch (err) {
-    console.error("POST admin/rings/community-events error:", err);
-    return res.status(500).json({ message: "Error interno" });
-  }
-});
 
 // ─── Routes: /api/loyalty ───────────────────────────────────────────────────
 
@@ -5275,7 +5143,6 @@ function buildGoogleWalletSaveUrl({ userId, userName, points, qrCode, membership
     : "all";
   const membershipCategoryLabel = getAlmaWalletCategoryLabel(membershipCategory);
   const progressSummary = getWalletProgressSummary(membership);
-  const ringState = getAlmaWeeklyRingState(membership, points);
   const isUnlimited = hasMembership && (membership.class_limit === null || membership.class_limit >= 9999);
   const classLimit = Number(membership?.class_limit ?? 0);
   const hasIconStampMode = hasMembership && !isUnlimited && classLimit > 0;
@@ -5340,26 +5207,6 @@ function buildGoogleWalletSaveUrl({ userId, userName, points, qrCode, membership
         id: "modalidad",
         header: "MODALIDAD",
         body: membershipCategoryLabel,
-      });
-      textModules.push({
-        id: "meta",
-        header: "ANILLOS ESTA SEMANA",
-        body: `${ringState.rings_closed}/3 cerrados`,
-      });
-      textModules.push({
-        id: "ring_constancia",
-        header: "CONSTANCIA",
-        body: `${ringState.constancia.progress}/${ringState.constancia.goal}`,
-      });
-      textModules.push({
-        id: "ring_esfuerzo",
-        header: "ESFUERZO",
-        body: `${ringState.esfuerzo.progress}/${ringState.esfuerzo.goal}`,
-      });
-      textModules.push({
-        id: "ring_conexion",
-        header: "CONEXIÓN",
-        body: `${ringState.conexion.progress}/${ringState.conexion.goal}`,
       });
     } else {
       textModules.push({
@@ -5878,100 +5725,6 @@ function getWalletProgressSummary(membership) {
   };
 }
 
-function getAlmaWeeklyRingState(membership, points = 0) {
-  const progressSummary = getWalletProgressSummary(membership);
-  const classLimit = progressSummary.isUnlimited ? 20 : Number(progressSummary.classLimit || 0);
-  const classesUsed = progressSummary.isUnlimited
-    ? Math.max(0, Math.round(progressSummary.completionPercent / 20))
-    : Number(progressSummary.classesUsed || 0);
-  const constanciaGoal = progressSummary.isUnlimited ? 5 : Math.max(1, Math.min(5, Math.ceil((classLimit || 4) / 4)));
-  const constanciaProgress = Math.min(constanciaGoal, classesUsed);
-  const esfuerzoGoal = Math.max(1, Math.ceil(constanciaGoal * 0.6));
-  const esfuerzoProgress = Math.min(esfuerzoGoal, Math.floor(constanciaProgress * 0.6));
-  const conexionGoal = 10;
-  const conexionProgress = Math.min(conexionGoal, Math.floor((Math.max(0, Number(points || 0)) % 500) / 50));
-
-  const ringsClosed =
-    (constanciaProgress >= constanciaGoal ? 1 : 0) +
-    (esfuerzoProgress >= esfuerzoGoal ? 1 : 0) +
-    (conexionProgress >= conexionGoal ? 1 : 0);
-
-  return {
-    source: "membership_fallback",
-    period: "weekly",
-    constancia: {
-      progress: constanciaProgress,
-      goal: constanciaGoal,
-      label: "Clases asistidas",
-    },
-    esfuerzo: {
-      progress: esfuerzoProgress,
-      goal: esfuerzoGoal,
-      label: "Clases intensas o retos",
-    },
-    conexion: {
-      progress: conexionProgress,
-      goal: conexionGoal,
-      label: "Puntos comunidad",
-    },
-    rings_closed: ringsClosed,
-    reward_unlocked: ringsClosed >= 3,
-  };
-}
-
-async function getAlmaWeeklyRingStateForUser(userId, membership, points = 0) {
-  try {
-    const ringRes = await pool.query(
-      `SELECT week_start,
-              constancia_progress,
-              constancia_goal,
-              esfuerzo_progress,
-              esfuerzo_goal,
-              conexion_progress,
-              conexion_goal,
-              rings_closed,
-              reward_unlocked,
-              reward_claimed_at,
-              source
-         FROM ring_states
-        WHERE user_id = $1
-          AND week_start = date_trunc('week', NOW() AT TIME ZONE 'America/Mexico_City')::date
-        LIMIT 1`,
-      [userId],
-    );
-    if (ringRes.rows.length > 0) {
-      const row = ringRes.rows[0];
-      return {
-        source: row.source || "ring_states",
-        period: "weekly",
-        week_start: row.week_start,
-        constancia: {
-          progress: Number(row.constancia_progress || 0),
-          goal: Number(row.constancia_goal || 1),
-          label: "Clases asistidas",
-        },
-        esfuerzo: {
-          progress: Number(row.esfuerzo_progress || 0),
-          goal: Number(row.esfuerzo_goal || 1),
-          label: "Clases intensas o retos",
-        },
-        conexion: {
-          progress: Number(row.conexion_progress || 0),
-          goal: Number(row.conexion_goal || 10),
-          label: "Puntos comunidad",
-        },
-        rings_closed: Number(row.rings_closed || 0),
-        reward_unlocked: parseBooleanFlag(row.reward_unlocked),
-        reward_claimed_at: row.reward_claimed_at || null,
-      };
-    }
-  } catch (err) {
-    console.warn("[Rings] Falling back to membership-derived state:", err?.message || err);
-  }
-
-  return getAlmaWeeklyRingState(membership, points);
-}
-
 /** Find image assets — check both public/ and dist/ directories */
 function findAssetDir() {
   const candidates = [
@@ -6226,15 +5979,12 @@ async function getWalletSnapshotForUser(userId, { eventId = null } = {}) {
     console.error("[Wallet] active event pass snapshot error:", err.message);
   }
 
-  const rings = await getAlmaWeeklyRingStateForUser(userId, membership, points);
-
   return {
     userId,
     userName,
     points,
     qrCode: Buffer.from(String(userId)).toString("base64"),
     membership,
-    rings,
     nextBooking,
     activeEventPass,
   };
@@ -6503,10 +6253,12 @@ async function notifyByTemplate(userId, templateKey, extraVars = {}, fallback = 
  * Priority (envía solo UNA por check-in):
  *   1. milestone (10/25/50/100 clases lifetime) — más impactante, one-shot
  *   2. comeback (≥14 días sin venir desde el check-in previo)
- *   3. streak_N (cerró el anillo HOY y entra a 2/4/8 semanas consecutivas)
- *   4. almost_ringed (le falta exactamente 1 clase para cerrar la semana)
+ *   3. streak_N (N semanas consecutivas asistiendo a clase)
+ *   4. almost_ringed (le falta exactamente 1 clase para la meta semanal)
  *   5. first_class_week (primera clase de la semana)
  */
+const WEEKLY_ATTENDANCE_GOAL = 2; // meta semanal de clases para los mensajes motivacionales
+
 async function pickMotivationTemplate(userId) {
   // Lifetime attended count (incluye el check-in que acabamos de marcar).
   const lifetimeRes = await pool.query(
@@ -6535,32 +6287,37 @@ async function pickMotivationTemplate(userId) {
     }
   }
 
-  // Ring state de la semana actual (ya actualizado por el trigger sincrono).
-  const weekRes = await pool.query(
-    `SELECT constancia_progress, constancia_goal, reward_unlocked
-       FROM ring_states
+  // Asistencia por semana (últimas 12 semanas) derivada directo de bookings.
+  // Cada fila = una semana con check-ins; week_offset 0 es la semana actual.
+  const weeksRes = await pool.query(
+    `SELECT FLOOR(EXTRACT(EPOCH FROM (
+              date_trunc('week', NOW() AT TIME ZONE 'America/Mexico_City')::date
+              - date_trunc('week', (checked_in_at AT TIME ZONE 'America/Mexico_City'))::date
+            )) / 604800)::int AS week_offset,
+            COUNT(*)::int AS classes
+       FROM bookings
       WHERE user_id = $1
-        AND week_start = date_trunc('week', NOW() AT TIME ZONE 'America/Mexico_City')::date
-      LIMIT 1`,
+        AND status = 'checked_in'
+        AND checked_in_at IS NOT NULL
+        AND checked_in_at >= (NOW() AT TIME ZONE 'America/Mexico_City') - INTERVAL '12 weeks'
+      GROUP BY 1
+      ORDER BY 1 ASC`,
     [userId],
   );
-  const week = weekRes.rows[0];
+  const classesByOffset = new Map();
+  for (const row of weeksRes.rows) {
+    classesByOffset.set(Number(row.week_offset), Number(row.classes || 0));
+  }
+  const classesThisWeek = classesByOffset.get(0) || 0;
 
-  // Streak: cuenta semanas consecutivas (incluyendo la actual si reward_unlocked) hacia atrás.
-  if (week?.reward_unlocked) {
-    const streakRes = await pool.query(
-      `SELECT week_start, reward_unlocked
-         FROM ring_states
-        WHERE user_id = $1
-        ORDER BY week_start DESC
-        LIMIT 12`,
-      [userId],
-    );
-    let streak = 0;
-    for (const row of streakRes.rows) {
-      if (row.reward_unlocked) streak++;
-      else break;
-    }
+  // Streak: semanas consecutivas (desde la actual hacia atrás) en que se asistió
+  // a la meta semanal. Se rompe en la primera semana sin cumplir la meta.
+  let streak = 0;
+  for (let offset = 0; offset < 12; offset++) {
+    if ((classesByOffset.get(offset) || 0) >= WEEKLY_ATTENDANCE_GOAL) streak++;
+    else break;
+  }
+  if (classesThisWeek >= WEEKLY_ATTENDANCE_GOAL) {
     const streakMap = {
       2: "motivation_streak_2_weeks",
       4: "motivation_streak_4_weeks",
@@ -6571,18 +6328,14 @@ async function pickMotivationTemplate(userId) {
     }
   }
 
-  if (week) {
-    const goal = Number(week.constancia_goal || 1);
-    const progress = Number(week.constancia_progress || 0);
-    if (goal >= 2 && progress === goal - 1) {
-      return { templateKey: "motivation_almost_ringed", vars: {} };
-    }
-    if (progress === 1) {
-      return {
-        templateKey: "motivation_first_class_week",
-        vars: { classesThisWeek: 1, weekGoal: goal },
-      };
-    }
+  if (classesThisWeek === WEEKLY_ATTENDANCE_GOAL - 1) {
+    return { templateKey: "motivation_almost_ringed", vars: {} };
+  }
+  if (classesThisWeek === 1) {
+    return {
+      templateKey: "motivation_first_class_week",
+      vars: { classesThisWeek: 1, weekGoal: WEEKLY_ATTENDANCE_GOAL },
+    };
   }
   return null;
 }
@@ -6742,7 +6495,7 @@ async function notifyClassAttended(userId, ctx = {}) {
       userId,
       "class_attended",
       { class: ctx.className || "tu clase" },
-      ({ firstName, class: cls }) => `Listo, ${firstName}. Tenemos tu check-in de ${cls}. Tus anillos se movieron. Buena clase. ✨`,
+      ({ firstName, class: cls }) => `Listo, ${firstName}. Tenemos tu check-in de ${cls}. Buena clase. ✨`,
     ).catch(() => {});
   }
 }
@@ -6761,20 +6514,6 @@ async function notifyPointsEarned(userId, points, totalPoints) {
       ({ firstName }) => `${firstName}, sumaste ${points} puntos Alma. Total: ${totalPoints}.`,
     ).catch(() => {});
   }
-}
-
-/**
- * 3 anillos cerrados → recompensa lista.
- * Template: rings_closed · vars: firstName
- */
-async function notifyRingsClosed(userId) {
-  triggerWalletPassSync(userId, "rings_closed");
-  notifyByTemplate(
-    userId,
-    "rings_closed",
-    {},
-    ({ firstName }) => `${firstName}, cerraste tus 3 anillos esta semana. Tu pase Alma ya muestra la recompensa.`,
-  ).catch(() => {});
 }
 
 /**
@@ -6890,13 +6629,6 @@ async function notifyRewardRedeemed(userId, rewardName, pointsSpent) {
     { rewardName: rewardName || "tu recompensa", points: pointsSpent },
     ({ firstName, rewardName: rn }) => `${firstName}, canjeaste "${rn}". Pasa por recepción a reclamarlo. ✨`,
   ).catch(() => {});
-}
-
-/**
- * Reset semanal (cron lunes 00:00). Solo refresca el pase, no manda WhatsApp.
- */
-async function notifyWeekReset(userId) {
-  triggerWalletPassSync(userId, "week_reset");
 }
 
 console.log("[Apple Wallet] Config check:",
@@ -9130,28 +8862,24 @@ app.post("/api/admin/plans", adminMiddleware, async (req, res) => {
   const {
     name, description, price, currency, duration_days, class_limit, class_category,
     features, is_active, sort_order, is_non_transferable, is_non_repeatable, repeat_key,
-    ring_constancia_goal, ring_esfuerzo_goal, ring_conexion_goal, reward_description,
     includes_video_library,
   } = req.body;
   if (!name?.trim() || price === undefined) return res.status(400).json({ message: "name y price requeridos" });
   try {
-    const validCats = ["barre", "jumping", "pilates", "mixto", "all"];
+    const validCats = ["studio", "reformer_tower", "mixto", "all"];
     const cat = validCats.includes(class_category) ? class_category : "all";
     const nonTransferable = parseBooleanFlag(is_non_transferable);
     const nonRepeatable = parseBooleanFlag(is_non_repeatable);
     const safeRepeatKey = nonRepeatable ? String(repeat_key ?? "").trim() || null : null;
-    const constanciaGoal = Math.max(1, Number(ring_constancia_goal ?? 1));
-    const esfuerzoGoal = Math.max(1, Number(ring_esfuerzo_goal ?? 1));
-    const conexionGoal = Math.max(1, Number(ring_conexion_goal ?? 10));
     const includesVideoLibrary = parseBooleanFlag(includes_video_library);
     const r = await pool.query(
       `INSERT INTO plans
-        (name, description, price, currency, duration_days, class_limit, class_category, features, is_active, sort_order, is_non_transferable, is_non_repeatable, repeat_key, ring_constancia_goal, ring_esfuerzo_goal, ring_conexion_goal, reward_description, includes_video_library)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING *`,
+        (name, description, price, currency, duration_days, class_limit, class_category, features, is_active, sort_order, is_non_transferable, is_non_repeatable, repeat_key, includes_video_library)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
       [name.trim(), description || null, price, currency || "MXN",
       duration_days || 30, class_limit || null,
       cat, JSON.stringify(features || []), is_active ?? true, sort_order ?? 0, nonTransferable, nonRepeatable, safeRepeatKey,
-      constanciaGoal, esfuerzoGoal, conexionGoal, reward_description || null, includesVideoLibrary]
+      includesVideoLibrary]
     );
     return res.status(201).json({ data: r.rows[0] });
   } catch (err) {
@@ -9165,11 +8893,10 @@ app.put("/api/admin/plans/:id", adminMiddleware, async (req, res) => {
   const {
     name, description, price, currency, duration_days, class_limit, class_category,
     features, is_active, sort_order, is_non_transferable, is_non_repeatable, repeat_key,
-    ring_constancia_goal, ring_esfuerzo_goal, ring_conexion_goal, reward_description,
     includes_video_library,
   } = req.body;
   try {
-    const validCats = ["barre", "jumping", "pilates", "mixto", "all"];
+    const validCats = ["studio", "reformer_tower", "mixto", "all"];
     const cat = validCats.includes(class_category) ? class_category : null;
     const nonTransferable = parseBooleanFlag(is_non_transferable);
     const nonRepeatable = parseBooleanFlag(is_non_repeatable);
@@ -9189,21 +8916,13 @@ app.put("/api/admin/plans/:id", adminMiddleware, async (req, res) => {
          is_non_transferable = COALESCE($11, is_non_transferable),
          is_non_repeatable   = COALESCE($12, is_non_repeatable),
          repeat_key          = CASE WHEN COALESCE($12, is_non_repeatable) = true THEN $13 ELSE NULL END,
-         ring_constancia_goal = COALESCE($14, ring_constancia_goal),
-         ring_esfuerzo_goal   = COALESCE($15, ring_esfuerzo_goal),
-         ring_conexion_goal   = COALESCE($16, ring_conexion_goal),
-         reward_description   = COALESCE($17, reward_description),
-         includes_video_library = COALESCE($18, includes_video_library),
+         includes_video_library = COALESCE($14, includes_video_library),
          updated_at    = NOW()
-       WHERE id = $19 RETURNING *`,
+       WHERE id = $15 RETURNING *`,
       [name || null, description || null, price ?? null, currency || null,
       duration_days || null, class_limit ?? null,
       cat, features ? JSON.stringify(features) : null,
       is_active ?? null, sort_order ?? null, nonTransferable, nonRepeatable, safeRepeatKey,
-      ring_constancia_goal === undefined ? null : Math.max(1, Number(ring_constancia_goal)),
-      ring_esfuerzo_goal === undefined ? null : Math.max(1, Number(ring_esfuerzo_goal)),
-      ring_conexion_goal === undefined ? null : Math.max(1, Number(ring_conexion_goal)),
-      reward_description || null,
       includes_video_library ?? null,
       req.params.id]
     );
@@ -9497,8 +9216,6 @@ app.post("/api/classes", adminMiddleware, async (req, res) => {
  *   - Inserta loyalty_transactions tipo 'adjust' con puntos negativos para
  *     revertir los +10 que se otorgaron al hacer check-in. Description
  *     'Reverso por cancelación admin'.
- *   - Decrementa ring_states.constancia_progress de la semana en que se hizo
- *     el check-in (si todavía es > 0).
  *   - NO revoca loyalty_milestone_awards (no se quitan logros desbloqueados,
  *     pero al bajar lifetime no se desbloquearán nuevos hasta que vuelva a
  *     subir de forma natural).
@@ -9516,10 +9233,10 @@ app.post("/api/classes", adminMiddleware, async (req, res) => {
  * @param opts { skipCreditRestore?: boolean } — si la política del caller
  *             decide que NO debe devolver crédito (cancelación tardía
  *             de alumna), pasa true.
- * @returns { creditRestored, pointsReverted, ringDecremented }
+ * @returns { creditRestored, pointsReverted }
  */
 async function applyCancellationRollback(client, booking, opts = {}) {
-  const result = { creditRestored: false, pointsReverted: 0, ringDecremented: false };
+  const result = { creditRestored: false, pointsReverted: 0 };
   const wasCheckedIn = booking.status === "checked_in";
   const wasConfirmed = booking.status === "confirmed";
 
@@ -9565,31 +9282,6 @@ async function applyCancellationRollback(client, booking, opts = {}) {
       }
     } catch (loyaltyErr) {
       console.warn("[cancel rollback] loyalty revert error:", loyaltyErr?.message);
-    }
-
-    // 2) Decrementar ring_states.constancia_progress de la semana del check-in.
-    try {
-      const checkinDate = booking.checked_in_at ? new Date(booking.checked_in_at) : null;
-      if (checkinDate && booking.user_id) {
-        const weekStart = await client.query(
-          `SELECT date_trunc('week', $1::timestamptz AT TIME ZONE 'America/Mexico_City')::date AS week_start`,
-          [checkinDate],
-        );
-        const ws = weekStart.rows[0]?.week_start;
-        if (ws) {
-          const dec = await client.query(
-            `UPDATE ring_states
-                SET constancia_progress = GREATEST(constancia_progress - 1, 0),
-                    updated_at = NOW()
-              WHERE user_id = $1 AND week_start = $2 AND constancia_progress > 0
-              RETURNING id`,
-            [booking.user_id, ws],
-          );
-          result.ringDecremented = dec.rowCount > 0;
-        }
-      }
-    } catch (ringErr) {
-      console.warn("[cancel rollback] ring decrement error:", ringErr?.message);
     }
   }
 
@@ -9694,10 +9386,9 @@ app.put("/api/classes/:id/cancel", adminMiddleware, async (req, res) => {
     );
     const activeBookings = bookingsRes.rows;
 
-    // 3) Cancel each booking + apply full rollback (credits, loyalty, rings)
+    // 3) Cancel each booking + apply full rollback (credits, loyalty)
     let creditsRestored = 0;
     let pointsReverted = 0;
-    let ringsDecremented = 0;
     for (const b of activeBookings) {
       await client.query(
         `UPDATE bookings SET status='cancelled', cancelled_at=NOW() WHERE id=$1`,
@@ -9708,7 +9399,6 @@ app.put("/api/classes/:id/cancel", adminMiddleware, async (req, res) => {
       const rollback = await applyCancellationRollback(client, b, { refundCheckedIn: true });
       if (rollback.creditRestored) creditsRestored++;
       if (rollback.pointsReverted) pointsReverted += rollback.pointsReverted;
-      if (rollback.ringDecremented) ringsDecremented++;
     }
     // 4) Reset class.current_bookings
     await client.query("UPDATE classes SET current_bookings = 0 WHERE id = $1", [req.params.id]);
@@ -9745,7 +9435,6 @@ app.put("/api/classes/:id/cancel", adminMiddleware, async (req, res) => {
         bookings_cancelled: activeBookings.length,
         credits_restored: creditsRestored,
         points_reverted: pointsReverted,
-        rings_decremented: ringsDecremented,
         wa_sent: waSent,
         reason: reason || null,
       },
@@ -9793,7 +9482,7 @@ app.delete("/api/admin/bookings/:id", adminMiddleware, async (req, res) => {
       [req.params.id],
     );
 
-    // Apply full rollback: credits, loyalty points, ring decrement. La admin
+    // Apply full rollback: credits, loyalty points. La admin
     // que cancela manualmente espera que el crédito se devuelva incluso si
     // la alumna ya tenía check-in (suele ser un check-in por error o
     // re-clasificación de la asistencia).
@@ -9826,7 +9515,6 @@ app.delete("/api/admin/bookings/:id", adminMiddleware, async (req, res) => {
         id: booking.id,
         credit_restored: rb.creditRestored,
         points_reverted: rb.pointsReverted,
-        ring_decremented: rb.ringDecremented,
         reason: reason || null,
       },
     });
@@ -12151,7 +11839,6 @@ const TEMPLATE_VARIABLES = {
   renewal_reminder: ["firstName", "plan", "expiresAt"],
   transfer_rejected: ["firstName", "reason"],
   video_access_granted: ["name"],
-  rings_closed: ["firstName"],
   points_earned: ["firstName", "points", "totalPoints"],
   reward_redeemed: ["firstName", "rewardName", "points"],
   event_registered: ["firstName", "eventTitle"],
@@ -14012,7 +13699,6 @@ app.put("/api/plans/:id", adminMiddleware, async (req, res) => {
     const {
       name, description, price, currency, durationDays, classLimit, classCategory,
       features, isActive, sortOrder, isNonTransferable, isNonRepeatable, repeatKey,
-      ringConstanciaGoal, ringEsfuerzoGoal, ringConexionGoal, rewardDescription,
       opening_price, morning_only,
     } = req.body;
     const validCats = ["studio", "reformer_tower", "mixto", "all"];
@@ -14036,11 +13722,10 @@ app.put("/api/plans/:id", adminMiddleware, async (req, res) => {
        class_limit=$6, features=$7, is_active=$8, sort_order=$9,
        class_category=COALESCE($10, class_category),
        is_non_transferable=$11, is_non_repeatable=$12, repeat_key=$13,
-       ring_constancia_goal=$14, ring_esfuerzo_goal=$15, ring_conexion_goal=$16,
-       reward_description=$17, is_visit_pack=$18,
-       opening_price=COALESCE($19, opening_price), morning_only=COALESCE($20, morning_only),
+       is_visit_pack=$14,
+       opening_price=COALESCE($15, opening_price), morning_only=COALESCE($16, morning_only),
        updated_at=NOW()
-       WHERE id=$21 RETURNING *`,
+       WHERE id=$17 RETURNING *`,
       [
         name,
         description || null,
@@ -14055,10 +13740,6 @@ app.put("/api/plans/:id", adminMiddleware, async (req, res) => {
         nonTransferable,
         nonRepeatable,
         safeRepeatKey,
-        Math.max(1, Number(ringConstanciaGoal ?? req.body.ring_constancia_goal ?? 1)),
-        Math.max(1, Number(ringEsfuerzoGoal ?? req.body.ring_esfuerzo_goal ?? 1)),
-        Math.max(1, Number(ringConexionGoal ?? req.body.ring_conexion_goal ?? 10)),
-        rewardDescription ?? req.body.reward_description ?? null,
         isVisitPack,
         openingPrice,
         morningOnly,
@@ -14129,7 +13810,6 @@ app.post("/api/plans", adminMiddleware, async (req, res) => {
       name, description, price, currency = "MXN", durationDays = 30, classLimit,
       classCategory, features, isActive = true, sortOrder = 0,
       isNonTransferable, isNonRepeatable, repeatKey,
-      ringConstanciaGoal, ringEsfuerzoGoal, ringConexionGoal, rewardDescription,
       opening_price, morning_only,
     } = req.body;
     if (!name) return res.status(400).json({ message: "Nombre requerido" });
@@ -14150,9 +13830,9 @@ app.post("/api/plans", adminMiddleware, async (req, res) => {
     const isVisitPack = parseBooleanFlag(req.body.isVisitPack ?? req.body.is_visit_pack);
     const r = await pool.query(
       `INSERT INTO plans
-        (name, description, price, currency, duration_days, class_limit, class_category, features, is_active, sort_order, is_non_transferable, is_non_repeatable, repeat_key, ring_constancia_goal, ring_esfuerzo_goal, ring_conexion_goal, reward_description, is_visit_pack, opening_price, morning_only)
+        (name, description, price, currency, duration_days, class_limit, class_category, features, is_active, sort_order, is_non_transferable, is_non_repeatable, repeat_key, is_visit_pack, opening_price, morning_only)
        VALUES
-        ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20) RETURNING *`,
+        ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING *`,
       [
         name,
         description || null,
@@ -14167,10 +13847,6 @@ app.post("/api/plans", adminMiddleware, async (req, res) => {
         nonTransferable,
         nonRepeatable,
         safeRepeatKey,
-        Math.max(1, Number(ringConstanciaGoal ?? req.body.ring_constancia_goal ?? 1)),
-        Math.max(1, Number(ringEsfuerzoGoal ?? req.body.ring_esfuerzo_goal ?? 1)),
-        Math.max(1, Number(ringConexionGoal ?? req.body.ring_conexion_goal ?? 10)),
-        rewardDescription ?? req.body.reward_description ?? null,
         isVisitPack,
         openingPrice,
         morningOnly,
@@ -16997,26 +16673,6 @@ async function runMembershipExpiredCron() {
   }
 }
 
-async function runWeekResetCron() {
-  // Refresca el pase (estado de anillos) para usuarias con membresía activa al inicio de la semana.
-  // Se corre el lunes 00:00 Mexico → todos los pases muestran rings reseteados.
-  try {
-    const res = await pool.query(`
-      SELECT DISTINCT m.user_id
-      FROM memberships m
-      WHERE m.status = 'active'
-        AND (m.end_date IS NULL OR m.end_date >= CURRENT_DATE)
-    `);
-    console.log(`[Cron] Week reset — ${res.rows.length} members`);
-    for (const row of res.rows) {
-      if (row.user_id) notifyWeekReset(row.user_id).catch(() => {});
-      await new Promise((r) => setTimeout(r, 60));
-    }
-  } catch (err) {
-    console.error("[Cron] Week reset error:", err.message);
-  }
-}
-
 function scheduleEmailCrons() {
   // Check every hour if it's time to run
   setInterval(async () => {
@@ -17045,12 +16701,6 @@ function scheduleEmailCrons() {
     if (mexicoHour === 10 && now.getUTCMinutes() < 60) {
       console.log("[Cron] Triggering membership-expired sweep...");
       runMembershipExpiredCron();
-    }
-
-    // Week reset: every Monday at 00:00 Mexico time → refresh pase de todas las alumnas activas.
-    if (dayOfWeek === 1 && mexicoHour === 0 && now.getUTCMinutes() < 60) {
-      console.log("[Cron] Triggering week reset (rings semanales)...");
-      runWeekResetCron();
     }
 
     // Birthday videoteca gift: every day at 8:00 AM Mexico time
