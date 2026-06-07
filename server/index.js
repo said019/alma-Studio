@@ -2277,6 +2277,38 @@ async function processPosSale({ userId, items, paymentMethod = "efectivo", disco
   }
 }
 
+// ── Faltas (inasistencias / cancelaciones tardías) ──────────────────────────
+// Registra una falta para el usuario y, cada vez que el contador alcanza un
+// múltiplo del umbral configurable, descuenta puntos de loyalty (asiento
+// 'adjust' con puntos negativos, mismo patrón que el reverso de check-in).
+// No aplica a invitadas (role='guest') ni a cancelaciones de admin.
+async function recordFalta({ userId, reason, client = null }) {
+  if (!userId) return { faltasCount: 0, penaltyApplied: false };
+  const q = client ?? pool;
+  let cfg = {};
+  try {
+    const cfgRes = await q.query("SELECT value FROM settings WHERE key='loyalty_config' LIMIT 1");
+    cfg = cfgRes.rows.length ? cfgRes.rows[0].value : {};
+  } catch { cfg = {}; }
+  if (cfg?.faltas_enabled === false) return { faltasCount: 0, penaltyApplied: false };
+  const upd = await q.query(
+    "UPDATE users SET faltas_count = COALESCE(faltas_count,0) + 1 WHERE id = $1 RETURNING faltas_count",
+    [userId]
+  );
+  const faltasCount = Number(upd.rows[0]?.faltas_count ?? 0);
+  const threshold = Number(cfg?.faltas_threshold ?? 5);
+  const penaltyPoints = Number(cfg?.faltas_penalty_points ?? 50);
+  let penaltyApplied = false;
+  if (penaltyDueAt(faltasCount, threshold) && penaltyPoints > 0) {
+    await q.query(
+      "INSERT INTO loyalty_transactions (user_id, type, points, description) VALUES ($1,'adjust',$2,$3)",
+      [userId, -Math.abs(penaltyPoints), `Penalización por ${threshold} inasistencias/cancelaciones tardías${reason ? " (" + reason + ")" : ""}`]
+    );
+    penaltyApplied = true;
+  }
+  return { faltasCount, penaltyApplied };
+}
+
 async function awardBirthdayBonusIfEligible(userId, client = null) {
   if (!userId) return null;
   const q = client ?? pool;
@@ -3509,6 +3541,21 @@ app.delete("/api/bookings/:id", authMiddleware, async (req, res) => {
       "UPDATE bookings SET status = 'cancelled', cancelled_at = NOW() WHERE id = $1",
       [req.params.id]
     );
+
+    // ── Falta por cancelación dentro de la ventana (config, default 12h) ───
+    // Se registra UNA sola vez aquí (la reserva ya está cancelada), antes de la
+    // ramificación late/on-time, para no duplicar. La ventana de 12h es
+    // independiente de la regla de crédito de 2h. Excluye invitadas (guest).
+    try {
+      let cfgWin = 12;
+      try {
+        const cfgRes = await pool.query("SELECT value FROM settings WHERE key='loyalty_config' LIMIT 1");
+        cfgWin = (cfgRes.rows.length ? cfgRes.rows[0].value : {})?.faltas_cancel_window_hours ?? 12;
+      } catch { cfgWin = 12; }
+      if (req.userId && !booking.guest_profile_id && isWithinCancelWindow(minutesUntilClass, cfgWin)) {
+        await recordFalta({ userId: req.userId, reason: "cancelación dentro de 12h" });
+      }
+    } catch (e) { console.warn("[faltas] late-cancel:", e.message); }
 
     if (booking.status === "confirmed") {
       // Always free the class spot
@@ -14009,6 +14056,12 @@ app.put("/api/bookings/:id/no-show", adminMiddleware, async (req, res) => {
     );
     if (!r.rows.length) return res.status(404).json({ message: "Reserva no encontrada o ya procesada" });
     triggerWalletPassSync(r.rows[0].user_id, "booking_no_show");
+    // Registrar falta por no-show (excluye invitadas con guest_profile_id).
+    try {
+      if (r.rows[0]?.user_id && !r.rows[0]?.guest_profile_id) {
+        await recordFalta({ userId: r.rows[0].user_id, reason: "no-show" });
+      }
+    } catch (e) { console.warn("[faltas] no-show:", e.message); }
     return res.json({ data: r.rows[0] });
   } catch (err) {
     return res.status(500).json({ message: "Error interno" });
