@@ -998,22 +998,205 @@ Abrir `http://localhost:8080/` (la landing). Verificar visualmente: la sección 
 Run: `node --test server/lib/ && npm test && npm run build`
 Expected: todos PASS; build OK.
 
-- [ ] **Step 5: Commit final / merge**
+- [ ] **Step 5: Commit del checkpoint de catálogo**
 
 ```bash
-git add -A && git commit -m "test(catalogo): verificacion integral Fase 1" --allow-empty
+git add -A && git commit -m "test(catalogo): verificacion integral del catalogo" --allow-empty
 ```
-Usar el skill `superpowers:finishing-a-development-branch` para decidir merge/PR.
+
+> NO cerrar la rama todavía: continúan las Tasks 12–15 (anillos). El cierre
+> (`superpowers:finishing-a-development-branch`) va tras la verificación final
+> de la Task 15.
+
+---
+
+### Task 12: Frontend — quitar anillos de Dashboard, Wallet y ClientDetail; borrar RingsTriple
+
+**Files:**
+- Modify: `src/pages/client/Dashboard.tsx` (import ≈10, sección ≈204-230, cómputo ≈104-154)
+- Modify: `src/pages/client/Wallet.tsx` (import ≈19, sección ≈268-309, cómputo ≈128-291)
+- Modify: `src/pages/admin/clients/ClientDetail.tsx` (tab "rings" + form ≈411-467)
+- Delete: `src/components/alma/RingsTriple.tsx`
+- Test: `src/pages/client/Dashboard.rings.test.ts`
+
+- [ ] **Step 1: Test de fuente que falla**
+
+```ts
+// src/pages/client/Dashboard.rings.test.ts
+import { readFileSync, existsSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, resolve } from "node:path";
+import { describe, expect, it } from "vitest";
+
+const here = dirname(fileURLToPath(import.meta.url));
+const read = (p: string) => readFileSync(resolve(here, p), "utf8");
+
+describe("anillos eliminados del producto", () => {
+  it("Dashboard y Wallet no importan RingsTriple", () => {
+    expect(read("Dashboard.tsx")).not.toContain("RingsTriple");
+    expect(read("Wallet.tsx")).not.toContain("RingsTriple");
+  });
+  it("ClientDetail no tiene tab de anillos", () => {
+    expect(read("../admin/clients/ClientDetail.tsx")).not.toContain("Conexión");
+  });
+  it("el componente RingsTriple ya no existe", () => {
+    expect(existsSync(resolve(here, "../../components/alma/RingsTriple.tsx"))).toBe(false);
+  });
+});
+```
+
+- [ ] **Step 2: Correr y verificar que falla**
+
+Run: `npm test -- Dashboard.rings`
+Expected: FAIL.
+
+- [ ] **Step 3: Quitar los anillos de cada archivo**
+
+Leer cada archivo y eliminar: el import de `RingsTriple`/`ALMA_RING_COLORS`/`AlmaRing`, el bloque JSX que renderiza `<RingsTriple .../>` con su `Section`/contenedor, y la lógica (`useMemo`/cálculos) que solo alimenta a los anillos. En `Dashboard.tsx` quitar la `<Section title="Tres anillos">…</Section>` completa y el `useMemo` de `rings`. En `Wallet.tsx` quitar el contenedor del `RingsTriple` y el cómputo `ringsState`. En `ClientDetail.tsx` quitar el `<TabsTrigger>`/`<TabsContent>` de "rings" y el form "Sumar puntos de Conexión" (incluida la llamada a `/api/admin/rings/community-events`).
+
+- [ ] **Step 4: Borrar el componente**
+
+```bash
+git rm src/components/alma/RingsTriple.tsx
+```
+
+- [ ] **Step 5: Test + build**
+
+Run: `npm test -- Dashboard.rings && npm run build`
+Expected: PASS y build OK (no quedan importadores de RingsTriple).
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add -A
+git commit -m "feat(anillos): eliminar anillos de dashboard, wallet y client detail"
+```
+
+---
+
+### Task 13: Server — eliminar endpoints, lógica y notificaciones de anillos
+
+**Files:**
+- Modify: `server/index.js` — endpoints `/api/me/rings` (≈4418-4474), `/api/admin/rings/users/:id` (≈4940-4981), `/api/admin/rings/community-events` (≈4984-5002); funciones `getAlmaWeeklyRingState` (≈5901-5940), `getAlmaWeeklyRingStateForUser` (≈5942-5993), `notifyWeekReset` (≈6918-6920); `runWeekResetCron` (≈17008-17026) y su registro en `scheduleEmailCrons` (≈17059); plantillas `rings_closed` y `motivation_*` (≈237-268)
+
+- [ ] **Step 1: Eliminar los 3 endpoints de anillos**
+
+Leer cada handler y borrar el bloque `app.get/post(...)` completo de los 3 endpoints de rings. Cualquier referencia en el frontend ya fue eliminada en Task 12.
+
+- [ ] **Step 2: Eliminar funciones de cómputo de anillos**
+
+Borrar `getAlmaWeeklyRingState`, `getAlmaWeeklyRingStateForUser` y `notifyWeekReset`. Buscar (`grep -n "getAlmaWeeklyRingState\|notifyWeekReset\|runWeekResetCron" server/index.js`) y eliminar todos los llamadores (en snapshots de wallet/check-in, usar el dato de membresía sin anillos).
+
+- [ ] **Step 3: Desactivar el cron de reset semanal de anillos**
+
+Quitar `runWeekResetCron` y su llamada dentro de `scheduleEmailCrons` (la rama "lunes 00:00").
+
+- [ ] **Step 4: Reescribir/eliminar plantillas con "anillos"**
+
+En las plantillas de notificación (≈172-300), reescribir `class_attended`, `motivation_*` para no mencionar anillos, y eliminar `rings_closed`. Quitar referencias a `rings_closed` donde se dispare.
+
+- [ ] **Step 5: Verificar arranque limpio**
+
+```bash
+DATABASE_URL=postgres://alma:alma@127.0.0.1:5433/alma npm start
+curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8080/api/me/rings   # esperado 404
+```
+Expected: server arranca sin errores; `/api/me/rings` ya no existe (404).
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add server/index.js
+git commit -m "feat(anillos): eliminar endpoints, computo y notificaciones de anillos del server"
+```
+
+---
+
+### Task 14: Server — neutralizar el strip del pase de Apple Wallet (sin anillos)
+
+**Files:**
+- Modify: `server/index.js` — `arcPath`/`buildAlmaStripSvg` (≈6987-7100+), bloques de anillos en pase email/QR (≈5370-5382, ≈7408-7420, ≈7491-7503, ≈8073-8075)
+
+- [ ] **Step 1: Reemplazar el contenido del strip por marca + clases restantes**
+
+Leer `buildAlmaStripSvg(ringState, scale, opts)` y reemplazar su cuerpo por un strip simple: fondo de marca + nombre del plan + "clases restantes" (o "Ilimitado") + logo, sin arcos de anillos. Mantener la firma para no romper llamadores; ignorar `ringState`. Borrar `arcPath` si queda sin uso.
+
+- [ ] **Step 2: Quitar campos de anillos del pase email/QR**
+
+En los bloques que renderizan `ring_constancia/esfuerzo/conexion` (≈5370-5382, ≈8073-8075, etc.), eliminar esos campos del HTML/JSON del pase.
+
+- [ ] **Step 3: Verificar que el pase aún se genera**
+
+Levantar server, autenticarse como alumna de prueba y pedir el pase (endpoint del pkpass/wallet, p.ej. el que usa la página Wallet). Verificar respuesta 200 y que el archivo se construye sin error en consola.
+
+```bash
+# revisar logs del server: no debe haber excepción al construir el strip
+```
+Expected: pase generado, sin anillos, sin errores.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add server/index.js
+git commit -m "feat(anillos): strip del pase de wallet sin anillos (marca + clases restantes)"
+```
+
+---
+
+### Task 15: DB — migración para eliminar tablas, columnas y triggers de anillos
+
+**Files:**
+- Create: `supabase/migrations/2026-06-07_drop_rings.sql`
+- Modify: `server/index.js` — quitar de `ensureSchema` el CREATE de `ring_states`/triggers/funciones (≈1361-1612) y los `ALTER TABLE plans ADD COLUMN ring_*_goal`/`reward_description` (≈868-871)
+
+- [ ] **Step 1: Escribir la migración de drop (idempotente)**
+
+```sql
+-- supabase/migrations/2026-06-07_drop_rings.sql
+-- Elimina la feature de anillos (gamificación) por completo.
+DROP TRIGGER IF EXISTS trg_bookings_recalculate_alma_rings ON bookings;
+DROP TRIGGER IF EXISTS trg_community_events_recalculate_alma_rings ON community_events;
+DROP TRIGGER IF EXISTS trg_ring_states_wallet_queue ON ring_states;
+DROP TRIGGER IF EXISTS trg_ring_states_updated_at ON ring_states;
+DROP FUNCTION IF EXISTS recalculate_alma_rings_on_checkin() CASCADE;
+DROP FUNCTION IF EXISTS recalculate_alma_rings_on_community_event() CASCADE;
+DROP FUNCTION IF EXISTS enqueue_wallet_update_from_ring_state() CASCADE;
+DROP FUNCTION IF EXISTS update_ring_states_updated_at() CASCADE;
+DROP TABLE IF EXISTS ring_states CASCADE;
+DROP TABLE IF EXISTS community_events CASCADE;
+ALTER TABLE plans DROP COLUMN IF EXISTS ring_constancia_goal;
+ALTER TABLE plans DROP COLUMN IF EXISTS ring_esfuerzo_goal;
+ALTER TABLE plans DROP COLUMN IF EXISTS ring_conexion_goal;
+ALTER TABLE plans DROP COLUMN IF EXISTS reward_description;
+```
+
+> Aplicar también el archivo a la lista de migraciones idempotentes en
+> `scripts/db-apply-schema.cjs` si lleva un registro explícito.
+
+- [ ] **Step 2: Quitar la creación de anillos de ensureSchema**
+
+Borrar de `server/index.js` el bloque que crea `ring_states` + sus índices + triggers + funciones (≈1361-1612) y los 4 `ALTER TABLE plans ADD COLUMN ring_*` / `reward_description` (≈868-871). Borrar también la migración vieja del repo `supabase/migrations/20260506_alma_progress_rings.sql` (o dejarla pero asegurar que el drop corre después).
+
+- [ ] **Step 3: Verificar arranque limpio y tablas eliminadas**
+
+Borrar `.pgdata/`, relevantar db:local + db:schema + start. Luego:
+```bash
+PGPASSWORD=alma psql -h 127.0.0.1 -p 5433 -U alma -d alma -c "SELECT to_regclass('public.ring_states'), to_regclass('public.community_events');"
+PGPASSWORD=alma psql -h 127.0.0.1 -p 5433 -U alma -d alma -c "\d plans" | grep -i ring || echo "sin columnas ring"
+```
+Expected: ambas `regclass` = NULL; "sin columnas ring".
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add server/index.js supabase/migrations/2026-06-07_drop_rings.sql scripts/db-apply-schema.cjs
+git commit -m "feat(anillos): migracion drop de tablas/columnas/triggers de anillos"
+```
 
 ---
 
 ## Fuera de este plan (planes siguientes)
 
-- **Teardown profundo de anillos** (server): endpoints `/api/me/rings` y
-  `/api/admin/rings/*`, strip del pase de Apple Wallet (`buildAlmaStripSvg`),
-  plantillas de notificación de anillos, `runWeekResetCron`, tablas
-  `ring_states`/`community_events`, columnas `ring_*_goal`, y rings en
-  `Dashboard.tsx`/`Wallet.tsx`/`ClientDetail.tsx`. (Independiente del catálogo.)
 - **Fase 2 — Limpieza de marca**: tokens `ophelia-*`, README, `index.html`,
   CSS `prose-ophelia`, `.lovable/plan.md`, footer email, placeholder POS,
   dirección y datos bancarios reales (requiere input de la dueña).
