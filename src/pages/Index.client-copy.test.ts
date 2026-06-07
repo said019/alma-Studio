@@ -24,10 +24,10 @@ describe("Alma landing client copy", () => {
     expect(indexSource).not.toContain("Karla decide la recompensa por plan");
   });
 
-  it("explains the recorded classes benefit for selected packages", () => {
-    expect(indexSource).toContain("Clases grabadas");
-    expect(indexSource).toContain("Algunos paquetes");
-    expect(indexSource).toContain("Los planes seleccionados pueden incluir acceso a la biblioteca de videos");
-    expect(indexSource).toContain("Acceso según plan");
+  it("ya no ofrece clases grabadas / planes online (eliminado en Fase 1)", () => {
+    // Fase 1 quitó la biblioteca de video y los planes online del catálogo.
+    expect(indexSource).not.toContain("Clases grabadas");
+    expect(indexSource).not.toContain("biblioteca de videos");
+    expect(indexSource).not.toContain("ONLINE_PLANS");
   });
 });
