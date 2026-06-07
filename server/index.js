@@ -73,6 +73,7 @@ const DEFAULT_GENERAL_SETTINGS = {
   venue_media_drive_id: "",
   venue_media_name: "",
   venue_media_updated_at: "",
+  opening_pricing_active: true,
 };
 
 const DEFAULT_BANK_INFO = Object.freeze({
@@ -2254,9 +2255,7 @@ function calculateDiscountAmount(type, value, subtotal) {
 }
 
 function normalizeClassCategory(value, fallback = "all") {
-  const raw = String(value ?? "").trim().toLowerCase();
-  if (["jumping", "pilates", "mixto", "all"].includes(raw)) return raw;
-  return fallback;
+  return ruleNormalizeCategory(value, fallback);
 }
 
 function normalizeDiscountChannel(value, fallback = "all") {
@@ -2270,11 +2269,7 @@ function isUnlimitedClasses(value) {
 }
 
 function isMembershipCategoryCompatible(membershipCategory, classCategory) {
-  const memCat = normalizeClassCategory(membershipCategory, "all");
-  const clsCat = normalizeClassCategory(classCategory, "all");
-  if (clsCat === "all") return true;
-  if (memCat === "all" || memCat === "mixto") return true;
-  return memCat === clsCat;
+  return ruleCategoryCompatible(membershipCategory, classCategory);
 }
 
 async function selectMembershipForClass({ userId, classCategory, client = null }) {
@@ -2287,7 +2282,8 @@ async function selectMembershipForClass({ userId, classCategory, client = null }
             m.classes_remaining,
             m.end_date,
             m.created_at,
-            COALESCE(p.class_category, 'all') AS class_category
+            COALESCE(p.class_category, 'all') AS class_category,
+            COALESCE(p.morning_only, false) AS morning_only
        FROM memberships m
        LEFT JOIN plans p ON p.id = m.plan_id
       WHERE m.user_id = $1
@@ -3218,7 +3214,21 @@ app.get("/api/plans", async (req, res) => {
     const r = await pool.query(
       "SELECT * FROM plans ORDER BY sort_order ASC, price ASC"
     );
-    return res.json({ data: camelRows(r.rows) });
+    const general = await getSettingValueWithDefaults("general_settings");
+    const openingActive = general?.opening_pricing_active !== false;
+    const data = r.rows.map((p) => {
+      const row = camelRow(p);
+      const effective = resolveEffectivePrice(p, openingActive);
+      const openingThisRow = openingActive && p.opening_price != null;
+      return {
+        ...row,
+        effective_price: effective,
+        effectivePrice: effective,
+        opening_active: openingThisRow,
+        openingActive: openingThisRow,
+      };
+    });
+    return res.json({ data });
   } catch (err) {
     console.error("Plans error:", err);
     return res.status(500).json({ message: "Error interno" });
@@ -3627,9 +3637,15 @@ app.post("/api/bookings", authMiddleware, async (req, res) => {
 
     if (!isMembershipCategoryCompatible(membership.class_category, clsCategory)) {
       await client.query("ROLLBACK");
-      const label = clsCategory === "jumping" ? "Jumping" : "Pilates";
+      const label = categoryLabel(clsCategory);
       return res.status(403).json({
-        message: `Tu membresía no incluye clases de ${label}. Necesitas una membresía ${label} o Mixta.`,
+        message: `Tu membresía no incluye clases de ${label}. Necesitas una membresía ${label}, Mixta o Unlimited.`,
+      });
+    }
+    if (membership.morning_only && !isWithinMorningWindow(cls.starts_at)) {
+      await client.query("ROLLBACK");
+      return res.status(403).json({
+        message: "Tu paquete AM Club solo permite reservar clases matutinas (hasta las 10:00 am).",
       });
     }
 
@@ -4127,6 +4143,9 @@ app.post("/api/orders", authMiddleware, async (req, res) => {
     }
     const plan = planRes.rows[0];
 
+    const generalForPrice = await getSettingValueWithDefaults("general_settings");
+    const effectivePrice = resolveEffectivePrice(plan, generalForPrice?.opening_pricing_active !== false);
+
     // ── Complemento online (add-on) ──────────────────────────────────────
     // Solo válido si el plan principal NO es online (no tiene sentido un add-on
     // online sobre un plan online), si el plan principal aún no incluye videos,
@@ -4155,7 +4174,7 @@ app.post("/api/orders", authMiddleware, async (req, res) => {
       return res.status(409).json({ message: nonRepeatableConflict.message });
     }
 
-    const subtotal = parseFloat(plan.price);
+    const subtotal = parseFloat(effectivePrice);
     let discount = 0;
     let appliedDiscountCode = null;
 
