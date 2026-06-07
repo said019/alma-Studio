@@ -4,7 +4,6 @@ import { useNavigate } from "react-router-dom";
 import api from "@/lib/api";
 import { useAuthStore } from "@/stores/authStore";
 import Schedule from "@/components/Schedule";
-import { ALMA_RING_COLORS, RingsTriple, type AlmaRing } from "@/components/alma/RingsTriple";
 import {
   ArrowUpRight,
   ArrowRight,
@@ -18,8 +17,6 @@ import {
   Mail,
   Clock,
   MessageCircle,
-  Film,
-  CheckCircle2,
 } from "lucide-react";
 
 const IconInstagram = ({ size = 16 }: { size?: number }) => (
@@ -89,47 +86,27 @@ type ClassTypeRow = {
   sort_order: number;
 };
 
-type PackageRow = {
+/* Catálogo real proveniente de /plans (camelCase) */
+type PlanRow = {
   id: string;
   name: string;
-  num_classes: string;
+  description?: string;
   price: number;
-  category: "barre";
-  validity_days: number;
-  is_active: boolean;
-  sort_order: number;
+  effectivePrice?: number;
+  openingActive?: boolean;
+  classLimit: number | null;
+  durationDays: number;
+  classCategory: string;
+  isActive?: boolean;
+  sortOrder?: number;
+  morningOnly?: boolean;
 };
 
-type TrialPlanRow = {
-  id: string;
-  name: string;
-  classCategory: "barre";
-  price: number;
-  durationDays: number;
-  classLimit: number;
-  isNonTransferable: boolean;
-  isNonRepeatable: boolean;
-};
+type CatalogGroup = { key: string; title: string; items: PlanRow[] };
 
 /* ───── Fallbacks ───── */
 const FALLBACK_CLASS_TYPES: ClassTypeRow[] = [
   { id: "c1", name: "Barre", subtitle: "Energía, fuerza y postura", description: "Una clase cercana, personalizada y apta para todos los niveles. Cada sesión cambia para trabajar fuerza, control, movilidad y compromiso con tu bienestar.", category: "barre", intensity: "media", color: ALMA.berry, emoji: "sparkles", level: "Todos los niveles", duration_min: 50, capacity: 5, is_active: true, sort_order: 1 },
-];
-
-const FALLBACK_PACKAGES: PackageRow[] = [
-  { id: "p1", name: "2 Clases al mes",     num_classes: "2",  price: 230,  category: "barre", validity_days: 30, is_active: true, sort_order: 1 },
-  { id: "p2", name: "3 Clases al mes",     num_classes: "3",  price: 355,  category: "barre", validity_days: 30, is_active: true, sort_order: 2 },
-  { id: "p3", name: "4 Clases al mes",     num_classes: "4",  price: 470,  category: "barre", validity_days: 30, is_active: true, sort_order: 3 },
-  { id: "p4", name: "5 Clases al mes",     num_classes: "5",  price: 585,  category: "barre", validity_days: 30, is_active: true, sort_order: 4 },
-  { id: "p5", name: "2 Clases por semana", num_classes: "8",  price: 880,  category: "barre", validity_days: 30, is_active: true, sort_order: 5 },
-  { id: "p6", name: "3 Clases por semana", num_classes: "12", price: 1080, category: "barre", validity_days: 30, is_active: true, sort_order: 6 },
-  { id: "p7", name: "4 Clases por semana", num_classes: "16", price: 1200, category: "barre", validity_days: 30, is_active: true, sort_order: 7 },
-  { id: "p8", name: "5 Clases por semana", num_classes: "20", price: 1300, category: "barre", validity_days: 30, is_active: true, sort_order: 8 },
-  { id: "p9", name: "Clase suelta",        num_classes: "1",  price: 125,  category: "barre", validity_days: 30, is_active: true, sort_order: 9 },
-];
-
-const FALLBACK_TRIAL_PLANS: TrialPlanRow[] = [
-  { id: "trial-barre", name: "Clase muestra Barre", classCategory: "barre", price: 50, durationDays: 7, classLimit: 1, isNonTransferable: true, isNonRepeatable: true },
 ];
 
 /* ── Programas especializados ── */
@@ -227,31 +204,6 @@ const SPECIAL_PROGRAMS: SpecialProgram[] = [
   },
 ];
 
-/* ── Planes de biblioteca online ── */
-type OnlinePlan = {
-  id: string;
-  name: string;
-  price: number;
-  monthlyEquivalent?: number;
-  savingsLabel?: string;
-  benefit: string;
-  featured?: boolean;
-};
-
-const ONLINE_PLANS: OnlinePlan[] = [
-  { id: "online-monthly",   name: "Mensual",    price: 350,  benefit: "Ideal para empezar y probar el método." },
-  { id: "online-quarterly", name: "Trimestral", price: 945,  monthlyEquivalent: 315, savingsLabel: "Ahorra 10%", benefit: "Tres meses con todo el catálogo." },
-  { id: "online-semester",  name: "Semestral",  price: 1785, monthlyEquivalent: 297, savingsLabel: "Ahorra 15%", benefit: "Seis meses para construir el hábito." },
-  { id: "online-annual",    name: "Anual",      price: 3500, monthlyEquivalent: 291, savingsLabel: "Ahorra 16%", benefit: "Acceso garantizado todo el año.", featured: true },
-];
-
-const ONLINE_PLAN_BENEFITS: { title: string; description: string; soon?: boolean }[] = [
-  { title: "Biblioteca completa de Barré", description: "Rutinas nuevas cada semana con diferentes duraciones y enfoques: fuerza, flexibilidad y cardio." },
-  { title: "Clases de Hipopresivos", description: "Fortalece tu core y cuida tu salud postural.", soon: true },
-  { title: "Barré Prenatal y Posnatal", description: "Programas diseñados para acompañarte de forma segura en esta etapa.", soon: true },
-  { title: "Acceso 24/7", description: "Desde cualquier dispositivo, cuando y donde quieras." },
-];
-
 /* ── Real photos pool ── */
 const HERO_PHOTOS = [almaHeroClass, almaClassEnergy, almaBarreLine] as const;
 
@@ -320,7 +272,6 @@ const Index = () => {
   const [navScrolled, setNavScrolled] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
   const [classTypes, setClassTypes] = useState<ClassTypeRow[]>(FALLBACK_CLASS_TYPES);
-  const [packages, setPackages] = useState<PackageRow[]>(FALLBACK_PACKAGES);
   const [openClassId, setOpenClassId] = useState<string | null>(null);
   const [openProgramId, setOpenProgramId] = useState<string | null>("prenatal");
   const [playingVideoId, setPlayingVideoId] = useState<number | null>(null);
@@ -357,35 +308,43 @@ const Index = () => {
     staleTime: 1000 * 60 * 5,
   });
 
-  const trialPlans: TrialPlanRow[] = useMemo(() => {
-    const rows = Array.isArray(plansData?.data) ? plansData.data : [];
-    const byCategory = new Map<"barre", TrialPlanRow>();
-    for (const row of rows) {
-      const isActive = (row?.isActive ?? row?.is_active) !== false;
-      if (!isActive) continue;
-      const category = String(row?.classCategory ?? row?.class_category ?? "").toLowerCase();
-      // Alma solo opera Barre; any/all/mixto cuentan como barre, demás se ignoran.
-      if (!["barre", "all", "mixto"].includes(category)) continue;
-      const normalizedCategory = "barre" as const;
-      const repeatKey = String(row?.repeatKey ?? row?.repeat_key ?? "");
-      const classLimit = Number(row?.classLimit ?? row?.class_limit ?? 0);
-      const price = Number(row?.price ?? 0);
-      const looksLikeTrial = repeatKey.startsWith("trial_single_session") || (classLimit === 1 && price <= 65);
-      if (!looksLikeTrial || byCategory.has(normalizedCategory)) continue;
-      byCategory.set(normalizedCategory, {
-        id: String(row?.id ?? normalizedCategory + "-trial"),
-        name: String(row?.name ?? "Clase muestra Barre"),
-        classCategory: normalizedCategory,
-        price,
-        durationDays: Number(row?.durationDays ?? row?.duration_days ?? 7) || 7,
-        classLimit: classLimit || 1,
-        isNonTransferable: Boolean(row?.isNonTransferable ?? row?.is_non_transferable),
-        isNonRepeatable: Boolean(row?.isNonRepeatable ?? row?.is_non_repeatable),
-      });
-    }
-    const ordered = ["barre"].map((cat) => byCategory.get(cat as "barre")).filter(Boolean) as TrialPlanRow[];
-    return ordered.length > 0 ? ordered : FALLBACK_TRIAL_PLANS;
-  }, [plansData]);
+  /* Catálogo real desde /plans (solo planes activos). */
+  const planRows: PlanRow[] = useMemo(
+    () =>
+      (Array.isArray(plansData?.data) ? plansData.data : []).filter(
+        (p: any) => p?.isActive !== false
+      ),
+    [plansData]
+  );
+
+  const CATALOG_GROUPS: { key: string; title: string }[] = [
+    { key: "studio", title: "Studio · Mat · Barre · Sculpt" },
+    { key: "reformer_tower", title: "Reformer & Tower" },
+    { key: "mixto", title: "Paquetes mixtos" },
+    { key: "all", title: "Premium" },
+  ];
+
+  const groupedPlans: CatalogGroup[] = useMemo(
+    () =>
+      CATALOG_GROUPS.map((g) => ({
+        ...g,
+        items: planRows
+          .filter((p) => p.classCategory === g.key)
+          .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)),
+      })).filter((g) => g.items.length > 0),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [planRows]
+  );
+
+  /* La clase muestra es el plan más corto de una sola sesión (Alma Studio Intro). */
+  const trialPlan: PlanRow | undefined = useMemo(() => {
+    const candidates = planRows
+      .filter((p) => p.classLimit === 1 && !p.morningOnly)
+      .sort((a, b) => (a.durationDays ?? 0) - (b.durationDays ?? 0));
+    return (
+      planRows.find((p) => p.name === "Alma Studio Intro") ?? candidates[0]
+    );
+  }, [planRows]);
 
   /* ── Effects ── */
   useEffect(() => {
@@ -398,13 +357,6 @@ const Index = () => {
     api.get<{ data: ClassTypeRow[] }>("/admin/class-types").then(({ data }) => {
       const rows = Array.isArray(data?.data) ? data.data.filter((c) => c.is_active) : [];
       if (rows.length > 0) setClassTypes(rows);
-    }).catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    api.get<{ data: PackageRow[] }>("/packages").then(({ data }) => {
-      const rows = Array.isArray(data?.data) ? data.data : [];
-      if (rows.length > 0) setPackages(rows);
     }).catch(() => {});
   }, []);
 
@@ -436,10 +388,6 @@ const Index = () => {
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
   };
 
-  const barrePackages = packages.filter((p) => p.category === "barre" && p.is_active).sort((a, b) => a.sort_order - b.sort_order);
-  const monthlyPackages = barrePackages.filter((p) => Number(p.num_classes) > 1);
-  const singleClass = barrePackages.find((p) => Number(p.num_classes) === 1);
-
   /* ═══════════════════════════════════════════════════════════ */
   return (
     <div className="min-h-screen text-[color:var(--ink)] [--ink:#43392F] [--cream:#FAF9F6] [--blush:#E6DAC8] [--berry:#A48D78] [--coral:#CBB9A4] [--olive:#9C8E72] [--orange:#C0A688] [--border:#E0D5C6]" style={{ backgroundColor: ALMA.cream }}>
@@ -464,8 +412,6 @@ const Index = () => {
               { label: "Clases", id: "clases" },
               { label: "Programas", id: "programas" },
               { label: "Horario", id: "horario" },
-              { label: "Progreso", id: "progreso" },
-              { label: "En línea", id: "online" },
               { label: "Paquetes", id: "paquetes" },
               { label: "Coaches", id: "coaches" },
               { label: "Galería", id: "galeria" },
@@ -537,8 +483,6 @@ const Index = () => {
                 { label: "Clases", id: "clases" },
                 { label: "Programas", id: "programas" },
                 { label: "Horario", id: "horario" },
-                { label: "Progreso", id: "progreso" },
-                { label: "En línea", id: "online" },
                 { label: "Paquetes", id: "paquetes" },
                 { label: "Coaches", id: "coaches" },
                 { label: "Galería", id: "galeria" },
@@ -1045,152 +989,13 @@ const Index = () => {
         </div>
       </section>
 
-      {/* ═════════ PROGRESO (Rings) ═════════ */}
-      <ProgresoSection onCta={() => navigate(membershipCtaPath)} />
-
       {/* ═════════ COACHES (Olive drench) ═════════ */}
       <CoachesSection instructors={instructors} />
 
-      {/* ═════════ BIBLIOTECA ONLINE ═════════ */}
-      <section id="online" className="relative px-5 sm:px-8 lg:px-12 py-20 lg:py-28" style={{ backgroundColor: ALMA.cream }}>
-        <div className="mx-auto max-w-[1320px]">
-          <div className="reveal opacity-0 translate-y-8 transition-all duration-700 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 mb-12 lg:mb-16">
-            <div className="lg:col-span-7">
-              <span className="text-[0.66rem] font-medium uppercase tracking-[0.34em]" style={{ color: ALMA.olive }}>
-                Entrena en línea
-              </span>
-              <h2 className="font-bebas mt-4 leading-[0.92]" style={{ color: ALMA.ink, fontSize: "clamp(2.4rem, 5.2vw, 4.6rem)" }}>
-                Tu estudio,
-                <span className="block italic font-alilato font-normal" style={{ color: ALMA.berry }}>donde tú quieras.</span>
-              </h2>
-              <p className="mt-6 max-w-[56ch] text-[1.02rem] leading-[1.75] text-[color:var(--ink)]/72">
-                Entrena a tu propio ritmo y desde donde quieras. Todos los planes incluyen acceso ilimitado a la biblioteca online de Alma.
-              </p>
-            </div>
-
-            <ul className="lg:col-span-5 grid grid-cols-1 sm:grid-cols-2 gap-3 list-none m-0 p-0">
-              {ONLINE_PLAN_BENEFITS.map((b, i) => (
-                <li key={i} className="rounded-[18px] p-4" style={{ backgroundColor: ALMA.blush, border: `1px solid ${ALMA.border}` }}>
-                  <div className="flex items-start justify-between gap-3">
-                    <p className="font-bebas text-[1rem] leading-[1.1]" style={{ color: ALMA.ink }}>
-                      {b.title}
-                    </p>
-                    {b.soon && (
-                      <span className="shrink-0 text-[0.55rem] uppercase tracking-[0.22em] px-2 py-1 rounded-full" style={{ backgroundColor: ALMA.coral, color: ALMA.cream }}>
-                        Pronto
-                      </span>
-                    )}
-                  </div>
-                  <p className="mt-2 text-[0.82rem] leading-[1.55] text-[color:var(--ink)]/68">
-                    {b.description}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <ul className="reveal opacity-0 translate-y-8 transition-all duration-700 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 list-none m-0 p-0" data-stagger>
-            {ONLINE_PLANS.map((plan) => {
-              const featured = !!plan.featured;
-              return (
-                <li key={plan.id} data-stagger-item className="relative flex">
-                  {featured && (
-                    <span
-                      className="absolute -top-3 left-1/2 -translate-x-1/2 z-10 text-[0.58rem] font-medium uppercase tracking-[0.22em] px-3 py-1.5 rounded-full whitespace-nowrap"
-                      style={{ backgroundColor: ALMA.berry, color: ALMA.cream }}
-                    >
-                      Mejor valor
-                    </span>
-                  )}
-                  <div
-                    className="flex flex-col w-full rounded-[24px] p-6 sm:p-7 transition-transform duration-300"
-                    style={{
-                      backgroundColor: featured ? ALMA.berry : ALMA.cream,
-                      color: featured ? ALMA.cream : ALMA.ink,
-                      border: `1px solid ${featured ? ALMA.berry : ALMA.border}`,
-                      boxShadow: featured ? "0 18px 40px -20px rgba(118, 33, 77, 0.55)" : "none",
-                    }}
-                    data-lift
-                  >
-                    <div>
-                      <p
-                        className="text-[0.62rem] font-medium uppercase tracking-[0.26em]"
-                        style={{ color: featured ? ALMA.cream : ALMA.olive, opacity: featured ? 0.75 : 1 }}
-                      >
-                        Biblioteca online
-                      </p>
-                      <h3 className="font-bebas mt-3 leading-[0.95] text-[2.1rem]">
-                        {plan.name}
-                      </h3>
-                    </div>
-
-                    <div className="mt-5 flex items-baseline gap-2">
-                      <span className="font-bebas text-[2.6rem] leading-none">
-                        ${plan.price.toLocaleString("es-MX")}
-                      </span>
-                      <span className="text-[0.74rem] uppercase tracking-[0.18em]" style={{ opacity: 0.6 }}>
-                        MXN
-                      </span>
-                    </div>
-
-                    {plan.monthlyEquivalent ? (
-                      <p className="mt-1 text-[0.82rem]" style={{ opacity: 0.75 }}>
-                        ${plan.monthlyEquivalent.toLocaleString("es-MX")} / mes
-                      </p>
-                    ) : (
-                      <p className="mt-1 text-[0.82rem]" style={{ opacity: 0.75 }}>
-                        Por mes
-                      </p>
-                    )}
-
-                    {plan.savingsLabel && (
-                      <p
-                        className="mt-3 inline-flex w-fit text-[0.62rem] uppercase tracking-[0.22em] px-2.5 py-1 rounded-full"
-                        style={{
-                          backgroundColor: featured ? "rgba(255,247,242,0.18)" : ALMA.blush,
-                          color: featured ? ALMA.cream : ALMA.berry,
-                        }}
-                      >
-                        {plan.savingsLabel}
-                      </p>
-                    )}
-
-                    <p
-                      className="mt-4 text-[0.9rem] leading-[1.55] font-alilato italic"
-                      style={{ opacity: featured ? 0.92 : 0.75 }}
-                    >
-                      {plan.benefit}
-                    </p>
-
-                    <button
-                      type="button"
-                      onClick={() => navigate(membershipCtaPath)}
-                      data-press
-                      className="mt-6 inline-flex items-center justify-center rounded-full px-5 py-3 text-[0.82rem] font-medium uppercase tracking-[0.18em] transition-colors cursor-pointer border-0"
-                      style={{
-                        backgroundColor: featured ? ALMA.cream : ALMA.berry,
-                        color: featured ? ALMA.berry : ALMA.cream,
-                      }}
-                    >
-                      Elegir {plan.name.toLowerCase()}
-                    </button>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-
-          <p className="reveal opacity-0 translate-y-8 transition-all duration-700 mt-10 text-center text-[0.82rem] text-[color:var(--ink)]/60">
-            Sé de las primeras en disfrutar los próximos lanzamientos · Hipopresivos · Prenatal · Posnatal
-          </p>
-        </div>
-      </section>
-
       {/* ═════════ MEMBRESÍAS (Berry drench) ═════════ */}
       <PaquetesSection
-        trialPlans={trialPlans}
-        monthlyPackages={monthlyPackages}
-        singleClass={singleClass}
+        trialPlan={trialPlan}
+        groupedPlans={groupedPlans}
         onPick={() => navigate(membershipCtaPath)}
       />
 
@@ -1247,138 +1052,6 @@ const Index = () => {
       {/* ═════════ FOOTER (Berry drench) ═════════ */}
       <FooterSection scrollTo={scrollTo} navigate={navigate} />
     </div>
-  );
-};
-
-/* ═══════════════════════════════════════════════════════════
-   PROGRESO — Rings story (orange role)
-   ═══════════════════════════════════════════════════════════ */
-const ProgresoSection = ({ onCta }: { onCta: () => void }) => {
-  const ringMetrics: AlmaRing[] = [
-    { key: "constancia", label: "Constancia", value: "2/3", goalLabel: "clases asistidas", progress: 67, ...ALMA_RING_COLORS.constancia },
-    { key: "esfuerzo", label: "Esfuerzo", value: "1/2", goalLabel: "retos o clases intensas", progress: 50, ...ALMA_RING_COLORS.esfuerzo },
-    { key: "conexion", label: "Conexión", value: "6/10", goalLabel: "puntos de comunidad", progress: 60, ...ALMA_RING_COLORS.conexion },
-  ];
-
-  const stories = [
-    { tag: "Constancia", word: "Asistir", note: "Cada check-in suma. El primero es el difícil; los demás vienen solos.", color: ALMA_RING_COLORS.constancia.color },
-    { tag: "Esfuerzo", word: "Retarte", note: "Las clases intensas y los retos del mes empujan este anillo.", color: ALMA_RING_COLORS.esfuerzo.color },
-    { tag: "Conexión", word: "Conectar", note: "Eventos, invitadas y comunidad suman puntos sin que lo notes.", color: ALMA_RING_COLORS.conexion.color },
-  ];
-
-  const planGoals = [
-    { plan: "Clase suelta", c: "1", e: "1", k: "3" },
-    { plan: "8 clases / mes", c: "2", e: "2", k: "10" },
-    { plan: "12 clases / mes", c: "3", e: "2", k: "10" },
-    { plan: "20 clases / mes", c: "5", e: "3", k: "10" },
-  ];
-
-  return (
-    <section id="progreso" className="relative px-5 sm:px-8 lg:px-12 py-20 lg:py-28" style={{ backgroundColor: ALMA.cream }}>
-      <div className="mx-auto max-w-[1320px]">
-        <div className="reveal opacity-0 translate-y-8 transition-all duration-700 grid grid-cols-1 lg:grid-cols-12 gap-10 items-end mb-12">
-          <div className="lg:col-span-7">
-            <span className="text-[0.66rem] font-medium uppercase tracking-[0.34em]" style={{ color: ALMA.orange }}>
-              Tu progreso es la meta
-            </span>
-            <h2 className="font-bebas mt-4 leading-[0.92]" style={{ color: ALMA.ink, fontSize: "clamp(2.4rem, 5.2vw, 4.6rem)" }}>
-              Tu avance
-              <span className="block italic font-alilato font-normal" style={{ color: ALMA.orange }}>se ve en la app.</span>
-            </h2>
-          </div>
-          <p className="lg:col-span-5 max-w-[44ch] text-[0.96rem] leading-[1.75] text-[color:var(--ink)]/72">
-            Tres anillos. Una historia: <em className="not-italic font-medium" style={{ color: ALMA.ink }}>constancia</em>, <em className="not-italic font-medium" style={{ color: ALMA.ink }}>esfuerzo</em>, <em className="not-italic font-medium" style={{ color: ALMA.ink }}>conexión</em>. Tú reservas, vienes y participas. El sistema convierte ese ritmo en algo visible.
-          </p>
-        </div>
-
-        <div className="reveal opacity-0 translate-y-8 transition-all duration-700 grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
-          {/* Rings visual */}
-          <div className="lg:col-span-5 relative overflow-hidden rounded-[26px] p-7 sm:p-9 flex flex-col justify-between" style={{ backgroundColor: ALMA.blush }}>
-            <div className="absolute -top-16 -right-16 h-56 w-56 rounded-full pointer-events-none" style={{ background: `radial-gradient(circle, ${ALMA.orange}44 0%, transparent 65%)` }} />
-            <div className="relative grid place-items-center py-4">
-              <div className="rounded-full p-3" style={{ backgroundColor: ALMA.ink }}>
-                <RingsTriple
-                  rings={ringMetrics}
-                  centerLabel="semana actual"
-                  centerValue="1/3"
-                  centerSub="anillo cerrado"
-                  shellClassName="border-transparent shadow-none"
-                />
-              </div>
-            </div>
-            <div className="relative mt-6 flex items-center gap-2 text-[0.7rem] uppercase tracking-[0.22em]" style={{ color: ALMA.berry }}>
-              <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ backgroundColor: ALMA.orange }} />
-              Se actualiza con cada visita
-            </div>
-          </div>
-
-          {/* Stories */}
-          <ul className="lg:col-span-7 grid grid-cols-1 gap-3 list-none m-0 p-0">
-            {stories.map((s) => (
-              <li key={s.tag} className="grid grid-cols-[auto_1fr_auto] items-center gap-5 px-5 py-5 rounded-[18px]" style={{ border: `1px solid ${ALMA.border}`, backgroundColor: ALMA.cream }}>
-                <span className="grid h-11 w-11 place-items-center rounded-full" style={{ backgroundColor: s.color + "1f" }}>
-                  <span className="h-3 w-3 rounded-full" style={{ backgroundColor: s.color }} />
-                </span>
-                <div>
-                  <p className="text-[0.62rem] uppercase tracking-[0.22em]" style={{ color: s.color }}>{s.tag}</p>
-                  <h3 className="font-bebas text-[1.6rem] leading-tight mt-0.5" style={{ color: ALMA.ink }}>{s.word.toUpperCase()}</h3>
-                  <p className="mt-1 text-[0.88rem] leading-[1.6] text-[color:var(--ink)]/68 max-w-[52ch]">{s.note}</p>
-                </div>
-                <ArrowRight size={16} style={{ color: s.color, opacity: 0.6 }} />
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        {/* Plan goals + reward */}
-        <div className="reveal opacity-0 translate-y-8 transition-all duration-700 mt-8 grid grid-cols-1 lg:grid-cols-12 gap-6">
-          <div className="lg:col-span-7 overflow-hidden rounded-[20px]" style={{ border: `1px solid ${ALMA.border}`, backgroundColor: ALMA.cream }}>
-            <div className="grid grid-cols-[1.4fr_repeat(3,1fr)] px-5 py-3 text-[0.6rem] uppercase tracking-[0.18em] font-medium" style={{ color: ALMA.ink, backgroundColor: ALMA.blush }}>
-              <span>Plan</span>
-              <span className="text-center">Constancia</span>
-              <span className="text-center">Esfuerzo</span>
-              <span className="text-center">Conexión</span>
-            </div>
-            {planGoals.map((row, i) => (
-              <div
-                key={row.plan}
-                className="grid grid-cols-[1.4fr_repeat(3,1fr)] items-center px-5 py-4 text-[0.86rem]"
-                style={i < planGoals.length - 1 ? { borderBottom: `1px solid ${ALMA.border}` } : undefined}
-              >
-                <span className="font-medium" style={{ color: ALMA.ink }}>{row.plan}</span>
-                <span className="text-center font-bebas tabular-nums text-[1rem]" style={{ color: ALMA.berry }}>{row.c}</span>
-                <span className="text-center font-bebas tabular-nums text-[1rem]" style={{ color: ALMA.olive }}>{row.e}</span>
-                <span className="text-center font-bebas tabular-nums text-[1rem]" style={{ color: ALMA.orange }}>{row.k}</span>
-              </div>
-            ))}
-          </div>
-
-          <div className="lg:col-span-5 relative overflow-hidden rounded-[20px] p-7 flex flex-col justify-between gap-6" style={{ backgroundColor: ALMA.orange, color: ALMA.cream }}>
-            <div className="absolute -bottom-12 -left-10 h-44 w-44 rounded-full pointer-events-none" style={{ background: `radial-gradient(circle, ${ALMA.cream}33 0%, transparent 60%)` }} />
-            <div className="relative">
-              <p className="text-[0.62rem] uppercase tracking-[0.24em] opacity-85">Recompensa</p>
-              <h3 className="font-bebas mt-3 leading-[0.92]" style={{ fontSize: "clamp(1.85rem, 3vw, 2.7rem)" }}>
-                Cierra los tres,
-                <span className="block italic font-alilato font-normal opacity-95">desbloquea algo.</span>
-              </h3>
-              <p className="mt-3 text-[0.9rem] leading-[1.6] opacity-90 max-w-[36ch]">
-                Una clase extra, un descuento, merch del estudio o un premio interno cuando cierres tus anillos.
-              </p>
-            </div>
-            <button
-              onClick={onCta}
-              className="group relative inline-flex w-fit items-center gap-3 rounded-full px-6 py-3 text-[0.78rem] font-medium uppercase tracking-[0.16em] transition-transform hover:-translate-y-0.5"
-              style={{ backgroundColor: ALMA.cream, color: ALMA.berry }}
-            >
-              Ver paquetes
-              <span className="grid h-7 w-7 place-items-center rounded-full transition-transform group-hover:translate-x-1" style={{ backgroundColor: ALMA.berry, color: ALMA.cream }}>
-                <ArrowUpRight size={13} />
-              </span>
-            </button>
-          </div>
-        </div>
-      </div>
-    </section>
   );
 };
 
@@ -1487,18 +1160,21 @@ const CoachesSection = ({ instructors }: { instructors: { id: string; displayNam
 /* ═══════════════════════════════════════════════════════════
    PAQUETES (Berry drench)
    ═══════════════════════════════════════════════════════════ */
+const formatPrice = (plan: PlanRow): string =>
+  Number(plan.effectivePrice ?? plan.price).toLocaleString("es-MX");
+
+const sessionsLabel = (plan: PlanRow): string =>
+  plan.classLimit == null ? "Ilimitado" : `${plan.classLimit} sesiones`;
+
 const PaquetesSection = ({
-  trialPlans,
-  monthlyPackages,
-  singleClass,
+  trialPlan,
+  groupedPlans,
   onPick,
 }: {
-  trialPlans: TrialPlanRow[];
-  monthlyPackages: PackageRow[];
-  singleClass: PackageRow | undefined;
+  trialPlan: PlanRow | undefined;
+  groupedPlans: CatalogGroup[];
   onPick: () => void;
 }) => {
-  const [activeIdx, setActiveIdx] = useState<number>(Math.max(0, monthlyPackages.length - 4));
   return (
     <section id="paquetes" className="relative overflow-hidden px-5 sm:px-8 lg:px-12 py-20 lg:py-28" style={{ backgroundColor: ALMA.berry }}>
       <div className="absolute inset-0 pointer-events-none opacity-[0.10]" style={{ background: `radial-gradient(circle at 80% 0%, ${ALMA.coral} 0%, transparent 55%), radial-gradient(circle at 0% 100%, ${ALMA.orange} 0%, transparent 60%)` }} />
@@ -1514,29 +1190,29 @@ const PaquetesSection = ({
             </h2>
           </div>
           <p className="max-w-[42ch] text-[0.95rem] leading-[1.7]" style={{ color: ALMA.cream, opacity: 0.78 }}>
-            Paquetes mensuales con 30 días de vigencia. Clase muestra de $50 si nunca has venido. Compra directa desde la app.
+            Catálogo completo de planes Alma. Elige por modalidad, número de sesiones y vigencia. Compra directa desde la app.
           </p>
         </div>
 
-        {/* Trial highlight + single class — editorial row, not cards-in-cards */}
-        <div className="reveal opacity-0 translate-y-8 transition-all duration-700 mb-10 grid grid-cols-1 lg:grid-cols-12 gap-6">
-          <div className="lg:col-span-7 rounded-[24px] p-7 sm:p-9 flex flex-col gap-5" style={{ backgroundColor: ALMA.cream }}>
-            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
-              <div>
-                <span className="text-[0.62rem] uppercase tracking-[0.24em]" style={{ color: ALMA.coral }}>Primera vez en Alma</span>
-                <h3 className="font-bebas mt-2 leading-tight" style={{ color: ALMA.berry, fontSize: "clamp(1.8rem, 3vw, 2.6rem)" }}>Clase muestra</h3>
+        {/* Trial highlight — clase muestra */}
+        {trialPlan && (
+          <div className="reveal opacity-0 translate-y-8 transition-all duration-700 mb-10">
+            <div className="rounded-[24px] p-7 sm:p-9 flex flex-col gap-5" style={{ backgroundColor: ALMA.cream }}>
+              <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+                <div>
+                  <span className="text-[0.62rem] uppercase tracking-[0.24em]" style={{ color: ALMA.coral }}>Primera vez en Alma</span>
+                  <h3 className="font-bebas mt-2 leading-tight" style={{ color: ALMA.berry, fontSize: "clamp(1.8rem, 3vw, 2.6rem)" }}>{trialPlan.name}</h3>
+                </div>
+                <span className="text-[0.78rem] uppercase tracking-[0.18em] text-[color:var(--ink)]/60">{sessionsLabel(trialPlan)} · {trialPlan.durationDays} días</span>
               </div>
-              <span className="text-[0.78rem] uppercase tracking-[0.18em] text-[color:var(--ink)]/60">No transferible · No repetible</span>
-            </div>
-            {trialPlans.map((plan) => (
-              <div key={plan.id} className="flex flex-col sm:flex-row sm:items-end gap-5">
+              <div className="flex flex-col sm:flex-row sm:items-end gap-5">
                 <div className="flex items-baseline gap-1">
-                  <span className="font-bebas leading-none" style={{ color: ALMA.berry, fontSize: "clamp(3.5rem, 7vw, 5.8rem)" }}>${plan.price}</span>
+                  <span className="font-bebas leading-none" style={{ color: ALMA.berry, fontSize: "clamp(3.5rem, 7vw, 5.8rem)" }}>${formatPrice(trialPlan)}</span>
                   <span className="text-[0.8rem] uppercase tracking-[0.18em] text-[color:var(--ink)]/55">MXN</span>
                 </div>
                 <div className="flex-1">
-                  <p className="text-[0.92rem] leading-[1.6] text-[color:var(--ink)]/72 max-w-[40ch]">
-                    {plan.name}. {plan.classLimit} clase, {plan.durationDays} días para usarla. Karla te explica la barra y te ajusta cada postura.
+                  <p className="text-[0.92rem] leading-[1.6] text-[color:var(--ink)]/72 max-w-[42ch]">
+                    {trialPlan.description || "Tu primera clase en el estudio. Karla te explica el equipo y te ajusta cada postura."}
                   </p>
                 </div>
                 <button
@@ -1548,147 +1224,68 @@ const PaquetesSection = ({
                   <ArrowUpRight size={13} className="transition-transform group-hover:translate-x-0.5" />
                 </button>
               </div>
-            ))}
+            </div>
           </div>
-          {singleClass && (
-            <div className="lg:col-span-5 rounded-[24px] p-7 sm:p-9 flex flex-col justify-between gap-6" style={{ border: `1px solid ${ALMA.cream}33`, color: ALMA.cream }}>
-              <div>
-                <span className="text-[0.62rem] uppercase tracking-[0.24em]" style={{ color: ALMA.cream, opacity: 0.7 }}>Sin paquete</span>
-                <h3 className="font-bebas mt-2 leading-tight" style={{ fontSize: "clamp(1.6rem, 2.6vw, 2.2rem)" }}>Clase suelta</h3>
-                <div className="mt-4 flex items-baseline gap-1">
-                  <span className="font-bebas leading-none" style={{ fontSize: "clamp(2.6rem, 5vw, 4rem)" }}>${singleClass.price}</span>
-                  <span className="text-[0.78rem] uppercase tracking-[0.18em] opacity-70">MXN</span>
-                </div>
-                <p className="mt-3 text-[0.9rem] leading-[1.6] opacity-80 max-w-[34ch]">Pago por sesión, sin compromiso. Útil cuando vienes de visita o quieres un día puntual.</p>
+        )}
+
+        {/* Catálogo real agrupado por modalidad */}
+        <div className="reveal opacity-0 translate-y-8 transition-all duration-700 grid grid-cols-1 gap-6">
+          {groupedPlans.map((group) => (
+            <div key={group.key} className="rounded-[24px] overflow-hidden" style={{ backgroundColor: ALMA.cream }}>
+              <div className="px-7 sm:px-9 pt-7 sm:pt-9 pb-1">
+                <span className="text-[0.62rem] uppercase tracking-[0.24em]" style={{ color: ALMA.olive }}>Modalidad</span>
+                <h3 className="font-bebas mt-2 leading-tight" style={{ color: ALMA.ink, fontSize: "clamp(1.6rem, 2.6vw, 2.3rem)" }}>{group.title}</h3>
               </div>
-              <button
-                onClick={onPick}
-                className="group inline-flex w-fit items-center gap-2 rounded-full px-5 py-2.5 text-[0.74rem] font-medium uppercase tracking-[0.18em] transition-colors"
-                style={{ border: `1px solid ${ALMA.cream}88`, color: ALMA.cream }}
-              >
-                Reservar visita
-                <ArrowRight size={13} />
-              </button>
-            </div>
-          )}
-        </div>
 
-        {/* Recorded classes benefit */}
-        <div className="reveal opacity-0 translate-y-8 transition-all duration-700 mb-10 grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
-          <div className="lg:col-span-5 rounded-[24px] p-7 sm:p-9 flex flex-col justify-between gap-8" style={{ backgroundColor: ALMA.olive, color: ALMA.cream }}>
-            <div>
-              <span className="inline-flex items-center gap-2 text-[0.62rem] uppercase tracking-[0.24em]" style={{ color: ALMA.cream, opacity: 0.78 }}>
-                <Film size={14} />
-                Clases grabadas
-              </span>
-              <h3 className="font-bebas mt-4 leading-[0.92]" style={{ fontSize: "clamp(2rem, 3.5vw, 3.2rem)" }}>
-                Algunos paquetes
-                <span className="block italic font-alilato font-normal opacity-90">también entrenan contigo en casa.</span>
-              </h3>
-            </div>
-            <p className="text-[0.94rem] leading-[1.7] opacity-85 max-w-[42ch]">
-              El paquete de <strong>5 clases por semana</strong> incluye gratis el plan online: biblioteca completa de videos —clases completas, técnica y rutinas— para mantener tu constancia fuera del estudio.
-            </p>
-          </div>
-
-          <div className="lg:col-span-7 rounded-[24px] p-7 sm:p-9" style={{ backgroundColor: ALMA.cream, color: ALMA.ink }}>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-              {[
-                { title: "Rutinas a tu ritmo", text: "Practica cuando no alcanzas clase presencial o quieres reforzar postura." },
-                { title: "Técnica y seguimiento", text: "Repite ajustes clave de barre, alineación y activación sin improvisar." },
-                { title: "Acceso según plan", text: "Si tu paquete lo incluye, el equipo activa la biblioteca desde tu cuenta." },
-              ].map((item) => (
-                <div key={item.title} className="pt-4" style={{ borderTop: `1px solid ${ALMA.border}` }}>
-                  <span className="grid h-9 w-9 place-items-center rounded-full" style={{ backgroundColor: `${ALMA.olive}1a`, color: ALMA.olive }}>
-                    <CheckCircle2 size={15} />
-                  </span>
-                  <h4 className="font-bebas mt-4 leading-tight" style={{ color: ALMA.ink, fontSize: "1.35rem" }}>{item.title}</h4>
-                  <p className="mt-2 text-[0.86rem] leading-[1.65] text-[color:var(--ink)]/68">{item.text}</p>
-                </div>
-              ))}
-            </div>
-            <div className="mt-7 flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-[18px] px-5 py-4" style={{ backgroundColor: ALMA.blush }}>
-              <p className="text-[0.86rem] leading-[1.6] text-[color:var(--ink)]/72">
-                Busca la leyenda de biblioteca incluida al elegir tu paquete o pregúntanos por WhatsApp antes de comprar.
-              </p>
-              <button
-                onClick={onPick}
-                className="group inline-flex w-fit items-center gap-2 rounded-full px-5 py-2.5 text-[0.72rem] font-medium uppercase tracking-[0.18em] transition-transform hover:-translate-y-0.5"
-                style={{ backgroundColor: ALMA.berry, color: ALMA.cream }}
-              >
-                Ver paquetes
-                <ArrowUpRight size={13} className="transition-transform group-hover:translate-x-0.5" />
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Monthly packages — editorial table row layout */}
-        <div className="reveal opacity-0 translate-y-8 transition-all duration-700 rounded-[24px] overflow-hidden" style={{ backgroundColor: ALMA.cream }}>
-          <div className="px-7 sm:px-9 pt-7 sm:pt-9 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-            <div>
-              <span className="text-[0.62rem] uppercase tracking-[0.24em]" style={{ color: ALMA.olive }}>Paquetes mensuales</span>
-              <h3 className="font-bebas mt-2 leading-tight" style={{ color: ALMA.ink, fontSize: "clamp(1.85rem, 3vw, 2.6rem)" }}>Compra y reserva todo el mes</h3>
-            </div>
-            <p className="text-[0.84rem] text-[color:var(--ink)]/60 max-w-[36ch] leading-[1.6]">Vigencia de 30 días desde la primera clase. Aplican términos y condiciones.</p>
-          </div>
-
-          <ul className="mt-6 list-none m-0 p-0">
-            {monthlyPackages.map((p, i) => {
-              const perClass = Number(p.num_classes) > 0 ? Math.round(Number(p.price) / Number(p.num_classes)) : null;
-              const active = i === activeIdx;
-              const isLast = i === monthlyPackages.length - 1;
-              return (
-                <li
-                  key={p.id}
-                  onMouseEnter={() => setActiveIdx(i)}
-                  onFocus={() => setActiveIdx(i)}
-                  className="group relative grid grid-cols-[auto_1fr_auto_auto] sm:grid-cols-[auto_1.6fr_1fr_auto_auto] items-center gap-x-4 sm:gap-x-6 gap-y-1 px-7 sm:px-9 py-5 transition-colors"
-                  style={{
-                    backgroundColor: active ? ALMA.blush : "transparent",
-                    borderTop: `1px solid ${ALMA.border}`,
-                    borderBottom: isLast ? `0px` : `0`,
-                  }}
-                >
-                  <span className="font-bebas tabular-nums text-[0.86rem]" style={{ color: ALMA.coral }}>
-                    {String(i + 1).padStart(2, "0")}
-                  </span>
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h4 className="font-bebas leading-tight" style={{ color: ALMA.ink, fontSize: "clamp(1.15rem, 1.5vw, 1.35rem)" }}>{p.name}</h4>
-                      {/* El paquete top (5/semana) incluye el plan online de videos sin costo extra. */}
-                      {Number(p.num_classes) >= 20 && (
-                        <span
-                          className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[0.58rem] font-medium uppercase tracking-[0.16em]"
-                          style={{ backgroundColor: `${ALMA.olive}1f`, color: ALMA.olive }}
-                        >
-                          <Film size={10} /> Incluye videos online
-                        </span>
+              <ul className="mt-4 list-none m-0 p-0">
+                {group.items.map((plan, i) => (
+                  <li
+                    key={plan.id}
+                    className="group relative grid grid-cols-[auto_1fr_auto_auto] sm:grid-cols-[auto_1.8fr_1fr_auto_auto] items-center gap-x-4 sm:gap-x-6 gap-y-1 px-7 sm:px-9 py-5"
+                    style={{ borderTop: `1px solid ${ALMA.border}` }}
+                  >
+                    <span className="font-bebas tabular-nums text-[0.86rem]" style={{ color: ALMA.coral }}>
+                      {String(i + 1).padStart(2, "0")}
+                    </span>
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h4 className="font-bebas leading-tight" style={{ color: ALMA.ink, fontSize: "clamp(1.15rem, 1.5vw, 1.4rem)" }}>{plan.name}</h4>
+                        {plan.morningOnly && (
+                          <span
+                            className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[0.58rem] font-medium uppercase tracking-[0.16em]"
+                            style={{ backgroundColor: `${ALMA.olive}1f`, color: ALMA.olive }}
+                          >
+                            Solo 7–10am
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[0.76rem] uppercase tracking-[0.16em] text-[color:var(--ink)]/55 mt-0.5">
+                        {sessionsLabel(plan)} · {plan.durationDays} días
+                      </p>
+                      {plan.description && (
+                        <p className="text-[0.84rem] leading-[1.55] text-[color:var(--ink)]/62 mt-1 max-w-[52ch]">
+                          {plan.description}
+                        </p>
                       )}
                     </div>
-                    <p className="text-[0.76rem] uppercase tracking-[0.16em] text-[color:var(--ink)]/55 mt-0.5">
-                      {p.num_classes} {Number(p.num_classes) === 1 ? "clase" : "clases"} · {p.validity_days ?? 30} días
-                    </p>
-                  </div>
-                  <div className="hidden sm:block text-[0.78rem] text-[color:var(--ink)]/55">
-                    {perClass !== null && <>${perClass} <span className="opacity-60">por clase</span></>}
-                  </div>
-                  <div className="text-right">
-                    <div className="font-bebas leading-none" style={{ color: ALMA.berry, fontSize: "clamp(1.65rem, 2.4vw, 2.15rem)" }}>${Number(p.price).toLocaleString()}</div>
-                    <div className="text-[0.66rem] uppercase tracking-[0.18em] text-[color:var(--ink)]/45 mt-0.5">MXN</div>
-                  </div>
-                  <button
-                    onClick={onPick}
-                    className="grid h-11 w-11 sm:h-12 sm:w-12 place-items-center rounded-full transition-transform group-hover:scale-105"
-                    style={{ backgroundColor: active ? ALMA.berry : "transparent", color: active ? ALMA.cream : ALMA.berry, border: `1px solid ${ALMA.berry}` }}
-                    aria-label={`Elegir ${p.name}`}
-                  >
-                    <ArrowUpRight size={16} />
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
+                    <div className="hidden sm:block" />
+                    <div className="text-right">
+                      <div className="font-bebas leading-none" style={{ color: ALMA.berry, fontSize: "clamp(1.6rem, 2.4vw, 2.1rem)" }}>${formatPrice(plan)}</div>
+                      <div className="text-[0.66rem] uppercase tracking-[0.18em] text-[color:var(--ink)]/45 mt-0.5">MXN</div>
+                    </div>
+                    <button
+                      onClick={onPick}
+                      className="grid h-11 w-11 sm:h-12 sm:w-12 place-items-center rounded-full transition-transform group-hover:scale-105"
+                      style={{ color: ALMA.berry, border: `1px solid ${ALMA.berry}` }}
+                      aria-label={`Elegir ${plan.name}`}
+                    >
+                      <ArrowUpRight size={16} />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </div>
 
         <p className="reveal opacity-0 translate-y-8 transition-all duration-700 mt-6 text-[0.78rem] uppercase tracking-[0.18em] text-center" style={{ color: ALMA.cream, opacity: 0.55 }}>
