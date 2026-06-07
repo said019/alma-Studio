@@ -1,53 +1,52 @@
 # Alma Movement
 
-Plataforma para reservas, pagos, asistencias y comunidad de Alma Movement en San Luis Potosi.
+Plataforma de reservas, pagos, asistencias y comunidad de **Alma Movement**, estudio de Pilates en **Juriquilla, Querétaro**.
 
-## Base del proyecto
+## Arquitectura
 
-Este repo fue copiado desde una plataforma de studio ya funcional y adaptado para Alma. La arquitectura conserva:
+- **App cliente**: reservar clases, comprar paquetes, ver membresía, historial, wallet y notificaciones.
+- **Panel admin**: clases, horarios, alumnas, membresías, pagos, POS, lealtad, reportes y configuración.
+- **Backend** Express + PostgreSQL: comprobantes de pago, recordatorios, WhatsApp/Evolution API, QR check-in y lealtad.
 
-- App cliente para reservar clases, comprar paquetes, ver membresia, historial, wallet y notificaciones.
-- Panel admin para clases, horarios, alumnas, membresias, pagos, POS, lealtad, reportes y configuracion.
-- Backend Express con PostgreSQL, comprobantes de pago, recordatorios, WhatsApp/Evolution API, QR check-in y lealtad.
+## Catálogo (Fase 1)
 
-## Requisitos de Alma extraidos del PDF
+- **5 disciplinas** en 2 áreas:
+  - **Reformer / Tower** (equipo) — cupo 4 por clase: *Pilates Reformer*, *Pilates Tower*.
+  - **Studio** (tapete) — cupo 8 por clase: *Pilates Mat*, *Barre*, *Sculpt*.
+- **Horarios**: lunes a sábado, 6:00–11:00 am y 5:00–8:00 pm. (La disciplina por horario se configura desde el admin.)
+- **17 paquetes** (tabla completa en `docs/superpowers/specs/2026-06-06-alma-catalogo-fase1-design.md`):
+  Clase única / 4 / 8 / 12 sesiones e Ilimitado por área, paquetes mixtos (Alma Balance / Fusion / Experience), AM Club matutino y Alma Unlimited.
+- **Modo apertura**: switch global en *Admin → Configuración*. Con él activo los paquetes ilimitados muestran y cobran precio de apertura; al apagarlo, el precio regular.
+- **Reglas**: un paquete reserva solo su área (Studio o Reformer/Tower); los mixtos y Unlimited reservan ambas. AM Club solo permite clases matutinas (hasta las 10:00 am). "Alma Studio Intro" es clase muestra de un solo uso para nuevas alumnas.
 
-- Marca cercana y casual, con vibra energetica.
-- Servicio principal: clases de barre.
-- Cupo regular: 4 a 5 lugares por clase; eventos privados/especiales hasta 6.
-- Horarios de clase: lunes a viernes 7:00 y 8:00 am, 7:00 y 8:00 pm; sabados 7:00, 8:00 y 9:00 am.
-- Atencion: 7:00 am a 3:00 pm y 5:00 pm a 9:00 pm.
-- Clase muestra: $50.
-- Clase suelta: $125.
-- Paquetes al mes: 2 clases $230, 3 clases $355, 4 clases $470, 5 clases $585.
-- Mensualidades por semana: 2 clases/semana $880, 3 clases/semana $1,080, 4 clases/semana $1,200, 5 clases/semana $1,300.
-- Pagos por transferencia o fisico; comprobante requerido para validar.
-- Transferencia BBVA: CLABE 012 700 01539444488 8, titular Karla Cruz.
-- Cancelacion: nuevas de 4 a 5 horas antes; alumnas recurrentes hasta 2 horas antes.
-- No-show o cancelacion tardia: clase tomada sin revalidacion.
-- Paquetes con vigencia de 1 mes desde la compra.
-- Reglas visibles: llegar 15 minutos antes si eres nueva.
-- Extras solicitados: lealtad, QR check-in, recordatorios por WhatsApp, promociones y recompensas por asistencia.
+## Pagos
 
-## Datos publicos
+- Transferencia o pago físico (tarjeta/efectivo en estudio); comprobante requerido para validar.
+- **Transferencia BBVA** — titular **Karla Cruz** (founder), CLABE **012 700 01539444488 8**.
+- Los datos bancarios se editan en *Admin → Configuración → Pagos*.
 
-- Direccion: Av. Nicolas Zapata #845 int. 4, Plaza San Martin, Col. Tequisquiapan, San Luis Potosi.
-- Maps: https://maps.app.goo.gl/5rQkyiewpX85vgXN9
-- WhatsApp: 4443073266
-- Instagram: @almamovement_slp
-- Facebook: Alma Barre studio SLP
+## Datos públicos
+
+- **Dirección**: Plaza Arce, Calle Acueducto de Querétaro 513, Jurica Acueducto, 76230 Juriquilla, Qro.
+- **WhatsApp**: 7721119216
+- **Instagram**: @movementalma
+- **Facebook**: Alma Movement
 
 ## Desarrollo local
+
+Frontend con hot-reload (sin backend):
 
 ```sh
 npm install
 npm run dev
 ```
 
-Backend:
+App completa (frontend + API + base de datos local):
 
 ```sh
-npm run start
+npm run db:local      # Postgres embebido en 127.0.0.1:5433 (deja la terminal abierta)
+npm run db:schema     # aplica esquema + migraciones
+npm start             # sirve dist + API en http://localhost:8080
 ```
 
-Configura `.env` desde `.env.example` antes de conectar base de datos, correo, WhatsApp o Wallet.
+Configura `.env` desde `.env.example` antes de conectar base de datos remota, correo, WhatsApp o Wallet. La planeación por fases vive en `docs/superpowers/`.
