@@ -760,7 +760,7 @@ async function ensureSchema() {
       if (upd.rowCount === 0) {
         await pool.query(
           `INSERT INTO class_types (name, category, intensity, level, duration_min, capacity, color, emoji, sort_order, is_active)
-           VALUES ($1,$2,'media','Todos los niveles',$3,$4,$5,'sparkles',$6,true)`,
+           VALUES ($1,$2,'media','all',$3,$4,$5,'sparkles',$6,true)`,
           [c.name, c.category, c.duration_min, c.capacity, c.color, c.sort_order]
         );
       }
@@ -1329,21 +1329,8 @@ async function ensureSchema() {
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `);
-    // Cupo del estudio: 5 lugares por clase. Backfill ÚNICO — baja a 5 los
-    // tipos de clase y las clases futuras una sola vez. Luego el admin puede
-    // editar el cupo por clase libremente sin que lo volvamos a pisar.
-    {
-      const seedKey = "capacity_5_backfill_done";
-      const seen = await pool.query("SELECT 1 FROM settings WHERE key = $1 LIMIT 1", [seedKey]).catch(() => ({ rows: [] }));
-      if (!seen.rows.length) {
-        await pool.query(`UPDATE class_types SET capacity = 5 WHERE capacity IS DISTINCT FROM 5`).catch(() => { });
-        await pool.query(`UPDATE classes SET max_capacity = 5 WHERE max_capacity > 5 AND date >= CURRENT_DATE`).catch(() => { });
-        await pool.query(
-          `INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO NOTHING`,
-          [seedKey, JSON.stringify({ done_at: new Date().toISOString() })]
-        ).catch(() => { });
-      }
-    }
+    // Cupo por disciplina: lo fija el seed de class_types (Reformer/Tower = 4,
+    // Studio = 8). El admin puede editar el cupo por clase libremente.
     await pool.query(
       `INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO NOTHING`,
       ["general_settings", JSON.stringify(DEFAULT_GENERAL_SETTINGS)],
@@ -8328,8 +8315,8 @@ app.post("/api/admin/class-types", adminMiddleware, async (req, res) => {
       `INSERT INTO class_types (name, subtitle, description, category, intensity, level, duration_min, capacity, color, emoji, sort_order)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
       [name.trim(), subtitle || null, description || null,
-      category || "jumping", intensity || "media",
-      level || "Todos los niveles", duration_min || 50, capacity || 5,
+      category || "studio", intensity || "media",
+      level || "all", duration_min || 50, capacity || 5,
       color || "#c026d3", emoji || "🏃", sort_order ?? 0]
     );
     return res.status(201).json({ data: r.rows[0] });
