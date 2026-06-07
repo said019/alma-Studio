@@ -1,5 +1,4 @@
 import { useQuery } from "@tanstack/react-query";
-import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { es } from "date-fns/locale";
 import { format, isToday, isTomorrow } from "date-fns";
@@ -7,7 +6,6 @@ import api from "@/lib/api";
 import { useAuthStore } from "@/stores/authStore";
 import { ClientAuthGuard } from "@/components/layout/ClientAuthGuard";
 import { safeParse } from "@/lib/utils";
-import { ALMA_RING_COLORS, RingsTriple, type AlmaRing } from "@/components/alma/RingsTriple";
 import {
   AppShell,
   PageHeader,
@@ -36,9 +34,6 @@ import {
 import type { ClientMembership } from "@/types/membership";
 import type { BookingClient } from "@/types/booking";
 
-const ringPercent = (progress: number, goal: number) =>
-  goal > 0 ? Math.min(100, Math.max(0, (progress / goal) * 100)) : 0;
-
 const formatBookingTime = (iso: string | null | undefined) => {
   if (!iso) return "Por confirmar";
   const d = safeParse(iso);
@@ -63,12 +58,6 @@ const Dashboard = () => {
   const { data: walletData } = useQuery({
     queryKey: ["wallet-pass"],
     queryFn: async () => (await api.get("/wallet/pass")).data,
-    retry: false,
-  });
-
-  const { data: ringsData } = useQuery({
-    queryKey: ["me-rings"],
-    queryFn: async () => (await api.get("/me/rings")).data,
     retry: false,
   });
 
@@ -101,58 +90,6 @@ const Dashboard = () => {
   const classesRemaining = membership?.classesRemaining ?? membership?.classes_remaining ?? null;
   const walletPoints = Number(wallet?.points ?? 0);
 
-  const ringsState = (ringsData?.data ?? ringsData)?.current;
-  const rings = useMemo<{ metrics: AlmaRing[]; closed: number; message: string }>(() => {
-    const classesTaken = classLimit && classesRemaining !== null
-      ? Math.max((classLimit ?? 0) - (classesRemaining ?? 0), 0)
-      : 0;
-    const fallbackConstanciaGoal = classLimit ? Math.max(1, Math.ceil(classLimit / 4)) : 1;
-    const constanciaProgress = Number(ringsState?.constancia?.progress ?? Math.min(fallbackConstanciaGoal, classesTaken));
-    const constanciaGoal = Number(ringsState?.constancia?.goal ?? fallbackConstanciaGoal);
-    const esfuerzoGoal = Number(ringsState?.esfuerzo?.goal ?? Math.max(1, Math.ceil(constanciaGoal * 0.6)));
-    const esfuerzoProgress = Number(ringsState?.esfuerzo?.progress ?? Math.min(esfuerzoGoal, Math.floor(constanciaProgress * 0.6)));
-    const conexionGoal = Number(ringsState?.conexion?.goal ?? 10);
-    const conexionProgress = Number(ringsState?.conexion?.progress ?? Math.min(conexionGoal, Math.floor((walletPoints % 500) / 50)));
-    const metrics: AlmaRing[] = [
-      {
-        key: "constancia",
-        label: "Constancia",
-        value: `${constanciaProgress}/${constanciaGoal}`,
-        goalLabel: "clases asistidas",
-        progress: ringPercent(constanciaProgress, constanciaGoal),
-        ...ALMA_RING_COLORS.constancia,
-      },
-      {
-        key: "esfuerzo",
-        label: "Esfuerzo",
-        value: `${esfuerzoProgress}/${esfuerzoGoal}`,
-        goalLabel: "retos o intensas",
-        progress: ringPercent(esfuerzoProgress, esfuerzoGoal),
-        ...ALMA_RING_COLORS.esfuerzo,
-      },
-      {
-        key: "conexion",
-        label: "Conexión",
-        value: `${conexionProgress}/${conexionGoal}`,
-        goalLabel: "puntos de comunidad",
-        progress: ringPercent(conexionProgress, conexionGoal),
-        ...ALMA_RING_COLORS.conexion,
-      },
-    ];
-    const closedCount = Number.isFinite(Number(ringsState?.rings_closed))
-      ? Number(ringsState?.rings_closed)
-      : metrics.filter((r) => r.progress >= 100).length;
-    const hasGoal = Boolean(membership && classLimit && classesRemaining !== null);
-    const message = hasGoal
-      ? closedCount >= 3
-        ? "Cerraste tus tres anillos esta semana. Tu recompensa Alma queda desbloqueada."
-        : classesTaken === 0
-          ? "Tus anillos empiezan con tu primera asistencia."
-          : `Llevas ${closedCount}/3 anillos cerrados. La siguiente clase suma constancia.`
-      : "Activa un paquete y cada asistencia empieza a cerrar tus anillos.";
-    return { metrics, closed: closedCount, message };
-  }, [ringsState, classLimit, classesRemaining, walletPoints, membership]);
-
   const upcoming = bookings
     .filter((b) => b.status === "confirmed" || b.status === "waitlist")
     .slice(0, 3);
@@ -167,7 +104,7 @@ const Dashboard = () => {
           eyebrow={`Hoy · ${format(new Date(), "EEEE d MMM", { locale: es })}`}
           title={<>Tu semana en</>}
           titleAccent="Alma."
-          subtitle={rings.message}
+          subtitle="Tu próxima clase, tu membresía y tus recompensas, en un solo lugar."
         />
 
         {/* ── Next class — primary action ── */}
@@ -200,34 +137,6 @@ const Dashboard = () => {
             />
           )}
         </div>
-
-        {/* ── Rings ── */}
-        <Section title="Tres anillos">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-7 lg:gap-10 items-center">
-            <div className="lg:col-span-5 flex justify-center lg:justify-start">
-              <div className="rounded-full p-3" style={{ backgroundColor: ALMA.ink }}>
-                <RingsTriple
-                  rings={rings.metrics}
-                  centerLabel="esta semana"
-                  centerValue={`${rings.closed}/3`}
-                  centerSub="anillos cerrados"
-                  shellClassName="border-transparent shadow-none"
-                />
-              </div>
-            </div>
-            <div className="lg:col-span-7 grid grid-cols-3 gap-5 sm:gap-7" data-stagger>
-              {rings.metrics.map((m) => (
-                <div key={m.key} data-stagger-item>
-                  <Stat
-                    value={m.value}
-                    label={m.label}
-                    tint={m.key === "constancia" ? "berry" : m.key === "esfuerzo" ? "olive" : "orange"}
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-        </Section>
 
         {/* ── Próximo milestone (recompensa por asistencia) ── */}
         {ms?.next_milestone && (

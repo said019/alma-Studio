@@ -33,9 +33,6 @@ const ClientDetail = () => {
   const qc = useQueryClient();
   const [adjPoints, setAdjPoints] = useState("");
   const [adjReason, setAdjReason] = useState("");
-  const [communityPoints, setCommunityPoints] = useState("1");
-  const [communityType, setCommunityType] = useState("story");
-  const [communityDescription, setCommunityDescription] = useState("");
 
   // Edición de membresía (créditos / estado / vencimiento)
   const [editMem, setEditMem] = useState<any | null>(null);
@@ -70,12 +67,6 @@ const ClientDetail = () => {
   const { data: loyalty, refetch: refetchLoyalty } = useQuery({
     queryKey: ["client-loyalty", id],
     queryFn: async () => (await api.get(`/loyalty/points/${id}`)).data,
-    enabled: !!id,
-  });
-
-  const { data: rings } = useQuery({
-    queryKey: ["client-rings", id],
-    queryFn: async () => (await api.get(`/admin/rings/users/${id}`)).data,
     enabled: !!id,
   });
 
@@ -131,23 +122,6 @@ const ClientDetail = () => {
     onError: (e: any) => toast({ title: e?.response?.data?.message ?? "Error al recalcular", variant: "destructive" }),
   });
 
-  const communityMutation = useMutation({
-    mutationFn: () => api.post("/admin/rings/community-events", {
-      userId: id,
-      pointsAwarded: Math.max(1, Number(communityPoints) || 1),
-      eventType: communityType,
-      description: communityDescription || "Acción de comunidad",
-    }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["client-rings", id] });
-      qc.invalidateQueries({ queryKey: ["me-rings"] });
-      toast({ title: "✅ Conexión actualizada" });
-      setCommunityPoints("1");
-      setCommunityDescription("");
-    },
-    onError: (e: any) => toast({ title: e?.response?.data?.message ?? "Error al sumar conexión", variant: "destructive" }),
-  });
-
   const openEditMem = (m: any) => {
     setEditMem(m);
     setEditCredits(m.classesRemaining == null ? "" : String(m.classesRemaining));
@@ -174,9 +148,6 @@ const ClientDetail = () => {
   });
 
   const u = user?.data ?? user;
-  const ringData = rings?.data ?? rings ?? {};
-  const currentRing = ringData.current ?? null;
-  const communityEvents = Array.isArray(ringData.communityEvents) ? ringData.communityEvents : [];
 
   return (
     <AuthGuard>
@@ -198,7 +169,6 @@ const ClientDetail = () => {
               <TabsTrigger value="bookings">Reservas</TabsTrigger>
               <TabsTrigger value="payments">Pagos</TabsTrigger>
               <TabsTrigger value="loyalty">Lealtad</TabsTrigger>
-              <TabsTrigger value="rings">Anillos</TabsTrigger>
             </TabsList>
 
             <TabsContent value="profile" className="mt-4">
@@ -405,84 +375,6 @@ const ClientDetail = () => {
                     − Deducir puntos
                   </Button>
                 </div>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="rings" className="mt-4 space-y-6">
-              <div className="grid gap-4 sm:grid-cols-4">
-                <div className="rounded-2xl border border-border bg-secondary p-4">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Cerrados</p>
-                  <p className="mt-2 text-3xl font-bold">{currentRing?.rings_closed ?? 0}/3</p>
-                </div>
-                <div className="rounded-2xl border border-[#A48D78]/25 bg-[#A48D78]/10 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-[#A48D78]">Constancia</p>
-                  <p className="mt-2 text-2xl font-bold">{currentRing?.constancia_progress ?? 0}/{currentRing?.constancia_goal ?? 1}</p>
-                </div>
-                <div className="rounded-2xl border border-[#9C8E72]/25 bg-[#9C8E72]/10 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-[#9C8E72]">Esfuerzo</p>
-                  <p className="mt-2 text-2xl font-bold">{currentRing?.esfuerzo_progress ?? 0}/{currentRing?.esfuerzo_goal ?? 1}</p>
-                </div>
-                <div className="rounded-2xl border border-[#C0A688]/25 bg-[#C0A688]/10 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-[#C0A688]">Conexión</p>
-                  <p className="mt-2 text-2xl font-bold">{currentRing?.conexion_progress ?? 0}/{currentRing?.conexion_goal ?? 10}</p>
-                </div>
-              </div>
-
-              <div className="rounded-xl border p-4 space-y-3 max-w-xl">
-                <p className="text-sm font-semibold">Sumar puntos de Conexión</p>
-                <div className="grid gap-3 sm:grid-cols-[110px_160px_1fr]">
-                  <div className="space-y-1">
-                    <Label>Puntos</Label>
-                    <Input
-                      type="number"
-                      min="1"
-                      value={communityPoints}
-                      onChange={(e) => setCommunityPoints(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label>Tipo</Label>
-                    <Input
-                      value={communityType}
-                      onChange={(e) => setCommunityType(e.target.value)}
-                      placeholder="story, invitada"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label>Descripción</Label>
-                    <Input
-                      value={communityDescription}
-                      onChange={(e) => setCommunityDescription(e.target.value)}
-                      placeholder="Ej: Story etiquetando a Alma"
-                    />
-                  </div>
-                </div>
-                <Button
-                  size="sm"
-                  disabled={communityMutation.isPending || !id}
-                  onClick={() => communityMutation.mutate()}
-                >
-                  {communityMutation.isPending ? "Guardando..." : "Sumar a Conexión"}
-                </Button>
-              </div>
-
-              <div>
-                <h3 className="text-sm font-semibold mb-3">Eventos recientes de comunidad</h3>
-                <Table>
-                  <TableHeader><TableRow><TableHead>Fecha</TableHead><TableHead>Tipo</TableHead><TableHead>Puntos</TableHead><TableHead>Descripción</TableHead></TableRow></TableHeader>
-                  <TableBody>
-                    {communityEvents.length === 0 ? (
-                      <TableRow><TableCell colSpan={4} className="text-sm text-muted-foreground">Sin eventos registrados.</TableCell></TableRow>
-                    ) : communityEvents.map((event: any) => (
-                      <TableRow key={event.id}>
-                        <TableCell>{event.occurred_at ? new Date(event.occurred_at).toLocaleDateString("es-MX") : "—"}</TableCell>
-                        <TableCell><Badge variant="outline">{event.event_type}</Badge></TableCell>
-                        <TableCell>{event.points_awarded}</TableCell>
-                        <TableCell>{event.description || "—"}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
               </div>
             </TabsContent>
           </Tabs>
