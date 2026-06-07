@@ -14013,9 +14013,12 @@ app.put("/api/plans/:id", adminMiddleware, async (req, res) => {
       name, description, price, currency, durationDays, classLimit, classCategory,
       features, isActive, sortOrder, isNonTransferable, isNonRepeatable, repeatKey,
       ringConstanciaGoal, ringEsfuerzoGoal, ringConexionGoal, rewardDescription,
+      opening_price, morning_only,
     } = req.body;
-    const validCats = ["barre", "jumping", "pilates", "mixto", "all"];
+    const validCats = ["studio", "reformer_tower", "mixto", "all"];
     const cat = validCats.includes(classCategory) ? classCategory : null;
+    const openingPrice = opening_price === "" || opening_price == null ? null : Number(opening_price);
+    const morningOnly = morning_only === undefined ? null : parseBooleanFlag(morning_only);
     const nonTransferable = parseBooleanFlag(isNonTransferable ?? req.body.is_non_transferable);
     const nonRepeatable = parseBooleanFlag(isNonRepeatable ?? req.body.is_non_repeatable);
     const safeRepeatKey = nonRepeatable
@@ -14034,8 +14037,10 @@ app.put("/api/plans/:id", adminMiddleware, async (req, res) => {
        class_category=COALESCE($10, class_category),
        is_non_transferable=$11, is_non_repeatable=$12, repeat_key=$13,
        ring_constancia_goal=$14, ring_esfuerzo_goal=$15, ring_conexion_goal=$16,
-       reward_description=$17, is_visit_pack=$18, updated_at=NOW()
-       WHERE id=$19 RETURNING *`,
+       reward_description=$17, is_visit_pack=$18,
+       opening_price=COALESCE($19, opening_price), morning_only=COALESCE($20, morning_only),
+       updated_at=NOW()
+       WHERE id=$21 RETURNING *`,
       [
         name,
         description || null,
@@ -14055,6 +14060,8 @@ app.put("/api/plans/:id", adminMiddleware, async (req, res) => {
         Math.max(1, Number(ringConexionGoal ?? req.body.ring_conexion_goal ?? 10)),
         rewardDescription ?? req.body.reward_description ?? null,
         isVisitPack,
+        openingPrice,
+        morningOnly,
         req.params.id,
       ]
     );
@@ -14123,10 +14130,13 @@ app.post("/api/plans", adminMiddleware, async (req, res) => {
       classCategory, features, isActive = true, sortOrder = 0,
       isNonTransferable, isNonRepeatable, repeatKey,
       ringConstanciaGoal, ringEsfuerzoGoal, ringConexionGoal, rewardDescription,
+      opening_price, morning_only,
     } = req.body;
     if (!name) return res.status(400).json({ message: "Nombre requerido" });
-    const validCats = ["barre", "jumping", "pilates", "mixto", "all"];
+    const validCats = ["studio", "reformer_tower", "mixto", "all"];
     const cat = validCats.includes(classCategory) ? classCategory : "all";
+    const openingPrice = opening_price === "" || opening_price == null ? null : Number(opening_price);
+    const morningOnly = parseBooleanFlag(morning_only);
     const nonTransferable = parseBooleanFlag(isNonTransferable ?? req.body.is_non_transferable);
     const nonRepeatable = parseBooleanFlag(isNonRepeatable ?? req.body.is_non_repeatable);
     const safeRepeatKey = nonRepeatable
@@ -14140,9 +14150,9 @@ app.post("/api/plans", adminMiddleware, async (req, res) => {
     const isVisitPack = parseBooleanFlag(req.body.isVisitPack ?? req.body.is_visit_pack);
     const r = await pool.query(
       `INSERT INTO plans
-        (name, description, price, currency, duration_days, class_limit, class_category, features, is_active, sort_order, is_non_transferable, is_non_repeatable, repeat_key, ring_constancia_goal, ring_esfuerzo_goal, ring_conexion_goal, reward_description, is_visit_pack)
+        (name, description, price, currency, duration_days, class_limit, class_category, features, is_active, sort_order, is_non_transferable, is_non_repeatable, repeat_key, ring_constancia_goal, ring_esfuerzo_goal, ring_conexion_goal, reward_description, is_visit_pack, opening_price, morning_only)
        VALUES
-        ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING *`,
+        ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20) RETURNING *`,
       [
         name,
         description || null,
@@ -14162,6 +14172,8 @@ app.post("/api/plans", adminMiddleware, async (req, res) => {
         Math.max(1, Number(ringConexionGoal ?? req.body.ring_conexion_goal ?? 10)),
         rewardDescription ?? req.body.reward_description ?? null,
         isVisitPack,
+        openingPrice,
+        morningOnly,
       ]
     );
     return res.status(201).json({ data: camelRow(r.rows[0]) });
