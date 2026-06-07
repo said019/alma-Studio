@@ -1304,7 +1304,7 @@ const PoliticasSection = () => {
   const items = [
     { num: "01", title: "Primera vez", text: "Si eres nueva, llega 10 minutos antes. Te mostramos el equipo y el espacio sin prisa. El uso de calcetines antiderrapantes es obligatorio." },
     { num: "02", title: "Reservación", text: "Todas las clases requieren reserva previa. Cupo de 4 lugares en Reformer/Tower y 8 en Studio." },
-    { num: "03", title: "Cancelaciones", text: "Puedes cancelar hasta 12 horas antes de tu clase. Tras 5 clases reservadas a las que no asistas, se aplica penalización en tus puntos." },
+    { num: "03", title: "Cancelaciones", text: "Si cancelas dentro de las 12 horas previas a tu clase y acumulas 5 clases reservadas sin asistir, se aplica una penalización con pérdida de puntos." },
     { num: "04", title: "En el estudio", text: "Respeta el horario de inicio, mantén tu celular en silencio e informa antes cualquier lesión o condición médica." },
     { num: "05", title: "Pagos", text: "Transferencia Banorte · Estefanía Torres Lanzagorta · CLABE 072298012591154950. También aceptamos pago físico con tarjeta o efectivo." },
     { num: "06", title: "Vigencia", text: "Todos los paquetes tienen vigencia de 30 días a partir de la compra." },

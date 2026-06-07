@@ -155,7 +155,7 @@ async function getConfiguredBankInfo(dbClient = pool) {
 }
 
 const DEFAULT_POLICIES_SETTINGS = {
-  cancellation_policy: "Puedes cancelar hasta 12 horas antes de tu clase sin penalizacion. Tras 5 clases reservadas a las que no asistas, se aplica penalizacion con perdida de puntos de lealtad.",
+  cancellation_policy: "Si cancelas dentro de las 12 horas previas a tu clase y acumulas 5 clases reservadas sin asistir, se aplica una penalizacion con perdida de puntos.",
   terms_of_service: "Al reservar o comprar en Alma Movement aceptas el reglamento interno, la vigencia mensual de paquetes, las politicas de cancelacion y el uso personal e intransferible de tus clases.",
   privacy_policy: "Tus datos se usan para gestionar reservas, pagos, asistencias, recompensas y comunicacion operativa del studio. No compartimos tu informacion personal con terceros sin autorizacion.",
 };

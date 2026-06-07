@@ -27,7 +27,7 @@ Plataforma de reservas, pagos, asistencias y comunidad de **Alma Movement**, est
 
 ## Políticas
 
-- **Cancelación**: hasta 12 horas antes de la clase sin penalización. Tras 5 clases reservadas sin asistir, penalización con pérdida de puntos de lealtad.
+- **Cancelación**: si cancelas dentro de las 12 horas previas a tu clase y acumulas 5 clases reservadas sin asistir, penalización con pérdida de puntos.
 - **Vigencia**: todos los paquetes 30 días desde la compra.
 - **Reglas en estudio**: llegar 10 min antes · calcetines antiderrapantes obligatorios · respetar el horario de inicio · celular en silencio · informar previamente lesiones o condiciones médicas.
 
