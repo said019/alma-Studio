@@ -7,7 +7,7 @@ const CONN = "postgres://alma:alma@127.0.0.1:5433/alma";
 const MIG = path.join(process.cwd(), "supabase", "migrations");
 const FLAG = path.join(process.cwd(), ".schema_applied");
 
-const IDEMPOTENT = ["schema_complete.sql", "20260506_alma_progress_rings.sql"];
+const IDEMPOTENT = ["schema_complete.sql", "20260607_drop_rings.sql"];
 const ONCE = ["20260226_fix_plans_real_prices.sql"]; // DELETE+INSERT, solo primera vez
 
 async function connectWithRetry(tries = 30) {
