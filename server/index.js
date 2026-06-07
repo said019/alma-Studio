@@ -24,6 +24,9 @@ import {
   sendPasswordResetEmail,
   sendVideoPurchaseApproved,
 } from "./emailService.js";
+import { ALMA_CLASS_TYPES, ALMA_SCHEDULE_SLOTS, ALMA_SCHEDULE_DAYS, ALMA_PLANS, ALMA_PLAN_NAMES } from "./lib/almaCatalog.js";
+import { resolveEffectivePrice } from "./lib/pricing.js";
+import { isMembershipCategoryCompatible as ruleCategoryCompatible, normalizeClassCategory as ruleNormalizeCategory, isWithinMorningWindow, categoryLabel } from "./lib/bookingRules.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -761,17 +764,24 @@ async function ensureSchema() {
     }
     // ── Seed class_types – ensure Alma Barre exists ───────────────────────
     await pool.query(`ALTER TABLE class_types DROP CONSTRAINT IF EXISTS class_types_category_check`).catch(() => { });
-    await pool.query(`ALTER TABLE class_types ADD CONSTRAINT class_types_category_check CHECK (category IN ('barre','jumping','pilates','mixto'))`).catch(() => { });
-    const hasAlmaTypes = await pool.query("SELECT 1 FROM class_types WHERE name = 'Barre' LIMIT 1");
-    if (hasAlmaTypes.rows.length === 0) {
-      const almaNames = ['Barre'];
-      await pool.query("DELETE FROM class_types WHERE name != ALL($1::text[])", [almaNames]);
-      await pool.query(`
-        INSERT INTO class_types (name, subtitle, description, category, intensity, level, duration_min, capacity, color, emoji, sort_order, is_active) VALUES
-          ('Barre', 'Fuerza, postura y comunidad', 'Clase cercana, energetica y personalizada para todos los niveles. Cada sesion cambia para que avances con compromiso y disfrutes el proceso.', 'barre', 'Media', 'all', 50, 5, '#76214D', 'sparkles', 1, true)
-        ON CONFLICT DO NOTHING;
-      `);
-      console.log("✅ Seeded Alma Barre class type");
+    await pool.query(`ALTER TABLE class_types ADD CONSTRAINT class_types_category_check CHECK (category IN ('studio','reformer_tower'))`).catch(() => { });
+    // Desactivar tipos heredados que no son disciplinas Alma.
+    await pool.query(
+      `UPDATE class_types SET is_active = false WHERE name <> ALL($1::text[])`,
+      [ALMA_CLASS_TYPES.map((c) => c.name)]
+    );
+    for (const c of ALMA_CLASS_TYPES) {
+      const upd = await pool.query(
+        `UPDATE class_types SET category=$2, capacity=$3, duration_min=$4, color=$5, sort_order=$6, is_active=true, updated_at=NOW() WHERE name=$1`,
+        [c.name, c.category, c.capacity, c.duration_min, c.color, c.sort_order]
+      );
+      if (upd.rowCount === 0) {
+        await pool.query(
+          `INSERT INTO class_types (name, category, intensity, level, duration_min, capacity, color, emoji, sort_order, is_active)
+           VALUES ($1,$2,'media','Todos los niveles',$3,$4,$5,'sparkles',$6,true)`,
+          [c.name, c.category, c.duration_min, c.capacity, c.color, c.sort_order]
+        );
+      }
     }
     // ── Seed schedule_slots si la tabla está vacía ─────────────────────────
     const ssCount = await pool.query("SELECT COUNT(*) FROM schedule_slots");
@@ -892,9 +902,11 @@ async function ensureSchema() {
        WHERE is_active = true
           OR reward_description IS NULL
     `).catch(() => { });
-    // ── Migrate class_types: prefer barre for Alma defaults ───────────────
+    // ── Migrate class_types: 'Barre' es disciplina Studio en Alma Movement ──
+    // (La categoría real la fija el upsert de ALMA_CLASS_TYPES; 'barre' ya no es
+    //  una categoría válida según el CHECK class_types_category_check.)
     await pool.query(`
-      UPDATE class_types SET category = 'barre' WHERE name = 'Barre';
+      UPDATE class_types SET category = 'studio' WHERE name = 'Barre';
     `).catch(() => { });
     // ── Migrate plans: 'mixto' class_category means both, keep as 'mixto' for logic ──
     // (mixto plans are still valid — the booking endpoint allows them on both categories)
