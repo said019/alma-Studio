@@ -48,7 +48,7 @@ export default {
           foreground: "hsl(var(--card-foreground))",
         },
         /* ── Alma Movement brand palette ── */
-        ophelia: {
+        alma: {
           purple:      "#2E201C",
           magenta:     "#76214D",
           violet:      "#778455",

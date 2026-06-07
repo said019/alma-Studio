@@ -13,9 +13,9 @@ describe("Alma landing client copy", () => {
     expect(indexSource).toContain("Flexibilidad");
     expect(indexSource).toMatch(/Evoluciona[\s\S]*en cada clase\./);
     expect(indexSource).toContain("Playlists y rutinas nuevas cada día.");
-    expect(indexSource).toContain("Cupos de 5 alumnas por clase.");
+    expect(indexSource).toContain("Cupos reducidos: 4 lugares en Reformer y Tower, 8 en Studio.");
     expect(indexSource).toMatch(/Aquí crecemos[\s\S]*juntas\./);
-    expect(indexSource).toContain("Barre es para todas, sin condiciones.");
+    expect(indexSource).toContain("El movimiento es para todas, sin condiciones.");
   });
 
   it("removes copy the client asked to take out", () => {

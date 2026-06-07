@@ -40,7 +40,7 @@ const Cancelacion = () => {
         </h1>
 
         {dynamicPolicy ? (
-          <div className="prose-ophelia space-y-6 text-[0.92rem] text-muted-foreground leading-[1.8]">
+          <div className="prose-alma space-y-6 text-[0.92rem] text-muted-foreground leading-[1.8]">
             <p className="text-foreground font-medium">
               Última actualización: {new Date().toLocaleDateString("es-MX")}
             </p>
@@ -49,7 +49,7 @@ const Cancelacion = () => {
             </div>
           </div>
         ) : (
-          <div className="prose-ophelia space-y-6 text-[0.92rem] text-muted-foreground leading-[1.8]">
+          <div className="prose-alma space-y-6 text-[0.92rem] text-muted-foreground leading-[1.8]">
           <p className="text-foreground font-medium">
             Última actualización: 26 de febrero de 2026
           </p>

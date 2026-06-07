@@ -190,13 +190,13 @@
     --radius: 0.75rem;
 
     /* Tokens legacy conservados para evitar refactor masivo de componentes */
-    --ophelia-purple:    30 18% 22%;     /* #43392F */
-    --ophelia-magenta:   29 19% 56%;    /* #A48D78 */
-    --ophelia-violet:    40 18% 53%;     /* #9C8E72 */
-    --ophelia-lime:      32 31% 64%;     /* #C0A688 */
-    --ophelia-cream:     45 29% 97%;    /* #FAF9F6 */
-    --ophelia-lilac:     32 27% 72%;      /* #CBB9A4 */
-    --ophelia-pinklight: 36 37% 84%;     /* #E6DAC8 */
+    --alma-purple:    30 18% 22%;     /* #43392F */
+    --alma-magenta:   29 19% 56%;    /* #A48D78 */
+    --alma-violet:    40 18% 53%;     /* #9C8E72 */
+    --alma-lime:      32 31% 64%;     /* #C0A688 */
+    --alma-cream:     45 29% 97%;    /* #FAF9F6 */
+    --alma-lilac:     32 27% 72%;      /* #CBB9A4 */
+    --alma-pinklight: 36 37% 84%;     /* #E6DAC8 */
 
     --pink-glow: 29 19% 56%;
   }

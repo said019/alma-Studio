@@ -20,7 +20,7 @@ const P = {
   warmAccent:    "#C0A688", // sustituto de naranja
 };
 
-// ── Remapeo HEX -> HEX (marca vieja Kala/Ophelia -> nude Alma) ──
+// ── Remapeo HEX -> HEX (hexes de marca antiguos -> paleta nude de Alma) ──
 const HEX_MAP = {
   "#76214D": P.desertRock,    // berry/primary
   "#E9745F": P.softSandstone, // coral

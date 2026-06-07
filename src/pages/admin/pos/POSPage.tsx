@@ -242,7 +242,7 @@ const POSTerminal = () => {
               <Input
                 value={discountCode}
                 onChange={(e) => setDiscountCode(e.target.value.toUpperCase())}
-                placeholder="Ej. OPHELIA10"
+                placeholder="Ej. ALMA10"
               />
             </div>
             <Button className="w-full" onClick={() => checkoutMutation.mutate()} disabled={checkoutMutation.isPending}>

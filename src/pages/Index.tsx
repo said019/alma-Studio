@@ -675,7 +675,7 @@ const Index = () => {
               <span className="block italic font-alilato font-normal" style={{ color: ALMA.olive }}>en cada clase.</span>
             </h2>
             <p className="mt-6 max-w-[56ch] text-[1.02rem] leading-[1.75] text-[color:var(--ink)]/72">
-              Playlists y rutinas nuevas cada día. Una experiencia diferente con la misma calidad de siempre. Cupos de 5 alumnas por clase.
+              Playlists y rutinas nuevas cada día. Una experiencia diferente con la misma calidad de siempre. Cupos reducidos: 4 lugares en Reformer y Tower, 8 en Studio.
             </p>
           </div>
 
@@ -953,7 +953,7 @@ const Index = () => {
                 Karla no solo dirige una clase; diseña una experiencia personalizada para cada cuerpo que entra al estudio. Con un enfoque profundo en la alineación y el ritmo individual, se asegura de que cada ajuste te acerque a tu mejor versión.
               </p>
               <p>
-                "Mi filosofía es simple: <strong style={{ color: ALMA.ink, fontWeight: 600 }}>Barre es para todas, sin condiciones.</strong> No importa tu nivel de condición física actual; lo único que importa es la disposición de llegar y la constancia de volver. Si tú pones el esfuerzo, yo te guío en el camino."
+                "Mi filosofía es simple: <strong style={{ color: ALMA.ink, fontWeight: 600 }}>El movimiento es para todas, sin condiciones.</strong> No importa tu nivel de condición física actual; lo único que importa es la disposición de llegar y la constancia de volver. Si tú pones el esfuerzo, yo te guío en el camino."
               </p>
             </div>
 
@@ -961,7 +961,7 @@ const Index = () => {
             <ul className="mt-9 grid grid-cols-2 gap-x-7 gap-y-4 list-none m-0 p-0 max-w-[440px]" data-stagger>
               {[
                 { k: "Coach certificada", v: "Barre & fitness funcional" },
-                { k: "5 alumnas", v: "Por clase, atención uno-a-uno" },
+                { k: "4–8", v: "Lugares por clase, atención personalizada" },
                 { k: "Cada clase", v: "Distinta, energía propia" },
                 { k: "Filosofía", v: "Bienestar · Comunidad · Compromiso" },
               ].map((it) => (
