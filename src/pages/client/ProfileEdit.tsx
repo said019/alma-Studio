@@ -171,7 +171,7 @@ const ProfileEdit = () => {
               {...register("healthNotes")}
             />
             <p className="mt-2 text-[0.78rem]" style={{ color: ALMA.ink, opacity: 0.55 }}>
-              Solo Karla y el equipo del estudio ven esta información.
+              Solo el equipo del estudio ve esta información.
             </p>
           </Section>
 

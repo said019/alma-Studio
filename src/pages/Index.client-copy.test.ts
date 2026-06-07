@@ -14,14 +14,13 @@ describe("Alma landing client copy", () => {
     expect(indexSource).toMatch(/Evoluciona[\s\S]*en cada clase\./);
     expect(indexSource).toContain("Playlists y rutinas nuevas cada día.");
     expect(indexSource).toContain("Cupos reducidos: 4 lugares en Reformer y Tower, 8 en Studio.");
-    expect(indexSource).toMatch(/Aquí crecemos[\s\S]*juntas\./);
-    expect(indexSource).toContain("El movimiento es para todas, sin condiciones.");
   });
 
   it("removes copy the client asked to take out", () => {
     expect(indexSource).not.toContain("No configures tu meta");
     expect(indexSource).not.toContain("gánala.");
     expect(indexSource).not.toContain("Karla decide la recompensa por plan");
+    expect(indexSource).not.toContain("Karla");
   });
 
   it("ya no ofrece clases grabadas / planes online (eliminado en Fase 1)", () => {

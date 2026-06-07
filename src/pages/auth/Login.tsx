@@ -80,7 +80,7 @@ const Login = () => {
       <InstallAppPrompt />
       <AuthShell
         brandPhoto={almaAuthLogin}
-        brandPhotoAlt="Karla guía una clase de barre en Alma"
+        brandPhotoAlt="Una clase de Pilates en Alma Movement"
         brandTint="berry"
         brandEyebrow="Bienvenida de vuelta"
         brandHeadline={<>Pasa,</>}

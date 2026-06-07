@@ -192,7 +192,7 @@ const WalletRewards = () => {
             <EmptyState
               icon={<Gift size={20} />}
               title="Sin recompensas disponibles."
-              description="Cuando Karla active recompensas nuevas, aparecen aquí."
+              description="Cuando el estudio active recompensas nuevas, aparecen aquí."
             />
           ) : (
             <ul className="grid grid-cols-1 sm:grid-cols-2 gap-4 list-none m-0 p-0">

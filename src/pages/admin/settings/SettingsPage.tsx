@@ -158,7 +158,7 @@ const BankInfoSettings = () => {
 
       <div className="space-y-1">
         <Label>Titular de la cuenta</Label>
-        <Input value={holder} onChange={(e) => setHolder(e.target.value)} placeholder="Karla Cruz" />
+        <Input value={holder} onChange={(e) => setHolder(e.target.value)} placeholder="Nombre del titular" />
       </div>
 
       <div className="space-y-1">

@@ -48,7 +48,7 @@ import almaInstagram01 from "@/assets/alma/instagram/alma-instagram-01.jpg";
 import almaInstagram02 from "@/assets/alma/instagram/alma-instagram-02.jpg";
 import almaInstagram03 from "@/assets/alma/instagram/alma-instagram-03.jpg";
 import almaIconUrl from "@/assets/alma/alma-icon.png";
-import almaKarlaCoach from "@/assets/alma/alma-karla-coach.jpg";
+
 
 /* ═════════════════════════════════════════════════════════════
    Alma Movement · Landing
@@ -169,28 +169,28 @@ const SPECIAL_PROGRAMS: SpecialProgram[] = [
     id: "core-breath",
     eyebrow: "Alta especialización",
     name: "Alma Core & Breath",
-    tagline: "Suelo pélvico fuerte, postura alineada y recuperación profunda. Barré + Hipopresivos.",
+    tagline: "Suelo pélvico fuerte, postura alineada y recuperación profunda desde el centro.",
     intro:
-      "La combinación de la energía del Barré con la ciencia de los hipopresivos (Low Pressure Fitness). Un programa enfocado en gestionar la presión intraabdominal y fortalecer desde tu centro.",
-    modality: "Presencial en estudio y clases en línea",
+      "Un programa enfocado en el fortalecimiento profundo del core y el suelo pélvico a través del Pilates. Cada sesión combina técnica precisa, respiración consciente y trabajo postural para que tu cuerpo funcione mejor desde adentro hacia afuera.",
+    modality: "Presencial en estudio",
     duration: "55 min totales",
     structure: [
-      "40 min · Barré (escultura corporal, fuerza y resistencia de bajo impacto)",
-      "15 min · Técnica de hipopresivos + estiramiento especializado y meditación",
+      "40 min · Pilates Mat y accesorios (core profundo, estabilidad y control)",
+      "15 min · Trabajo de suelo pélvico, respiración y estiramiento especializado",
     ],
     benefitGroups: [
       {
-        title: "Beneficios de los hipopresivos",
+        title: "Beneficios del trabajo de core profundo",
         items: [
-          "Apoyan la recuperación de la diástasis abdominal tras el embarazo.",
-          "Tonifican la faja abdominal profunda y el suelo pélvico de forma refleja.",
-          "Mejoran la postura, liberando tensión y reduciendo dolores de espalda.",
-          "Aumentan la capacidad pulmonar y reducen estrés y ansiedad.",
+          "Fortalece la faja abdominal profunda y estabiliza la columna.",
+          "Mejora la postura y reduce dolores de espalda baja.",
+          "Favorece la recuperación del suelo pélvico de forma progresiva y segura.",
+          "Aumenta la conciencia corporal y reduce el estrés mediante la respiración.",
         ],
       },
     ],
     safety: {
-      heading: "Requisitos e indicaciones de seguridad",
+      heading: "Indicaciones de seguridad",
       notes: [
         {
           label: "Postparto",
@@ -198,11 +198,7 @@ const SPECIAL_PROGRAMS: SpecialProgram[] = [
         },
         {
           label: "Embarazo",
-          text: "No es apto durante ninguna etapa de la gestación. Para ese periodo, el programa ideal es Alma Prenatal & Postnatal.",
-        },
-        {
-          label: "Contraindicaciones médicas",
-          text: "No deben realizar hipopresivos personas con hipertensión arterial ni con condiciones respiratorias crónicas obstructivas (asma, EPOC).",
+          text: "No es apto durante el embarazo. Para ese periodo, el programa ideal es Alma Prenatal & Postnatal.",
         },
       ],
     },
@@ -620,7 +616,7 @@ const Index = () => {
             </h2>
             <div className="mt-7 space-y-5 text-[1.02rem] leading-[1.85] text-[color:var(--ink)]/76 max-w-[60ch]">
               <p>
-                Alma nace de una idea simple: que entrenar pueda sentirse como llegar a casa de una amiga. Karla recibe a cada alumna, ajusta cada postura y cambia la clase para que ningún día se sienta igual.
+                Alma nace de una idea simple: que el movimiento se sienta como bienestar. Grupos pequeños, atención personalizada y técnica cuidada en cada disciplina, para que cada clase te acerque a tu mejor versión.
               </p>
               <p>
                 Aquí no hay multitud, no hay aparatos imposibles, no hay vergüenza. Hay barra, suelo, música cuidada y una intención: que salgas con la sensación de haber hecho algo real por ti.
@@ -884,99 +880,6 @@ const Index = () => {
       {/* ═════════ HORARIO (Schedule embed) ═════════ */}
       <Schedule />
 
-      {/* ═════════ KARLA CRUZ — Tu coach y founder ═════════ */}
-      <section className="px-5 sm:px-8 lg:px-12 py-20 lg:py-28" style={{ backgroundColor: ALMA.blush }}>
-        <div className="mx-auto max-w-[1320px] grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-center">
-          {/* Photo column */}
-          <div className="lg:col-span-6 reveal opacity-0 translate-y-8 transition-all duration-700">
-            <div className="relative">
-              <div className="relative aspect-[4/5] overflow-hidden rounded-[28px]">
-                <img
-                  src={almaKarlaCoach}
-                  alt="Karla Cruz, coach y founder de Alma Movement"
-                  className="absolute inset-0 h-full w-full object-cover"
-                  loading="lazy"
-                />
-                <div
-                  className="absolute inset-0"
-                  style={{ background: "linear-gradient(180deg, rgba(46,32,28,0) 55%, rgba(46,32,28,0.35) 100%)" }}
-                />
-                {/* Name sticker */}
-                <div
-                  className="absolute left-4 bottom-4 sm:left-6 sm:bottom-6 rounded-2xl px-5 py-4 shadow-lg"
-                  style={{ backgroundColor: ALMA.cream, color: ALMA.ink }}
-                >
-                  <p className="font-bebas leading-none" style={{ fontSize: "1.55rem", color: ALMA.berry }}>
-                    Karla Cruz
-                  </p>
-                  <p className="mt-1 text-[0.66rem] uppercase tracking-[0.24em]" style={{ color: ALMA.ink, opacity: 0.65 }}>
-                    Coach · Fundadora
-                  </p>
-                </div>
-              </div>
-              {/* Decorative numeral */}
-              <div
-                className="hidden lg:block absolute -top-3 -right-3 font-bebas leading-none select-none pointer-events-none"
-                style={{ color: ALMA.coral, fontSize: "5.5rem", opacity: 0.85 }}
-              >
-                03
-              </div>
-            </div>
-          </div>
-
-          {/* Text column */}
-          <div className="lg:col-span-6 reveal opacity-0 translate-y-8 transition-all duration-700">
-            <span className="text-[0.66rem] font-medium uppercase tracking-[0.34em]" style={{ color: ALMA.berry }}>
-              Conoce a tu coach
-            </span>
-            <h2 className="font-bebas mt-4 leading-[0.92]" style={{ color: ALMA.ink, fontSize: "clamp(2.4rem, 5.4vw, 4.8rem)" }}>
-              Aquí crecemos
-              <span className="block italic font-alilato font-normal" style={{ color: ALMA.berry }}>
-                juntas.
-              </span>
-            </h2>
-            <div className="mt-7 space-y-5 text-[1rem] leading-[1.8] text-[color:var(--ink)]/76 max-w-[58ch]">
-              <p>
-                Karla no solo dirige una clase; diseña una experiencia personalizada para cada cuerpo que entra al estudio. Con un enfoque profundo en la alineación y el ritmo individual, se asegura de que cada ajuste te acerque a tu mejor versión.
-              </p>
-              <p>
-                "Mi filosofía es simple: <strong style={{ color: ALMA.ink, fontWeight: 600 }}>El movimiento es para todas, sin condiciones.</strong> No importa tu nivel de condición física actual; lo único que importa es la disposición de llegar y la constancia de volver. Si tú pones el esfuerzo, yo te guío en el camino."
-              </p>
-            </div>
-
-            {/* Inline credentials/values */}
-            <ul className="mt-9 grid grid-cols-2 gap-x-7 gap-y-4 list-none m-0 p-0 max-w-[440px]" data-stagger>
-              {[
-                { k: "Coach certificada", v: "Barre & fitness funcional" },
-                { k: "4–8", v: "Lugares por clase, atención personalizada" },
-                { k: "Cada clase", v: "Distinta, energía propia" },
-                { k: "Filosofía", v: "Bienestar · Comunidad · Compromiso" },
-              ].map((it) => (
-                <li key={it.k} data-stagger-item className="border-t pt-2.5" style={{ borderColor: ALMA.border }}>
-                  <p className="text-[0.62rem] uppercase tracking-[0.22em]" style={{ color: ALMA.berry }}>{it.k}</p>
-                  <p className="mt-1 text-[0.88rem] leading-[1.45]" style={{ color: ALMA.ink, opacity: 0.78 }}>{it.v}</p>
-                </li>
-              ))}
-            </ul>
-
-            <div className="mt-10">
-              <button
-                onClick={() => navigate(membershipCtaPath)}
-                data-press
-                data-lift
-                className="group inline-flex items-center gap-3 rounded-full px-7 py-4 text-[0.82rem] font-medium uppercase tracking-[0.16em]"
-                style={{ backgroundColor: ALMA.berry, color: ALMA.cream }}
-              >
-                Reserva con Karla
-                <span className="grid h-7 w-7 place-items-center rounded-full bg-[color:var(--cream)]/18 transition-transform group-hover:translate-x-1">
-                  <ArrowUpRight size={13} />
-                </span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* ═════════ COACHES (Olive drench) ═════════ */}
       <CoachesSection instructors={instructors} />
 
@@ -1008,7 +911,7 @@ const Index = () => {
             <span className="block italic font-alilato font-normal mt-2" style={{ color: ALMA.cream }}>te recibimos.</span>
           </h2>
           <p className="mt-7 mx-auto max-w-[52ch] text-[1.05rem] leading-[1.7]" style={{ color: ALMA.cream, opacity: 0.88 }}>
-            Cincuenta pesos. Cincuenta minutos. Una sola vez. Karla te enseña la barra, ajusta tu postura y te muestra cómo se siente entrenar acompañada.
+            Una clase muestra para conocernos. Te mostramos el equipo, ajustamos tu técnica y te enseñamos cómo se siente entrenar acompañada.
           </p>
           <div className="mt-9 flex flex-wrap items-center justify-center gap-4">
             <button
@@ -1016,7 +919,7 @@ const Index = () => {
               className="group inline-flex items-center gap-3 rounded-full px-8 py-4 text-[0.86rem] font-medium uppercase tracking-[0.18em] transition-transform hover:-translate-y-0.5"
               style={{ backgroundColor: ALMA.cream, color: ALMA.berry }}
             >
-              Reservar $50
+              Reservar clase muestra
               <span className="grid h-7 w-7 place-items-center rounded-full transition-transform group-hover:translate-x-1" style={{ backgroundColor: ALMA.berry, color: ALMA.cream }}>
                 <ArrowUpRight size={13} />
               </span>
@@ -1047,37 +950,20 @@ const Index = () => {
    COACHES (Olive drench)
    ═══════════════════════════════════════════════════════════ */
 const CoachesSection = ({ instructors }: { instructors: { id: string; displayName: string; bio?: string; specialties?: string | string[]; photoUrl?: string; photoFocusX?: number; photoFocusY?: number }[] }) => {
-  const KNOWN_COACHES: Record<string, { coachTitle: string; disciplines: string; funFact: string }> = {
-    karla: { coachTitle: "Coach Karla", disciplines: "Barre · Bienestar · Comunidad", funFact: "Te recibe con energía cercana y cambia la clase para que ningún día sea igual." },
-  };
-  const matchCoach = (name: string) => {
-    const n = name.toLowerCase().trim();
-    for (const [key, val] of Object.entries(KNOWN_COACHES)) {
-      if (n.includes(key)) return val;
-    }
-    return null;
-  };
-  const items = instructors.length > 0
-    ? instructors.map((inst) => {
-        const known = matchCoach(inst.displayName);
-        return {
-          key: inst.id,
-          label: inst.displayName,
-          coachTitle: known?.coachTitle ?? inst.displayName,
-          sub: Array.isArray(inst.specialties)
-            ? (inst.specialties as unknown as string[]).join(" · ")
-            : (typeof inst.specialties === "string" && inst.specialties ? inst.specialties : (known?.disciplines ?? "Instructora")),
-          bio: inst.bio || known?.funFact || null,
-          photoUrl: inst.photoUrl || null,
-          photoFocusX: clampFocus(inst.photoFocusX),
-          photoFocusY: clampFocus(inst.photoFocusY),
-        };
-      })
-    : [
-        { key: "karla", label: "Karla Cruz", coachTitle: "Coach Karla", sub: "Barre · Bienestar · Comunidad",
-          bio: "Atención cercana y personalizada para que cada alumna avance a su ritmo y disfrute el proceso. Cada clase cambia, cada postura se ajusta.",
-          photoUrl: null, photoFocusX: 50, photoFocusY: 50 },
-      ];
+  if (instructors.length === 0) return null;
+
+  const items = instructors.map((inst) => ({
+    key: inst.id,
+    label: inst.displayName,
+    coachTitle: inst.displayName,
+    sub: Array.isArray(inst.specialties)
+      ? (inst.specialties as unknown as string[]).join(" · ")
+      : (typeof inst.specialties === "string" && inst.specialties ? inst.specialties : "Instructora"),
+    bio: inst.bio || null,
+    photoUrl: inst.photoUrl || null,
+    photoFocusX: clampFocus(inst.photoFocusX),
+    photoFocusY: clampFocus(inst.photoFocusY),
+  }));
 
   const isSolo = items.length === 1;
 
@@ -1096,7 +982,7 @@ const CoachesSection = ({ instructors }: { instructors: { id: string; displayNam
             </h2>
           </div>
           <p className="max-w-[40ch] text-[0.95rem] leading-[1.7]" style={{ color: ALMA.cream, opacity: 0.78 }}>
-            Karla diseña cada clase, recibe a cada alumna y sigue tu progreso de cerca. Sin recetas genéricas.
+            Coaches certificadas que ajustan cada clase y siguen tu progreso de cerca.
           </p>
         </div>
 
@@ -1200,7 +1086,7 @@ const PaquetesSection = ({
                 </div>
                 <div className="flex-1">
                   <p className="text-[0.92rem] leading-[1.6] text-[color:var(--ink)]/72 max-w-[42ch]">
-                    {trialPlan.description || "Tu primera clase en el estudio. Karla te explica el equipo y te ajusta cada postura."}
+                    {trialPlan.description || "Tu primera clase en el estudio. Te mostramos el equipo y ajustamos tu técnica sin prisa."}
                   </p>
                 </div>
                 <button
