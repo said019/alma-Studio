@@ -937,69 +937,11 @@ async function ensureSchema() {
     await pool.query(`UPDATE plans SET class_category = 'jumping' WHERE (class_category IS NULL OR class_category = 'all') AND (name ILIKE '%jumping%' OR name ILIKE '%jump%' OR name ILIKE '%strong%' OR name ILIKE '%dance%' OR name ILIKE '%tone%' OR name ILIKE '%mindful jump%')`).catch(() => { });
     await pool.query(`UPDATE plans SET class_category = 'pilates' WHERE (class_category IS NULL OR class_category = 'all') AND (name ILIKE '%pilates%' OR name ILIKE '%mat%' OR name ILIKE '%flow%' OR name ILIKE '%hot%')`).catch(() => { });
     await pool.query(`UPDATE plans SET class_category = 'mixto'   WHERE (class_category IS NULL OR class_category = 'all') AND name ILIKE '%mixto%'`).catch(() => { });
-    // ── Ensure sample single-session plans exist (MXN 65, non-transferable, non-repeatable) ──
-    const samplePlans = [
-      {
-        name: "Clase muestra Barre",
-        classCategory: "all",
-        repeatKey: "trial_single_session_barre",
-        sortOrder: 0,
-      }
-    ];
-    for (const sp of samplePlans) {
-      const features = JSON.stringify(["1 clase de muestra", "No transferible", "No repetible"]);
-      const updateRes = await pool.query(
-        `UPDATE plans
-           SET price = 50,
-               currency = 'MXN',
-               duration_days = 7,
-               class_limit = 1,
-               class_category = $2,
-               features = $3::jsonb,
-               is_active = true,
-               is_non_transferable = true,
-               is_non_repeatable = true,
-               repeat_key = $4,
-               sort_order = $5,
-               updated_at = NOW()
-         WHERE name = $1`,
-        [sp.name, sp.classCategory, features, sp.repeatKey, sp.sortOrder]
-      );
-      if (updateRes.rowCount === 0) {
-        await pool.query(
-          `INSERT INTO plans
-            (name, description, price, currency, duration_days, class_limit, class_category, features, is_active, sort_order, is_non_transferable, is_non_repeatable, repeat_key)
-           VALUES
-            ($1, $2, 50, 'MXN', 7, 1, $3, $4::jsonb, true, $5, true, true, $6)`,
-          [
-            sp.name,
-            "Clase muestra individual. No transferible y no repetible.",
-            sp.classCategory,
-            features,
-            sp.sortOrder,
-            sp.repeatKey,
-          ]
-        );
-      }
-    }
-    // ── Ensure "Clase suelta — Visita" $125 plan exists ──
-    {
-      const visitaFeatures = JSON.stringify(["1 clase cualquier disciplina", "No transferible"]);
-      const visitaUpdate = await pool.query(
-        `UPDATE plans SET price = 125, currency = 'MXN', duration_days = 30, class_limit = 1,
-                class_category = 'all', features = $1::jsonb, is_active = true,
-                is_non_transferable = true, is_non_repeatable = false, sort_order = -1, updated_at = NOW()
-         WHERE name = 'Clase suelta — Visita'`,
-        [visitaFeatures]
-      );
-      if (visitaUpdate.rowCount === 0) {
-        await pool.query(
-          `INSERT INTO plans (name, description, price, currency, duration_days, class_limit, class_category, features, is_active, sort_order, is_non_transferable, is_non_repeatable)
-           VALUES ('Clase suelta — Visita', 'Una clase de barre. Pago por sesion.', 125, 'MXN', 30, 1, 'all', $1::jsonb, true, -1, true, false)`,
-          [visitaFeatures]
-        );
-      }
-    }
+    // Planes de muestra/visita heredados eliminados: el catálogo Alma define
+    // "Alma Studio Intro" como única clase muestra y las clases únicas Studio /
+    // Reformer-Tower como sesiones sueltas. Ver server/lib/almaCatalog.js.
+    // (Si la dueña requiere un pack de visitas/invitadas lo crea desde el admin
+    //  con is_visit_pack=true.)
     // ── Products table ─────────────────────────────────────────────────────
     await pool.query(`
       CREATE TABLE IF NOT EXISTS products (
