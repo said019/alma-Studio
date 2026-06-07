@@ -27,6 +27,7 @@ import {
 import { ALMA_CLASS_TYPES, ALMA_SCHEDULE_SLOTS, ALMA_SCHEDULE_DAYS, ALMA_PLANS, ALMA_PLAN_NAMES } from "./lib/almaCatalog.js";
 import { resolveEffectivePrice } from "./lib/pricing.js";
 import { isMembershipCategoryCompatible as ruleCategoryCompatible, normalizeClassCategory as ruleNormalizeCategory, isWithinMorningWindow, categoryLabel } from "./lib/bookingRules.js";
+import { isWithinCancelWindow, penaltyDueAt } from "./lib/faltas.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -1157,6 +1158,8 @@ async function ensureSchema() {
     await pool.query(`
       ALTER TABLE memberships ADD COLUMN IF NOT EXISTS cancellations_used INTEGER NOT NULL DEFAULT 0;
     `).catch(() => { });
+    // ── users: contador de faltas (no-show o cancelación dentro de la ventana) ──
+    await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS faltas_count INTEGER NOT NULL DEFAULT 0").catch(() => { });
     // ── Reconcile cancellations_used with actual cancelled bookings ────────
     await pool.query(`
       UPDATE memberships m
@@ -10244,7 +10247,7 @@ app.post("/api/pos/checkout", adminMiddleware, async (req, res) => {
 app.get("/api/loyalty/config", adminMiddleware, async (req, res) => {
   try {
     const r = await pool.query("SELECT value FROM settings WHERE key='loyalty_config' LIMIT 1");
-    const defaults = { enabled: true, points_per_class: 10, points_per_peso: 1, welcome_bonus: 50, birthday_bonus: 100 };
+    const defaults = { enabled: true, points_per_class: 10, points_per_peso: 1, welcome_bonus: 50, birthday_bonus: 100, faltas_enabled: true, faltas_threshold: 5, faltas_penalty_points: 50, faltas_cancel_window_hours: 12 };
     return res.json({ data: r.rows.length ? { ...defaults, ...r.rows[0].value } : defaults });
   } catch (err) { return res.status(500).json({ message: "Error interno" }); }
 });
