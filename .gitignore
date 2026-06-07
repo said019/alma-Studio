@@ -38,3 +38,8 @@ wallet-assets/apple-pass/*.cer
 *.njsproj
 *.sln
 *.sw?
+
+# local test/screenshot artifacts
+alma-paquetes-*.jpeg
+.playwright-mcp/
+.pgdata/

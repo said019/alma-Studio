@@ -28,11 +28,10 @@ import { useToast } from "@/hooks/use-toast";
 import { MoreHorizontal, Plus } from "lucide-react";
 
 const CATEGORIES = [
-  { value: "barre",   label: "Barre",         color: "bg-[#A48D78]/20 text-[#A48D78] border-[#A48D78]/30" },
-  { value: "barre", label: "Barre",         color: "bg-[#A48D78]/20 text-[#A48D78] border-[#A48D78]/30" },
-  { value: "pilates", label: "Pilates",        color: "bg-[#CBB9A4]/20 text-[#CBB9A4] border-[#CBB9A4]/30" },
-  { value: "mixto",   label: "Mixto",          color: "bg-yellow-400/15 text-yellow-400 border-yellow-400/30" },
-  { value: "all",     label: "Todas (sin filtro)", color: "bg-white/10 text-white/60 border-white/15" },
+  { value: "studio",         label: "Studio",         color: "bg-[#A48D78]/20 text-[#A48D78] border-[#A48D78]/30" },
+  { value: "reformer_tower", label: "Reformer/Tower", color: "bg-[#CBB9A4]/20 text-[#CBB9A4] border-[#CBB9A4]/30" },
+  { value: "mixto",          label: "Mixto",          color: "bg-yellow-400/15 text-yellow-400 border-yellow-400/30" },
+  { value: "all",            label: "Todo (all)",     color: "bg-white/10 text-white/60 border-white/15" },
 ] as const;
 
 type CategoryValue = (typeof CATEGORIES)[number]["value"];
@@ -44,16 +43,14 @@ const planSchema = z.object({
   currency: z.string().default("MXN"),
   durationDays: z.coerce.number().min(1),
   classLimit: z.preprocess((v) => (v === "" || v === null || v === undefined ? null : Number(v)), z.number().nullable()),
-  classCategory: z.enum(["barre", "barre", "pilates", "mixto", "all"]).default("all"),
+  classCategory: z.enum(["studio", "reformer_tower", "mixto", "all"]).default("studio"),
+  openingPrice: z.preprocess((v) => (v === "" || v == null ? null : Number(v)), z.number().nullable()),
+  morningOnly: z.boolean().default(false),
   features: z.string().optional(),
   isActive: z.boolean().default(true),
   isNonTransferable: z.boolean().default(false),
   isNonRepeatable: z.boolean().default(false),
   repeatKey: z.string().optional(),
-  ringConstanciaGoal: z.coerce.number().min(1).default(1),
-  ringEsfuerzoGoal: z.coerce.number().min(1).default(1),
-  ringConexionGoal: z.coerce.number().min(1).default(10),
-  rewardDescription: z.string().optional(),
   sortOrder: z.coerce.number().default(0),
   includesVideoLibrary: z.boolean().default(false),
   isVisitPack: z.boolean().default(false),
@@ -79,7 +76,9 @@ function normalizePlanRow(row: any): Plan {
       const n = Number(raw);
       return Number.isFinite(n) ? n : null;
     })(),
-    classCategory: ((row?.classCategory ?? row?.class_category ?? "all") as CategoryValue),
+    classCategory: ((row?.classCategory ?? row?.class_category ?? "studio") as CategoryValue),
+    openingPrice: (() => { const r = (row as any)?.openingPrice ?? (row as any)?.opening_price; return r == null || r === "" ? null : Number(r); })(),
+    morningOnly: Boolean((row as any)?.morningOnly ?? (row as any)?.morning_only ?? false),
     features: Array.isArray(row?.features)
       ? row.features.join(", ")
       : String(row?.features ?? ""),
@@ -87,10 +86,6 @@ function normalizePlanRow(row: any): Plan {
     isNonTransferable: Boolean(row?.isNonTransferable ?? row?.is_non_transferable ?? false),
     isNonRepeatable: Boolean(row?.isNonRepeatable ?? row?.is_non_repeatable ?? false),
     repeatKey: String(row?.repeatKey ?? row?.repeat_key ?? ""),
-    ringConstanciaGoal: Number(row?.ringConstanciaGoal ?? row?.ring_constancia_goal ?? 1),
-    ringEsfuerzoGoal: Number(row?.ringEsfuerzoGoal ?? row?.ring_esfuerzo_goal ?? 1),
-    ringConexionGoal: Number(row?.ringConexionGoal ?? row?.ring_conexion_goal ?? 10),
-    rewardDescription: String(row?.rewardDescription ?? row?.reward_description ?? ""),
     sortOrder: Number(row?.sortOrder ?? row?.sort_order ?? 0),
     includesVideoLibrary: Boolean(row?.includesVideoLibrary ?? row?.includes_video_library ?? false),
     isVisitPack: Boolean(row?.isVisitPack ?? row?.is_visit_pack ?? false),
@@ -99,9 +94,9 @@ function normalizePlanRow(row: any): Plan {
 
 const EMPTY: PlanFormData = {
   name: "", description: "", price: 0, currency: "MXN",
-  durationDays: 30, classLimit: null, classCategory: "all",
+  durationDays: 30, classLimit: null, classCategory: "studio",
+  openingPrice: null, morningOnly: false,
   features: "", isActive: true, isNonTransferable: false, isNonRepeatable: false, repeatKey: "",
-  ringConstanciaGoal: 1, ringEsfuerzoGoal: 1, ringConexionGoal: 10, rewardDescription: "",
   sortOrder: 0,
   includesVideoLibrary: false,
   isVisitPack: false,
@@ -111,7 +106,8 @@ function serializePlan(d: PlanFormData) {
   return {
     ...d,
     repeatKey: d.isNonRepeatable ? (d.repeatKey?.trim() || null) : null,
-    rewardDescription: d.rewardDescription?.trim() || null,
+    opening_price: d.openingPrice,
+    morning_only: !!d.morningOnly,
     features: d.features
       ? d.features.split(",").map((s) => s.trim()).filter(Boolean)
       : [],
@@ -124,17 +120,15 @@ function serializePlan(d: PlanFormData) {
 function normalizePlan(p: Plan): PlanFormData {
   return {
     ...p,
-    classCategory: ((p as any).classCategory ?? (p as any).class_category ?? "all") as CategoryValue,
+    classCategory: ((p as any).classCategory ?? (p as any).class_category ?? "studio") as CategoryValue,
+    openingPrice: (() => { const r = (p as any).openingPrice ?? (p as any).opening_price; return r == null || r === "" ? null : Number(r); })(),
+    morningOnly: Boolean((p as any).morningOnly ?? (p as any).morning_only ?? false),
     features: Array.isArray(p.features)
       ? (p.features as unknown as string[]).join(", ")
       : (p.features as unknown as string) ?? "",
     isNonTransferable: Boolean((p as any).isNonTransferable ?? (p as any).is_non_transferable),
     isNonRepeatable: Boolean((p as any).isNonRepeatable ?? (p as any).is_non_repeatable),
     repeatKey: String((p as any).repeatKey ?? (p as any).repeat_key ?? ""),
-    ringConstanciaGoal: Number((p as any).ringConstanciaGoal ?? (p as any).ring_constancia_goal ?? 1),
-    ringEsfuerzoGoal: Number((p as any).ringEsfuerzoGoal ?? (p as any).ring_esfuerzo_goal ?? 1),
-    ringConexionGoal: Number((p as any).ringConexionGoal ?? (p as any).ring_conexion_goal ?? 10),
-    rewardDescription: String((p as any).rewardDescription ?? (p as any).reward_description ?? ""),
     includesVideoLibrary: Boolean((p as any).includesVideoLibrary ?? (p as any).includes_video_library ?? false),
     isVisitPack: Boolean((p as any).isVisitPack ?? (p as any).is_visit_pack ?? false),
   };
@@ -204,7 +198,6 @@ const PlansList = () => {
                   <TableHead>Duración</TableHead>
                   <TableHead>Límite clases</TableHead>
                   <TableHead>Categoría</TableHead>
-                  <TableHead>Anillos</TableHead>
                   <TableHead>Reglas</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead />
@@ -213,7 +206,7 @@ const PlansList = () => {
               <TableBody>
                 {isLoading
                   ? Array(4).fill(0).map((_, i) => (
-                    <TableRow key={i}>{Array(9).fill(0).map((_, j) => <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>)}</TableRow>
+                    <TableRow key={i}>{Array(8).fill(0).map((_, j) => <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>)}</TableRow>
                   ))
                   : plans.map((p) => (
                     <TableRow key={p.id}>
@@ -230,13 +223,6 @@ const PlansList = () => {
                           {Boolean((p as any).includesVideoLibrary ?? (p as any).includes_video_library) && (
                             <Badge variant="secondary" className="text-[0.6rem]">📹 Videos</Badge>
                           )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1.5 text-xs">
-                          <Badge variant="outline" className="border-[#A48D78]/25 text-[#A48D78]">C {p.ringConstanciaGoal}</Badge>
-                          <Badge variant="outline" className="border-[#9C8E72]/25 text-[#9C8E72]">E {p.ringEsfuerzoGoal}</Badge>
-                          <Badge variant="outline" className="border-[#C0A688]/25 text-[#C0A688]">X {p.ringConexionGoal}</Badge>
                         </div>
                       </TableCell>
                       <TableCell>
@@ -344,30 +330,14 @@ const PlansList = () => {
                 <Label>Beneficios (separados por coma)</Label>
                 <Input {...form.register("features")} />
               </div>
-              <div className="rounded-2xl border border-[#E0D5C6] bg-[#FAF9F6] p-4">
-                <div className="mb-3">
-                  <p className="text-sm font-semibold text-[#43392F]">Metas de anillos por semana</p>
-                  <p className="text-xs text-muted-foreground">Alma define estas metas por plan. La alumna solo asiste y participa.</p>
-                </div>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                  <div className="space-y-1">
-                    <Label>Constancia</Label>
-                    <Input type="number" min={1} {...form.register("ringConstanciaGoal")} />
-                  </div>
-                  <div className="space-y-1">
-                    <Label>Esfuerzo</Label>
-                    <Input type="number" min={1} {...form.register("ringEsfuerzoGoal")} />
-                  </div>
-                  <div className="space-y-1">
-                    <Label>Conexión</Label>
-                    <Input type="number" min={1} {...form.register("ringConexionGoal")} />
-                  </div>
-                </div>
-                <div className="mt-3 space-y-1">
-                  <Label>Recompensa al cerrar 3 anillos</Label>
-                  <Input placeholder="Ej: Clase extra o premio interno" {...form.register("rewardDescription")} />
-                </div>
+              <div className="space-y-1">
+                <Label>Precio de apertura (opcional)</Label>
+                <Input type="number" min={0} {...form.register("openingPrice")} />
               </div>
+              <label className="flex items-center gap-2">
+                <input type="checkbox" {...form.register("morningOnly")} />
+                <span>Solo horario matutino (AM Club)</span>
+              </label>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="flex items-center gap-3 rounded-xl border border-border p-3">
                   <Switch

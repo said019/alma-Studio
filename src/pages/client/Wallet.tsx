@@ -16,7 +16,6 @@ import {
   ALMA,
 } from "@/components/app/AppShell";
 import { InfoBanner } from "@/components/app/widgets";
-import { ALMA_RING_COLORS, RingsTriple, type AlmaRing } from "@/components/alma/RingsTriple";
 import { useToast } from "@/hooks/use-toast";
 import {
   Download,
@@ -59,12 +58,6 @@ type WalletData = {
   points?: number;
   qr_code?: string;
   membership?: Membership | null;
-  rings?: {
-    constancia?: { progress?: number; goal?: number };
-    esfuerzo?: { progress?: number; goal?: number };
-    conexion?: { progress?: number; goal?: number };
-    rings_closed?: number;
-  } | null;
   next_booking?: {
     class_name?: string | null;
     instructor_name?: string | null;
@@ -72,8 +65,6 @@ type WalletData = {
     start_time?: string | null;
   } | null;
 };
-
-const percentFrom = (p: number, g: number) => (g <= 0 ? 0 : Math.min(100, Math.round((Math.max(0, p) / Math.max(1, g)) * 100)));
 
 const formatShortDate = (value?: string | null) => {
   if (!value) return "Sin fecha";
@@ -120,25 +111,6 @@ const Wallet = () => {
       planName: m.plan_name || "Alma Pass",
     };
   }, [wallet?.membership]);
-
-  const ringsState = useMemo(() => {
-    const points = Number(wallet?.points ?? 0);
-    const r = wallet?.rings ?? undefined;
-    const weeklyClassGoal = metrics.isUnlimited ? 5 : Math.max(1, Math.min(5, Math.ceil((metrics.total || 4) / 4)));
-    const constanciaProgress = Number(r?.constancia?.progress ?? Math.min(weeklyClassGoal, metrics.used));
-    const constanciaGoal = Number(r?.constancia?.goal ?? weeklyClassGoal);
-    const esfuerzoGoal = Number(r?.esfuerzo?.goal ?? Math.max(1, Math.ceil(constanciaGoal * 0.6)));
-    const esfuerzoProgress = Number(r?.esfuerzo?.progress ?? Math.min(esfuerzoGoal, Math.floor(constanciaProgress * 0.6)));
-    const conexionGoal = Number(r?.conexion?.goal ?? 10);
-    const conexionProgress = Number(r?.conexion?.progress ?? Math.min(conexionGoal, Math.floor((points % 500) / 50)));
-    const rings: AlmaRing[] = [
-      { key: "constancia", label: "Constancia", value: `${constanciaProgress}/${constanciaGoal}`, goalLabel: "clases asistidas", progress: percentFrom(constanciaProgress, constanciaGoal), ...ALMA_RING_COLORS.constancia },
-      { key: "esfuerzo", label: "Esfuerzo", value: `${esfuerzoProgress}/${esfuerzoGoal}`, goalLabel: "clases intensas", progress: percentFrom(esfuerzoProgress, esfuerzoGoal), ...ALMA_RING_COLORS.esfuerzo },
-      { key: "conexion", label: "Conexión", value: `${conexionProgress}/${conexionGoal}`, goalLabel: "puntos comunidad", progress: percentFrom(conexionProgress, conexionGoal), ...ALMA_RING_COLORS.conexion },
-    ];
-    const ringsClosed = Number.isFinite(Number(r?.rings_closed)) ? Number(r?.rings_closed) : rings.filter((x) => x.progress >= 100).length;
-    return { rings, ringsClosed };
-  }, [wallet?.points, wallet?.rings, metrics]);
 
   const { data: gwData, isLoading: gwLoading } = useQuery({
     queryKey: ["google-wallet-save"],
@@ -197,7 +169,7 @@ const Wallet = () => {
           eyebrow="Alma Club"
           title={<>Tu pase</>}
           titleAccent="del estudio."
-          subtitle="Tres anillos que cuentan tu semana y un QR para hacer check-in al llegar."
+          subtitle="Tu membresía y un QR para hacer check-in al llegar al estudio."
         />
 
         {isLoading ? (
@@ -264,91 +236,34 @@ const Wallet = () => {
                   </span>
                 </header>
 
-                {/* ── Card body: 3 columns desktop, stack mobile ── */}
-                <div className="relative grid grid-cols-1 lg:grid-cols-[auto_1fr] gap-7 lg:gap-9 items-center px-6 sm:px-8 py-7 sm:py-9">
-                  {/* Rings stage */}
-                  <div className="flex justify-center lg:justify-start">
-                    <div
-                      className="rounded-full p-2.5 transition-transform duration-700 ease-[cubic-bezier(0.32,0.72,0,1)]"
-                      style={{
-                        backgroundColor: `${ALMA.ink}cc`,
-                        border: `1px solid ${ALMA.cream}22`,
-                        boxShadow:
-                          "inset 0 1px 0 rgba(255,247,242,0.18), 0 16px 40px -12px rgba(0,0,0,0.45)",
-                      }}
-                    >
-                      <RingsTriple
-                        rings={ringsState.rings}
-                        centerLabel="esta semana"
-                        centerValue={`${ringsState.ringsClosed}/3`}
-                        centerSub="anillos"
-                        shellClassName="border-transparent shadow-none"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Right column: anillo bars + cuadricula */}
-                  <div className="flex flex-col gap-5 min-w-0">
-                    <ul className="grid grid-cols-1 gap-2.5 list-none m-0 p-0" data-stagger>
-                      {ringsState.rings.map((ring) => (
-                        <li
-                          key={ring.key}
-                          data-stagger-item
-                          className="rounded-2xl px-4 py-3"
-                          style={{
-                            backgroundColor: `${ALMA.cream}10`,
-                            border: `1px solid ${ALMA.cream}14`,
-                          }}
+                {/* ── Card body: membership stats ── */}
+                <div className="relative px-6 sm:px-8 py-7 sm:py-9">
+                  {/* Stats: 3 cols hairline */}
+                  <div
+                    className="grid grid-cols-3 gap-0 rounded-2xl overflow-hidden"
+                    style={{ backgroundColor: `${ALMA.cream}0d`, border: `1px solid ${ALMA.cream}14` }}
+                  >
+                    {[
+                      { label: "Por usar", value: metrics.isUnlimited ? "∞" : metrics.remaining },
+                      { label: "Vence", value: formatShortDate(wallet?.membership?.end_date) },
+                      { label: "Puntos", value: (wallet?.points ?? 0).toLocaleString("es-MX") },
+                    ].map((s, i, arr) => (
+                      <div
+                        key={s.label}
+                        className="px-4 py-3"
+                        style={i < arr.length - 1 ? { borderRight: `1px solid ${ALMA.cream}14` } : undefined}
+                      >
+                        <p className="text-[0.58rem] uppercase tracking-[0.2em]" style={{ color: ALMA.cream, opacity: 0.65 }}>
+                          {s.label}
+                        </p>
+                        <p
+                          className="font-bebas leading-none mt-1 tabular-nums truncate"
+                          style={{ color: ALMA.cream, fontSize: "clamp(1.05rem, 1.6vw, 1.35rem)" }}
                         >
-                          <div className="flex items-center justify-between gap-3">
-                            <span className="text-[0.6rem] font-medium uppercase tracking-[0.22em]" style={{ color: ALMA.cream, opacity: 0.78 }}>
-                              {ring.label}
-                            </span>
-                            <span className="font-bebas tabular-nums" style={{ color: ALMA.cream, fontSize: "1rem" }}>
-                              {ring.value}
-                            </span>
-                          </div>
-                          <div className="mt-2 h-1 rounded-full overflow-hidden" style={{ backgroundColor: `${ALMA.cream}1a` }}>
-                            <div
-                              className="h-full rounded-full"
-                              style={{
-                                width: `${ring.progress}%`,
-                                backgroundColor: ring.color,
-                                transition: "width 1100ms var(--ease-alma-out)",
-                              }}
-                            />
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-
-                    {/* Stats: 3 cols hairline */}
-                    <div
-                      className="grid grid-cols-3 gap-0 rounded-2xl overflow-hidden"
-                      style={{ backgroundColor: `${ALMA.cream}0d`, border: `1px solid ${ALMA.cream}14` }}
-                    >
-                      {[
-                        { label: "Por usar", value: metrics.isUnlimited ? "∞" : metrics.remaining },
-                        { label: "Vence", value: formatShortDate(wallet?.membership?.end_date) },
-                        { label: "Puntos", value: (wallet?.points ?? 0).toLocaleString("es-MX") },
-                      ].map((s, i, arr) => (
-                        <div
-                          key={s.label}
-                          className="px-4 py-3"
-                          style={i < arr.length - 1 ? { borderRight: `1px solid ${ALMA.cream}14` } : undefined}
-                        >
-                          <p className="text-[0.58rem] uppercase tracking-[0.2em]" style={{ color: ALMA.cream, opacity: 0.65 }}>
-                            {s.label}
-                          </p>
-                          <p
-                            className="font-bebas leading-none mt-1 tabular-nums truncate"
-                            style={{ color: ALMA.cream, fontSize: "clamp(1.05rem, 1.6vw, 1.35rem)" }}
-                          >
-                            {s.value}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
+                          {s.value}
+                        </p>
+                      </div>
+                    ))}
                   </div>
                 </div>
 
@@ -550,7 +465,7 @@ const Wallet = () => {
             <InfoBanner
               tone="coral"
               title="Aún no activas un paquete."
-              description="Compra uno y empezamos a contar tus anillos automáticamente."
+              description="Compra uno y tu pase se activa automáticamente."
               action={<PrimaryButton size="sm" to="/app/checkout">Ver paquetes</PrimaryButton>}
             />
           </Section>
