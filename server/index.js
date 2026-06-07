@@ -838,6 +838,8 @@ async function ensureSchema() {
     // Paquete de visitas (1, 5, 10): marca el plan como vendible a invitadas
     // (no socias) desde POS, y habilita el flujo de cuestionario reutilizable.
     await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS is_visit_pack BOOLEAN DEFAULT false`).catch(() => { });
+    await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS opening_price DECIMAL(10,2)`).catch(() => { });
+    await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS morning_only BOOLEAN DEFAULT false`).catch(() => { });
     // Tabla de perfiles de invitada/acompañante (no socia). El cuestionario
     // inicial vive aquí y se reusa al volver con el mismo teléfono.
     await pool.query(`
