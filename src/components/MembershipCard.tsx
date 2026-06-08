@@ -29,13 +29,13 @@ import imgPilates from "@/assets/pilates_2320695.png";
 // ─────────────────────────────────────────────
 // Category detection
 // ─────────────────────────────────────────────
-type PlanCategory = "jumping" | "pilates" | "mixto" | "other";
+type PlanCategory = "studio" | "reformer_tower" | "mixto" | "other";
 
 function detectCategory(planName: string): PlanCategory {
   const lower = planName.toLowerCase();
-  if (lower.includes("mixto")) return "mixto";
-  if (lower.includes("jumping")) return "jumping";
-  if (lower.includes("pilates")) return "pilates";
+  if (lower.includes("reformer") || lower.includes("tower")) return "reformer_tower";
+  if (lower.includes("studio") || lower.includes("mat") || lower.includes("barre") || lower.includes("sculpt")) return "studio";
+  if (lower.includes("balance") || lower.includes("fusion") || lower.includes("experience") || lower.includes("unlimited") || lower.includes("mixto")) return "mixto";
   return "other";
 }
 
@@ -43,97 +43,101 @@ function detectCategory(planName: string): PlanCategory {
 // Palette
 // ─────────────────────────────────────────────
 const PALETTE = {
-  jumping: {
-    gradient: "linear-gradient(145deg, #120318 0%, #1e0630 35%, #2d0a3d 65%, #1a0522 100%)",
-    glow1: "#A48D78",
-    glow2: "#E6DAC8",
-    accent: "#A48D78",
-    accentLight: "#E6DAC8",
-    badge: "rgba(118,33,77,0.12)",
-    badgeText: "#E6DAC8",
-    badgeBorder: "rgba(118,33,77,0.25)",
-    label: "Jumping",
-    border: "rgba(118,33,77,0.18)",
-    glass: "rgba(118,33,77,0.06)",
-    glassBorder: "rgba(118,33,77,0.12)",
-    dotActive: "#C0A688",
-    dotGlow: "rgba(245,138,36,0.5)",
+  // Reformer / Tower — equipo premium oscuro: espresso profundo
+  reformer_tower: {
+    gradient: "linear-gradient(145deg, #241B1A 0%, #3A2A26 45%, #4A3333 100%)",
+    glow1: "#E4D2C3",
+    glow2: "#E9E6DF",
+    accent: "#E4D2C3",
+    accentLight: "#E9E6DF",
+    badge: "rgba(228,210,195,0.10)",
+    badgeText: "#E9E6DF",
+    badgeBorder: "rgba(228,210,195,0.22)",
+    label: "Reformer/Tower",
+    border: "rgba(228,210,195,0.14)",
+    glass: "rgba(228,210,195,0.05)",
+    glassBorder: "rgba(228,210,195,0.10)",
+    dotActive: "#E4D2C3",
+    dotGlow: "rgba(228,210,195,0.45)",
     iconMuted: "rgba(255,255,255,0.12)",
-    progressFrom: "#A48D78",
-    progressTo: "#E6DAC8",
-    progressVia: "#CBB9A4",
-    shimmer: "rgba(254,165,220,0.08)",
-    heroGlow: "rgba(118,33,77,0.25)",
-    divider: "rgba(118,33,77,0.10)",
+    progressFrom: "#E4D2C3",
+    progressTo: "#E9E6DF",
+    progressVia: "#C7A892",
+    shimmer: "rgba(228,210,195,0.07)",
+    heroGlow: "rgba(228,210,195,0.18)",
+    divider: "rgba(228,210,195,0.08)",
   },
-  pilates: {
-    gradient: "linear-gradient(145deg, #080d02 0%, #151d0a 35%, #1c2510 65%, #0d1205 100%)",
-    glow1: "#C0A688",
-    glow2: "#F4F1EA",
-    accent: "#C0A688",
-    accentLight: "#F4F1EA",
-    badge: "rgba(245,138,36,0.10)",
-    badgeText: "#C0A688",
-    badgeBorder: "rgba(245,138,36,0.20)",
-    label: "Pilates",
-    border: "rgba(245,138,36,0.15)",
-    glass: "rgba(245,138,36,0.05)",
-    glassBorder: "rgba(245,138,36,0.10)",
-    dotActive: "#A48D78",
-    dotGlow: "rgba(118,33,77,0.5)",
+  // Studio (Mat / Barre / Sculpt) — café medio cálido
+  studio: {
+    gradient: "linear-gradient(145deg, #4A3333 0%, #6E5247 50%, #8A6E60 100%)",
+    glow1: "#E4D2C3",
+    glow2: "#E9E6DF",
+    accent: "#E4D2C3",
+    accentLight: "#E9E6DF",
+    badge: "rgba(228,210,195,0.10)",
+    badgeText: "#E9E6DF",
+    badgeBorder: "rgba(228,210,195,0.22)",
+    label: "Studio",
+    border: "rgba(228,210,195,0.14)",
+    glass: "rgba(228,210,195,0.05)",
+    glassBorder: "rgba(228,210,195,0.10)",
+    dotActive: "#E4D2C3",
+    dotGlow: "rgba(228,210,195,0.45)",
     iconMuted: "rgba(255,255,255,0.12)",
-    progressFrom: "#C0A688",
-    progressTo: "#F4F1EA",
-    progressVia: "#d4d85e",
-    shimmer: "rgba(245,138,36,0.06)",
-    heroGlow: "rgba(245,138,36,0.20)",
-    divider: "rgba(245,138,36,0.08)",
+    progressFrom: "#E4D2C3",
+    progressTo: "#E9E6DF",
+    progressVia: "#C7A892",
+    shimmer: "rgba(233,230,223,0.07)",
+    heroGlow: "rgba(228,210,195,0.20)",
+    divider: "rgba(228,210,195,0.08)",
   },
+  // Mixto — espresso + café + berry medio
   mixto: {
-    gradient: "linear-gradient(145deg, #0b0418 0%, #150830 35%, #1e0c3a 65%, #0c0520 100%)",
-    glow1: "#CBB9A4",
-    glow2: "#E6DAC8",
-    accent: "#CBB9A4",
-    accentLight: "#E6DAC8",
-    badge: "rgba(233,116,95,0.12)",
-    badgeText: "#E6DAC8",
-    badgeBorder: "rgba(233,116,95,0.25)",
+    gradient: "linear-gradient(145deg, #3A2A26 0%, #5A4036 50%, #8A6E60 100%)",
+    glow1: "#E9E6DF",
+    glow2: "#E4D2C3",
+    accent: "#E9E6DF",
+    accentLight: "#E9E6DF",
+    badge: "rgba(233,230,223,0.10)",
+    badgeText: "#E9E6DF",
+    badgeBorder: "rgba(233,230,223,0.22)",
     label: "Mixto",
-    border: "rgba(233,116,95,0.18)",
-    glass: "rgba(233,116,95,0.06)",
-    glassBorder: "rgba(233,116,95,0.12)",
-    dotActive: "#C0A688",
-    dotGlow: "rgba(245,138,36,0.5)",
+    border: "rgba(233,230,223,0.14)",
+    glass: "rgba(233,230,223,0.05)",
+    glassBorder: "rgba(233,230,223,0.10)",
+    dotActive: "#E4D2C3",
+    dotGlow: "rgba(233,230,223,0.40)",
     iconMuted: "rgba(255,255,255,0.12)",
-    progressFrom: "#CBB9A4",
-    progressTo: "#E6DAC8",
-    progressVia: "#A48D78",
-    shimmer: "rgba(233,116,95,0.07)",
-    heroGlow: "rgba(233,116,95,0.22)",
-    divider: "rgba(233,116,95,0.10)",
+    progressFrom: "#E4D2C3",
+    progressTo: "#E9E6DF",
+    progressVia: "#C7A892",
+    shimmer: "rgba(233,230,223,0.07)",
+    heroGlow: "rgba(233,230,223,0.18)",
+    divider: "rgba(233,230,223,0.08)",
   },
+  // Other / genérico — café oscuro neutro
   other: {
-    gradient: "linear-gradient(145deg, #120318 0%, #1e0630 35%, #280940 65%, #160420 100%)",
-    glow1: "#A48D78",
-    glow2: "#CBB9A4",
-    accent: "#E6DAC8",
-    accentLight: "#E6DAC8",
-    badge: "rgba(254,165,220,0.10)",
-    badgeText: "#E6DAC8",
-    badgeBorder: "rgba(254,165,220,0.20)",
-    label: "Membresia",
-    border: "rgba(254,165,220,0.16)",
-    glass: "rgba(254,165,220,0.05)",
-    glassBorder: "rgba(254,165,220,0.10)",
-    dotActive: "#C0A688",
-    dotGlow: "rgba(245,138,36,0.5)",
+    gradient: "linear-gradient(145deg, #4A3333 0%, #5A4A45 100%)",
+    glow1: "#E9E6DF",
+    glow2: "#E4D2C3",
+    accent: "#E9E6DF",
+    accentLight: "#E9E6DF",
+    badge: "rgba(233,230,223,0.10)",
+    badgeText: "#E9E6DF",
+    badgeBorder: "rgba(233,230,223,0.20)",
+    label: "Alma",
+    border: "rgba(233,230,223,0.14)",
+    glass: "rgba(233,230,223,0.05)",
+    glassBorder: "rgba(233,230,223,0.10)",
+    dotActive: "#E4D2C3",
+    dotGlow: "rgba(228,210,195,0.40)",
     iconMuted: "rgba(255,255,255,0.12)",
-    progressFrom: "#A48D78",
-    progressTo: "#CBB9A4",
-    progressVia: "#E6DAC8",
-    shimmer: "rgba(254,165,220,0.06)",
-    heroGlow: "rgba(254,165,220,0.20)",
-    divider: "rgba(254,165,220,0.08)",
+    progressFrom: "#E4D2C3",
+    progressTo: "#E9E6DF",
+    progressVia: "#C7A892",
+    shimmer: "rgba(233,230,223,0.06)",
+    heroGlow: "rgba(233,230,223,0.16)",
+    divider: "rgba(233,230,223,0.08)",
   },
 } as const;
 
@@ -271,7 +275,7 @@ function DotGrid({
   const used = classLimit - classesRemaining;
 
   const getImg = (i: number) => {
-    if (category === "pilates") return imgPilates;
+    if (category === "studio") return imgPilates;
     if (category === "mixto") return i % 2 === 0 ? imgTrampoline : imgPilates;
     return imgTrampoline;
   };

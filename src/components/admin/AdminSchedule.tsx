@@ -6,7 +6,7 @@ interface ScheduleSlot {
   id: string;
   time_slot: string;
   day_of_week: number;
-  class_label: "JUMPING" | "PILATES" | "SORPRESA";
+  class_label: "REFORMER" | "TOWER" | "MAT" | "BARRE" | "SCULPT";
   shift: "morning" | "evening";
   is_active: boolean;
 }
@@ -14,9 +14,11 @@ interface ScheduleSlot {
 const DAYS = ["LUN", "MAR", "MIÉ", "JUE", "VIE", "SÁB"];
 
 const LABEL_STYLE: Record<string, string> = {
-  JUMPING: "bg-fuchsia-500/20 text-fuchsia-300 border border-fuchsia-500/30",
-  PILATES: "bg-pink-500/20 text-pink-300 border border-pink-500/30",
-  SORPRESA: "bg-yellow-500/20 text-yellow-300 border border-yellow-500/30",
+  REFORMER: "bg-[#241B1A]/30 text-[#E4D2C3] border border-[#8A6E60]/30",
+  TOWER: "bg-[#3A2A26]/30 text-[#E9E6DF] border border-[#8A6E60]/30",
+  MAT: "bg-[#4A3333]/20 text-[#E4D2C3] border border-[#8A6E60]/30",
+  BARRE: "bg-[#6E5247]/20 text-[#E9E6DF] border border-[#8A6E60]/30",
+  SCULPT: "bg-[#8A7C66]/15 text-[#4A3333] border border-[#8A6E60]/30",
 };
 
 const AdminSchedule = () => {
@@ -24,7 +26,7 @@ const AdminSchedule = () => {
 
   const [timeSlot, setTimeSlot] = useState("");
   const [dayOfWeek, setDayOfWeek] = useState(1);
-  const [classLabel, setClassLabel] = useState<"JUMPING" | "PILATES" | "SORPRESA">("JUMPING");
+  const [classLabel, setClassLabel] = useState<"REFORMER" | "TOWER" | "MAT" | "BARRE" | "SCULPT">("REFORMER");
   const [shift, setShift] = useState<"morning" | "evening">("morning");
   const [editId, setEditId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -64,7 +66,7 @@ const AdminSchedule = () => {
   const resetForm = () => {
     setTimeSlot("");
     setDayOfWeek(1);
-    setClassLabel("JUMPING");
+    setClassLabel("REFORMER");
     setShift("morning");
     setEditId(null);
     setSaving(false);
@@ -134,7 +136,7 @@ const AdminSchedule = () => {
                                 setDayOfWeek(day);
                                 setShift(list === morningSlots ? "morning" : "evening");
                                 setEditId(null);
-                                setClassLabel("JUMPING");
+                                setClassLabel("REFORMER");
                               }}
                               className="text-muted-foreground/30 hover:text-muted-foreground text-lg leading-none transition-colors"
                             >
@@ -198,12 +200,14 @@ const AdminSchedule = () => {
           </select>
           <select
             value={classLabel}
-            onChange={(e) => setClassLabel(e.target.value as "JUMPING" | "PILATES" | "SORPRESA")}
+            onChange={(e) => setClassLabel(e.target.value as "REFORMER" | "TOWER" | "MAT" | "BARRE" | "SCULPT")}
             className="bg-background border border-border rounded-xl px-4 py-2.5 text-sm text-foreground focus:outline-none focus:border-primary"
           >
-            <option value="JUMPING">JUMPING</option>
-            <option value="PILATES">PILATES</option>
-            <option value="SORPRESA">SORPRESA</option>
+            <option value="REFORMER">REFORMER</option>
+            <option value="TOWER">TOWER</option>
+            <option value="MAT">MAT</option>
+            <option value="BARRE">BARRE</option>
+            <option value="SCULPT">SCULPT</option>
           </select>
           <select
             value={shift}
