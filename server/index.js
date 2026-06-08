@@ -1160,6 +1160,21 @@ async function ensureSchema() {
     `).catch(() => { });
     // ── users: contador de faltas (no-show o cancelación dentro de la ventana) ──
     await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS faltas_count INTEGER NOT NULL DEFAULT 0").catch(() => { });
+    // ── Responsiva y consentimiento informado (se firma en la 1a reserva) ──
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS waivers (
+        id             UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        user_id        UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        full_name      VARCHAR(150),
+        phone          VARCHAR(40),
+        email          VARCHAR(150),
+        image_consent  BOOLEAN DEFAULT false,
+        signature_data TEXT,
+        waiver_version VARCHAR(20) DEFAULT 'v1',
+        signed_at      TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `).catch(() => { });
+    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_waivers_user ON waivers(user_id)`).catch(() => { });
     // ── Reconcile cancellations_used with actual cancelled bookings ────────
     await pool.query(`
       UPDATE memberships m
@@ -2741,6 +2756,40 @@ app.get("/api/auth/me", authMiddleware, async (req, res) => {
   }
 });
 
+// ── Responsiva y consentimiento informado ──────────────────────────────────
+// GET: la responsiva firmada por la alumna (o null si aún no firma).
+app.get("/api/me/waiver", authMiddleware, async (req, res) => {
+  try {
+    const r = await pool.query("SELECT * FROM waivers WHERE user_id = $1 LIMIT 1", [req.userId]);
+    return res.json({ data: r.rows[0] ?? null });
+  } catch (err) {
+    console.error("GET waiver error:", err);
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// POST: firma la responsiva (nombre + firma dibujada + consentimiento de imagen).
+app.post("/api/me/waiver", authMiddleware, async (req, res) => {
+  const { full_name, phone, email, image_consent, signature_data } = req.body || {};
+  if (!full_name?.trim() || !signature_data) {
+    return res.status(400).json({ message: "Nombre y firma son requeridos." });
+  }
+  try {
+    const r = await pool.query(
+      `INSERT INTO waivers (user_id, full_name, phone, email, image_consent, signature_data, waiver_version, signed_at)
+       VALUES ($1,$2,$3,$4,$5,$6,'v1',NOW())
+       ON CONFLICT (user_id) DO UPDATE SET
+         full_name=$2, phone=$3, email=$4, image_consent=$5, signature_data=$6, signed_at=NOW()
+       RETURNING *`,
+      [req.userId, full_name.trim(), phone || null, email || null, !!image_consent, signature_data]
+    );
+    return res.status(201).json({ data: r.rows[0] });
+  } catch (err) {
+    console.error("POST waiver error:", err);
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
 // POST /api/auth/change-password — cambiar contraseña estando logueado.
 // Sirve a cualquier rol (cliente, admin, super_admin). Pide la contraseña
 // actual y la nueva; valida fuerza de la nueva. No invalida el token actual
@@ -3262,6 +3311,11 @@ async function liveBookingCount(classId, db = pool) {
 app.post("/api/bookings", authMiddleware, async (req, res) => {
   const { classId } = req.body;
   if (!classId) return res.status(400).json({ message: "classId requerido" });
+  // Gate: la primera reserva requiere la responsiva y consentimiento firmados.
+  const waiverGate = await pool.query("SELECT 1 FROM waivers WHERE user_id = $1 LIMIT 1", [req.userId]).catch(() => ({ rows: [] }));
+  if (waiverGate.rows.length === 0) {
+    return res.status(403).json({ code: "WAIVER_REQUIRED", message: "Antes de tu primera reserva necesitas leer y firmar la responsiva y consentimiento informado." });
+  }
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
