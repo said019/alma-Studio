@@ -219,8 +219,8 @@ const TemplateCard = ({
           </div>
 
           {preview && (
-            <div className="rounded-xl border border-[#A48D78]/30 bg-[#A48D78]/5 p-3">
-              <p className="text-[10px] uppercase tracking-widest text-[#A48D78] mb-1.5">Preview con datos de muestra</p>
+            <div className="rounded-xl border border-[#8A6E60]/30 bg-[#8A6E60]/5 p-3">
+              <p className="text-[10px] uppercase tracking-widest text-[#8A6E60] mb-1.5">Preview con datos de muestra</p>
               <p className="text-sm font-medium">{preview.subject}</p>
               <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">{preview.body}</p>
             </div>
@@ -242,7 +242,7 @@ const TemplateCard = ({
               disabled={sendingTest || dirty}
               variant="outline"
               size="sm"
-              className="border-[#9C8E72]/40 bg-[#9C8E72]/5 text-[#9C8E72]"
+              className="border-[#8A7C66]/40 bg-[#8A7C66]/5 text-[#8A7C66]"
               title={dirty ? "Guarda primero los cambios antes de enviar prueba" : "Mandar WA de prueba a un teléfono"}
             >
               {sendingTest ? <Loader2 size={13} className="mr-1.5 animate-spin" /> : <Send size={13} className="mr-1.5" />}
@@ -252,7 +252,7 @@ const TemplateCard = ({
               onClick={handleSave}
               disabled={!dirty || saving}
               size="sm"
-              className="bg-gradient-to-r from-[#A48D78] to-[#CBB9A4] text-white"
+              className="bg-gradient-to-r from-[#8A6E60] to-[#C7A892] text-white"
             >
               {saving ? <Loader2 size={13} className="mr-1.5 animate-spin" /> : <Save size={13} className="mr-1.5" />}
               Guardar
@@ -409,7 +409,7 @@ const WhatsAppTemplatesPage = () => {
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <MessageSquare size={18} className="text-[#CBB9A4]" />
+                  <MessageSquare size={18} className="text-[#C7A892]" />
                   <h1 className="text-xl font-bold text-white">Templates WhatsApp</h1>
                 </div>
                 <p className="mt-1 text-sm text-white/45">
@@ -452,7 +452,7 @@ const WhatsAppTemplatesPage = () => {
                 onClick={addAdminPhone}
                 disabled={!phoneInput.trim() || updatePhonesMutation.isPending}
                 size="sm"
-                className="bg-gradient-to-r from-[#A48D78] to-[#CBB9A4] text-white"
+                className="bg-gradient-to-r from-[#8A6E60] to-[#C7A892] text-white"
               >
                 Agregar
               </Button>
@@ -492,7 +492,7 @@ const WhatsAppTemplatesPage = () => {
                       {cat.label}
                       <span className="ml-1.5 text-[10px] text-muted-foreground">{cat.keys.length}</span>
                       {editedCount > 0 && (
-                        <span className="ml-1 inline-block h-1.5 w-1.5 rounded-full bg-[#CBB9A4]" />
+                        <span className="ml-1 inline-block h-1.5 w-1.5 rounded-full bg-[#C7A892]" />
                       )}
                     </TabsTrigger>
                   );

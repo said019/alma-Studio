@@ -28,8 +28,8 @@ import { useToast } from "@/hooks/use-toast";
 import { MoreHorizontal, Plus } from "lucide-react";
 
 const CATEGORIES = [
-  { value: "studio",         label: "Studio",         color: "bg-[#A48D78]/20 text-[#A48D78] border-[#A48D78]/30" },
-  { value: "reformer_tower", label: "Reformer/Tower", color: "bg-[#CBB9A4]/20 text-[#CBB9A4] border-[#CBB9A4]/30" },
+  { value: "studio",         label: "Studio",         color: "bg-[#8A6E60]/20 text-[#8A6E60] border-[#8A6E60]/30" },
+  { value: "reformer_tower", label: "Reformer/Tower", color: "bg-[#C7A892]/20 text-[#C7A892] border-[#C7A892]/30" },
   { value: "mixto",          label: "Mixto",          color: "bg-yellow-400/15 text-yellow-400 border-yellow-400/30" },
   { value: "all",            label: "Todo (all)",     color: "bg-white/10 text-white/60 border-white/15" },
 ] as const;

@@ -133,7 +133,7 @@ const VisitsList = () => {
             </div>
             <Button
               onClick={() => { resetForm(); setFormOpen(true); }}
-              className="bg-gradient-to-r from-[#CBB9A4] to-[#A48D78] text-white"
+              className="bg-gradient-to-r from-[#C7A892] to-[#8A6E60] text-white"
             >
               <Plus size={14} className="mr-1.5" /> Nueva invitada
             </Button>
@@ -260,7 +260,7 @@ const VisitsList = () => {
               <Button
                 onClick={() => saveMutation.mutate()}
                 disabled={!canSubmit || saveMutation.isPending}
-                className="bg-gradient-to-r from-[#CBB9A4] to-[#A48D78] text-white"
+                className="bg-gradient-to-r from-[#C7A892] to-[#8A6E60] text-white"
               >
                 {saveMutation.isPending ? "Guardando…" : (editing ? "Guardar cambios" : "Registrar")}
               </Button>

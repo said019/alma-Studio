@@ -326,7 +326,7 @@ const LoyaltyMilestones = () => {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-lg font-semibold flex items-center gap-2">
-            <Trophy size={18} className="text-[#C0A688]" />
+            <Trophy size={18} className="text-[#C7A892]" />
             Recompensas por asistencia
           </h2>
           <p className="text-xs text-muted-foreground mt-0.5">
@@ -425,7 +425,7 @@ const LoyaltyMilestones = () => {
       {/* ── Recent awards feed ── */}
       <div>
         <h3 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
-          <Sparkles size={14} className="text-[#C0A688]" />
+          <Sparkles size={14} className="text-[#C7A892]" />
           Últimas alumnas premiadas
         </h3>
         {awards.length === 0 ? (

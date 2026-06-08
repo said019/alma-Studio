@@ -30,7 +30,7 @@ interface Props {
 const REG_STATUS_BADGE: Record<string, { label: string; className: string }> = {
   confirmed: { label: "Confirmado", className: "text-[#4ade80] border-[#4ade80]/30 bg-[#4ade80]/5" },
   pending:   { label: "Pendiente",  className: "text-[#fbbf24] border-[#fbbf24]/30 bg-[#fbbf24]/5" },
-  waitlist:  { label: "Espera",     className: "text-[#CBB9A4] border-[#CBB9A4]/30 bg-[#CBB9A4]/5" },
+  waitlist:  { label: "Espera",     className: "text-[#C7A892] border-[#C7A892]/30 bg-[#C7A892]/5" },
   cancelled: { label: "Cancelado",  className: "text-white/30 border-white/10 bg-white/3" },
   no_show:   { label: "No asistió", className: "text-[#f87171] border-[#f87171]/30 bg-[#f87171]/5" },
 };
@@ -61,7 +61,7 @@ export default function EventDetailView({
   const lastCodeRef = useRef("");
 
   const typeInfo = EVENT_TYPES.find((t) => t.value === event.type);
-  const color = typeInfo?.color ?? "#A48D78";
+  const color = typeInfo?.color ?? "#8A6E60";
   const pct = occupancyPercent(event.registered, event.capacity);
   const barColor = occupancyColor(pct);
   const currentPrice = calcCurrentPrice(event);
@@ -207,7 +207,7 @@ export default function EventDetailView({
                   event.status === "published" ? "text-[#4ade80] border-[#4ade80]/30 bg-[#4ade80]/5"
                   : event.status === "draft" ? "text-white/50 border-white/15 bg-white/3"
                   : event.status === "cancelled" ? "text-[#f87171] border-[#f87171]/30 bg-[#f87171]/5"
-                  : "text-[#CBB9A4] border-[#CBB9A4]/30 bg-[#CBB9A4]/5"
+                  : "text-[#C7A892] border-[#C7A892]/30 bg-[#C7A892]/5"
                 )}
               >
                 {event.status === "published" ? "Publicado" : event.status === "draft" ? "Borrador"
@@ -254,7 +254,7 @@ export default function EventDetailView({
           {event.status === "published" && (
             <button
               onClick={() => onUpdateStatus("completed")}
-              className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium bg-[#CBB9A4]/10 border border-[#CBB9A4]/30 hover:bg-[#CBB9A4]/15 transition-all text-[#CBB9A4]"
+              className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium bg-[#C7A892]/10 border border-[#C7A892]/30 hover:bg-[#C7A892]/15 transition-all text-[#C7A892]"
             >
               <CheckCircle size={14} />
               Marcar completado
@@ -265,9 +265,9 @@ export default function EventDetailView({
         {/* Stats */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
           {[
-            { label: "Inscritos",   value: `${confirmed.length + pending.length}/${event.capacity}`, sub: `${pending.length} pendiente${pending.length !== 1 ? "s" : ""}`, color: "#A48D78" },
-            { label: "En espera",   value: String(waitlist.length),    sub: null, color: "#CBB9A4" },
-            { label: "Ingresos",    value: formatCurrency(income),      sub: `${confirmed.length} confirmados`, color: "#C0A688" },
+            { label: "Inscritos",   value: `${confirmed.length + pending.length}/${event.capacity}`, sub: `${pending.length} pendiente${pending.length !== 1 ? "s" : ""}`, color: "#8A6E60" },
+            { label: "En espera",   value: String(waitlist.length),    sub: null, color: "#C7A892" },
+            { label: "Ingresos",    value: formatCurrency(income),      sub: `${confirmed.length} confirmados`, color: "#C7A892" },
             { label: "Precio",      value: event.price === 0 ? "Gratis" : formatCurrency(currentPrice), sub: event.earlyBirdPrice ? `Early Bird: ${formatCurrency(event.earlyBirdPrice)}` : null, color: color },
             { label: "Dto. Socias", value: event.memberDiscount > 0 ? `${event.memberDiscount}%` : "—", sub: null, color: "#4ade80" },
           ].map((s) => (
@@ -332,7 +332,7 @@ export default function EventDetailView({
           {event.tags.length > 0 && (
             <div className="flex flex-wrap gap-2">
               {event.tags.map((tag, i) => (
-                <span key={i} className="text-xs text-[#CBB9A4] bg-[#CBB9A4]/10 border border-[#CBB9A4]/20 rounded-full px-2.5 py-1">
+                <span key={i} className="text-xs text-[#C7A892] bg-[#C7A892]/10 border border-[#C7A892]/20 rounded-full px-2.5 py-1">
                   #{tag}
                 </span>
               ))}
@@ -349,7 +349,7 @@ export default function EventDetailView({
             {[
               { label: `${confirmed.length} confirmado${confirmed.length !== 1 ? "s" : ""}`, color: "#4ade80" },
               { label: `${pending.length} pendiente${pending.length !== 1 ? "s" : ""}`,  color: "#fbbf24" },
-              { label: `${waitlist.length} en espera`, color: "#CBB9A4" },
+              { label: `${waitlist.length} en espera`, color: "#C7A892" },
             ].map((b) => (
               <span
                 key={b.label}
@@ -373,18 +373,18 @@ export default function EventDetailView({
                 const badge = REG_STATUS_BADGE[reg.status] ?? REG_STATUS_BADGE.pending;
                 return (
                   <div key={reg.id} className="flex items-center gap-3 rounded-xl p-3 bg-white/[0.02] border border-white/[0.05] hover:bg-white/[0.04] transition-all">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#A48D78]/15 text-[#A48D78] text-xs font-bold flex-shrink-0">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#8A6E60]/15 text-[#8A6E60] text-xs font-bold flex-shrink-0">
                       {reg.name.charAt(0).toUpperCase()}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-foreground truncate">{reg.name}</p>
                       <p className="text-[0.7rem] text-muted-foreground truncate">{reg.email}</p>
                       {reg.eventPassCode && (
-                        <p className="text-[0.65rem] text-[#CBB9A4] mt-0.5 truncate">Pase: {reg.eventPassCode}</p>
+                        <p className="text-[0.65rem] text-[#C7A892] mt-0.5 truncate">Pase: {reg.eventPassCode}</p>
                       )}
                     </div>
                     <div className="hidden sm:block text-right mr-2">
-                      <p className="text-sm font-semibold text-[#C0A688]">
+                      <p className="text-sm font-semibold text-[#C7A892]">
                         {reg.amount === 0 ? "Gratis" : formatCurrency(reg.amount)}
                       </p>
                       {reg.paymentMethod && (
@@ -399,7 +399,7 @@ export default function EventDetailView({
                         "text-[0.62rem] font-semibold border rounded-full px-2 py-0.5 whitespace-nowrap",
                         reg.eventPassStatus === "used"
                           ? "text-[#4ade80] border-[#4ade80]/30 bg-[#4ade80]/8"
-                          : "text-[#CBB9A4] border-[#CBB9A4]/30 bg-[#CBB9A4]/8",
+                          : "text-[#C7A892] border-[#C7A892]/30 bg-[#C7A892]/8",
                       )}>
                         {reg.eventPassStatus === "used" ? "Pase usado" : "Pase emitido"}
                       </span>
@@ -433,7 +433,7 @@ export default function EventDetailView({
                       {reg.status === "waitlist" && (
                         <button
                           onClick={() => onConfirmReg(reg.id)}
-                          className="rounded-lg px-2 py-1 text-[0.65rem] font-medium bg-[#CBB9A4]/10 border border-[#CBB9A4]/30 text-[#CBB9A4] hover:bg-[#CBB9A4]/15 transition-all"
+                          className="rounded-lg px-2 py-1 text-[0.65rem] font-medium bg-[#C7A892]/10 border border-[#C7A892]/30 text-[#C7A892] hover:bg-[#C7A892]/15 transition-all"
                         >
                           Inscribir
                         </button>
@@ -451,15 +451,15 @@ export default function EventDetailView({
       {tab === "Check-in" && (
         <div className="space-y-5">
           {/* Counter */}
-          <div className="rounded-2xl border border-[#C0A688]/20 bg-[#C0A688]/[0.04] p-5 flex items-center gap-4">
-            <div className="text-4xl font-bold text-[#C0A688]">{checkedIn.length}</div>
+          <div className="rounded-2xl border border-[#C7A892]/20 bg-[#C7A892]/[0.04] p-5 flex items-center gap-4">
+            <div className="text-4xl font-bold text-[#C7A892]">{checkedIn.length}</div>
             <div>
               <p className="text-sm font-medium text-foreground">Check-ins realizados</p>
               <p className="text-xs text-muted-foreground">de {confirmed.length} confirmados</p>
             </div>
             <div className="ml-auto h-1.5 w-24 rounded-full bg-white/[0.06] overflow-hidden">
               <div
-                className="h-full rounded-full bg-[#C0A688]"
+                className="h-full rounded-full bg-[#C7A892]"
                 style={{ width: `${confirmed.length ? Math.round((checkedIn.length / confirmed.length) * 100) : 0}%` }}
               />
             </div>
@@ -487,7 +487,7 @@ export default function EventDetailView({
                   "rounded-lg px-3 py-1.5 text-xs font-semibold border transition-all",
                   scannerOpen
                     ? "border-[#f87171]/35 bg-[#f87171]/10 text-[#f87171] hover:bg-[#f87171]/15"
-                    : "border-[#CBB9A4]/35 bg-[#CBB9A4]/10 text-[#CBB9A4] hover:bg-[#CBB9A4]/15",
+                    : "border-[#C7A892]/35 bg-[#C7A892]/10 text-[#C7A892] hover:bg-[#C7A892]/15",
                 )}
               >
                 <Camera size={13} className="inline mr-1.5" />
@@ -499,7 +499,7 @@ export default function EventDetailView({
               <div className="relative overflow-hidden rounded-xl border border-white/[0.12] bg-black/70 aspect-video">
                 <video ref={videoRef} className="h-full w-full object-cover" playsInline muted />
                 <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                  <div className="h-40 w-40 rounded-2xl border-2 border-[#C0A688]/80 shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]" />
+                  <div className="h-40 w-40 rounded-2xl border-2 border-[#C7A892]/80 shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]" />
                 </div>
                 {scanBusy && (
                   <div className="absolute inset-0 bg-black/55 flex items-center justify-center gap-2 text-xs text-white">
@@ -532,7 +532,7 @@ export default function EventDetailView({
               <button
                 onClick={() => submitScannedCode(manualCode)}
                 disabled={!manualCode.trim() || scanBusy}
-                className="rounded-lg px-3 py-2 text-xs font-semibold border border-[#C0A688]/35 bg-[#C0A688]/10 text-[#C0A688] hover:bg-[#C0A688]/15 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="rounded-lg px-3 py-2 text-xs font-semibold border border-[#C7A892]/35 bg-[#C7A892]/10 text-[#C7A892] hover:bg-[#C7A892]/15 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <ScanLine size={13} className="inline mr-1.5" />
                 Validar
@@ -562,7 +562,7 @@ export default function EventDetailView({
             ) : (
               confirmed.map((reg) => (
                 <div key={reg.id} className="flex items-center gap-3 rounded-xl p-3 bg-white/[0.02] border border-white/[0.05]">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#A48D78]/15 text-[#A48D78] text-xs font-bold flex-shrink-0">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#8A6E60]/15 text-[#8A6E60] text-xs font-bold flex-shrink-0">
                     {reg.name.charAt(0).toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -596,9 +596,9 @@ export default function EventDetailView({
             <p className="text-sm font-semibold text-foreground mb-4">Notificaciones</p>
             <div className="flex flex-wrap gap-2">
               {[
-                { label: "Push Notification", icon: Bell, color: "#A48D78" },
+                { label: "Push Notification", icon: Bell, color: "#8A6E60" },
                 { label: "WhatsApp Masivo",   icon: MessageSquare, color: "#4ade80" },
-                { label: "Email a inscritas", icon: Mail, color: "#CBB9A4" },
+                { label: "Email a inscritas", icon: Mail, color: "#C7A892" },
               ].map((btn) => (
                 <button
                   key={btn.label}

@@ -15,7 +15,7 @@ const STATUS_BADGE: Record<string, { label: string; className: string }> = {
   published: { label: "Publicado",  className: "text-[#4ade80] border-[#4ade80]/30 bg-[#4ade80]/5" },
   draft:     { label: "Borrador",   className: "text-white/50 border-white/15 bg-white/3" },
   cancelled: { label: "Cancelado",  className: "text-[#f87171] border-[#f87171]/30 bg-[#f87171]/5" },
-  completed: { label: "Completado", className: "text-[#CBB9A4] border-[#CBB9A4]/30 bg-[#CBB9A4]/5" },
+  completed: { label: "Completado", className: "text-[#C7A892] border-[#C7A892]/30 bg-[#C7A892]/5" },
 };
 
 export default function EventListView({ events, onCreateNew, onSelect }: Props) {
@@ -40,7 +40,7 @@ export default function EventListView({ events, onCreateNew, onSelect }: Props) 
         </div>
         <button
           onClick={onCreateNew}
-          className="flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold bg-gradient-to-r from-[#A48D78] to-[#CBB9A4] text-white shadow-lg shadow-[#A48D78]/20 hover:opacity-90 transition-opacity"
+          className="flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold bg-gradient-to-r from-[#8A6E60] to-[#C7A892] text-white shadow-lg shadow-[#8A6E60]/20 hover:opacity-90 transition-opacity"
         >
           <Plus size={16} />
           Crear Evento
@@ -50,10 +50,10 @@ export default function EventListView({ events, onCreateNew, onSelect }: Props) 
       {/* ── Summary stats ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          { label: "Total eventos", value: String(events.length), icon: Calendar, color: "#A48D78" },
+          { label: "Total eventos", value: String(events.length), icon: Calendar, color: "#8A6E60" },
           { label: "Publicados",    value: String(active),         icon: TrendingUp, color: "#4ade80" },
-          { label: "Inscritos",     value: String(totalRegs),      icon: Users,      color: "#CBB9A4" },
-          { label: "Ingresos",      value: formatCurrency(totalIncome), icon: TrendingUp, color: "#C0A688" },
+          { label: "Inscritos",     value: String(totalRegs),      icon: Users,      color: "#C7A892" },
+          { label: "Ingresos",      value: formatCurrency(totalIncome), icon: TrendingUp, color: "#C7A892" },
         ].map((stat) => (
           <div
             key={stat.label}
@@ -75,7 +75,7 @@ export default function EventListView({ events, onCreateNew, onSelect }: Props) 
           className={cn(
             "rounded-full px-3 py-1.5 text-xs font-medium border transition-all",
             filter === "all"
-              ? "bg-[#A48D78]/15 border-[#A48D78]/40 text-[#A48D78]"
+              ? "bg-[#8A6E60]/15 border-[#8A6E60]/40 text-[#8A6E60]"
               : "border-white/10 text-muted-foreground hover:border-white/20 hover:text-foreground"
           )}
         >
@@ -112,7 +112,7 @@ export default function EventListView({ events, onCreateNew, onSelect }: Props) 
         <div className="flex flex-col items-center justify-center py-20 text-center">
           <Calendar size={40} className="text-white/20 mb-3" />
           <p className="text-muted-foreground">No hay eventos aún.</p>
-          <button onClick={onCreateNew} className="mt-4 text-sm text-[#A48D78] hover:underline">
+          <button onClick={onCreateNew} className="mt-4 text-sm text-[#8A6E60] hover:underline">
             Crear el primero
           </button>
         </div>
@@ -120,7 +120,7 @@ export default function EventListView({ events, onCreateNew, onSelect }: Props) 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {filtered.map((ev) => {
             const info = EVENT_TYPES.find((t) => t.value === ev.type);
-            const color = info?.color ?? "#A48D78";
+            const color = info?.color ?? "#8A6E60";
             const pct = occupancyPercent(ev.registered, ev.capacity);
             const barColor = occupancyColor(pct);
             const badge = STATUS_BADGE[ev.status] ?? STATUS_BADGE.draft;
@@ -176,10 +176,10 @@ export default function EventListView({ events, onCreateNew, onSelect }: Props) 
                 {/* Stats row */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {[
-                    { label: "Capacidad",   value: `${ev.registered}/${ev.capacity}`, color: "#A48D78" },
+                    { label: "Capacidad",   value: `${ev.registered}/${ev.capacity}`, color: "#8A6E60" },
                     { label: "Ocupación",   value: `${pct}%`,                         color: barColor },
                     { label: "Confirmados", value: String(confirmed),                  color: "#4ade80" },
-                    { label: "Ingresos",    value: formatCurrency(income),             color: "#C0A688" },
+                    { label: "Ingresos",    value: formatCurrency(income),             color: "#C7A892" },
                   ].map((s) => (
                     <div key={s.label} className="rounded-xl p-2.5 bg-white/[0.03] border border-white/[0.05]">
                       <p className="text-[0.6rem] text-muted-foreground mb-0.5">{s.label}</p>

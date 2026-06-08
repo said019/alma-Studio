@@ -411,7 +411,7 @@ const ClientDetail = () => {
                 Cancelar
               </Button>
               <Button
-                className="bg-gradient-to-r from-[#A48D78] to-[#CBB9A4] text-white border-0"
+                className="bg-gradient-to-r from-[#8A6E60] to-[#C7A892] text-white border-0"
                 disabled={editMemMutation.isPending}
                 onClick={() => editMemMutation.mutate()}
               >

@@ -301,7 +301,7 @@ const InstructorsList = () => {
                       if (event.buttons !== 1 && event.pointerType !== "touch") return;
                       applyPreviewFocus(event);
                     }}
-                    className="group relative mx-auto block h-[360px] w-full max-w-[300px] touch-none overflow-hidden rounded-[28px] border border-border bg-black/30 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#CBB9A4]"
+                    className="group relative mx-auto block h-[360px] w-full max-w-[300px] touch-none overflow-hidden rounded-[28px] border border-border bg-black/30 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C7A892]"
                     aria-label="Seleccionar enfoque de la foto"
                   >
                     <img

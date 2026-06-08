@@ -28,9 +28,9 @@ import { ChevronLeft, ChevronRight, Plus, CalendarDays, Palette, Zap, MoreHorizo
 
 /* ── Palette ── */
 const PALETTE_COLORS = [
-  { label: "Rosa", value: "#A48D78" },
-  { label: "Violeta", value: "#CBB9A4" },
-  { label: "Lima", value: "#C0A688" },
+  { label: "Rosa", value: "#8A6E60" },
+  { label: "Violeta", value: "#C7A892" },
+  { label: "Lima", value: "#C7A892" },
   { label: "Púrpura", value: "#8B5CF6" },
   { label: "Magenta", value: "#c026d3" },
   { label: "Azul", value: "#3B82F6" },
@@ -100,7 +100,7 @@ type ClassFormData = z.infer<typeof classSchema>;
 
 const typeSchema = z.object({
   name: z.string().min(1),
-  color: z.string().default("#CBB9A4"),
+  color: z.string().default("#C7A892"),
   category: z.enum(["barre", "pilates"]).default("barre"),
   defaultDuration: z.coerce.number().min(1),
   maxCapacity: z.coerce.number().min(1),
@@ -147,7 +147,7 @@ const ClassesCalendar = () => {
                   className={
                     "flex min-h-[44px] items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium whitespace-nowrap transition-all sm:px-4 sm:text-sm " +
                     (tab === key
-                      ? "bg-gradient-to-r from-[#CBB9A4] to-[#A48D78] text-white shadow-md shadow-[#A48D78]/25"
+                      ? "bg-gradient-to-r from-[#C7A892] to-[#8A6E60] text-white shadow-md shadow-[#8A6E60]/25"
                       : "text-muted-foreground hover:text-foreground hover:bg-white/5")
                   }
                 >
@@ -371,7 +371,7 @@ function CalendarTab({
                     className={cn(
                       "flex min-h-[52px] min-w-[76px] flex-col items-center justify-center rounded-xl border px-2 text-xs transition-colors",
                       isActive
-                        ? "border-[#A48D78]/60 bg-gradient-to-r from-[#A48D78]/20 to-[#CBB9A4]/20 text-white"
+                        ? "border-[#8A6E60]/60 bg-gradient-to-r from-[#8A6E60]/20 to-[#C7A892]/20 text-white"
                         : "border-white/10 bg-black/30 text-white/70",
                     )}
                   >
@@ -407,7 +407,7 @@ function CalendarTab({
                     type="button"
                     onClick={() => { setSelectedClass(c); setSheetOpen(true); }}
                     className="w-full rounded-xl border border-white/10 bg-black/30 p-3 text-left"
-                    style={{ borderLeftColor: c.classTypeColor ?? "#CBB9A4", borderLeftWidth: 3 }}
+                    style={{ borderLeftColor: c.classTypeColor ?? "#C7A892", borderLeftWidth: 3 }}
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
@@ -432,7 +432,7 @@ function CalendarTab({
                       ) : (
                         <span
                           className="flex h-6 w-6 items-center justify-center rounded-full text-[0.6rem] font-bold text-white"
-                          style={{ background: c.classTypeColor ?? "#CBB9A4" }}
+                          style={{ background: c.classTypeColor ?? "#C7A892" }}
                         >
                           {(c.instructorName ?? "?")[0].toUpperCase()}
                         </span>
@@ -485,7 +485,7 @@ function CalendarTab({
                           ) : (
                             <span
                               className="flex h-4 w-4 items-center justify-center rounded-full text-[0.5rem] font-bold text-white ring-1 ring-white/30"
-                              style={{ background: c.classTypeColor ?? "#CBB9A4" }}
+                              style={{ background: c.classTypeColor ?? "#C7A892" }}
                             >
                               {(c.instructorName ?? "?")[0].toUpperCase()}
                             </span>
@@ -552,7 +552,7 @@ function CalendarTab({
             <div className="space-y-1"><Label>Notas</Label><Input {...form.register("notes")} /></div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>Cancelar</Button>
-              <Button type="submit" disabled={createMutation.isPending} className="bg-gradient-to-r from-[#CBB9A4] to-[#A48D78] text-white">Crear</Button>
+              <Button type="submit" disabled={createMutation.isPending} className="bg-gradient-to-r from-[#C7A892] to-[#8A6E60] text-white">Crear</Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -567,9 +567,9 @@ function CalendarTab({
               {/* Instructor with avatar */}
               <div className="flex items-center gap-3">
                 {selectedClass.instructorPhoto ? (
-                  <img src={selectedClass.instructorPhoto} alt="" className="w-8 h-8 rounded-full object-cover ring-2 ring-offset-1" style={{ outline: `2px solid ${selectedClass.classTypeColor ?? "#CBB9A4"}` }} />
+                  <img src={selectedClass.instructorPhoto} alt="" className="w-8 h-8 rounded-full object-cover ring-2 ring-offset-1" style={{ outline: `2px solid ${selectedClass.classTypeColor ?? "#C7A892"}` }} />
                 ) : (
-                  <span className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-white text-sm" style={{ background: selectedClass.classTypeColor ?? "#CBB9A4" }}>
+                  <span className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-white text-sm" style={{ background: selectedClass.classTypeColor ?? "#C7A892" }}>
                     {(selectedClass.instructorName ?? "?")[0].toUpperCase()}
                   </span>
                 )}
@@ -696,7 +696,7 @@ function TypesTab({ types, toast, qc }: { types: ClassType[]; toast: any; qc: an
   const [editing, setEditing] = useState<ClassType | null>(null);
   const form = useForm<TypeFormData>({
     resolver: zodResolver(typeSchema),
-    defaultValues: { color: "#CBB9A4", category: "barre", defaultDuration: 50, maxCapacity: 5, isActive: true },
+    defaultValues: { color: "#C7A892", category: "barre", defaultDuration: 50, maxCapacity: 5, isActive: true },
   });
 
   const createMutation = useMutation({
@@ -736,7 +736,7 @@ function TypesTab({ types, toast, qc }: { types: ClassType[]; toast: any; qc: an
     setOpen(true);
   };
   const openCreate = () => {
-    form.reset({ color: "#CBB9A4", category: "barre", defaultDuration: 50, maxCapacity: 5, isActive: true });
+    form.reset({ color: "#C7A892", category: "barre", defaultDuration: 50, maxCapacity: 5, isActive: true });
     setEditing(null);
     setOpen(true);
   };
@@ -745,7 +745,7 @@ function TypesTab({ types, toast, qc }: { types: ClassType[]; toast: any; qc: an
     <>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
         <p className="text-sm text-muted-foreground">{types.length} tipos registrados</p>
-        <Button size="sm" onClick={openCreate} className="bg-gradient-to-r from-[#CBB9A4] to-[#A48D78] text-white">
+        <Button size="sm" onClick={openCreate} className="bg-gradient-to-r from-[#C7A892] to-[#8A6E60] text-white">
           <Plus size={14} className="mr-1" />Nuevo tipo
         </Button>
       </div>
@@ -766,8 +766,8 @@ function TypesTab({ types, toast, qc }: { types: ClassType[]; toast: any; qc: an
                       <p className="truncate text-sm font-semibold text-white">{t.name}</p>
                     </div>
                     <div className="mt-2 flex flex-wrap gap-1.5">
-                      {t.category === "barre" && <Badge className="bg-[#A48D78]/20 text-[#A48D78] border border-[#A48D78]/30">Barre</Badge>}
-                      {t.category === "pilates" && <Badge className="bg-[#CBB9A4]/20 text-[#CBB9A4] border border-[#CBB9A4]/30">Pilates</Badge>}
+                      {t.category === "barre" && <Badge className="bg-[#8A6E60]/20 text-[#8A6E60] border border-[#8A6E60]/30">Barre</Badge>}
+                      {t.category === "pilates" && <Badge className="bg-[#C7A892]/20 text-[#C7A892] border border-[#C7A892]/30">Pilates</Badge>}
                       {!t.category && <Badge variant="secondary">—</Badge>}
                       <Badge variant="outline">{(t.defaultDuration ?? t.durationMin ?? "—") + " min"}</Badge>
                       <Badge variant="outline">{(t.maxCapacity ?? t.capacity ?? "—") + " cupos"}</Badge>
@@ -788,7 +788,7 @@ function TypesTab({ types, toast, qc }: { types: ClassType[]; toast: any; qc: an
                 <div className="mt-2">
                   <Badge
                     variant={t.isActive !== false ? "default" : "secondary"}
-                    className={t.isActive !== false ? "bg-[#CBB9A4]/20 text-[#CBB9A4] border border-[#CBB9A4]/30" : ""}
+                    className={t.isActive !== false ? "bg-[#C7A892]/20 text-[#C7A892] border border-[#C7A892]/30" : ""}
                   >
                     {t.isActive !== false ? "Activo" : "Inactivo"}
                   </Badge>
@@ -817,8 +817,8 @@ function TypesTab({ types, toast, qc }: { types: ClassType[]; toast: any; qc: an
                   <TableCell><div className="w-6 h-6 rounded-full shadow-sm" style={{ backgroundColor: t.color }} /></TableCell>
                   <TableCell className="font-medium">{t.name}</TableCell>
                   <TableCell>
-                    {t.category === "barre" && <Badge className="bg-[#A48D78]/20 text-[#A48D78] border border-[#A48D78]/30">Barre</Badge>}
-                    {t.category === "pilates" && <Badge className="bg-[#CBB9A4]/20 text-[#CBB9A4] border border-[#CBB9A4]/30">Pilates</Badge>}
+                    {t.category === "barre" && <Badge className="bg-[#8A6E60]/20 text-[#8A6E60] border border-[#8A6E60]/30">Barre</Badge>}
+                    {t.category === "pilates" && <Badge className="bg-[#C7A892]/20 text-[#C7A892] border border-[#C7A892]/30">Pilates</Badge>}
                     {!t.category && <Badge variant="secondary">—</Badge>}
                   </TableCell>
                   <TableCell>{(t.defaultDuration ?? t.durationMin ?? "—") + " min"}</TableCell>
@@ -826,7 +826,7 @@ function TypesTab({ types, toast, qc }: { types: ClassType[]; toast: any; qc: an
                   <TableCell>
                     <Badge
                       variant={t.isActive !== false ? "default" : "secondary"}
-                      className={t.isActive !== false ? "bg-[#CBB9A4]/20 text-[#CBB9A4] border border-[#CBB9A4]/30" : ""}
+                      className={t.isActive !== false ? "bg-[#C7A892]/20 text-[#C7A892] border border-[#C7A892]/30" : ""}
                     >
                       {t.isActive !== false ? "Activo" : "Inactivo"}
                     </Badge>
@@ -886,7 +886,7 @@ function TypesTab({ types, toast, qc }: { types: ClassType[]; toast: any; qc: an
                     className={
                       "w-8 h-8 rounded-full border-2 transition-all " +
                       (form.watch("color") === c.value
-                        ? "border-foreground scale-110 ring-2 ring-offset-2 ring-offset-background ring-[#CBB9A4]"
+                        ? "border-foreground scale-110 ring-2 ring-offset-2 ring-offset-background ring-[#C7A892]"
                         : "border-transparent opacity-70 hover:opacity-100")
                     }
                     style={{ backgroundColor: c.value }}
@@ -906,7 +906,7 @@ function TypesTab({ types, toast, qc }: { types: ClassType[]; toast: any; qc: an
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-              <Button type="submit" className="bg-gradient-to-r from-[#CBB9A4] to-[#A48D78] text-white">
+              <Button type="submit" className="bg-gradient-to-r from-[#C7A892] to-[#8A6E60] text-white">
                 {editing ? "Actualizar" : "Crear"}
               </Button>
             </DialogFooter>
@@ -1018,20 +1018,20 @@ function GenerateTab({
     <div className="max-w-3xl mx-auto space-y-6">
       {/* Header */}
       <div className="text-center mb-2">
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-gradient-to-r from-[#CBB9A4]/10 to-[#A48D78]/10 border border-[#CBB9A4]/20 mb-3">
-          <Sparkles size={14} className="text-[#C0A688]" />
-          <span className="text-xs font-semibold text-[#CBB9A4]">Generador de clases</span>
+        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-gradient-to-r from-[#C7A892]/10 to-[#8A6E60]/10 border border-[#C7A892]/20 mb-3">
+          <Sparkles size={14} className="text-[#C7A892]" />
+          <span className="text-xs font-semibold text-[#C7A892]">Generador de clases</span>
         </div>
         <h2 className="text-2xl font-bold text-white">Generar clases en bloque</h2>
         <p className="text-sm text-white/40 mt-1">Selecciona tipo, instructor, rango de fechas y días</p>
       </div>
 
       {/* ── Preset: Horario Alma oficial ── */}
-      <div className="rounded-2xl border border-[#A48D78]/30 bg-gradient-to-br from-[#A48D78]/10 to-[#CBB9A4]/5 p-5 space-y-4">
+      <div className="rounded-2xl border border-[#8A6E60]/30 bg-gradient-to-br from-[#8A6E60]/10 to-[#C7A892]/5 p-5 space-y-4">
         <div>
           <div className="flex items-center gap-2">
-            <Sparkles size={14} className="text-[#C0A688]" />
-            <span className="text-xs font-semibold text-[#CBB9A4] uppercase tracking-wider">Preset Alma</span>
+            <Sparkles size={14} className="text-[#C7A892]" />
+            <span className="text-xs font-semibold text-[#C7A892] uppercase tracking-wider">Preset Alma</span>
           </div>
           <p className="mt-1.5 text-sm font-medium text-white">Horario oficial del estudio</p>
           <p className="mt-0.5 text-xs text-white/50">
@@ -1078,7 +1078,7 @@ function GenerateTab({
               }
             }}
             disabled={resetAlmaMutation.isPending || !presetInstructorId}
-            className="bg-gradient-to-r from-[#A48D78] to-[#CBB9A4] text-white disabled:opacity-50"
+            className="bg-gradient-to-r from-[#8A6E60] to-[#C7A892] text-white disabled:opacity-50"
           >
             {resetAlmaMutation.isPending ? (
               <Loader2 size={14} className="mr-2 animate-spin" />
@@ -1101,7 +1101,7 @@ function GenerateTab({
           </Button>
         </div>
         {!presetInstructorId && instructors.length === 0 && (
-          <p className="text-xs text-[#C0A688] flex items-center gap-1.5 mt-2">
+          <p className="text-xs text-[#C7A892] flex items-center gap-1.5 mt-2">
             <Sparkles size={12} /> Crea una instructora primero en la sección Instructoras.
           </p>
         )}
@@ -1115,8 +1115,8 @@ function GenerateTab({
       {/* ── Step 1: Class type + Instructor ── */}
       <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-5 space-y-4">
         <div className="flex items-center gap-2 mb-1">
-          <span className="flex items-center justify-center w-6 h-6 rounded-full bg-[#CBB9A4]/20 text-[#CBB9A4] text-xs font-bold">1</span>
-          <span className="text-xs font-semibold text-[#CBB9A4]/70 uppercase tracking-wider">Clase e instructor</span>
+          <span className="flex items-center justify-center w-6 h-6 rounded-full bg-[#C7A892]/20 text-[#C7A892] text-xs font-bold">1</span>
+          <span className="text-xs font-semibold text-[#C7A892]/70 uppercase tracking-wider">Clase e instructor</span>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
@@ -1156,8 +1156,8 @@ function GenerateTab({
       {/* ── Step 2: Date range ── */}
       <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-5 space-y-4">
         <div className="flex items-center gap-2 mb-1">
-          <span className="flex items-center justify-center w-6 h-6 rounded-full bg-[#A48D78]/20 text-[#A48D78] text-xs font-bold">2</span>
-          <span className="text-xs font-semibold text-[#A48D78]/70 uppercase tracking-wider">Rango de fechas</span>
+          <span className="flex items-center justify-center w-6 h-6 rounded-full bg-[#8A6E60]/20 text-[#8A6E60] text-xs font-bold">2</span>
+          <span className="text-xs font-semibold text-[#8A6E60]/70 uppercase tracking-wider">Rango de fechas</span>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
@@ -1174,8 +1174,8 @@ function GenerateTab({
       {/* ── Step 3: Days of week ── */}
       <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-5 space-y-4">
         <div className="flex items-center gap-2 mb-1">
-          <span className="flex items-center justify-center w-6 h-6 rounded-full bg-[#C0A688]/20 text-[#C0A688] text-xs font-bold">3</span>
-          <span className="text-xs font-semibold text-[#C0A688]/70 uppercase tracking-wider">Días de la semana</span>
+          <span className="flex items-center justify-center w-6 h-6 rounded-full bg-[#C7A892]/20 text-[#C7A892] text-xs font-bold">3</span>
+          <span className="text-xs font-semibold text-[#C7A892]/70 uppercase tracking-wider">Días de la semana</span>
         </div>
         <div className="flex flex-wrap gap-2">
           {GENERATE_DAYS.map((d) => (
@@ -1186,7 +1186,7 @@ function GenerateTab({
               className={
                 "relative px-5 py-2.5 rounded-xl text-sm font-semibold transition-all " +
                 (selectedDays.includes(d.value)
-                  ? "bg-gradient-to-r from-[#A48D78] to-[#CBB9A4] text-white shadow-[0_0_12px_rgba(118,33,77,0.3)]"
+                  ? "bg-gradient-to-r from-[#8A6E60] to-[#C7A892] text-white shadow-[0_0_12px_rgba(118,33,77,0.3)]"
                   : "bg-white/[0.04] border border-white/[0.07] text-white/45 hover:text-white/75 hover:border-white/20")
               }
             >
@@ -1198,21 +1198,21 @@ function GenerateTab({
           <button
             type="button"
             onClick={() => setSelectedDays([1, 2, 3, 4, 5])}
-            className="text-[10px] text-[#CBB9A4] font-medium hover:underline"
+            className="text-[10px] text-[#C7A892] font-medium hover:underline"
           >
             Lun–Vie
           </button>
           <button
             type="button"
             onClick={() => setSelectedDays([1, 2, 3, 4, 5, 6])}
-            className="text-[10px] text-[#CBB9A4] font-medium hover:underline"
+            className="text-[10px] text-[#C7A892] font-medium hover:underline"
           >
             Lun–Sáb
           </button>
           <button
             type="button"
             onClick={() => setSelectedDays([0, 1, 2, 3, 4, 5, 6])}
-            className="text-[10px] text-[#CBB9A4] font-medium hover:underline"
+            className="text-[10px] text-[#C7A892] font-medium hover:underline"
           >
             Todos
           </button>
@@ -1255,13 +1255,13 @@ function GenerateTab({
 
       {/* ── Preview ── */}
       {preview.length > 0 && (
-        <div className="rounded-2xl border border-[#CBB9A4]/20 bg-gradient-to-br from-[#CBB9A4]/5 to-[#A48D78]/5 p-5 space-y-3">
+        <div className="rounded-2xl border border-[#C7A892]/20 bg-gradient-to-br from-[#C7A892]/5 to-[#8A6E60]/5 p-5 space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Calendar size={14} className="text-[#C0A688]" />
+              <Calendar size={14} className="text-[#C7A892]" />
               <span className="text-xs font-semibold text-white/60 uppercase tracking-wider">Vista previa</span>
             </div>
-            <Badge variant="outline" className="border-[#CBB9A4]/30 text-[#CBB9A4] font-bold">
+            <Badge variant="outline" className="border-[#C7A892]/30 text-[#C7A892] font-bold">
               {preview.length} {preview.length === 1 ? "clase" : "clases"}
             </Badge>
           </div>
@@ -1284,7 +1284,7 @@ function GenerateTab({
                 <span className="text-sm font-bold text-white">
                   {format(d, "d")}
                 </span>
-                <span className="text-[9px] text-[#C0A688]/60 font-medium">
+                <span className="text-[9px] text-[#C7A892]/60 font-medium">
                   {startTime}
                 </span>
                 {selectedType && (
@@ -1318,7 +1318,7 @@ function GenerateTab({
         className={
           "w-full flex items-center justify-center gap-2.5 py-3.5 rounded-xl font-semibold text-white transition-all " +
           (canGenerate
-            ? "bg-gradient-to-r from-[#A48D78] to-[#CBB9A4] hover:opacity-90 shadow-[0_4px_20px_rgba(118,33,77,0.25)]"
+            ? "bg-gradient-to-r from-[#8A6E60] to-[#C7A892] hover:opacity-90 shadow-[0_4px_20px_rgba(118,33,77,0.25)]"
             : "bg-white/[0.05] text-white/25 cursor-not-allowed")
         }
       >

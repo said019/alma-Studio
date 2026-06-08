@@ -21,14 +21,14 @@ import { TrendingUp, TrendingDown, Minus, Download, Printer, Sparkles, AlertTria
 
 // Alma palette references
 const C = {
-  ink: "#43392F",
-  berry: "#A48D78",
-  coral: "#CBB9A4",
-  olive: "#9C8E72",
-  orange: "#C0A688",
-  cream: "#FAF9F6",
-  blush: "#E6DAC8",
-  border: "#E0D5C6",
+  ink: "#4A3333",
+  berry: "#8A6E60",
+  coral: "#C7A892",
+  olive: "#8A7C66",
+  orange: "#C7A892",
+  cream: "#E9E6DF",
+  blush: "#E4D2C3",
+  border: "#D8CFC1",
   muted: "rgba(46,32,28,0.55)",
 };
 

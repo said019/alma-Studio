@@ -41,9 +41,9 @@ interface ClientOption {
 
 // ── Status config ──────────────────────────────────────────────────────────────
 const statusConfig: Record<string, { label: string; className: string }> = {
-  confirmed:  { label: "Confirmada",   className: "text-[#C0A688] border-[#C0A688]/30 bg-[#C0A688]/5" },
+  confirmed:  { label: "Confirmada",   className: "text-[#C7A892] border-[#C7A892]/30 bg-[#C7A892]/5" },
   checked_in: { label: "Asistió ✓",   className: "text-[#166534] border-[#166534]/50 bg-[#166534]/15 font-semibold" },
-  waitlist:   { label: "Lista espera", className: "text-[#CBB9A4] border-[#CBB9A4]/30 bg-[#CBB9A4]/5" },
+  waitlist:   { label: "Lista espera", className: "text-[#C7A892] border-[#C7A892]/30 bg-[#C7A892]/5" },
   no_show:    { label: "No asistió",   className: "text-[#f87171] border-[#f87171]/30 bg-[#f87171]/5" },
   cancelled:  { label: "Cancelada",    className: "text-white/30 border-white/10 bg-white/3" },
 };
@@ -252,7 +252,7 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
               <div className="flex items-center gap-2 mb-1">
                 <span
                   className="w-2.5 h-2.5 rounded-full shrink-0"
-                  style={{ backgroundColor: classInfo.color || "#A48D78" }}
+                  style={{ backgroundColor: classInfo.color || "#8A6E60" }}
                 />
                 <h2 className="text-xl font-bold text-white">{classInfo.classTypeName}</h2>
               </div>
@@ -265,7 +265,7 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
             </div>
             <button
               onClick={() => refetch()}
-              className="text-xs text-[#CBB9A4]/60 hover:text-[#CBB9A4] transition-colors flex items-center gap-1"
+              className="text-xs text-[#C7A892]/60 hover:text-[#C7A892] transition-colors flex items-center gap-1"
             >
               <Clock size={11} /> Actualizar
             </button>
@@ -276,7 +276,7 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
               size="sm"
               onClick={() => setAssignOpen(true)}
               data-press
-              className="bg-gradient-to-r from-[#CBB9A4] to-[#A48D78] text-white"
+              className="bg-gradient-to-r from-[#C7A892] to-[#8A6E60] text-white"
             >
               <Plus size={14} className="mr-1" /> Asignar miembro
             </Button>
@@ -285,7 +285,7 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
               variant="outline"
               onClick={() => setVisitOpen(true)}
               data-press
-              className="border-[#9C8E72]/40 bg-[#9C8E72]/5 text-[#9C8E72] hover:bg-[#9C8E72]/10"
+              className="border-[#8A7C66]/40 bg-[#8A7C66]/5 text-[#8A7C66] hover:bg-[#8A7C66]/10"
             >
               <UserPlus size={14} className="mr-1" /> Asignar visitante
             </Button>
@@ -307,7 +307,7 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
                   cancelClassMutation.mutate(reason || undefined);
                 }}
                 disabled={cancelClassMutation.isPending}
-                className="border-[#CBB9A4]/40 text-[#CBB9A4]/85 hover:bg-[#CBB9A4]/10"
+                className="border-[#C7A892]/40 text-[#C7A892]/85 hover:bg-[#C7A892]/10"
               >
                 <Ban size={14} className="mr-1" /> Cancelar clase
               </Button>
@@ -317,9 +317,9 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
           {/* Stats */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
             {[
-              { label: "Confirmadas", value: confirmed, color: "#C0A688" },
+              { label: "Confirmadas", value: confirmed, color: "#C7A892" },
               { label: "Asistieron",  value: checkedIn, color: "#4ade80" },
-              { label: "Lista esp.",  value: waitlist,  color: "#CBB9A4" },
+              { label: "Lista esp.",  value: waitlist,  color: "#C7A892" },
               { label: "No asistió",  value: noShow,    color: "#f87171" },
             ].map((s) => (
               <div key={s.label} className="rounded-xl border border-white/[0.07] bg-white/[0.03] px-3 py-2 text-center">
@@ -364,7 +364,7 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
                     "w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0",
                     entry.status === "checked_in"
                       ? "bg-[#4ade80]/20 text-[#4ade80] border border-[#4ade80]/30"
-                      : "bg-gradient-to-br from-[#A48D78]/20 to-[#CBB9A4]/10 border border-[#A48D78]/20 text-[#A48D78]"
+                      : "bg-gradient-to-br from-[#8A6E60]/20 to-[#C7A892]/10 border border-[#8A6E60]/20 text-[#8A6E60]"
                   )}>
                     {entry.status === "checked_in"
                       ? <UserCheck size={16} />
@@ -379,7 +379,7 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
                       {entry.phone && <span className="text-xs text-white/25">{entry.phone}</span>}
                     </div>
                     {entry.planName && (
-                      <p className="text-[10px] text-[#CBB9A4]/60 mt-0.5">
+                      <p className="text-[10px] text-[#C7A892]/60 mt-0.5">
                         {entry.planName}
                         {entry.classesRemaining !== null
                           ? ` · ${entry.classesRemaining} clases restantes`
@@ -426,7 +426,7 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
                         }}
                         disabled={cancelMutation.isPending}
                         title="Cancelar reserva (devuelve crédito)"
-                        className="w-8 h-8 rounded-lg bg-[#CBB9A4]/8 border border-[#CBB9A4]/25 text-[#CBB9A4]/80 hover:bg-[#CBB9A4]/15 flex items-center justify-center transition-all disabled:opacity-40"
+                        className="w-8 h-8 rounded-lg bg-[#C7A892]/8 border border-[#C7A892]/25 text-[#C7A892]/80 hover:bg-[#C7A892]/15 flex items-center justify-center transition-all disabled:opacity-40"
                       >
                         <XCircle size={14} />
                       </button>
@@ -514,9 +514,9 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
           {assignWithGuest && selectedMember && (
             <div className="space-y-3">
               {/* Tarjeta de socia seleccionada */}
-              <div className="rounded-xl border border-[#A48D78]/40 bg-[#A48D78]/10 px-3 py-2.5 flex items-start justify-between gap-2">
+              <div className="rounded-xl border border-[#8A6E60]/40 bg-[#8A6E60]/10 px-3 py-2.5 flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="text-[10px] uppercase tracking-wide text-[#CBB9A4]/80">Socia</p>
+                  <p className="text-[10px] uppercase tracking-wide text-[#C7A892]/80">Socia</p>
                   <p className="text-sm font-medium truncate">{selectedMember.displayName}</p>
                   <p className="text-[11px] text-muted-foreground truncate">
                     {selectedMember.email ?? "—"}{selectedMember.phone ? ` · ${selectedMember.phone}` : ""}
@@ -733,7 +733,7 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
                     (guestChargeMode === "guest_sale" && !guestSalePlanId) ||
                     assignMutation.isPending
                   }
-                  className="flex-1 bg-gradient-to-r from-[#CBB9A4] to-[#A48D78] text-white"
+                  className="flex-1 bg-gradient-to-r from-[#C7A892] to-[#8A6E60] text-white"
                 >
                   {assignMutation.isPending
                     ? "Asignando…"
@@ -798,7 +798,7 @@ const ClassPicker = ({ onSelectClass }: { onSelectClass: (id: string) => void })
         </button>
         <button
           onClick={() => setWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }))}
-          className="ml-2 text-xs text-[#A48D78]/60 hover:text-[#A48D78] transition-colors"
+          className="ml-2 text-xs text-[#8A6E60]/60 hover:text-[#8A6E60] transition-colors"
         >
           Hoy
         </button>
@@ -826,12 +826,12 @@ const ClassPicker = ({ onSelectClass }: { onSelectClass: (id: string) => void })
               <div className="flex items-center gap-2 mb-2">
                 <p className={cn(
                   "text-xs font-semibold uppercase tracking-wider",
-                  isToday ? "text-[#A48D78]" : "text-white/30"
+                  isToday ? "text-[#8A6E60]" : "text-white/30"
                 )}>
                   {format(day, "EEEE d", { locale: es })}
                 </p>
                 {isToday && (
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#A48D78]/15 text-[#A48D78] border border-[#A48D78]/25 font-semibold">
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#8A6E60]/15 text-[#8A6E60] border border-[#8A6E60]/25 font-semibold">
                     Hoy
                   </span>
                 )}
@@ -854,11 +854,11 @@ const ClassPicker = ({ onSelectClass }: { onSelectClass: (id: string) => void })
                       <button
                         key={cls.id}
                         onClick={() => onSelectClass(cls.id)}
-                        className="w-full flex items-center gap-4 p-4 rounded-xl border border-white/[0.07] bg-white/[0.02] hover:border-[#A48D78]/30 hover:bg-[#A48D78]/5 transition-all group text-left"
+                        className="w-full flex items-center gap-4 p-4 rounded-xl border border-white/[0.07] bg-white/[0.02] hover:border-[#8A6E60]/30 hover:bg-[#8A6E60]/5 transition-all group text-left"
                       >
                         <span
                           className="w-2.5 h-2.5 rounded-full shrink-0"
-                          style={{ backgroundColor: cls.class_type_color ?? cls.color ?? "#A48D78" }}
+                          style={{ backgroundColor: cls.class_type_color ?? cls.color ?? "#8A6E60" }}
                         />
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-semibold text-white/85 truncate">
@@ -875,11 +875,11 @@ const ClassPicker = ({ onSelectClass }: { onSelectClass: (id: string) => void })
                           </div>
                           <div className="w-12 h-1.5 rounded-full bg-white/10 overflow-hidden">
                             <div
-                              className={cn("h-full rounded-full transition-all", full ? "bg-[#f87171]" : "bg-[#A48D78]")}
+                              className={cn("h-full rounded-full transition-all", full ? "bg-[#f87171]" : "bg-[#8A6E60]")}
                               style={{ width: `${pct}%` }}
                             />
                           </div>
-                          <ChevronRight size={14} className="text-white/20 group-hover:text-[#A48D78]/60 transition-colors" />
+                          <ChevronRight size={14} className="text-white/20 group-hover:text-[#8A6E60]/60 transition-colors" />
                         </div>
                       </button>
                     );

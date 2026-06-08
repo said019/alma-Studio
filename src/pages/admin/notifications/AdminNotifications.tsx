@@ -38,13 +38,13 @@ const ICON: Record<Category, React.ReactNode> = {
 };
 
 const ACCENT: Record<Category, string> = {
-  new_user: "#9C8E72",
-  order_pending: "#C0A688",
-  milestone: "#C0A688",
-  checkin: "#9C8E72",
-  campaign: "#A48D78",
+  new_user: "#8A7C66",
+  order_pending: "#C7A892",
+  milestone: "#C7A892",
+  checkin: "#8A7C66",
+  campaign: "#8A6E60",
   order_rejected: "#B23A48",
-  expiring: "#CBB9A4",
+  expiring: "#C7A892",
 };
 
 function formatTime(iso: string): string {
@@ -104,7 +104,7 @@ const AdminNotifications = () => {
       <AdminLayout>
         <div className="admin-page max-w-4xl">
           <div className="flex items-center gap-2 mb-1">
-            <Bell size={20} className="text-[#A48D78]" />
+            <Bell size={20} className="text-[#8A6E60]" />
             <h1 className="text-2xl font-bold">Bandeja del studio</h1>
           </div>
           <p className="text-sm text-muted-foreground mb-6">
@@ -172,7 +172,7 @@ const AdminNotifications = () => {
                         {n.unread && (
                           <span
                             className="h-2 w-2 rounded-full shrink-0 mt-1.5"
-                            style={{ backgroundColor: "#A48D78" }}
+                            style={{ backgroundColor: "#8A6E60" }}
                             aria-label="Sin leer"
                           />
                         )}

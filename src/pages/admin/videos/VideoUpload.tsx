@@ -227,7 +227,7 @@ const VideoUpload = () => {
       sales_cta_text: "Comprar acceso",
       duration_seconds: 0,
       sort_order: 0,
-      brand_color: "#A48D78",
+      brand_color: "#8A6E60",
       plan_ids: [],
       // Saneamos lo que viene de la BD: quitamos los null para no pisar los
       // defaults de arriba (un null en un Select/Input lo deja descontrolado).

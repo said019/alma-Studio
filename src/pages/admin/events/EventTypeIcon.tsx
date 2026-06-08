@@ -12,7 +12,7 @@ interface Props {
 
 export default function EventTypeIcon({ type, size = 16, withBg = false, className }: Props) {
   const info = EVENT_TYPES.find((t) => t.value === type);
-  const color = info?.color ?? "#A48D78";
+  const color = info?.color ?? "#8A6E60";
   const iconName = info?.iconName ?? "sparkles";
   const Icon = ICON_MAP[iconName as keyof typeof ICON_MAP] ?? Sparkles;
 

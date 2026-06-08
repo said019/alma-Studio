@@ -129,7 +129,7 @@ export default function CreateEventView({ initialData, onSave, onCancel }: Props
   const eb = form.early_bird_price ? Number(form.early_bird_price) : null;
   const discount = Number(form.member_discount) || 0;
 
-  const inputCls = "w-full rounded-xl bg-white/[0.04] border border-white/[0.08] px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-[#A48D78]/40 focus:bg-white/[0.06] transition-all";
+  const inputCls = "w-full rounded-xl bg-white/[0.04] border border-white/[0.08] px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-[#8A6E60]/40 focus:bg-white/[0.06] transition-all";
   const labelCls = "block text-xs font-medium text-muted-foreground mb-1.5";
 
   return (
@@ -155,18 +155,18 @@ export default function CreateEventView({ initialData, onSave, onCancel }: Props
             >
               <div className={cn(
                 "flex h-7 w-7 items-center justify-center rounded-full border text-xs font-bold transition-all",
-                i < step   ? "bg-[#A48D78] border-[#A48D78] text-white"
-                : i === step ? "border-[#A48D78] text-[#A48D78] bg-[#A48D78]/10"
+                i < step   ? "bg-[#8A6E60] border-[#8A6E60] text-white"
+                : i === step ? "border-[#8A6E60] text-[#8A6E60] bg-[#8A6E60]/10"
                 : "border-white/15 text-white/30 bg-white/[0.02]"
               )}>
                 {i < step ? <Check size={13} /> : i + 1}
               </div>
-              <span className={cn("text-[0.62rem] font-medium hidden sm:block", i === step ? "text-[#A48D78]" : i < step ? "text-foreground" : "text-white/30")}>
+              <span className={cn("text-[0.62rem] font-medium hidden sm:block", i === step ? "text-[#8A6E60]" : i < step ? "text-foreground" : "text-white/30")}>
                 {label}
               </span>
             </button>
             {i < STEPS.length - 1 && (
-              <div className={cn("h-px flex-1 mx-1 transition-all", i < step ? "bg-[#A48D78]/50" : "bg-white/[0.06]")} />
+              <div className={cn("h-px flex-1 mx-1 transition-all", i < step ? "bg-[#8A6E60]/50" : "bg-white/[0.06]")} />
             )}
           </div>
         ))}
@@ -308,7 +308,7 @@ export default function CreateEventView({ initialData, onSave, onCancel }: Props
           </div>
 
           <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 space-y-4">
-            <p className="text-xs font-semibold text-[#C0A688]/80 uppercase tracking-wider">Early Bird (opcional)</p>
+            <p className="text-xs font-semibold text-[#C7A892]/80 uppercase tracking-wider">Early Bird (opcional)</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className={labelCls}>Precio early bird (MXN)</label>
@@ -338,19 +338,19 @@ export default function CreateEventView({ initialData, onSave, onCancel }: Props
                   <p className="text-lg font-bold text-foreground">{formatCurrency(price)}</p>
                 </div>
                 {eb && (
-                  <div className="rounded-xl p-3 border border-[#C0A688]/20 bg-[#C0A688]/[0.04]">
-                    <p className="text-[0.65rem] text-[#C0A688]/70 mb-1">Early Bird</p>
-                    <p className="text-lg font-bold text-[#C0A688]">{formatCurrency(eb)}</p>
-                    <p className="text-[0.62rem] text-[#C0A688]/50 mt-0.5">Ahorro: {formatCurrency(price - eb)}</p>
+                  <div className="rounded-xl p-3 border border-[#C7A892]/20 bg-[#C7A892]/[0.04]">
+                    <p className="text-[0.65rem] text-[#C7A892]/70 mb-1">Early Bird</p>
+                    <p className="text-lg font-bold text-[#C7A892]">{formatCurrency(eb)}</p>
+                    <p className="text-[0.62rem] text-[#C7A892]/50 mt-0.5">Ahorro: {formatCurrency(price - eb)}</p>
                   </div>
                 )}
                 {discount > 0 && (
-                  <div className="rounded-xl p-3 border border-[#CBB9A4]/20 bg-[#CBB9A4]/[0.04]">
-                    <p className="text-[0.65rem] text-[#CBB9A4]/70 mb-1">Para socias</p>
-                    <p className="text-lg font-bold text-[#CBB9A4]">
+                  <div className="rounded-xl p-3 border border-[#C7A892]/20 bg-[#C7A892]/[0.04]">
+                    <p className="text-[0.65rem] text-[#C7A892]/70 mb-1">Para socias</p>
+                    <p className="text-lg font-bold text-[#C7A892]">
                       {formatCurrency(Math.round(price * (1 - discount / 100)))}
                     </p>
-                    <p className="text-[0.62rem] text-[#CBB9A4]/50 mt-0.5">{discount}% descuento</p>
+                    <p className="text-[0.62rem] text-[#C7A892]/50 mt-0.5">{discount}% descuento</p>
                   </div>
                 )}
               </div>
@@ -372,7 +372,7 @@ export default function CreateEventView({ initialData, onSave, onCancel }: Props
               <label className={labelCls}>¿Qué incluye?</label>
               <button
                 onClick={() => set("includes", [...form.includes, ""])}
-                className="text-[0.7rem] text-[#A48D78] flex items-center gap-1 hover:opacity-80"
+                className="text-[0.7rem] text-[#8A6E60] flex items-center gap-1 hover:opacity-80"
               >
                 <Plus size={12} />
                 Agregar
@@ -419,7 +419,7 @@ export default function CreateEventView({ initialData, onSave, onCancel }: Props
             )}
             <button
               onClick={() => onSave(buildPayload(), isEdit ? (initialData?.status as "draft" | "published") ?? "draft" : "published")}
-              className="flex-1 flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold bg-gradient-to-r from-[#A48D78] to-[#CBB9A4] text-white shadow-lg shadow-[#A48D78]/20 hover:opacity-90 transition-opacity"
+              className="flex-1 flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold bg-gradient-to-r from-[#8A6E60] to-[#C7A892] text-white shadow-lg shadow-[#8A6E60]/20 hover:opacity-90 transition-opacity"
             >
               <Sparkles size={15} />
               {isEdit ? "Guardar cambios" : "Publicar Evento"}
@@ -442,7 +442,7 @@ export default function CreateEventView({ initialData, onSave, onCancel }: Props
           <button
             onClick={() => setStep((s) => s + 1)}
             disabled={!canNext()}
-            className="flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold bg-gradient-to-r from-[#A48D78] to-[#CBB9A4] text-white shadow-lg shadow-[#A48D78]/20 hover:opacity-90 disabled:opacity-40 transition-opacity"
+            className="flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold bg-gradient-to-r from-[#8A6E60] to-[#C7A892] text-white shadow-lg shadow-[#8A6E60]/20 hover:opacity-90 disabled:opacity-40 transition-opacity"
           >
             Siguiente
             <ArrowRight size={15} />

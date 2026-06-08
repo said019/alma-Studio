@@ -776,9 +776,9 @@ const SettingsPage = () => (
           <TabsContent value="security">
             {/* La tarjeta usa los campos claros de AuthShell; la envolvemos en
                 un contenedor cream para que se lean sobre el panel oscuro. */}
-            <div className="rounded-2xl bg-[#FAF9F6] p-6 sm:p-8 max-w-md">
-              <h2 className="font-bold text-[#43392F] text-lg mb-1">Cambiar mi contraseña</h2>
-              <p className="text-[#43392F]/60 text-sm mb-6">
+            <div className="rounded-2xl bg-[#E9E6DF] p-6 sm:p-8 max-w-md">
+              <h2 className="font-bold text-[#4A3333] text-lg mb-1">Cambiar mi contraseña</h2>
+              <p className="text-[#4A3333]/60 text-sm mb-6">
                 Cambia la contraseña de tu cuenta de administrador. Por seguridad cerraremos tu sesión al terminar.
               </p>
               <ChangePassword logoutAfter />

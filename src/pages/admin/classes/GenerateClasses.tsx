@@ -82,7 +82,7 @@ const GenerateClasses = () => {
           <form onSubmit={form.handleSubmit((d) => generateMutation.mutate(d))} className="space-y-6">
             {/* Selects */}
             <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-5 space-y-4">
-              <p className="text-[11px] text-[#CBB9A4]/70 font-semibold uppercase tracking-wider">Clase e instructor</p>
+              <p className="text-[11px] text-[#C7A892]/70 font-semibold uppercase tracking-wider">Clase e instructor</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <Label className="text-white/60 text-xs">Tipo de clase</Label>
@@ -115,7 +115,7 @@ const GenerateClasses = () => {
 
             {/* Date range */}
             <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-5 space-y-4">
-              <p className="text-[11px] text-[#A48D78]/70 font-semibold uppercase tracking-wider">Rango de fechas</p>
+              <p className="text-[11px] text-[#8A6E60]/70 font-semibold uppercase tracking-wider">Rango de fechas</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <Label className="text-white/60 text-xs">Fecha inicio</Label>
@@ -139,7 +139,7 @@ const GenerateClasses = () => {
 
             {/* Time range */}
             <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-5 space-y-4">
-              <p className="text-[11px] text-[#C0A688]/70 font-semibold uppercase tracking-wider">Horario</p>
+              <p className="text-[11px] text-[#C7A892]/70 font-semibold uppercase tracking-wider">Horario</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <Label className="text-white/60 text-xs">Hora inicio</Label>
@@ -168,7 +168,7 @@ const GenerateClasses = () => {
 
             {/* Days of week */}
             <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-5 space-y-3">
-              <p className="text-[11px] text-[#CBB9A4]/70 font-semibold uppercase tracking-wider">Días de la semana</p>
+              <p className="text-[11px] text-[#C7A892]/70 font-semibold uppercase tracking-wider">Días de la semana</p>
               <div className="flex flex-wrap gap-2">
                 {DAYS.map((d) => (
                   <button
@@ -177,7 +177,7 @@ const GenerateClasses = () => {
                     onClick={() => toggleDay(d.value)}
                     className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all ${
                       selectedDays.includes(d.value)
-                        ? "bg-gradient-to-r from-[#A48D78] to-[#CBB9A4] text-white shadow-[0_0_10px_rgba(118,33,77,0.3)]"
+                        ? "bg-gradient-to-r from-[#8A6E60] to-[#C7A892] text-white shadow-[0_0_10px_rgba(118,33,77,0.3)]"
                         : "bg-white/[0.04] border border-white/[0.07] text-white/45 hover:text-white/75 hover:border-white/20"
                     }`}
                   >
@@ -190,7 +190,7 @@ const GenerateClasses = () => {
             <button
               type="submit"
               disabled={generateMutation.isPending}
-              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-[#A48D78] to-[#CBB9A4] hover:opacity-90 transition-opacity disabled:opacity-50"
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-[#8A6E60] to-[#C7A892] hover:opacity-90 transition-opacity disabled:opacity-50"
             >
               {generateMutation.isPending
                 ? <Loader2 className="animate-spin" size={16} />

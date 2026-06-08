@@ -297,14 +297,14 @@ export const VisitAssignDialog = ({ classId, open, onOpenChange, onSuccess }: Pr
               )}
             </div>
             {host ? (
-              <div className="rounded-lg bg-[#A48D78]/5 border border-[#A48D78]/20 px-3 py-2 text-sm">
+              <div className="rounded-lg bg-[#8A6E60]/5 border border-[#8A6E60]/20 px-3 py-2 text-sm">
                 <p className="font-medium">{host.displayName}</p>
                 {(host.email || host.phone) && (
                   <p className="text-[11px] text-muted-foreground mt-0.5">
                     {[host.email, host.phone].filter(Boolean).join(" · ")}
                   </p>
                 )}
-                <p className="text-[11px] text-[#A48D78] mt-1">
+                <p className="text-[11px] text-[#8A6E60] mt-1">
                   El crédito se descuenta del pack de visitas de {host.displayName.split(" ")[0]}.
                 </p>
               </div>

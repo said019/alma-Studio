@@ -79,7 +79,7 @@ const Waitlist = () => {
                   <div className="flex items-start justify-between">
                     <div>
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: classInfo.color || "#A48D78" }} />
+                        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: classInfo.color || "#8A6E60" }} />
                         <h2 className="text-xl font-bold text-white">{classInfo.classTypeName}</h2>
                       </div>
                       <p className="text-sm text-white/50">
@@ -90,13 +90,13 @@ const Waitlist = () => {
                     </div>
                     <button
                       onClick={() => refetch()}
-                      className="text-xs text-[#CBB9A4]/60 hover:text-[#CBB9A4] transition-colors flex items-center gap-1"
+                      className="text-xs text-[#C7A892]/60 hover:text-[#C7A892] transition-colors flex items-center gap-1"
                     >
                       <Clock size={11} /> Actualizar
                     </button>
                   </div>
                   <div className="mt-3">
-                    <Badge variant="outline" className="text-[#CBB9A4] border-[#CBB9A4]/30 bg-[#CBB9A4]/5">
+                    <Badge variant="outline" className="text-[#C7A892] border-[#C7A892]/30 bg-[#C7A892]/5">
                       {roster.length} en lista de espera
                     </Badge>
                   </div>
@@ -116,9 +116,9 @@ const Waitlist = () => {
                     : roster.map((entry, idx) => (
                       <div
                         key={entry.bookingId}
-                        className="flex items-center gap-4 p-4 rounded-xl border border-[#CBB9A4]/15 bg-[#CBB9A4]/5 transition-all"
+                        className="flex items-center gap-4 p-4 rounded-xl border border-[#C7A892]/15 bg-[#C7A892]/5 transition-all"
                       >
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#CBB9A4]/20 to-[#A48D78]/10 border border-[#CBB9A4]/20 flex items-center justify-center text-sm font-bold text-[#CBB9A4]">
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#C7A892]/20 to-[#8A6E60]/10 border border-[#C7A892]/20 flex items-center justify-center text-sm font-bold text-[#C7A892]">
                           #{idx + 1}
                         </div>
                         <div className="flex-1 min-w-0">
@@ -128,7 +128,7 @@ const Waitlist = () => {
                             {entry.phone && <span className="text-xs text-white/25">{entry.phone}</span>}
                           </div>
                           {entry.planName && (
-                            <p className="text-[10px] text-[#CBB9A4]/60 mt-0.5">
+                            <p className="text-[10px] text-[#C7A892]/60 mt-0.5">
                               {entry.planName}
                               {entry.classesRemaining !== null
                                 ? ` · ${entry.classesRemaining} clases`
@@ -136,7 +136,7 @@ const Waitlist = () => {
                             </p>
                           )}
                         </div>
-                        <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full border text-[#CBB9A4] border-[#CBB9A4]/30 bg-[#CBB9A4]/5 shrink-0">
+                        <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full border text-[#C7A892] border-[#C7A892]/30 bg-[#C7A892]/5 shrink-0">
                           Posición {idx + 1}
                         </span>
                       </div>
@@ -164,7 +164,7 @@ const Waitlist = () => {
                 </button>
                 <button
                   onClick={() => setWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }))}
-                  className="ml-2 text-xs text-[#A48D78]/60 hover:text-[#A48D78] transition-colors"
+                  className="ml-2 text-xs text-[#8A6E60]/60 hover:text-[#8A6E60] transition-colors"
                 >
                   Hoy
                 </button>
@@ -185,12 +185,12 @@ const Waitlist = () => {
                       <div className="flex items-center gap-2 mb-2">
                         <p className={cn(
                           "text-xs font-semibold uppercase tracking-wider",
-                          isToday ? "text-[#A48D78]" : "text-white/30"
+                          isToday ? "text-[#8A6E60]" : "text-white/30"
                         )}>
                           {format(day, "EEEE d", { locale: es })}
                         </p>
                         {isToday && (
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#A48D78]/15 text-[#A48D78] border border-[#A48D78]/25 font-semibold">
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#8A6E60]/15 text-[#8A6E60] border border-[#8A6E60]/25 font-semibold">
                             Hoy
                           </span>
                         )}
@@ -207,11 +207,11 @@ const Waitlist = () => {
                               <button
                                 key={cls.id}
                                 onClick={() => setSelectedClassId(cls.id)}
-                                className="w-full flex items-center gap-4 p-4 rounded-xl border border-white/[0.07] bg-white/[0.02] hover:border-[#CBB9A4]/30 hover:bg-[#CBB9A4]/5 transition-all group text-left"
+                                className="w-full flex items-center gap-4 p-4 rounded-xl border border-white/[0.07] bg-white/[0.02] hover:border-[#C7A892]/30 hover:bg-[#C7A892]/5 transition-all group text-left"
                               >
                                 <span
                                   className="w-2.5 h-2.5 rounded-full shrink-0"
-                                  style={{ backgroundColor: cls.class_type_color ?? cls.color ?? "#CBB9A4" }}
+                                  style={{ backgroundColor: cls.class_type_color ?? cls.color ?? "#C7A892" }}
                                 />
                                 <div className="flex-1 min-w-0">
                                   <p className="text-sm font-semibold text-white/85 truncate">
@@ -219,7 +219,7 @@ const Waitlist = () => {
                                   </p>
                                   <p className="text-xs text-white/35">{time} · {cls.instructor_name ?? "—"}</p>
                                 </div>
-                                <ChevronRight size={14} className="text-white/20 group-hover:text-[#CBB9A4]/60 transition-colors" />
+                                <ChevronRight size={14} className="text-white/20 group-hover:text-[#C7A892]/60 transition-colors" />
                               </button>
                             );
                           })}

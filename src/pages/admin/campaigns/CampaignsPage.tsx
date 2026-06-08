@@ -55,7 +55,7 @@ type CampaignLog = {
 
 const STATUS_PILL: Record<Campaign["status"], { label: string; className: string }> = {
   queued: { label: "En cola", className: "border-white/20 bg-white/5 text-white/70" },
-  sending: { label: "Enviando", className: "border-[#C0A688]/40 bg-[#C0A688]/10 text-[#C0A688]" },
+  sending: { label: "Enviando", className: "border-[#C7A892]/40 bg-[#C7A892]/10 text-[#C7A892]" },
   completed: { label: "Completada", className: "border-[#4ade80]/40 bg-[#4ade80]/10 text-[#4ade80]" },
   failed: { label: "Falló", className: "border-[#f87171]/40 bg-[#f87171]/10 text-[#f87171]" },
 };
@@ -151,7 +151,7 @@ const CampaignsPage = () => {
           {/* ── Header ── */}
           <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-5">
             <div className="flex items-center gap-2">
-              <MessageCircle size={18} className="text-[#CBB9A4]" />
+              <MessageCircle size={18} className="text-[#C7A892]" />
               <h1 className="text-xl font-bold text-white">Campañas WhatsApp</h1>
             </div>
             <p className="mt-1 text-sm text-white/45">
@@ -229,7 +229,7 @@ const CampaignsPage = () => {
 
             {/* ── Preview result ── */}
             {previewData && (
-              <div className="rounded-xl border border-[#A48D78]/40 bg-[#A48D78]/10 p-4">
+              <div className="rounded-xl border border-[#8A6E60]/40 bg-[#8A6E60]/10 p-4">
                 <div className="flex flex-wrap items-center gap-3 text-sm">
                   <span className="text-white">
                     <strong>{previewData.sendable}</strong> alumnas recibirán el mensaje
@@ -269,7 +269,7 @@ const CampaignsPage = () => {
                   }
                 }}
                 disabled={!canSend || sendMutation.isPending}
-                className="bg-gradient-to-r from-[#A48D78] to-[#CBB9A4] text-white hover:opacity-90 disabled:opacity-50"
+                className="bg-gradient-to-r from-[#8A6E60] to-[#C7A892] text-white hover:opacity-90 disabled:opacity-50"
               >
                 {sendMutation.isPending ? <Loader2 size={14} className="mr-2 animate-spin" /> : <Send size={14} className="mr-2" />}
                 Enviar ahora

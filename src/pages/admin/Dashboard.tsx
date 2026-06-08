@@ -92,10 +92,10 @@ const Dashboard = () => {
 
   const dorm = dormantData?.data ?? null;
   const dormantRows = dorm ? [
-    { label: "≤7d", value: dorm.active_7d, color: "#9C8E72" },
-    { label: "8-14d", value: dorm.dormant_8_14d, color: "#C0A688" },
-    { label: "15-30d", value: dorm.dormant_15_30d, color: "#CBB9A4" },
-    { label: "31-60d", value: dorm.dormant_31_60d, color: "#A48D78" },
+    { label: "≤7d", value: dorm.active_7d, color: "#8A7C66" },
+    { label: "8-14d", value: dorm.dormant_8_14d, color: "#C7A892" },
+    { label: "15-30d", value: dorm.dormant_15_30d, color: "#C7A892" },
+    { label: "31-60d", value: dorm.dormant_31_60d, color: "#8A6E60" },
     { label: "60+d", value: dorm.lost_60d, color: "#888" },
   ] : [];
 
@@ -109,7 +109,7 @@ const Dashboard = () => {
   const birthdays: Birthday[] = Array.isArray(birthdaysData?.data) ? birthdaysData.data : [];
   const todayBirthdays = birthdays.filter((b) => b.isToday);
 
-  const metric = (label: string, value: number | undefined, icon: React.ReactNode, prefix = "", accent = "#CBB9A4") => (
+  const metric = (label: string, value: number | undefined, icon: React.ReactNode, prefix = "", accent = "#C7A892") => (
     <Card className="border-t-2" style={{ borderTopColor: accent }}>
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <CardTitle className="text-sm font-medium text-muted-foreground">{label}</CardTitle>
@@ -142,9 +142,9 @@ const Dashboard = () => {
 
           {/* Metric cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6" data-stagger>
-            <div data-stagger-item>{metric("Clases de hoy", stats?.classesToday, <CalendarDays size={18} />, "", "#CBB9A4")}</div>
-            <div data-stagger-item>{metric("Membresías activas", stats?.activeMembers, <Users size={18} />, "", "#A48D78")}</div>
-            <div data-stagger-item>{metric("Ingresos del mes", stats?.monthlyRevenue, <DollarSign size={18} />, "$", "#C0A688")}</div>
+            <div data-stagger-item>{metric("Clases de hoy", stats?.classesToday, <CalendarDays size={18} />, "", "#C7A892")}</div>
+            <div data-stagger-item>{metric("Membresías activas", stats?.activeMembers, <Users size={18} />, "", "#8A6E60")}</div>
+            <div data-stagger-item>{metric("Ingresos del mes", stats?.monthlyRevenue, <DollarSign size={18} />, "$", "#C7A892")}</div>
             <div data-stagger-item>{metric("Alertas pendientes", stats?.pendingAlerts, <AlertCircle size={18} />, "", "#F97316")}</div>
           </div>
 
@@ -157,7 +157,7 @@ const Dashboard = () => {
             >
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm flex items-center gap-2">
-                  <TrendingUp size={15} className="text-[#A48D78]" />
+                  <TrendingUp size={15} className="text-[#8A6E60]" />
                   Ingresos últimos 6 meses
                 </CardTitle>
               </CardHeader>
@@ -169,8 +169,8 @@ const Dashboard = () => {
                     <AreaChart data={revenueRows} margin={{ top: 5, right: 5, left: 5, bottom: 0 }}>
                       <defs>
                         <linearGradient id="rev-grad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#A48D78" stopOpacity={0.4} />
-                          <stop offset="100%" stopColor="#A48D78" stopOpacity={0} />
+                          <stop offset="0%" stopColor="#8A6E60" stopOpacity={0.4} />
+                          <stop offset="100%" stopColor="#8A6E60" stopOpacity={0} />
                         </linearGradient>
                       </defs>
                       <XAxis dataKey="month" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
@@ -178,7 +178,7 @@ const Dashboard = () => {
                         formatter={(v: any) => `$${Number(v).toLocaleString("es-MX")}`}
                         contentStyle={{ fontSize: 11, padding: 6 }}
                       />
-                      <Area type="monotone" dataKey="amount" stroke="#A48D78" strokeWidth={2} fill="url(#rev-grad)" />
+                      <Area type="monotone" dataKey="amount" stroke="#8A6E60" strokeWidth={2} fill="url(#rev-grad)" />
                     </AreaChart>
                   </ResponsiveContainer>
                 )}
@@ -188,7 +188,7 @@ const Dashboard = () => {
             <Card data-lift>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm flex items-center gap-2">
-                  <UserMinus size={15} className="text-[#CBB9A4]" />
+                  <UserMinus size={15} className="text-[#C7A892]" />
                   Distribución por última visita
                 </CardTitle>
               </CardHeader>
@@ -219,19 +219,19 @@ const Dashboard = () => {
           <Card
             className="mb-6 cursor-pointer hover:border-primary/50 transition-colors"
             onClick={() => navigate("/admin/clients?birthday=month")}
-            style={todayBirthdays.length > 0 ? { borderColor: "#C0A688", borderTopWidth: 2 } : undefined}
+            style={todayBirthdays.length > 0 ? { borderColor: "#C7A892", borderTopWidth: 2 } : undefined}
           >
             <CardHeader>
               <CardTitle className="text-base flex items-center justify-between gap-3">
                 <span className="flex items-center gap-2">
-                  <Cake size={17} className="text-[#C0A688]" />
+                  <Cake size={17} className="text-[#C7A892]" />
                   Cumpleaños de {MONTHS[currentMonth - 1]}
                   <span className="text-xs text-muted-foreground font-normal ml-1">
                     ({birthdays.length})
                   </span>
                 </span>
                 {todayBirthdays.length > 0 && (
-                  <Badge style={{ backgroundColor: "#C0A688", color: "#FAF9F6" }} className="text-xs">
+                  <Badge style={{ backgroundColor: "#C7A892", color: "#E9E6DF" }} className="text-xs">
                     {todayBirthdays.length} {todayBirthdays.length === 1 ? "es hoy" : "son hoy"}
                   </Badge>
                 )}
@@ -255,13 +255,13 @@ const Dashboard = () => {
                         key={b.id}
                         className="flex items-center gap-3 rounded-xl px-3 py-2.5 transition-colors"
                         style={{
-                          backgroundColor: b.isToday ? "#C0A68818" : "transparent",
-                          border: `1px solid ${b.isToday ? "#C0A68855" : "#E0D5C6"}`,
+                          backgroundColor: b.isToday ? "#C7A89218" : "transparent",
+                          border: `1px solid ${b.isToday ? "#C7A89255" : "#D8CFC1"}`,
                         }}
                       >
                         <span
                           className="grid h-9 w-9 shrink-0 place-items-center rounded-full overflow-hidden text-[0.7rem] font-bold text-white"
-                          style={{ backgroundColor: b.isToday ? "#C0A688" : "#A48D78" }}
+                          style={{ backgroundColor: b.isToday ? "#C7A892" : "#8A6E60" }}
                         >
                           {b.photoUrl ? (
                             <img src={b.photoUrl} alt="" className="h-full w-full object-cover" />
@@ -276,9 +276,9 @@ const Dashboard = () => {
                         <span
                           className="text-[0.7rem] font-bold tabular-nums px-2 py-0.5 rounded-full"
                           style={{
-                            backgroundColor: b.isToday ? "#C0A688" : "transparent",
-                            color: b.isToday ? "#FAF9F6" : "#A48D78",
-                            border: b.isToday ? "0" : "1px solid #A48D7833",
+                            backgroundColor: b.isToday ? "#C7A892" : "transparent",
+                            color: b.isToday ? "#E9E6DF" : "#8A6E60",
+                            border: b.isToday ? "0" : "1px solid #8A6E6033",
                           }}
                         >
                           {b.isToday ? "HOY" : `${b.day} ${MONTHS[b.month - 1].slice(0, 3)}`}

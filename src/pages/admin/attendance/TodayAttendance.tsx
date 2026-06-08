@@ -130,7 +130,7 @@ const TodayAttendance = () => {
                         <Badge variant="outline" className="border-emerald-500/40 text-emerald-300">
                           {stats.checked_in} asistió
                         </Badge>
-                        <Badge variant="outline" className="border-[#C0A688]/40 text-[#C0A688]">
+                        <Badge variant="outline" className="border-[#C7A892]/40 text-[#C7A892]">
                           {stats.confirmed} pendiente{stats.confirmed === 1 ? "" : "s"}
                         </Badge>
                       </div>
