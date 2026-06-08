@@ -159,7 +159,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
                 className="h-9 w-auto object-contain"
               />
               <span className="mt-1 text-[9px] font-medium uppercase tracking-[0.32em] text-[#A48D78]/60">
-                Barre Studio
+                Pilates Studio
               </span>
             </div>
           )}

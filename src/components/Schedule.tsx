@@ -226,7 +226,7 @@ export default function Schedule() {
 
           {/* Studio label */}
           <p className="text-[11px] font-normal tracking-[0.25em] uppercase text-muted-foreground mb-8">
-            Alma · Barre Studio
+            Alma · Pilates Studio
           </p>
 
           <div className="mb-8 grid grid-cols-1 gap-3 rounded-3xl border border-primary/15 bg-white/70 p-5 sm:grid-cols-[1fr_auto] sm:items-center">

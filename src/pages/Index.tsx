@@ -73,14 +73,14 @@ const ALMA = {
 } as const;
 
 /* ───── Types ───── */
-// Alma es estudio de Barre. Solo manejamos categoría 'barre'. Mantenemos
-// el campo para forward-compat pero no hay otras categorías activas.
+// Disciplinas (tipos de clase) que vienen de /api/class-types. Áreas:
+// 'studio' (Mat, Barre, Sculpt) y 'reformer_tower' (Reformer, Tower).
 type ClassTypeRow = {
   id: string;
   name: string;
   subtitle: string | null;
   description: string | null;
-  category: "barre";
+  category: string;
   intensity: "ligera" | "media" | "pesada" | "todas";
   color: string;
   emoji: string;
@@ -111,7 +111,11 @@ type CatalogGroup = { key: string; title: string; items: PlanRow[] };
 
 /* ───── Fallbacks ───── */
 const FALLBACK_CLASS_TYPES: ClassTypeRow[] = [
-  { id: "c1", name: "Barre", subtitle: "Energía, fuerza y postura", description: "Una clase cercana, personalizada y apta para todos los niveles. Cada sesión cambia para trabajar fuerza, control, movilidad y compromiso con tu bienestar.", category: "barre", intensity: "media", color: ALMA.berry, emoji: "sparkles", level: "Todos los niveles", duration_min: 50, capacity: 5, is_active: true, sort_order: 1 },
+  { id: "ct1", name: "Pilates Reformer", subtitle: "Fuerza y control en equipo", description: "Trabajo de cuerpo completo en el reformer: resistencia, alineación y control en grupos pequeños.", category: "reformer_tower", intensity: "media", color: ALMA.ink, emoji: "sparkles", level: "Todos los niveles", duration_min: 50, capacity: 4, is_active: true, sort_order: 1 },
+  { id: "ct2", name: "Pilates Tower", subtitle: "Movilidad y precisión", description: "Trabajo en torre que combina resistencia y movilidad para una postura fuerte y consciente.", category: "reformer_tower", intensity: "media", color: ALMA.ink, emoji: "sparkles", level: "Todos los niveles", duration_min: 50, capacity: 4, is_active: true, sort_order: 2 },
+  { id: "ct3", name: "Pilates Mat", subtitle: "Core y conexión", description: "Pilates en tapete con accesorios: core profundo, control y respiración consciente.", category: "studio", intensity: "media", color: ALMA.berry, emoji: "sparkles", level: "Todos los niveles", duration_min: 50, capacity: 8, is_active: true, sort_order: 3 },
+  { id: "ct4", name: "Barre", subtitle: "Postura y tono", description: "Energía, fuerza y postura en una clase cercana apta para todos los niveles.", category: "studio", intensity: "media", color: ALMA.berry, emoji: "sparkles", level: "Todos los niveles", duration_min: 50, capacity: 8, is_active: true, sort_order: 4 },
+  { id: "ct5", name: "Sculpt", subtitle: "Fuerza funcional", description: "Trabajo de tonificación y fuerza funcional para todo el cuerpo, con ritmo y constancia.", category: "studio", intensity: "media", color: ALMA.berry, emoji: "sparkles", level: "Todos los niveles", duration_min: 50, capacity: 8, is_active: true, sort_order: 5 },
 ];
 
 /* ── Real photos pool ── */
@@ -162,9 +166,8 @@ function clampFocus(value: unknown): number {
 
 function pickClassImage(name: string, idx: number): string {
   const lc = (name || "").toLowerCase();
-  // Solo Barre. Si el name contiene "barre" en cualquier variante (mixto,
-  // flow, energy, etc.) usa la hero; el resto rota por el pool.
-  if (lc.includes("barre")) return almaHeroClass;
+  // Reformer/Tower usan la foto del estudio; el resto rota por el pool.
+  if (lc.includes("reformer") || lc.includes("tower")) return almaHeroClass;
   return CLASS_IMAGE_POOL[idx % CLASS_IMAGE_POOL.length];
 }
 
@@ -206,8 +209,8 @@ const Index = () => {
   const videoCards = videoCardsData?.data?.length
     ? videoCardsData.data
     : [
-        { id: 1, title: "Barre Flow", description: "Movimiento, fuerza y postura en una clase cercana para todos los niveles.", emoji: "sparkles", video_url: null, thumbnail_url: null },
-        { id: 2, title: "Barre Energy", description: "Una experiencia distinta cada clase para salir con energía y foco.", emoji: "activity", video_url: null, thumbnail_url: null },
+        { id: 1, title: "Reformer & Tower", description: "Trabajo en equipo: fuerza, control y alineación en grupos pequeños.", emoji: "sparkles", video_url: null, thumbnail_url: null },
+        { id: 2, title: "Studio · Mat, Barre y Sculpt", description: "Core, postura y tono en tapete, con ritmo y constancia.", emoji: "activity", video_url: null, thumbnail_url: null },
         { id: 3, title: "Comunidad ALMA", description: "Atención personalizada, grupos pequeños y seguimiento real a tu avance.", emoji: "heart", video_url: null, thumbnail_url: null },
       ];
 
@@ -700,7 +703,7 @@ const Index = () => {
               </span>
             </button>
             <a
-              href="https://wa.me/527721119216?text=Hola%2C%20me%20interesa%20conocer%20m%C3%A1s%20sobre%20Alma%20Barre%20Studio"
+              href="https://wa.me/527721119216?text=Hola%2C%20me%20interesa%20conocer%20m%C3%A1s%20sobre%20Alma%20Movement"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-3 rounded-full px-7 py-4 text-[0.84rem] uppercase tracking-[0.18em] no-underline transition-colors hover:bg-[color:var(--cream)]/10"
@@ -1188,7 +1191,7 @@ const ContactoSection = () => {
             <a href="https://www.instagram.com/movementalma/" target="_blank" rel="noopener noreferrer" className="grid h-11 w-11 place-items-center rounded-full no-underline transition-colors hover:bg-[color:var(--blush)]" style={{ border: `1px solid ${ALMA.border}`, color: ALMA.berry }}>
               <IconInstagram size={16} />
             </a>
-            <a href="https://www.facebook.com/search/top?q=Alma%20Barre%20studio%20SLP" target="_blank" rel="noopener noreferrer" className="grid h-11 w-11 place-items-center rounded-full no-underline transition-colors hover:bg-[color:var(--blush)]" style={{ border: `1px solid ${ALMA.border}`, color: ALMA.berry }}>
+            <a href="https://www.facebook.com/search/top?q=Alma%20Movement%20Quer%C3%A9taro" target="_blank" rel="noopener noreferrer" className="grid h-11 w-11 place-items-center rounded-full no-underline transition-colors hover:bg-[color:var(--blush)]" style={{ border: `1px solid ${ALMA.border}`, color: ALMA.berry }}>
               <IconFacebook size={16} />
             </a>
             <a href="https://wa.me/527721119216" target="_blank" rel="noopener noreferrer" className="grid h-11 w-11 place-items-center rounded-full no-underline transition-colors hover:bg-[color:var(--blush)]" style={{ border: `1px solid ${ALMA.border}`, color: ALMA.berry }}>
