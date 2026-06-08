@@ -7966,6 +7966,17 @@ app.get("/api/admin/users/:userId/video-access", adminMiddleware, async (req, re
   }
 });
 
+// GET /api/admin/users/:userId/waiver — responsiva firmada por la alumna (admin).
+app.get("/api/admin/users/:userId/waiver", adminMiddleware, async (req, res) => {
+  try {
+    const r = await pool.query("SELECT * FROM waivers WHERE user_id = $1 LIMIT 1", [req.params.userId]);
+    return res.json({ data: r.rows[0] ?? null });
+  } catch (err) {
+    console.error("GET /admin/users/:userId/waiver error:", err);
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
 // POST /api/admin/users/:userId/video-access — grant library access (idempotent)
 app.post("/api/admin/users/:userId/video-access", adminMiddleware, async (req, res) => {
   try {

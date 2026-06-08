@@ -77,6 +77,13 @@ const ClientDetail = () => {
   });
   const access = vaData?.data;
 
+  const { data: waiverData } = useQuery({
+    queryKey: ["admin-waiver", id],
+    queryFn: async () => (await api.get(`/admin/users/${id}/waiver`)).data,
+    enabled: !!id,
+  });
+  const waiver = waiverData?.data;
+
   const grantVideoMutation = useMutation({
     mutationFn: () => api.post(`/admin/users/${id}/video-access`, { note: "Concedido desde ficha" }),
     onSuccess: () => {
@@ -169,6 +176,7 @@ const ClientDetail = () => {
               <TabsTrigger value="bookings">Reservas</TabsTrigger>
               <TabsTrigger value="payments">Pagos</TabsTrigger>
               <TabsTrigger value="loyalty">Lealtad</TabsTrigger>
+              <TabsTrigger value="waiver">Responsiva</TabsTrigger>
             </TabsList>
 
             <TabsContent value="profile" className="mt-4">
@@ -376,6 +384,43 @@ const ClientDetail = () => {
                   </Button>
                 </div>
               </div>
+            </TabsContent>
+
+            <TabsContent value="waiver" className="mt-4">
+              {!waiver ? (
+                <div className="rounded-xl border border-border bg-card p-6 text-sm text-muted-foreground">
+                  Esta alumna aún no ha firmado su responsiva. La firmará al reservar su primera clase.
+                </div>
+              ) : (
+                <div className="space-y-5">
+                  <div className="rounded-xl border border-border bg-card p-5">
+                    <div className="flex items-center justify-between gap-3 mb-3">
+                      <h3 className="text-base font-semibold">Responsiva y consentimiento informado</h3>
+                      <Badge>Firmada</Badge>
+                    </div>
+                    <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-sm">
+                      {[
+                        ["Nombre", waiver.full_name || "—"],
+                        ["Correo", waiver.email || "—"],
+                        ["Teléfono", waiver.phone || "—"],
+                        ["Uso de imagen", waiver.image_consent ? "Sí autorizado" : "No autorizado"],
+                        ["Firmada el", waiver.signed_at ? new Date(waiver.signed_at).toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" }) : "—"],
+                      ].map(([k, v]) => (
+                        <div key={k} className="flex justify-between gap-4 border-b border-border/50 py-1.5">
+                          <dt className="text-muted-foreground">{k}</dt>
+                          <dd className="text-right">{v}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </div>
+                  {waiver.signature_data && (
+                    <div className="rounded-xl border border-border bg-card p-5">
+                      <p className="text-xs uppercase tracking-wider text-muted-foreground mb-3">Firma</p>
+                      <img src={waiver.signature_data} alt="Firma de la alumna" className="max-h-32 rounded-lg border border-border bg-white p-2" />
+                    </div>
+                  )}
+                </div>
+              )}
             </TabsContent>
           </Tabs>
         </div>
