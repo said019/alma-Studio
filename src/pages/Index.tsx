@@ -528,7 +528,7 @@ const Index = () => {
                 Alma nace de una idea simple: que el movimiento se sienta como bienestar. Grupos pequeños, atención personalizada y técnica cuidada en cada disciplina, para que cada clase te acerque a tu mejor versión.
               </p>
               <p>
-                Aquí no hay multitud, no hay aparatos imposibles, no hay vergüenza. Hay barra, suelo, música cuidada y una intención: que salgas con la sensación de haber hecho algo real por ti.
+                Aquí no hay multitud ni prisa. Hay equipo de Pilates, técnica cuidada, música elegida y una intención: que salgas con la sensación de haber hecho algo real por ti.
               </p>
             </div>
 
@@ -608,7 +608,7 @@ const Index = () => {
                       <div className="absolute inset-0 transition-opacity duration-500" style={{ background: "linear-gradient(180deg, rgba(46,32,28,0) 50%, rgba(46,32,28,0.55) 100%)" }} />
                       <div className="absolute left-5 top-5 inline-flex items-center gap-2 rounded-full px-3 py-1 text-[0.6rem] uppercase tracking-[0.22em]" style={{ backgroundColor: ALMA.cream, color: ALMA.berry }}>
                         <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ backgroundColor: ALMA.berry }} />
-                        {c.category}
+                        {c.category === "reformer_tower" ? "Reformer · Tower" : c.category === "studio" ? "Studio" : c.category}
                       </div>
                       <div className="absolute inset-x-0 bottom-0 p-5 sm:p-6 flex items-end justify-between gap-4">
                         <div>
