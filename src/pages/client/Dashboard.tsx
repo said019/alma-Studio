@@ -131,7 +131,7 @@ const Dashboard = () => {
               to="/app/classes"
               eyebrow="Sin clase reservada"
               title="Reserva tu próxima clase"
-              meta="Cinco lugares por sesión, cada clase es distinta."
+              meta="Grupos pequeños, cada clase es distinta."
               rightLabel="Reservar"
               tint="coral"
             />
@@ -305,7 +305,7 @@ const Dashboard = () => {
             <EmptyState
               icon={<CalendarDays size={20} />}
               title="Aún no tienes clases reservadas."
-              description="Cinco lugares por sesión, cada clase es distinta. Reserva la tuya."
+              description="Grupos pequeños, cada clase es distinta. Reserva la tuya."
               ctaLabel="Reservar clase"
               ctaTo="/app/classes"
             />

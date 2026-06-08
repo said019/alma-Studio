@@ -114,7 +114,7 @@ const Register = () => {
       brandEyebrow="Nueva en Alma"
       brandHeadline={<>Te recibimos</>}
       brandHeadlineItalic="como te recibe una amiga."
-      brandSubline="Crea tu cuenta y reserva tu primera clase. Cinco lugares, atención personalizada, una persona que te enseña."
+      brandSubline="Crea tu cuenta y reserva tu primera clase. Grupos pequeños, atención personalizada, técnica cuidada."
       brandList={[
         { label: "Reservas y check-in en línea" },
         { label: "Anillos de progreso semanales" },

@@ -174,7 +174,7 @@ const MyBookings = () => {
               <EmptyState
                 icon={<CalendarDays size={20} />}
                 title="No tienes clases reservadas."
-                description="Cinco lugares por sesión. Reserva la tuya."
+                description="Grupos pequeños. Reserva la tuya."
                 ctaLabel="Reservar clase"
                 ctaTo="/app/classes"
               />

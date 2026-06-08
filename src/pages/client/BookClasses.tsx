@@ -37,17 +37,17 @@ import type { BookingClient } from "@/types/booking";
 
 const DAY_LABELS = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
 
-type ClassCat = "jumping" | "pilates" | "mixto" | "all";
+type ClassCat = "studio" | "reformer_tower" | "mixto" | "all";
 const CAT_LABEL: Record<ClassCat, string> = {
-  jumping: "Barre",
-  pilates: "Pilates",
+  studio: "Studio",
+  reformer_tower: "Reformer/Tower",
   mixto: "Mixto",
   all: "Todas",
 };
 const CAT_TINT: Record<ClassCat, keyof typeof ALMA> = {
-  jumping: "berry",
-  pilates: "coral",
-  mixto: "orange",
+  studio: "berry",
+  reformer_tower: "ink",
+  mixto: "coral",
   all: "olive",
 };
 

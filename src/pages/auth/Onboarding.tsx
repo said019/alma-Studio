@@ -119,7 +119,7 @@ const Onboarding = () => {
       brandList={[
         { label: "Atención personalizada" },
         { label: "Ejercicios adaptados a tu cuerpo" },
-        { label: "Cinco lugares por clase" },
+        { label: "Grupos pequeños por clase" },
       ]}
       formEyebrow="Un último paso"
       formHeadline="Cuéntanos sobre"
