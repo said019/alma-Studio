@@ -114,97 +114,6 @@ const FALLBACK_CLASS_TYPES: ClassTypeRow[] = [
   { id: "c1", name: "Barre", subtitle: "Energía, fuerza y postura", description: "Una clase cercana, personalizada y apta para todos los niveles. Cada sesión cambia para trabajar fuerza, control, movilidad y compromiso con tu bienestar.", category: "barre", intensity: "media", color: ALMA.berry, emoji: "sparkles", level: "Todos los niveles", duration_min: 50, capacity: 5, is_active: true, sort_order: 1 },
 ];
 
-/* ── Programas especializados ── */
-type SpecialBenefitGroup = { title: string; items: string[] };
-type SpecialNote = { label: string; text: string };
-type SpecialProgram = {
-  id: string;
-  eyebrow: string;
-  name: string;
-  tagline: string;
-  intro: string;
-  modality: string;
-  duration: string;
-  structure: string[];
-  benefitGroups: SpecialBenefitGroup[];
-  safety?: { heading: string; notes: SpecialNote[] };
-};
-
-const SPECIAL_PROGRAMS: SpecialProgram[] = [
-  {
-    id: "prenatal",
-    eyebrow: "Maternidad",
-    name: "Alma Prenatal & Postnatal",
-    tagline: "El movimiento consciente que te acompaña en la etapa más transformadora de tu vida.",
-    intro:
-      "Un espacio seguro y guiado, diseñado para mujeres embarazadas y mamás en etapa de postparto. Honramos los cambios de tu cuerpo y te acompañamos a mantenerte fuerte, activa y en bienestar.",
-    modality: "Presencial en estudio y clases en línea",
-    duration: "55 min totales",
-    structure: [
-      "40 min · Barré adaptado (fuerza, control y movilidad de bajo impacto)",
-      "15 min · Estiramiento profundo y meditación guiada adaptada",
-    ],
-    benefitGroups: [
-      {
-        title: "Etapa prenatal (embarazo)",
-        items: [
-          "Reduce los dolores de espalda baja y pelvis.",
-          "Mejora la circulación, previniendo la retención de líquidos.",
-          "Fortalece piernas y suelo pélvico para el momento del parto.",
-          "Mantiene una postura alineada al cambiar tu centro de gravedad.",
-        ],
-      },
-      {
-        title: "Etapa postnatal (postparto)",
-        items: [
-          "Recupera la fuerza muscular de forma progresiva y segura.",
-          "Estabiliza la pelvis y el core tras el parto.",
-          "Fortalece el abdomen respetando la anatomía postparto.",
-          "Ofrece un espacio de reconexión mental, física y de autocuidado.",
-        ],
-      },
-    ],
-  },
-  {
-    id: "core-breath",
-    eyebrow: "Alta especialización",
-    name: "Alma Core & Breath",
-    tagline: "Suelo pélvico fuerte, postura alineada y recuperación profunda desde el centro.",
-    intro:
-      "Un programa enfocado en el fortalecimiento profundo del core y el suelo pélvico a través del Pilates. Cada sesión combina técnica precisa, respiración consciente y trabajo postural para que tu cuerpo funcione mejor desde adentro hacia afuera.",
-    modality: "Presencial en estudio",
-    duration: "55 min totales",
-    structure: [
-      "40 min · Pilates Mat y accesorios (core profundo, estabilidad y control)",
-      "15 min · Trabajo de suelo pélvico, respiración y estiramiento especializado",
-    ],
-    benefitGroups: [
-      {
-        title: "Beneficios del trabajo de core profundo",
-        items: [
-          "Fortalece la faja abdominal profunda y estabiliza la columna.",
-          "Mejora la postura y reduce dolores de espalda baja.",
-          "Favorece la recuperación del suelo pélvico de forma progresiva y segura.",
-          "Aumenta la conciencia corporal y reduce el estrés mediante la respiración.",
-        ],
-      },
-    ],
-    safety: {
-      heading: "Indicaciones de seguridad",
-      notes: [
-        {
-          label: "Postparto",
-          text: "Solo de 6 a 8 semanas después del parto, con el visto bueno de tu médico ginecólogo.",
-        },
-        {
-          label: "Embarazo",
-          text: "No es apto durante el embarazo. Para ese periodo, el programa ideal es Alma Prenatal & Postnatal.",
-        },
-      ],
-    },
-  },
-];
-
 /* ── Real photos pool ── */
 const HERO_PHOTOS = [almaHeroClass, almaClassEnergy, almaBarreLine] as const;
 
@@ -274,7 +183,6 @@ const Index = () => {
   const [navOpen, setNavOpen] = useState(false);
   const [classTypes, setClassTypes] = useState<ClassTypeRow[]>(FALLBACK_CLASS_TYPES);
   const [openClassId, setOpenClassId] = useState<string | null>(null);
-  const [openProgramId, setOpenProgramId] = useState<string | null>("prenatal");
   const [playingVideoId, setPlayingVideoId] = useState<number | null>(null);
   const [galleryIdx, setGalleryIdx] = useState(0);
   const videoRefs = useRef<Record<number, HTMLVideoElement | null>>({});
@@ -412,7 +320,6 @@ const Index = () => {
             {[
               { label: "Estudio", id: "estudio" },
               { label: "Clases", id: "clases" },
-              { label: "Programas", id: "programas" },
               { label: "Horario", id: "horario" },
               { label: "Paquetes", id: "paquetes" },
               { label: "Coaches", id: "coaches" },
@@ -483,7 +390,6 @@ const Index = () => {
               {[
                 { label: "Estudio", id: "estudio" },
                 { label: "Clases", id: "clases" },
-                { label: "Programas", id: "programas" },
                 { label: "Horario", id: "horario" },
                 { label: "Paquetes", id: "paquetes" },
                 { label: "Coaches", id: "coaches" },
@@ -739,137 +645,6 @@ const Index = () => {
                       </div>
                     </div>
                   </button>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      </section>
-
-      {/* ═════════ PROGRAMAS ESPECIALIZADOS ═════════ */}
-      <section id="programas" className="relative px-5 sm:px-8 lg:px-12 py-20 lg:py-28" style={{ backgroundColor: ALMA.blush }}>
-        <div className="mx-auto max-w-[1320px]">
-          <div className="reveal opacity-0 translate-y-8 transition-all duration-700 mb-10 lg:mb-14">
-            <span className="text-[0.66rem] font-medium uppercase tracking-[0.34em]" style={{ color: ALMA.olive }}>
-              Cuidado especializado
-            </span>
-            <h2 className="font-bebas mt-4 leading-[0.92]" style={{ color: ALMA.ink, fontSize: "clamp(2.4rem, 5.2vw, 4.6rem)" }}>
-              Programas
-              <span className="block italic font-alilato font-normal" style={{ color: ALMA.berry }}>diseñados para tu etapa.</span>
-            </h2>
-            <p className="mt-6 max-w-[58ch] text-[1.02rem] leading-[1.75] text-[color:var(--ink)]/72">
-              Acompañamiento experto para momentos que requieren un enfoque distinto. Disponibles presencial en estudio y en línea.
-            </p>
-          </div>
-
-          <ul className="reveal opacity-0 translate-y-8 transition-all duration-700 grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-7 list-none m-0 p-0" data-stagger>
-            {SPECIAL_PROGRAMS.map((p) => {
-              const isOpen = openProgramId === p.id;
-              return (
-                <li key={p.id} data-stagger-item>
-                  <div
-                    className="h-full rounded-[24px] overflow-hidden border"
-                    style={{ backgroundColor: ALMA.cream, borderColor: ALMA.border }}
-                  >
-                    <button
-                      onClick={() => setOpenProgramId(isOpen ? null : p.id)}
-                      data-press
-                      className="group block w-full text-left bg-transparent border-0 p-6 sm:p-8 cursor-pointer"
-                      aria-expanded={isOpen}
-                    >
-                      <div className="flex items-start justify-between gap-4">
-                        <div>
-                          <span className="text-[0.6rem] font-medium uppercase tracking-[0.26em]" style={{ color: ALMA.olive }}>
-                            {p.eyebrow}
-                          </span>
-                          <h3 className="font-bebas mt-2 leading-[0.98] text-[1.9rem] sm:text-[2.3rem]" style={{ color: ALMA.ink }}>
-                            {p.name}
-                          </h3>
-                        </div>
-                        <span
-                          className="grid h-10 w-10 shrink-0 place-items-center rounded-full transition-transform group-hover:rotate-45"
-                          style={{ backgroundColor: ALMA.berry, color: ALMA.cream }}
-                        >
-                          {isOpen ? <Minus size={14} /> : <Plus size={14} />}
-                        </span>
-                      </div>
-                      <p className="mt-3 font-alilato italic text-[1rem] leading-[1.6]" style={{ color: ALMA.berry }}>
-                        {p.tagline}
-                      </p>
-                      <div className="mt-5 flex flex-wrap gap-x-6 gap-y-2 text-[0.72rem] uppercase tracking-[0.18em] text-[color:var(--ink)]/55">
-                        <div className="flex items-baseline gap-2"><span>Modalidad</span><span className="font-bebas text-[0.9rem]" style={{ color: ALMA.ink }}>Estudio + en línea</span></div>
-                        <div className="flex items-baseline gap-2"><span>Duración</span><span className="font-bebas text-[0.9rem]" style={{ color: ALMA.ink }}>{p.duration}</span></div>
-                      </div>
-                    </button>
-
-                    <div
-                      className="grid overflow-hidden transition-[grid-template-rows] duration-500 ease-out"
-                      style={{ gridTemplateRows: isOpen ? "1fr" : "0fr" }}
-                    >
-                      <div className="min-h-0 overflow-hidden">
-                        <div className="px-6 sm:px-8 pb-8 -mt-1">
-                          <p className="text-[0.95rem] leading-[1.75] text-[color:var(--ink)]/76">
-                            {p.intro}
-                          </p>
-
-                          <div className="mt-6">
-                            <p className="text-[0.66rem] font-medium uppercase tracking-[0.24em]" style={{ color: ALMA.olive }}>
-                              Estructura de la sesión
-                            </p>
-                            <ul className="mt-3 space-y-2 list-none p-0 m-0">
-                              {p.structure.map((s, i) => (
-                                <li key={i} className="flex gap-3 text-[0.92rem] leading-[1.6] text-[color:var(--ink)]/80">
-                                  <span className="mt-2 inline-block h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: ALMA.coral }} />
-                                  {s}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-
-                          <div className="mt-7 grid grid-cols-1 sm:grid-cols-2 gap-6">
-                            {p.benefitGroups.map((g, gi) => (
-                              <div key={gi}>
-                                <p className="font-bebas text-[1.05rem]" style={{ color: ALMA.berry }}>
-                                  {g.title}
-                                </p>
-                                <ul className="mt-3 space-y-2 list-none p-0 m-0">
-                                  {g.items.map((it, ii) => (
-                                    <li key={ii} className="flex gap-3 text-[0.9rem] leading-[1.6] text-[color:var(--ink)]/76">
-                                      <span className="mt-2 inline-block h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: ALMA.olive }} />
-                                      {it}
-                                    </li>
-                                  ))}
-                                </ul>
-                              </div>
-                            ))}
-                          </div>
-
-                          {p.safety && (
-                            <div
-                              className="mt-7 rounded-[18px] p-5 sm:p-6"
-                              style={{ backgroundColor: ALMA.blush, border: `1px solid ${ALMA.coral}55` }}
-                            >
-                              <p className="font-bebas text-[1.05rem] flex items-center gap-2" style={{ color: ALMA.berry }}>
-                                <span aria-hidden>⚠</span> {p.safety.heading}
-                              </p>
-                              <dl className="mt-4 space-y-3">
-                                {p.safety.notes.map((n, ni) => (
-                                  <div key={ni}>
-                                    <dt className="text-[0.66rem] font-medium uppercase tracking-[0.22em]" style={{ color: ALMA.coral }}>
-                                      {n.label}
-                                    </dt>
-                                    <dd className="mt-1 text-[0.9rem] leading-[1.6] text-[color:var(--ink)]/78">
-                                      {n.text}
-                                    </dd>
-                                  </div>
-                                ))}
-                              </dl>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
                 </li>
               );
             })}
