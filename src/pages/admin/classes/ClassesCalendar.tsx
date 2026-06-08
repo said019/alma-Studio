@@ -24,7 +24,7 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { TimePicker } from "@/components/ui/time-picker";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
-import { ChevronLeft, ChevronRight, Plus, CalendarDays, Palette, Zap, MoreHorizontal, Loader2, UserCheck, Sparkles, Calendar } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, CalendarDays, Palette, Zap, MoreHorizontal, Loader2, Sparkles, Calendar } from "lucide-react";
 
 /* ── Palette ── */
 const PALETTE_COLORS = [
@@ -84,7 +84,6 @@ const TABS = [
   { key: "calendar",     label: "Calendario",    icon: CalendarDays },
   { key: "types",        label: "Tipos de clase", icon: Palette },
   { key: "generate",     label: "Generar semana", icon: Zap },
-  { key: "instructors",  label: "Instructoras",   icon: UserCheck },
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
 
@@ -108,79 +107,6 @@ const typeSchema = z.object({
   isActive: z.boolean().default(true),
 });
 type TypeFormData = z.infer<typeof typeSchema>;
-
-/* ── Instructor schemas ── */
-const instructorSchema = z.object({
-  displayName: z.string().trim().min(1, "Nombre requerido"),
-  email: z.string().trim().email("Email inválido"),
-  bio: z.string().optional(),
-  specialties: z.string().optional(),
-  isActive: z.boolean().default(true),
-  photoFocusX: z.coerce.number().min(0).max(100).default(50),
-  photoFocusY: z.coerce.number().min(0).max(100).default(50),
-});
-type InstructorFormData = z.infer<typeof instructorSchema>;
-interface Instructor extends Omit<InstructorFormData, "specialties"> {
-  id: string;
-  specialties?: string[] | string | null;
-  photoUrl?: string;
-  photoFocusX?: number;
-  photoFocusY?: number;
-}
-
-function clampFocus(value: unknown): number {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return 50;
-  return Math.max(0, Math.min(100, Math.round(n)));
-}
-
-function normalizeSpecialties(value: unknown): string[] {
-  if (Array.isArray(value)) {
-    return value
-      .map((item) => String(item).trim())
-      .filter(Boolean);
-  }
-  if (typeof value === "string") {
-    const trimmed = value.trim();
-    if (!trimmed) return [];
-    try {
-      const parsed = JSON.parse(trimmed);
-      if (Array.isArray(parsed)) {
-        return parsed.map((item) => String(item).trim()).filter(Boolean);
-      }
-    } catch (_) {
-      // fallback parsing below
-    }
-    return value
-      .replace(/^\{|\}$/g, "")
-      .split(",")
-      .map((item) => item.replace(/^"+|"+$/g, "").trim())
-      .filter(Boolean);
-  }
-  return [];
-}
-
-function instructorPayload(d: InstructorFormData) {
-  return {
-    displayName: d.displayName.trim(),
-    email: d.email.trim().toLowerCase(),
-    bio: d.bio?.trim() || null,
-    specialties: normalizeSpecialties(d.specialties),
-    isActive: d.isActive,
-    photoFocusX: clampFocus(d.photoFocusX),
-    photoFocusY: clampFocus(d.photoFocusY),
-  };
-}
-
-function getFocusFromPointerEvent(event: React.PointerEvent<HTMLElement>) {
-  const rect = event.currentTarget.getBoundingClientRect();
-  const nextX = ((event.clientX - rect.left) / rect.width) * 100;
-  const nextY = ((event.clientY - rect.top) / rect.height) * 100;
-  return {
-    x: clampFocus(nextX),
-    y: clampFocus(nextY),
-  };
-}
 
 /* ═══════════════════════════════════════════════════════════════════
    MAIN PAGE
@@ -210,7 +136,7 @@ const ClassesCalendar = () => {
           <div className="mb-6 flex flex-col gap-4 rounded-2xl border border-white/[0.07] bg-white/[0.02] p-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
               <h1 className="admin-title font-bold text-white">Clases</h1>
-              <p className="mt-1 text-xs text-white/45 sm:text-sm">Gestiona calendario, tipos, generación semanal e instructoras.</p>
+              <p className="mt-1 text-xs text-white/45 sm:text-sm">Gestiona calendario, tipos y generación semanal.</p>
             </div>
             <div className="w-full sm:w-auto overflow-x-auto">
               <div className="flex min-w-max gap-1 rounded-xl bg-secondary p-1">
@@ -242,7 +168,6 @@ const ClassesCalendar = () => {
           {tab === "calendar" && <CalendarTab types={types} instructors={instructors} toast={toast} qc={qc} />}
           {tab === "types" && <TypesTab types={types} toast={toast} qc={qc} />}
           {tab === "generate" && <GenerateTab types={types} instructors={instructors} toast={toast} />}
-          {tab === "instructors" && <InstructorsTab toast={toast} qc={qc} />}
         </div>
       </AdminLayout>
     </AuthGuard>
@@ -1177,7 +1102,7 @@ function GenerateTab({
         </div>
         {!presetInstructorId && instructors.length === 0 && (
           <p className="text-xs text-[#C0A688] flex items-center gap-1.5 mt-2">
-            <Sparkles size={12} /> Crea una instructora primero en la tab "Instructoras".
+            <Sparkles size={12} /> Crea una instructora primero en la sección Instructoras.
           </p>
         )}
         {!presetInstructorId && instructors.length > 0 && (
@@ -1409,396 +1334,6 @@ function GenerateTab({
           : "Generar clases"}
       </button>
     </div>
-  );
-}
-
-/* ═══════════════════════════════════════════════════════════════════
-   TAB 4 – INSTRUCTORAS
-   ═══════════════════════════════════════════════════════════════════ */
-function InstructorsTab({ toast, qc }: { toast: any; qc: any }) {
-  const isMobile = useIsMobile();
-  const [open, setOpen] = useState(false);
-  const [editing, setEditing] = useState<Instructor | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
-  const [uploadTarget, setUploadTarget] = useState<string | null>(null);
-
-  const { data, isLoading } = useQuery<{ data: Instructor[] }>({
-    queryKey: ["instructors"],
-    queryFn: async () => (await api.get("/instructors")).data,
-  });
-  const instructors = Array.isArray(data?.data) ? data.data : [];
-
-  const form = useForm<InstructorFormData>({
-    resolver: zodResolver(instructorSchema),
-    defaultValues: { isActive: true, photoFocusX: 50, photoFocusY: 50 },
-  });
-
-  const createMutation = useMutation({
-    mutationFn: (d: InstructorFormData) => api.post("/instructors", instructorPayload(d)),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["instructors"] });
-      toast({ title: "Instructora creada" });
-      setOpen(false);
-      setEditing(null);
-    },
-    onError: (e: any) => {
-      toast({ title: e?.response?.data?.message ?? "Error al crear instructora", variant: "destructive" });
-    },
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: ({ id, ...d }: { id: string } & InstructorFormData) =>
-      api.put(`/instructors/${id}`, instructorPayload(d)),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["instructors"] });
-      toast({ title: "Instructora actualizada" });
-      setOpen(false);
-      setEditing(null);
-    },
-    onError: (e: any) => {
-      toast({ title: e?.response?.data?.message ?? "Error al actualizar instructora", variant: "destructive" });
-    },
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: (id: string) => api.delete(`/instructors/${id}`),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["instructors"] }); toast({ title: "Instructora eliminada" }); },
-    onError: (e: any) => {
-      toast({ title: e?.response?.data?.message ?? "Error al eliminar instructora", variant: "destructive" });
-    },
-  });
-
-  const uploadPhotoMutation = useMutation({
-    mutationFn: ({ id, file }: { id: string; file: File }) => {
-      const fd = new FormData();
-      fd.append("photo", file);
-      return api.post(`/instructors/${id}/photo`, fd, { headers: { "Content-Type": "multipart/form-data" } });
-    },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["instructors"] }); toast({ title: "Foto actualizada" }); },
-    onError: (e: any) => {
-      toast({ title: e?.response?.data?.message ?? "Error al subir foto", variant: "destructive" });
-    },
-  });
-
-  const openEdit = (i: Instructor) => {
-    form.reset({
-      displayName: i.displayName ?? "",
-      email: i.email ?? "",
-      bio: i.bio ?? "",
-      specialties: normalizeSpecialties(i.specialties).join(", "),
-      isActive: i.isActive ?? true,
-      photoFocusX: clampFocus(i.photoFocusX),
-      photoFocusY: clampFocus(i.photoFocusY),
-    });
-    setEditing(i);
-    setOpen(true);
-  };
-  const openCreate = () => {
-    form.reset({ displayName: "", email: "", bio: "", specialties: "", isActive: true, photoFocusX: 50, photoFocusY: 50 });
-    setEditing(null);
-    setOpen(true);
-  };
-  const isSaving = createMutation.isPending || updateMutation.isPending;
-  const focusX = clampFocus(form.watch("photoFocusX"));
-  const focusY = clampFocus(form.watch("photoFocusY"));
-  const applyPreviewFocus = (event: React.PointerEvent<HTMLElement>) => {
-    const next = getFocusFromPointerEvent(event);
-    form.setValue("photoFocusX", next.x, { shouldDirty: true, shouldTouch: true });
-    form.setValue("photoFocusY", next.y, { shouldDirty: true, shouldTouch: true });
-  };
-
-  return (
-    <>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
-        <p className="text-sm text-muted-foreground">{instructors.length} instructora{instructors.length !== 1 ? "s" : ""} registrada{instructors.length !== 1 ? "s" : ""}</p>
-        <Button
-          size="sm"
-          onClick={openCreate}
-          className="bg-gradient-to-r from-[#CBB9A4] to-[#A48D78] text-white"
-        >
-          <Plus size={14} className="mr-1" />Nueva instructora
-        </Button>
-      </div>
-
-      {/* Hidden file input */}
-      <input
-        type="file"
-        accept="image/*"
-        className="hidden"
-        ref={fileRef}
-        onChange={(e) => {
-          const f = e.target.files?.[0];
-          if (f && uploadTarget) uploadPhotoMutation.mutate({ id: uploadTarget, file: f });
-          e.target.value = "";
-          setUploadTarget(null);
-        }}
-      />
-
-      {isMobile ? (
-        <div className="space-y-2">
-          {isLoading ? (
-            Array(4).fill(0).map((_, i) => <Skeleton key={i} className="h-24 w-full rounded-xl" />)
-          ) : instructors.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-white/10 p-6 text-center text-xs text-white/45">
-              Sin instructoras registradas.
-            </div>
-          ) : (
-            instructors.map((ins) => (
-              <div key={ins.id} className="rounded-xl border border-white/10 bg-black/30 p-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      {ins.photoUrl ? (
-                        <img
-                          src={ins.photoUrl}
-                          className="h-9 w-9 rounded-full object-cover ring-2 ring-[#CBB9A4]/30"
-                          style={{ objectPosition: `${clampFocus(ins.photoFocusX)}% ${clampFocus(ins.photoFocusY)}%` }}
-                          alt=""
-                        />
-                      ) : (
-                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-[#CBB9A4] to-[#A48D78] text-xs font-bold text-white">
-                          {ins.displayName?.[0]?.toUpperCase()}
-                        </div>
-                      )}
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-white">{ins.displayName}</p>
-                        <p className="truncate text-xs text-white/55">{ins.email}</p>
-                      </div>
-                    </div>
-                    <p className="mt-2 text-xs text-white/55">{normalizeSpecialties(ins.specialties).join(", ") || "Sin especialidades"}</p>
-                    <div className="mt-2">
-                      <Badge
-                        variant={ins.isActive ? "default" : "secondary"}
-                        className={ins.isActive ? "bg-[#CBB9A4]/20 text-[#CBB9A4] border border-[#CBB9A4]/30" : ""}
-                      >
-                        {ins.isActive ? "Activa" : "Inactiva"}
-                      </Badge>
-                    </div>
-                  </div>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-11 w-11 min-h-[44px] min-w-[44px]">
-                        <MoreHorizontal size={14} />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent>
-                      <DropdownMenuItem onClick={() => openEdit(ins)}>Editar</DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => { setUploadTarget(ins.id); setTimeout(() => fileRef.current?.click(), 50); }}>
-                        Subir foto
-                      </DropdownMenuItem>
-                      <DropdownMenuItem className="text-destructive" onClick={() => { if (window.confirm("¿Eliminar este instructor?")) deleteMutation.mutate(ins.id); }}>
-                        Eliminar
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      ) : (
-        <div className="rounded-xl border border-border overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-16">Foto</TableHead>
-                <TableHead>Nombre</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Especialidades</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead className="w-12" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading
-                ? Array(4).fill(0).map((_, i) => (
-                  <TableRow key={i}>
-                    {Array(6).fill(0).map((_, j) => (
-                      <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>
-                    ))}
-                  </TableRow>
-                ))
-                : instructors.map((ins) => (
-                  <TableRow key={ins.id}>
-                    <TableCell>
-                      {ins.photoUrl ? (
-                        <img
-                          src={ins.photoUrl}
-                          className="w-9 h-9 rounded-full object-cover ring-2 ring-[#CBB9A4]/30"
-                          style={{ objectPosition: `${clampFocus(ins.photoFocusX)}% ${clampFocus(ins.photoFocusY)}%` }}
-                          alt=""
-                        />
-                      ) : (
-                        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#CBB9A4] to-[#A48D78] flex items-center justify-center text-xs font-bold text-white">
-                          {ins.displayName?.[0]?.toUpperCase()}
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell className="font-medium">{ins.displayName}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{ins.email}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{normalizeSpecialties(ins.specialties).join(", ")}</TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={ins.isActive ? "default" : "secondary"}
-                        className={ins.isActive ? "bg-[#CBB9A4]/20 text-[#CBB9A4] border border-[#CBB9A4]/30" : ""}
-                      >
-                        {ins.isActive ? "Activa" : "Inactiva"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon"><MoreHorizontal size={14} /></Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent>
-                          <DropdownMenuItem onClick={() => openEdit(ins)}>Editar</DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => { setUploadTarget(ins.id); setTimeout(() => fileRef.current?.click(), 50); }}>
-                            Subir foto
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="text-destructive" onClick={() => { if (window.confirm("¿Eliminar este instructor?")) deleteMutation.mutate(ins.id); }}>
-                            Eliminar
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))
-              }
-            </TableBody>
-          </Table>
-        </div>
-      )}
-
-      {/* CRUD dialog */}
-      <Dialog
-        open={open}
-        onOpenChange={(nextOpen) => {
-          setOpen(nextOpen);
-          if (!nextOpen) setEditing(null);
-        }}
-      >
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>{editing ? "Editar instructora" : "Nueva instructora"}</DialogTitle>
-          </DialogHeader>
-          <form
-            noValidate
-            onSubmit={form.handleSubmit(
-              (d) => {
-                if (editing) {
-                  updateMutation.mutate({ ...d, id: editing.id });
-                  return;
-                }
-                createMutation.mutate(d);
-              },
-              (errors) => {
-                const first = Object.values(errors)[0];
-                toast({
-                  title: first?.message ? String(first.message) : "Revisa los campos del formulario",
-                  variant: "destructive",
-                });
-              },
-            )}
-            className="space-y-4"
-          >
-            <div className="space-y-1">
-              <Label>Nombre</Label>
-              <Input {...form.register("displayName")} />
-              {form.formState.errors.displayName && (
-                <p className="text-xs text-destructive">{String(form.formState.errors.displayName.message)}</p>
-              )}
-            </div>
-            <div className="space-y-1">
-              <Label>Email</Label>
-              <Input type="email" {...form.register("email")} />
-              {form.formState.errors.email && (
-                <p className="text-xs text-destructive">{String(form.formState.errors.email.message)}</p>
-              )}
-            </div>
-            <div className="space-y-1"><Label>Bio</Label><Input {...form.register("bio")} /></div>
-            <div className="space-y-1">
-              <Label>Especialidades (separadas por coma)</Label>
-              <Input {...form.register("specialties")} placeholder="Ej: Barre, Cardio, Stretch" />
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label>Enfoque horizontal</Label>
-                <span className="text-xs text-muted-foreground">{focusX}%</span>
-              </div>
-              <Input
-                type="range"
-                min={0}
-                max={100}
-                step={1}
-                value={focusX}
-                onChange={(e) => form.setValue("photoFocusX", Number(e.target.value), { shouldDirty: true })}
-              />
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label>Enfoque vertical</Label>
-                <span className="text-xs text-muted-foreground">{focusY}%</span>
-              </div>
-              <Input
-                type="range"
-                min={0}
-                max={100}
-                step={1}
-                value={focusY}
-                onChange={(e) => form.setValue("photoFocusY", Number(e.target.value), { shouldDirty: true })}
-              />
-            </div>
-            {editing?.photoUrl && (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between gap-3">
-                  <Label>Vista previa y enfoque</Label>
-                  <span className="text-[11px] text-muted-foreground">Haz clic o arrastra sobre la cara</span>
-                </div>
-                <button
-                  type="button"
-                  onPointerDown={applyPreviewFocus}
-                  onPointerMove={(event) => {
-                    if (event.buttons !== 1 && event.pointerType !== "touch") return;
-                    applyPreviewFocus(event);
-                  }}
-                  className="group relative mx-auto block h-[360px] w-full max-w-[300px] touch-none overflow-hidden rounded-[28px] border border-white/10 bg-black/30 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#CBB9A4]"
-                  aria-label="Seleccionar enfoque de la foto"
-                >
-                  <img
-                    src={editing.photoUrl}
-                    alt={editing.displayName}
-                    className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
-                    style={{ objectPosition: `${focusX}% ${focusY}%` }}
-                  />
-                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent" />
-                  <div
-                    className="pointer-events-none absolute h-8 w-8 rounded-full border border-white/80 bg-white/10 shadow-[0_0_0_1px_rgba(0,0,0,0.2)] backdrop-blur-sm"
-                    style={{ left: `${focusX}%`, top: `${focusY}%`, transform: "translate(-50%, -50%)" }}
-                  >
-                    <div className="absolute left-1/2 top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white" />
-                  </div>
-                  <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-between px-4 py-3 text-[11px] font-medium text-white/80">
-                    <span>X {focusX}%</span>
-                    <span>Y {focusY}%</span>
-                  </div>
-                </button>
-              </div>
-            )}
-            <div className="flex items-center gap-3">
-              <Switch checked={form.watch("isActive")} onCheckedChange={(v) => form.setValue("isActive", v, { shouldDirty: true })} />
-              <Label>Activa</Label>
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-              <Button type="submit" disabled={isSaving} className="bg-gradient-to-r from-[#CBB9A4] to-[#A48D78] text-white">
-                {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {isSaving ? "Guardando..." : editing ? "Actualizar" : "Crear"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-    </>
   );
 }
 
