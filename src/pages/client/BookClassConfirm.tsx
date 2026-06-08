@@ -1,9 +1,11 @@
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams, useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import api from "@/lib/api";
 import { safeParse } from "@/lib/utils";
+import { useAuthStore } from "@/stores/authStore";
 import { ClientAuthGuard } from "@/components/layout/ClientAuthGuard";
 import {
   AppShell,
@@ -17,12 +19,16 @@ import {
 import { BackLink, DataRow, StickyCta } from "@/components/app/widgets";
 import { useToast } from "@/hooks/use-toast";
 import { CalendarDays, Clock, Users, UserRound } from "lucide-react";
+import { ResponsivaDialog } from "@/components/app/ResponsivaDialog";
 
 const BookClassConfirm = () => {
   const { classId } = useParams<{ classId: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
   const qc = useQueryClient();
+  const { user } = useAuthStore();
+
+  const [waiverOpen, setWaiverOpen] = useState(false);
 
   const { data: classData, isLoading } = useQuery({
     queryKey: ["class-detail", classId],
@@ -46,6 +52,10 @@ const BookClassConfirm = () => {
       navigate("/app/bookings");
     },
     onError: (err: any) => {
+      if (err?.response?.status === 403 && err?.response?.data?.code === "WAIVER_REQUIRED") {
+        setWaiverOpen(true);
+        return;
+      }
       toast({
         title: "No se pudo reservar",
         description: err.response?.data?.message ?? "Inténtalo de nuevo.",
@@ -59,8 +69,22 @@ const BookClassConfirm = () => {
     : 0;
   const isFull = cls && remaining === 0;
 
+  const defaultName =
+    user?.displayName ?? user?.display_name ?? user?.full_name ?? "";
+  const defaultEmail = user?.email ?? "";
+
   return (
     <ClientAuthGuard requiredRoles={["client"]}>
+      <ResponsivaDialog
+        open={waiverOpen}
+        onClose={() => setWaiverOpen(false)}
+        onSigned={() => {
+          setWaiverOpen(false);
+          bookMutation.mutate();
+        }}
+        defaultName={defaultName}
+        defaultEmail={defaultEmail}
+      />
       <AppShell hideGreeting>
         <BackLink to="/app/classes" label="Volver al calendario" />
         <PageHeader

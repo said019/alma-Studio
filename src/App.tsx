@@ -32,6 +32,7 @@ import ProfileMembership from "./pages/client/ProfileMembership";
 import ProfilePreferences from "./pages/client/ProfilePreferences";
 import ProfileSecurity from "./pages/client/ProfileSecurity";
 import ReferFriends from "./pages/client/ReferFriends";
+import Responsiva from "./pages/client/Responsiva";
 import VideoLibrary from "./pages/client/VideoLibrary";
 import VideoPlayer from "./pages/client/VideoPlayer";
 import Notifications from "./pages/client/Notifications";
@@ -126,6 +127,7 @@ const App = () => (
           <Route path="/app/profile/preferences" element={<ProfilePreferences />} />
           <Route path="/app/profile/security" element={<ProfileSecurity />} />
           <Route path="/app/profile/refer" element={<ReferFriends />} />
+          <Route path="/app/profile/responsiva" element={<Responsiva />} />
           <Route path="/app/notifications" element={<Notifications />} />
 
           {/* Admin panel */}

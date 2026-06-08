@@ -21,6 +21,7 @@ import {
   LogOut,
   MessageCircle,
   FileText,
+  FileSignature,
 } from "lucide-react";
 
 const Profile = () => {
@@ -176,6 +177,13 @@ const Profile = () => {
               iconTint="berry"
               title="Seguridad"
               description="Cambia tu contraseña"
+            />
+            <ListRow
+              to="/app/profile/responsiva"
+              icon={<FileSignature size={17} strokeWidth={1.7} />}
+              iconTint="olive"
+              title="Mi responsiva"
+              description="Consentimiento informado firmado"
             />
           </ListGroup>
         </Section>
