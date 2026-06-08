@@ -828,7 +828,7 @@ const PaquetesSection = ({
   onPick: () => void;
 }) => {
   return (
-    <section id="paquetes" className="relative overflow-hidden px-5 sm:px-8 lg:px-12 py-20 lg:py-28" style={{ backgroundColor: ALMA.berry }}>
+    <section id="paquetes" className="relative overflow-hidden px-5 sm:px-8 lg:px-12 py-20 lg:py-28" style={{ backgroundColor: ALMA.inkDeep }}>
       <div className="absolute inset-0 pointer-events-none opacity-[0.10]" style={{ background: `radial-gradient(circle at 80% 0%, ${ALMA.coral} 0%, transparent 55%), radial-gradient(circle at 0% 100%, ${ALMA.orange} 0%, transparent 60%)` }} />
       <div className="relative mx-auto max-w-[1320px]">
         <div className="reveal opacity-0 translate-y-8 transition-all duration-700 flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-12">
@@ -1222,23 +1222,19 @@ const ContactoSection = () => {
    ═══════════════════════════════════════════════════════════ */
 const FooterSection = ({ scrollTo, navigate }: { scrollTo: (id: string) => void; navigate: (path: string) => void }) => {
   return (
-    <footer className="relative overflow-hidden px-5 sm:px-8 lg:px-12 pt-16 pb-8" style={{ backgroundColor: ALMA.berry, color: ALMA.cream }}>
-      <div className="absolute inset-0 pointer-events-none opacity-[0.08]" style={{ background: `radial-gradient(circle at 90% 10%, ${ALMA.coral} 0%, transparent 55%)` }} />
+    <footer className="relative overflow-hidden px-5 sm:px-8 lg:px-12 pt-20 pb-8" style={{ backgroundColor: ALMA.inkDeep, color: ALMA.cream }}>
+      <div className="absolute inset-0 pointer-events-none opacity-[0.10]" style={{ background: `radial-gradient(circle at 88% 8%, ${ALMA.berry} 0%, transparent 55%)` }} />
       <div className="relative mx-auto max-w-[1320px]">
-        {/* Giant wordmark */}
-        <div className="flex items-center pb-12">
-          <img
-            src="/wallet-logo@3x.png"
-            alt="Alma Movement"
-            className="h-[clamp(5rem,14vw,12rem)] w-auto object-contain"
-            style={{ filter: "brightness(0) invert(1)" }}
-          />
+        {/* Giant serif wordmark (estilo Frame) */}
+        <div className="pb-12">
+          <p className="text-[0.62rem] uppercase tracking-[0.34em] mb-5" style={{ opacity: 0.6 }}>Estudio de Pilates · Juriquilla, Querétaro</p>
+          <h2 className="font-display leading-[0.88]" style={{ fontSize: "clamp(2.8rem, 11vw, 9rem)", fontWeight: 360, letterSpacing: "-0.02em" }}>Alma Movement</h2>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-8 pb-10" style={{ borderTop: `1px solid ${ALMA.cream}22` }}>
           <div className="col-span-2 sm:col-span-1 pt-8">
-            <p className="text-[0.92rem] leading-[1.65] max-w-[26ch] opacity-85">
-              Estudio cercano, casual y energético. Una amiga te recibe.
+            <p className="text-[0.92rem] leading-[1.65] max-w-[28ch] opacity-85">
+              Pilates Reformer, Tower, Mat, Barre y Sculpt. Movimiento consciente, técnica y comunidad.
             </p>
           </div>
           <div className="pt-8">
