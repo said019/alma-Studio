@@ -14,7 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Film, Pencil } from "lucide-react";
+import { Pencil } from "lucide-react";
 
 // Formatea fecha de nacimiento sin que el timezone corra un día: toma solo
 // la parte YYYY-MM-DD y la muestra en es-MX (ej. "19 abr 2000").
@@ -70,40 +70,12 @@ const ClientDetail = () => {
     enabled: !!id,
   });
 
-  const { data: vaData } = useQuery({
-    queryKey: ["video-access", id],
-    queryFn: async () => (await api.get(`/admin/users/${id}/video-access`)).data,
-    enabled: !!id,
-  });
-  const access = vaData?.data;
-
   const { data: waiverData } = useQuery({
     queryKey: ["admin-waiver", id],
     queryFn: async () => (await api.get(`/admin/users/${id}/waiver`)).data,
     enabled: !!id,
   });
   const waiver = waiverData?.data;
-
-  const grantVideoMutation = useMutation({
-    mutationFn: () => api.post(`/admin/users/${id}/video-access`, { note: "Concedido desde ficha" }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["video-access", id] });
-      qc.invalidateQueries({ queryKey: ["video-access-pending"] });
-      qc.invalidateQueries({ queryKey: ["me-video-access"] });
-      toast({ title: "✅ Acceso concedido. Le mandamos WA." });
-    },
-    onError: (e: any) => toast({ title: e?.response?.data?.message ?? "Error al conceder acceso", variant: "destructive" }),
-  });
-  const revokeVideoMutation = useMutation({
-    mutationFn: () => api.delete(`/admin/users/${id}/video-access`),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["video-access", id] });
-      qc.invalidateQueries({ queryKey: ["video-access-pending"] });
-      qc.invalidateQueries({ queryKey: ["me-video-access"] });
-      toast({ title: "Acceso revocado." });
-    },
-    onError: (e: any) => toast({ title: e?.response?.data?.message ?? "Error al revocar acceso", variant: "destructive" }),
-  });
 
   const adjustMutation = useMutation({
     mutationFn: ({ points, reason, type }: { points: number; reason: string; type: "earn" | "redeem" }) =>
@@ -250,55 +222,6 @@ const ClientDetail = () => {
                 </TableBody>
               </Table>
 
-              <div className="rounded-xl border border-border p-4 max-w-xl space-y-3">
-                <div className="flex items-center gap-2">
-                  <Film size={15} className="text-muted-foreground" />
-                  <h3 className="text-sm font-semibold">Acceso a biblioteca de videos</h3>
-                </div>
-                {!access ? (
-                  <Skeleton className="h-12" />
-                ) : access.state === "unlocked" ? (
-                  <div className="space-y-2">
-                    <Badge className="bg-green-600 hover:bg-green-600">Con acceso</Badge>
-                    <p className="text-xs text-muted-foreground">
-                      {access.full_library
-                        ? "Tiene un plan con biblioteca completa."
-                        : "Acceso concedido manualmente (cortesía)."}
-                    </p>
-                    {access.has_grant && (
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        className="text-xs"
-                        onClick={() => {
-                          if (window.confirm("¿Revocar el acceso de cortesía a la biblioteca de videos?")) {
-                            revokeVideoMutation.mutate();
-                          }
-                        }}
-                        disabled={revokeVideoMutation.isPending}
-                      >
-                        Revocar acceso de cortesía
-                      </Button>
-                    )}
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    <Badge variant="outline">Sin acceso</Badge>
-                    <p className="text-xs text-muted-foreground">
-                      No tiene plan de biblioteca completa. Puedes concederle acceso de cortesía a toda la biblioteca.
-                    </p>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="text-xs"
-                      onClick={() => grantVideoMutation.mutate()}
-                      disabled={grantVideoMutation.isPending}
-                    >
-                      Conceder acceso de cortesía
-                    </Button>
-                  </div>
-                )}
-              </div>
             </TabsContent>
 
             <TabsContent value="bookings" className="mt-4">

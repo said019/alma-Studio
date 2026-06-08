@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import api from "@/lib/api";
 import { AuthGuard } from "@/components/admin/AuthGuard";
@@ -18,7 +18,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { MoreHorizontal, Plus, Search, UserPlus, CreditCard, Banknote, Building2, Film } from "lucide-react";
+import { MoreHorizontal, Plus, Search, UserPlus, CreditCard, Banknote, Building2 } from "lucide-react";
 import { useDebounce } from "@/hooks/use-debounce";
 import { cn } from "@/lib/utils";
 import { DatePicker } from "@/components/ui/date-picker";
@@ -89,38 +89,7 @@ const ClientsList = () => {
   });
   const clients = Array.isArray(data?.data) ? data.data : [];
 
-  // Video access pending list
-  const { data: pendingData } = useQuery({
-    queryKey: ["video-access-pending"],
-    queryFn: async () => (await api.get("/admin/video-access/pending")).data,
-    staleTime: 60_000,
-  });
-  const pendingClients: any[] = Array.isArray(pendingData?.data) ? pendingData.data : [];
-  const pendingIds = new Set(pendingClients.map((c: any) => c.id));
-
-  const [searchParams] = useSearchParams();
-  const [showOnlyPending, setShowOnlyPending] = useState(searchParams.get("pending") === "1");
-  // I4: re-sync when the URL param changes (e.g. dashboard widget click while
-  // already on /admin/clients — useState initializer alone wouldn't re-fire).
-  useEffect(() => {
-    if (searchParams.get("pending") === "1") setShowOnlyPending(true);
-  }, [searchParams]);
-  const filteredClients = showOnlyPending
-    ? clients.filter((c: any) => pendingIds.has(c.id))
-    : clients;
-
-  const grantInlineMutation = useMutation({
-    mutationFn: (userId: string) =>
-      api.post(`/admin/users/${userId}/video-access`, { note: "Concedido desde lista" }),
-    onSuccess: (_res, userId) => {
-      const granted = pendingClients.find((c: any) => c.id === userId);
-      qc.invalidateQueries({ queryKey: ["video-access-pending"] });
-      qc.invalidateQueries({ queryKey: ["video-access", userId] });
-      qc.invalidateQueries({ queryKey: ["me-video-access"] });
-      toast({ title: `✅ Acceso dado a ${granted?.display_name ?? "alumna"}` });
-    },
-    onError: (e: any) => toast({ title: e?.response?.data?.message ?? "Error al conceder acceso", variant: "destructive" }),
-  });
+  const filteredClients = clients;
 
   // Plans for the manual dialog
   const { data: plansData } = useQuery<{ data: Plan[] }>({
@@ -202,9 +171,7 @@ const ClientsList = () => {
             <div>
               <h1 className="text-3xl font-bold text-white mb-1">Clientas</h1>
               <p className="text-sm text-white/35">
-                {showOnlyPending
-                  ? `${filteredClients.length} pendientes de acceso a videos`
-                  : `${clients.length} clientas registradas`}
+                {clients.length} clientas registradas
               </p>
             </div>
             <button
@@ -226,23 +193,6 @@ const ClientsList = () => {
             />
           </div>
 
-          {/* Pending video access filter */}
-          {pendingClients.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setShowOnlyPending((s) => !s)}
-              className={cn(
-                "inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full mb-4 transition-colors",
-                showOnlyPending
-                  ? "bg-amber-500 text-white hover:bg-amber-500/90"
-                  : "bg-amber-500/15 text-amber-300 hover:bg-amber-500/25"
-              )}
-            >
-              <Film size={12} /> Pendientes de acceso ({pendingClients.length})
-              {showOnlyPending && <span className="ml-1 opacity-80">· quitar filtro</span>}
-            </button>
-          )}
-
           {/* Table */}
           <div className="rounded-2xl border border-white/[0.07] overflow-hidden bg-white/[0.01]">
             <Table>
@@ -263,39 +213,15 @@ const ClientsList = () => {
                       ))}
                     </TableRow>
                   ))
-                  : filteredClients.length === 0 && showOnlyPending ? (
-                    <TableRow className="border-white/[0.05]">
-                      <TableCell colSpan={4} className="text-center text-sm text-white/40 py-8">
-                        Ninguna clienta pendiente de acceso a videos.
-                      </TableCell>
-                    </TableRow>
-                  ) : filteredClients.map((c) => (
+                  : filteredClients.map((c) => (
                     <TableRow key={c.id} className="border-white/[0.05] hover:bg-white/[0.03] transition-colors">
                       <TableCell className="font-semibold text-white/85">
-                        <div className="flex items-center gap-2">
-                          <span>{c.displayName}</span>
-                          {pendingIds.has(c.id) && (
-                            <Film size={12} className="text-amber-400" />
-                          )}
-                        </div>
+                        <span>{c.displayName}</span>
                       </TableCell>
                       <TableCell className="text-sm text-white/45">{c.email}</TableCell>
                       <TableCell className="text-sm text-white/45">{c.phone ?? "—"}</TableCell>
                       <TableCell>
                         <div className="flex items-center justify-end gap-2">
-                          {showOnlyPending && pendingIds.has(c.id) && (
-                            <Button
-                              size="sm"
-                              className="text-xs h-7 bg-amber-500 hover:bg-amber-500/90 text-white border-0"
-                              disabled={grantInlineMutation.isPending}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                grantInlineMutation.mutate(c.id);
-                              }}
-                            >
-                              ✓ Conceder
-                            </Button>
-                          )}
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button variant="ghost" size="icon" className="text-white/30 hover:text-white/70 hover:bg-white/5">

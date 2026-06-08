@@ -220,9 +220,6 @@ const PlansList = () => {
                             const cat = CATEGORIES.find((c) => c.value === (p.classCategory ?? "all")) ?? CATEGORIES[3];
                             return <Badge className={`border ${cat.color}`}>{cat.label}</Badge>;
                           })()}
-                          {Boolean((p as any).includesVideoLibrary ?? (p as any).includes_video_library) && (
-                            <Badge variant="secondary" className="text-[0.6rem]">📹 Videos</Badge>
-                          )}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -366,18 +363,6 @@ const PlansList = () => {
                   onCheckedChange={(v) => form.setValue("isActive", v)}
                 />
                 <Label>Activo</Label>
-              </div>
-              <div className="flex items-start gap-3 rounded-xl border border-border p-3">
-                <Switch
-                  checked={form.watch("includesVideoLibrary")}
-                  onCheckedChange={(v) => form.setValue("includesVideoLibrary", v)}
-                />
-                <div className="space-y-0.5">
-                  <Label className="cursor-pointer">Biblioteca completa de videos</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Las alumnas con este plan ven todos los videos por planes, sin asignarlo video por video.
-                  </p>
-                </div>
               </div>
               <div className="flex items-start gap-3 rounded-xl border border-border p-3">
                 <Switch

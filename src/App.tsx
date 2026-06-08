@@ -60,8 +60,6 @@ import WhatsAppTemplatesPage from "./pages/admin/whatsapp/WhatsAppTemplatesPage"
 import AdminNotifications from "./pages/admin/notifications/AdminNotifications";
 import Referrals from "./pages/admin/referrals/Referrals";
 import InstructorsList from "./pages/admin/staff/InstructorsList";
-import VideoList from "./pages/admin/videos/VideoList";
-import VideoUpload from "./pages/admin/videos/VideoUpload";
 import VideoSalesVerification from "./pages/admin/videos/VideoSalesVerification";
 import ReportsPage from "./pages/admin/reports/ReportsPage";
 import AdminReviewsDashboard from "./pages/admin/reviews/AdminReviewsDashboard";
@@ -154,8 +152,6 @@ const App = () => (
           <Route path="/admin/whatsapp-templates" element={<WhatsAppTemplatesPage />} />
           <Route path="/admin/notifications" element={<AdminNotifications />} />
           <Route path="/admin/referrals" element={<Referrals />} />
-          <Route path="/admin/videos" element={<VideoList />} />
-          <Route path="/admin/videos/upload" element={<VideoUpload />} />
           <Route path="/admin/videos/ventas" element={<VideoSalesVerification />} />
           <Route path="/admin/reports" element={<ReportsPage />} />
           <Route path="/admin/reviews" element={<AdminReviewsDashboard />} />
