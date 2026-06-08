@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { AuthGuard } from "@/components/admin/AuthGuard";
 import AdminLayout from "@/components/admin/AdminLayout";
+import SectionTabs from "@/components/admin/SectionTabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -399,6 +400,12 @@ const PaymentsPage = () => {
     <AuthGuard>
       <AdminLayout>
         <div className="admin-page max-w-3xl">
+          <SectionTabs
+            tabs={[
+              { label: "Cobrar", to: "/admin/payments" },
+              { label: "Verificar", to: "/admin/orders" },
+            ]}
+          />
           {/* Header */}
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-white mb-1">Pagos</h1>

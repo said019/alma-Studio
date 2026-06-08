@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { AuthGuard } from "@/components/admin/AuthGuard";
 import AdminLayout from "@/components/admin/AdminLayout";
+import SectionTabs from "@/components/admin/SectionTabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -387,6 +388,13 @@ const ReportsPage = () => {
     <AuthGuard>
       <AdminLayout>
         <div className="admin-page max-w-6xl">
+          <SectionTabs
+            tabs={[
+              { label: "Reportes", to: "/admin/reports" },
+              { label: "Lealtad", to: "/admin/loyalty" },
+              { label: "Descuentos", to: "/admin/discount-codes" },
+            ]}
+          />
           {/* ═════ Header con range picker ═════ */}
           <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-7">
             <div>

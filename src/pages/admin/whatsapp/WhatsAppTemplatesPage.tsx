@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { AuthGuard } from "@/components/admin/AuthGuard";
 import AdminLayout from "@/components/admin/AdminLayout";
+import SectionTabs from "@/components/admin/SectionTabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -397,6 +398,13 @@ const WhatsAppTemplatesPage = () => {
     <AuthGuard>
       <AdminLayout>
         <div className="admin-page max-w-4xl">
+          <SectionTabs
+            tabs={[
+              { label: "Ajustes", to: "/admin/settings" },
+              { label: "Instructoras", to: "/admin/staff" },
+              { label: "Templates WA", to: "/admin/whatsapp-templates" },
+            ]}
+          />
           <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-5 mb-6">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">

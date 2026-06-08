@@ -8,6 +8,7 @@ import { format } from "date-fns";
 import api from "@/lib/api";
 import { AuthGuard } from "@/components/admin/AuthGuard";
 import AdminLayout from "@/components/admin/AdminLayout";
+import SectionTabs from "@/components/admin/SectionTabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -190,6 +191,12 @@ const ClientsList = () => {
     <AuthGuard>
       <AdminLayout>
         <div className="admin-page max-w-6xl">
+          <SectionTabs
+            tabs={[
+              { label: "Clientes", to: "/admin/clients" },
+              { label: "Visitas", to: "/admin/visitas" },
+            ]}
+          />
           {/* Header */}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-7">
             <div>

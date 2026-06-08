@@ -5,6 +5,7 @@ import { es } from "date-fns/locale";
 import api from "@/lib/api";
 import { AuthGuard } from "@/components/admin/AuthGuard";
 import AdminLayout from "@/components/admin/AdminLayout";
+import SectionTabs from "@/components/admin/SectionTabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -908,6 +909,12 @@ const BookingsList = () => {
     <AuthGuard>
       <AdminLayout>
         <div className="admin-page max-w-3xl">
+          <SectionTabs
+            tabs={[
+              { label: "Semana", to: "/admin/bookings" },
+              { label: "Hoy · pasar lista", to: "/admin/pasar-lista" },
+            ]}
+          />
           <div className="mb-7">
             <h1 className="text-3xl font-bold text-white mb-1">Reservas</h1>
             <p className="text-sm text-white/35">

@@ -6,6 +6,7 @@ import { z } from "zod";
 import api from "@/lib/api";
 import { AuthGuard } from "@/components/admin/AuthGuard";
 import AdminLayout from "@/components/admin/AdminLayout";
+import SectionTabs from "@/components/admin/SectionTabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -590,6 +591,13 @@ const LoyaltyPage = () => (
   <AuthGuard>
     <AdminLayout>
       <div className="admin-page max-w-5xl">
+        <SectionTabs
+          tabs={[
+            { label: "Reportes", to: "/admin/reports" },
+            { label: "Lealtad", to: "/admin/loyalty" },
+            { label: "Descuentos", to: "/admin/discount-codes" },
+          ]}
+        />
         <h1 className="text-2xl font-bold mb-6">Programa de Lealtad</h1>
         <Tabs defaultValue="rewards">
           <TabsList>

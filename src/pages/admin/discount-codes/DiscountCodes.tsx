@@ -6,6 +6,7 @@ import { z } from "zod";
 import api from "@/lib/api";
 import { AuthGuard } from "@/components/admin/AuthGuard";
 import AdminLayout from "@/components/admin/AdminLayout";
+import SectionTabs from "@/components/admin/SectionTabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -186,6 +187,13 @@ const DiscountCodes = () => {
     <AuthGuard>
       <AdminLayout>
         <div className="admin-page max-w-5xl">
+          <SectionTabs
+            tabs={[
+              { label: "Reportes", to: "/admin/reports" },
+              { label: "Lealtad", to: "/admin/loyalty" },
+              { label: "Descuentos", to: "/admin/discount-codes" },
+            ]}
+          />
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
             <h1 className="text-2xl font-bold">Códigos de Descuento</h1>
             <Button size="sm" onClick={openCreate}><Plus size={14} className="mr-1" />Nuevo código</Button>

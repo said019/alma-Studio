@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { AuthGuard } from "@/components/admin/AuthGuard";
 import AdminLayout from "@/components/admin/AdminLayout";
+import SectionTabs from "@/components/admin/SectionTabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -390,6 +391,12 @@ const OrdersVerification = () => (
   <AuthGuard>
     <AdminLayout>
       <div className="admin-page max-w-5xl">
+        <SectionTabs
+          tabs={[
+            { label: "Cobrar", to: "/admin/payments" },
+            { label: "Verificar", to: "/admin/orders" },
+          ]}
+        />
         <h1 className="text-2xl font-bold mb-6">Verificación de Órdenes</h1>
         <Tabs defaultValue="pending">
           <TabsList>

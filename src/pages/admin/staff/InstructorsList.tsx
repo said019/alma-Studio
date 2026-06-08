@@ -6,6 +6,7 @@ import { z } from "zod";
 import api from "@/lib/api";
 import { AuthGuard } from "@/components/admin/AuthGuard";
 import AdminLayout from "@/components/admin/AdminLayout";
+import SectionTabs from "@/components/admin/SectionTabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -169,6 +170,13 @@ const InstructorsList = () => {
     <AuthGuard>
       <AdminLayout>
         <div className="admin-page max-w-5xl">
+          <SectionTabs
+            tabs={[
+              { label: "Ajustes", to: "/admin/settings" },
+              { label: "Instructoras", to: "/admin/staff" },
+              { label: "Templates WA", to: "/admin/whatsapp-templates" },
+            ]}
+          />
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
             <h1 className="text-2xl font-bold">Instructores / Staff</h1>
             <Button size="sm" onClick={openCreate}><Plus size={14} className="mr-1" />Nuevo instructor</Button>
