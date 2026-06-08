@@ -157,48 +157,49 @@
        botones (causa de fechas/valores que se veían en blanco). */
     color-scheme: light;
 
-    --background: 45 29% 97%;           /* #FAF9F6 */
-    --foreground: 30 18% 22%;            /* #43392F */
+    /* Tema Frame Pilates Lab: greige cálido + café vino + tan */
+    --background: 42 19% 89%;            /* #E9E6DF greige */
+    --foreground: 0 18% 25%;             /* #4A3333 café */
 
-    --card: 0 0% 100%;                   /* #FFFFFF */
-    --card-foreground: 30 18% 22%;
+    --card: 40 24% 93%;                  /* #F1EEE8 */
+    --card-foreground: 0 18% 25%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 30 18% 22%;
+    --popover: 40 24% 93%;
+    --popover-foreground: 0 18% 25%;
 
-    /* Primario: vino berry #A48D78 */
-    --primary: 29 19% 56%;
-    --primary-foreground: 45 29% 97%;
+    /* Primario: café espresso (botones oscuros estilo Frame) */
+    --primary: 0 18% 25%;                /* #4A3333 */
+    --primary-foreground: 42 19% 89%;
 
-    --secondary: 42 31% 94%;            /* #F4F1EA */
-    --secondary-foreground: 30 18% 22%;
+    --secondary: 40 22% 91%;
+    --secondary-foreground: 0 18% 25%;
 
-    --muted: 40 33% 91%;                 /* #F0EBE1 */
-    --muted-foreground: 30 15% 48%;      /* #8C7A68 */
+    --muted: 40 20% 90%;
+    --muted-foreground: 20 14% 45%;
 
-    /* Acento: coral activo #CBB9A4 */
-    --accent: 32 27% 72%;
-    --accent-foreground: 30 18% 22%;
+    /* Acento: tan suave #E4D2C3 */
+    --accent: 27 38% 83%;
+    --accent-foreground: 0 18% 25%;
 
-    --destructive: 0 84.2% 60.2%;
+    --destructive: 0 72% 45%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 35 30% 83%;                /* #E0D5C6 */
-    --input: 35 30% 83%;
-    --ring: 29 19% 56%;
+    --border: 37 23% 80%;                /* #D8CFC1 */
+    --input: 37 23% 80%;
+    --ring: 20 18% 46%;
 
     --radius: 0.75rem;
 
-    /* Tokens legacy conservados para evitar refactor masivo de componentes */
-    --alma-purple:    30 18% 22%;     /* #43392F */
-    --alma-magenta:   29 19% 56%;    /* #A48D78 */
-    --alma-violet:    40 18% 53%;     /* #9C8E72 */
-    --alma-lime:      32 31% 64%;     /* #C0A688 */
-    --alma-cream:     45 29% 97%;    /* #FAF9F6 */
-    --alma-lilac:     32 27% 72%;      /* #CBB9A4 */
-    --alma-pinklight: 36 37% 84%;     /* #E6DAC8 */
+    /* Tokens legacy (mapeados a la paleta Frame) */
+    --alma-purple:    0 18% 25%;      /* #4A3333 */
+    --alma-magenta:   20 18% 46%;     /* #8A6E60 */
+    --alma-violet:    35 12% 48%;
+    --alma-lime:      25 32% 68%;     /* #C7A892 */
+    --alma-cream:     42 19% 89%;     /* #E9E6DF */
+    --alma-lilac:     25 32% 68%;     /* #C7A892 */
+    --alma-pinklight: 27 38% 83%;     /* #E4D2C3 */
 
-    --pink-glow: 29 19% 56%;
+    --pink-glow: 20 18% 46%;
   }
 }
 
