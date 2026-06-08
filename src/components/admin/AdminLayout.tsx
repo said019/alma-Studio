@@ -7,10 +7,9 @@ import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
   LayoutDashboard, Package, CreditCard, Users, CalendarDays,
-  BookOpen, DollarSign, ShoppingBag,
-  ShoppingCart, Tag, Gift, Video, BarChart2, MessageCircle, GraduationCap, Bell,
+  BookOpen, DollarSign,
+  ShoppingCart, BarChart2, Bell,
   Settings, ChevronLeft, ChevronRight, ChevronDown, LogOut, Globe, Menu, Ticket, X,
-  UserPlus, ClipboardCheck,
 } from "lucide-react";
 
 const NAV_GROUPS = [
@@ -19,12 +18,10 @@ const NAV_GROUPS = [
     collapsible: false,
     accentColor: "#A48D78",
     items: [
-      { path: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
+      { path: "/admin/dashboard", label: "Inicio", icon: LayoutDashboard },
       { path: "/admin/notifications", label: "Bandeja", icon: Bell },
-      { path: "/admin/clients", label: "Clientes", icon: Users },
-      { path: "/admin/payments", label: "Pagos", icon: DollarSign },
       { path: "/admin/bookings", label: "Reservas", icon: BookOpen },
-      { path: "/admin/pasar-lista", label: "Pasar lista", icon: ClipboardCheck },
+      { path: "/admin/classes", label: "Clases", icon: CalendarDays },
     ],
   },
   {
@@ -32,17 +29,11 @@ const NAV_GROUPS = [
     collapsible: true,
     accentColor: "#CBB9A4",
     items: [
-      { path: "/admin/plans", label: "Planes", icon: Package },
+      { path: "/admin/payments", label: "Cobros", icon: DollarSign },
       { path: "/admin/memberships", label: "Membresías", icon: CreditCard },
-      { path: "/admin/classes", label: "Clases", icon: CalendarDays },
-      { path: "/admin/staff", label: "Instructoras", icon: GraduationCap },
-      { path: "/admin/orders", label: "Órdenes", icon: ShoppingBag },
-      { path: "/admin/pos", label: "POS", icon: ShoppingCart },
-      { path: "/admin/visitas", label: "Visitas", icon: UserPlus },
-      { path: "/admin/discount-codes", label: "Descuentos", icon: Tag },
-      { path: "/admin/loyalty", label: "Lealtad", icon: Gift },
-      { path: "/admin/whatsapp-templates", label: "Templates WA", icon: MessageCircle },
-      { path: "/admin/videos", label: "Videos", icon: Video },
+      { path: "/admin/plans", label: "Planes", icon: Package },
+      { path: "/admin/clients", label: "Personas", icon: Users },
+      { path: "/admin/pos", label: "Tienda", icon: ShoppingCart },
       { path: "/admin/events", label: "Eventos", icon: Ticket },
     ],
   },
@@ -51,7 +42,7 @@ const NAV_GROUPS = [
     collapsible: false,
     accentColor: "#A48D78",
     items: [
-      { path: "/admin/reports", label: "Reportes", icon: BarChart2 },
+      { path: "/admin/reports", label: "Crecimiento", icon: BarChart2 },
       { path: "/admin/settings", label: "Configuración", icon: Settings },
     ],
   },
@@ -59,10 +50,10 @@ const NAV_GROUPS = [
 
 const MOBILE_QUICK_NAV = [
   { path: "/admin/dashboard", label: "Inicio", icon: LayoutDashboard },
-  { path: "/admin/classes", label: "Clases", icon: CalendarDays },
   { path: "/admin/bookings", label: "Reservas", icon: BookOpen },
-  { path: "/admin/clients", label: "Clientes", icon: Users },
-  { path: "/admin/payments", label: "Pagos", icon: DollarSign },
+  { path: "/admin/classes", label: "Clases", icon: CalendarDays },
+  { path: "/admin/clients", label: "Personas", icon: Users },
+  { path: "/admin/payments", label: "Cobros", icon: DollarSign },
 ];
 
 interface AdminLayoutProps {
@@ -114,16 +105,6 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
     enabled: !!user?.id,
   });
   const unreadCount = unreadData?.data?.unread_count ?? 0;
-
-  // Pending video access count para badge en sidebar item 'Clientes'
-  const { data: vaPending } = useQuery<{ data: any[] }>({
-    queryKey: ["video-access-pending"],
-    queryFn: async () => (await api.get("/admin/video-access/pending")).data,
-    staleTime: 60_000,
-    refetchInterval: 120_000,
-    enabled: !!user?.id,
-  });
-  const vaPendingCount = Array.isArray(vaPending?.data) ? vaPending.data.length : 0;
 
   return (
     <div className="alma-admin flex min-h-screen bg-[#FAF9F6] text-[#43392F]">
@@ -254,16 +235,6 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
                             style={{ backgroundColor: "#A48D78", color: "#FAF9F6" }}
                           >
                             {unreadCount > 9 ? "9+" : unreadCount}
-                          </span>
-                        )}
-                        {/* Badge: pending video access count para 'Clientes' nav item */}
-                        {path === "/admin/clients" && vaPendingCount > 0 && (
-                          <span
-                            className="absolute -top-1.5 -right-2 grid place-items-center rounded-full text-[8px] font-bold leading-none px-1 min-w-[14px] h-[14px]"
-                            style={{ backgroundColor: "#F59E0B", color: "#FAF9F6" }}
-                            title={`${vaPendingCount} alumna${vaPendingCount === 1 ? "" : "s"} pendiente${vaPendingCount === 1 ? "" : "s"} de acceso a videos`}
-                          >
-                            {vaPendingCount > 9 ? "9+" : vaPendingCount}
                           </span>
                         )}
                       </span>
