@@ -1149,7 +1149,7 @@ const ContactoSection = () => {
             Cómo llegar
           </span>
           <h2 className="font-bebas mt-4 leading-[0.92]" style={{ color: ALMA.ink, fontSize: "clamp(2.2rem, 4.6vw, 4rem)" }}>
-            Plaza San Martín,
+            Plaza Arce,
             <span className="block italic font-alilato font-normal" style={{ color: ALMA.berry }}>Juriquilla, Querétaro.</span>
           </h2>
           <ul className="mt-8 list-none m-0 p-0 grid gap-5">
