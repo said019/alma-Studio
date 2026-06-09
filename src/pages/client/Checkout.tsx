@@ -161,8 +161,8 @@ const Checkout = () => {
   const [file, setFile] = useState<File | null>(null);
 
   const { data: plansData, isLoading: loadingPlans } = useQuery({
-    queryKey: ["plans"],
-    queryFn: async () => (await api.get("/plans")).data,
+    queryKey: ["plans", "active"],
+    queryFn: async () => (await api.get("/plans?active=true")).data,
   });
   const rawPlans: any[] = Array.isArray(plansData?.data) ? plansData.data : Array.isArray(plansData) ? plansData : [];
   const activePlans = rawPlans.filter((p) => (p.isActive ?? p.is_active) !== false);

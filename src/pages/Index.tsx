@@ -203,7 +203,7 @@ const Index = () => {
   /* ── Queries ── */
   const { data: plansData } = useQuery<{ data: any[] }>({
     queryKey: ["plans-public"],
-    queryFn: async () => (await api.get("/plans")).data,
+    queryFn: async () => (await api.get("/plans?active=true")).data,
     staleTime: 1000 * 60 * 5,
   });
 

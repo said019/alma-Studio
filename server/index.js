@@ -2790,8 +2790,11 @@ app.post("/api/auth/reset-password", async (req, res) => {
 // GET /api/plans
 app.get("/api/plans", async (req, res) => {
   try {
+    // El storefront pasa ?active=true para no recibir planes legacy inactivos.
+    // El admin llama sin parámetro para poder gestionar también los inactivos.
+    const onlyActive = req.query.active === "true" || req.query.is_active === "true";
     const r = await pool.query(
-      "SELECT * FROM plans ORDER BY sort_order ASC, price ASC"
+      `SELECT * FROM plans ${onlyActive ? "WHERE is_active = true" : ""} ORDER BY sort_order ASC, price ASC`
     );
     const general = await getSettingValueWithDefaults("general_settings");
     const openingActive = general?.opening_pricing_active !== false;
