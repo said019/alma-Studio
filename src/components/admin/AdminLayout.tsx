@@ -9,7 +9,7 @@ import {
   LayoutDashboard, Package, CreditCard, Users, CalendarDays,
   BookOpen, DollarSign,
   ShoppingCart, BarChart2, Bell,
-  Settings, ChevronLeft, ChevronRight, ChevronDown, LogOut, Globe, Menu, Ticket, X,
+  Settings, ChevronLeft, ChevronRight, ChevronDown, LogOut, Globe, Menu, X,
 } from "lucide-react";
 
 const NAV_GROUPS = [
@@ -34,7 +34,6 @@ const NAV_GROUPS = [
       { path: "/admin/plans", label: "Planes", icon: Package },
       { path: "/admin/clients", label: "Personas", icon: Users },
       { path: "/admin/pos", label: "Tienda", icon: ShoppingCart },
-      { path: "/admin/events", label: "Eventos", icon: Ticket },
     ],
   },
   {

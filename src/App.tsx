@@ -54,13 +54,10 @@ import DiscountCodes from "./pages/admin/discount-codes/DiscountCodes";
 import LoyaltyPage from "./pages/admin/loyalty/LoyaltyPage";
 import WhatsAppTemplatesPage from "./pages/admin/whatsapp/WhatsAppTemplatesPage";
 import AdminNotifications from "./pages/admin/notifications/AdminNotifications";
-import Referrals from "./pages/admin/referrals/Referrals";
 import InstructorsList from "./pages/admin/staff/InstructorsList";
-import VideoSalesVerification from "./pages/admin/videos/VideoSalesVerification";
 import ReportsPage from "./pages/admin/reports/ReportsPage";
 import AdminReviewsDashboard from "./pages/admin/reviews/AdminReviewsDashboard";
 import SettingsPage from "./pages/admin/settings/SettingsPage";
-import EventsManager from "./pages/admin/events/EventsManager";
 
 // Legal pages
 import Privacidad from "./pages/legal/Privacidad";
@@ -143,12 +140,9 @@ const App = () => (
           <Route path="/admin/loyalty" element={<LoyaltyPage />} />
           <Route path="/admin/whatsapp-templates" element={<WhatsAppTemplatesPage />} />
           <Route path="/admin/notifications" element={<AdminNotifications />} />
-          <Route path="/admin/referrals" element={<Referrals />} />
-          <Route path="/admin/videos/ventas" element={<VideoSalesVerification />} />
           <Route path="/admin/reports" element={<ReportsPage />} />
           <Route path="/admin/reviews" element={<AdminReviewsDashboard />} />
           <Route path="/admin/settings" element={<SettingsPage />} />
-          <Route path="/admin/events" element={<EventsManager />} />
 
           {/* 404 */}
           <Route path="*" element={<NotFound />} />

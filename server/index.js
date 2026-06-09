@@ -662,7 +662,7 @@ async function ensureSchema() {
         name         VARCHAR(100) NOT NULL,
         subtitle     VARCHAR(150),
         description  TEXT,
-        category     VARCHAR(20)  NOT NULL DEFAULT 'jumping' CHECK (category IN ('jumping','pilates')),
+        category     VARCHAR(20)  NOT NULL DEFAULT 'studio' CHECK (category IN ('studio','reformer_tower')),
         intensity    VARCHAR(20)  DEFAULT 'media' CHECK (intensity IN ('ligera','media','pesada','todas')),
         level        VARCHAR(50)  DEFAULT 'Todos los niveles',
         duration_min INTEGER      DEFAULT 50,
@@ -676,7 +676,7 @@ async function ensureSchema() {
       );
     `);
     await pool.query(`ALTER TABLE class_types ADD COLUMN IF NOT EXISTS subtitle VARCHAR(150)`).catch(() => { });
-    await pool.query(`ALTER TABLE class_types ADD COLUMN IF NOT EXISTS category VARCHAR(20) DEFAULT 'jumping'`).catch(() => { });
+    await pool.query(`ALTER TABLE class_types ADD COLUMN IF NOT EXISTS category VARCHAR(20) DEFAULT 'studio'`).catch(() => { });
     await pool.query(`ALTER TABLE class_types ADD COLUMN IF NOT EXISTS intensity VARCHAR(20) DEFAULT 'media'`).catch(() => { });
     await pool.query(`ALTER TABLE class_types ADD COLUMN IF NOT EXISTS level VARCHAR(50) DEFAULT 'Todos los niveles'`).catch(() => { });
     await pool.query(`ALTER TABLE class_types ADD COLUMN IF NOT EXISTS duration_min INTEGER DEFAULT 50`).catch(() => { });
@@ -727,7 +727,7 @@ async function ensureSchema() {
         name          VARCHAR(100) NOT NULL,
         num_classes   VARCHAR(20)  NOT NULL,
         price         DECIMAL(10,2) NOT NULL,
-        category      VARCHAR(20)  NOT NULL DEFAULT 'barre' CHECK (category IN ('barre','jumping','pilates','mixtos')),
+        category      VARCHAR(20)  NOT NULL DEFAULT 'mixto' CHECK (category IN ('studio','reformer_tower','mixto','all')),
         validity_days INTEGER      DEFAULT 30,
         is_active     BOOLEAN      DEFAULT true,
         sort_order    INTEGER      DEFAULT 0,
@@ -736,7 +736,8 @@ async function ensureSchema() {
       );
     `);
     await pool.query(`ALTER TABLE packages DROP CONSTRAINT IF EXISTS packages_category_check`).catch(() => { });
-    await pool.query(`ALTER TABLE packages ADD CONSTRAINT packages_category_check CHECK (category IN ('barre','jumping','pilates','mixtos'))`).catch(() => { });
+    await pool.query(`UPDATE packages SET category='mixto' WHERE category NOT IN ('studio','reformer_tower','mixto','all')`).catch(() => { });
+    await pool.query(`ALTER TABLE packages ADD CONSTRAINT packages_category_check CHECK (category IN ('studio','reformer_tower','mixto','all'))`).catch(() => { });
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_packages_category ON packages(category)`).catch(() => { });
     // La tabla `packages` es legacy (solo display). La landing ahora lee de
     // `plans`. Desactivamos cualquier fila para no mostrar precios viejos.
@@ -1221,7 +1222,7 @@ async function ensureSchema() {
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_discount_codes_channel ON discount_codes(channel)`).catch(() => { });
     await pool.query(`UPDATE discount_codes SET discount_type = 'percent' WHERE discount_type IN ('percentage', 'porcentaje', '%')`).catch(() => { });
     await pool.query(`UPDATE discount_codes SET channel = 'all' WHERE channel IS NULL OR channel = ''`).catch(() => { });
-    await pool.query(`UPDATE discount_codes SET class_category = NULL WHERE class_category NOT IN ('all','jumping','pilates','mixto')`).catch(() => { });
+    await pool.query(`UPDATE discount_codes SET class_category = NULL WHERE class_category NOT IN ('all','studio','reformer_tower','mixto')`).catch(() => { });
     // ── bookings: add checked_in_at column ────────────────────────────────
     await pool.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS checked_in_at TIMESTAMP WITH TIME ZONE`).catch(() => { });
 
@@ -2005,7 +2006,7 @@ async function findApplicableDiscountCode({
           class_category IS NULL
           OR class_category = 'all'
           OR class_category = $4
-          OR (class_category = 'mixto' AND $4 IN ('jumping','pilates'))
+          OR (class_category = 'mixto' AND $4 IN ('studio','reformer_tower'))
         )
       ORDER BY
         CASE WHEN plan_id IS NULL THEN 1 ELSE 0 END ASC,
@@ -7146,11 +7147,9 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
   const assetCategory =
     hasEventPass
       ? "event"
-      : membershipCategory === "jumping"
-        ? "jumping"
-        : membershipCategory === "pilates"
-          ? "pilates"
-          : "mixto";
+      : membershipCategory === "mixto"
+        ? "mixto"
+        : "pilates";
 
   const iconPath = findAssetFile([
     `wallet-icon-${assetCategory}.png`,
@@ -7219,9 +7218,8 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
   let strip3xPath = null;
   if (!hasEventPass) {
     const stripCategory =
-      membershipCategory === "jumping" ? "jumping"
-        : membershipCategory === "pilates" ? "pilates"
-          : "mixto";
+      membershipCategory === "mixto" ? "mixto"
+        : "pilates";
     dynamicStripName = shouldUseStampStrip
       ? `wallet-strip-${stripCategory}-t${stripStampState.total}-r${stripStampState.remaining}.png`
       : `wallet-strip-${stripCategory}.png`;
@@ -8796,8 +8794,8 @@ app.get("/api/public/review-tags", async (_req, res) => {
 app.post("/api/class-types", adminMiddleware, async (req, res) => {
   const { name, color, category, defaultDuration, maxCapacity, isActive } = req.body;
   if (!name?.trim()) return res.status(400).json({ message: "name requerido" });
-  const validCategories = ["jumping", "pilates"];
-  const cat = validCategories.includes(category) ? category : "jumping";
+  const validCategories = ["studio", "reformer_tower"];
+  const cat = validCategories.includes(category) ? category : "studio";
   try {
     const r = await pool.query(
       `INSERT INTO class_types (name, color, category, duration_min, capacity, is_active, sort_order)
@@ -8811,7 +8809,7 @@ app.post("/api/class-types", adminMiddleware, async (req, res) => {
 // PUT /api/class-types/:id — alias CRUD (admin)
 app.put("/api/class-types/:id", adminMiddleware, async (req, res) => {
   const { name, color, category, defaultDuration, maxCapacity, isActive } = req.body;
-  const validCategories = ["jumping", "pilates"];
+  const validCategories = ["studio", "reformer_tower"];
   const cat = validCategories.includes(category) ? category : null;
   try {
     const r = await pool.query(
