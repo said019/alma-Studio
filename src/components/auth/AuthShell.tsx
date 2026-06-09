@@ -103,8 +103,8 @@ export const AuthShell = ({
             <img
               src="/wallet-logo@2x.png"
               alt="Alma Movement"
-              className="h-10 sm:h-12 w-auto object-contain"
-              style={{ filter: "brightness(0) invert(1)" }}
+              className="h-14 w-14 sm:h-16 sm:w-16 rounded-[18px] object-cover"
+              style={{ boxShadow: "0 2px 12px rgba(36,27,26,0.28)" }}
             />
           </Link>
 
