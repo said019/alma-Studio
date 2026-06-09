@@ -52,7 +52,6 @@ const planSchema = z.object({
   isNonRepeatable: z.boolean().default(false),
   repeatKey: z.string().optional(),
   sortOrder: z.coerce.number().default(0),
-  includesVideoLibrary: z.boolean().default(false),
   isVisitPack: z.boolean().default(false),
 });
 
@@ -87,7 +86,6 @@ function normalizePlanRow(row: any): Plan {
     isNonRepeatable: Boolean(row?.isNonRepeatable ?? row?.is_non_repeatable ?? false),
     repeatKey: String(row?.repeatKey ?? row?.repeat_key ?? ""),
     sortOrder: Number(row?.sortOrder ?? row?.sort_order ?? 0),
-    includesVideoLibrary: Boolean(row?.includesVideoLibrary ?? row?.includes_video_library ?? false),
     isVisitPack: Boolean(row?.isVisitPack ?? row?.is_visit_pack ?? false),
   };
 }
@@ -98,7 +96,6 @@ const EMPTY: PlanFormData = {
   openingPrice: null, morningOnly: false,
   features: "", isActive: true, isNonTransferable: false, isNonRepeatable: false, repeatKey: "",
   sortOrder: 0,
-  includesVideoLibrary: false,
   isVisitPack: false,
 };
 
@@ -111,7 +108,6 @@ function serializePlan(d: PlanFormData) {
     features: d.features
       ? d.features.split(",").map((s) => s.trim()).filter(Boolean)
       : [],
-    includes_video_library: !!d.includesVideoLibrary,
     isVisitPack: !!d.isVisitPack,
     is_visit_pack: !!d.isVisitPack,
   };
@@ -129,7 +125,6 @@ function normalizePlan(p: Plan): PlanFormData {
     isNonTransferable: Boolean((p as any).isNonTransferable ?? (p as any).is_non_transferable),
     isNonRepeatable: Boolean((p as any).isNonRepeatable ?? (p as any).is_non_repeatable),
     repeatKey: String((p as any).repeatKey ?? (p as any).repeat_key ?? ""),
-    includesVideoLibrary: Boolean((p as any).includesVideoLibrary ?? (p as any).includes_video_library ?? false),
     isVisitPack: Boolean((p as any).isVisitPack ?? (p as any).is_visit_pack ?? false),
   };
 }

@@ -201,19 +201,6 @@ const Index = () => {
   }[]>([]);
 
   /* ── Queries ── */
-  const { data: videoCardsData } = useQuery<{ data: { id: number; title: string; description: string; emoji: string; video_url?: string | null; thumbnail_url?: string | null }[] }>({
-    queryKey: ["homepage-video-cards"],
-    queryFn: async () => (await api.get("/homepage-video-cards")).data,
-    staleTime: 1000 * 60 * 5,
-  });
-  const videoCards = videoCardsData?.data?.length
-    ? videoCardsData.data
-    : [
-        { id: 1, title: "Reformer & Tower", description: "Trabajo en equipo: fuerza, control y alineación en grupos pequeños.", emoji: "sparkles", video_url: null, thumbnail_url: null },
-        { id: 2, title: "Studio · Mat, Barre y Sculpt", description: "Core, postura y tono en tapete, con ritmo y constancia.", emoji: "activity", video_url: null, thumbnail_url: null },
-        { id: 3, title: "Comunidad ALMA", description: "Atención personalizada, grupos pequeños y seguimiento real a tu avance.", emoji: "heart", video_url: null, thumbnail_url: null },
-      ];
-
   const { data: plansData } = useQuery<{ data: any[] }>({
     queryKey: ["plans-public"],
     queryFn: async () => (await api.get("/plans")).data,

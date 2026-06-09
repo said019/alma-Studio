@@ -22,7 +22,6 @@ import {
   sendWeeklyReminder,
   sendRenewalReminder,
   sendPasswordResetEmail,
-  sendVideoPurchaseApproved,
 } from "./emailService.js";
 import { ALMA_CLASS_TYPES, ALMA_SCHEDULE_SLOTS, ALMA_SCHEDULE_DAYS, ALMA_PLANS, ALMA_PLAN_NAMES } from "./lib/almaCatalog.js";
 import { resolveEffectivePrice } from "./lib/pricing.js";
@@ -33,20 +32,6 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = process.env.PORT || 8080;
 const JWT_SECRET = process.env.JWT_SECRET || "dev_alma_secret_change_me";
-
-// ─── Video stream token helpers ───────────────────────────────────────────────
-// HMAC tokens used to gate /api/drive/secure-video/:fileId. See spec
-// docs/superpowers/specs/2026-05-14-video-library-access-design.md.
-function signStreamToken({ userId, fileId, exp }) {
-  const payload = `${userId}|${fileId}|${exp}`;
-  return crypto.createHmac("sha256", JWT_SECRET).update(payload).digest("base64url");
-}
-function verifyStreamToken({ token, userId, fileId, exp }) {
-  if (!token || !exp || Date.now() >= Number(exp)) return false;
-  const expected = signStreamToken({ userId, fileId, exp });
-  if (token.length !== expected.length) return false;
-  return crypto.timingSafeEqual(Buffer.from(token), Buffer.from(expected));
-}
 
 const APP_PUBLIC_URL = String(process.env.APP_URL || process.env.SITE_URL || "https://alma-movement.com.mx").replace(/\/+$/, "");
 
@@ -390,22 +375,6 @@ function mergeSettingsWithDefaults(key, rawValue) {
 // ─── File upload (memory storage, max 10 MB) ────────────────────────────────
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
-// ─── File upload for videos (disk storage, max 8 GB) ───────────────────────
-// Disk storage (os.tmpdir) so large videos stream to disk, never into Node RAM.
-// 8 GB allows full-quality 1080p/4K class recordings without forcing the admin
-// to re-compress. The primary admin upload UI uses the chunked Drive resumable
-// path (/drive/init-upload + /drive/upload-chunk), which streams 5 MB at a time;
-// this multer limit only governs the legacy /api/videos/upload and
-// /api/homepage-video-cards/:id/upload paths.
-const VIDEO_MAX_MB = 8192;
-const uploadVideo = multer({
-  storage: multer.diskStorage({
-    destination: (req, file, cb) => cb(null, os.tmpdir()),
-    filename: (req, file, cb) => cb(null, `alma_vid_${Date.now()}_${file.originalname}`),
-  }),
-  limits: { fileSize: VIDEO_MAX_MB * 1024 * 1024 },
-});
-
 // ─── Google Drive helpers ────────────────────────────────────────────────────
 async function getGoogleDriveAccessToken() {
   const resp = await axios.post("https://oauth2.googleapis.com/token", new URLSearchParams({
@@ -577,8 +546,8 @@ async function ensureSchema() {
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS receive_promotions BOOLEAN DEFAULT false`).catch(() => { });
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS receive_weekly_summary BOOLEAN DEFAULT false`).catch(() => { });
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true`).catch(() => { });
-    // Videoteca: acceso temporal (regalo de cumpleaños) y guard anual idempotente.
-    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS video_library_access_until TIMESTAMPTZ`).catch(() => { });
+    // Videoteca retirada: se elimina la columna del regalo de cumpleaños de acceso.
+    await pool.query(`ALTER TABLE users DROP COLUMN IF EXISTS video_library_access_until`).catch(() => { });
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS birthday_gift_year INTEGER`).catch(() => { });
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS gender VARCHAR(10)`).catch(() => { });
     // Teléfono opcional: el alta manual de clientas permite registrar sin teléfono.
@@ -834,9 +803,6 @@ async function ensureSchema() {
     await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS is_visit_pack BOOLEAN DEFAULT false`).catch(() => { });
     await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS opening_price DECIMAL(10,2)`).catch(() => { });
     await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS morning_only BOOLEAN DEFAULT false`).catch(() => { });
-    // includes_video_library lo (re)añade más abajo la migración de video library,
-    // pero el seed de planes Alma lo referencia: garantízalo aquí (idempotente).
-    await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS includes_video_library BOOLEAN NOT NULL DEFAULT false`).catch(() => { });
     // Tabla de perfiles de invitada/acompañante (no socia). El cuestionario
     // inicial vive aquí y se reusa al volver con el mismo teléfono.
     await pool.query(`
@@ -884,7 +850,7 @@ async function ensureSchema() {
              description=$2, price=$3, opening_price=$4, currency='MXN',
              duration_days=$5, class_limit=$6, class_category=$7, morning_only=$8,
              is_non_repeatable=$9, repeat_key=$10, is_non_transferable=false,
-             includes_video_library=false, is_active=true, sort_order=$11, updated_at=NOW()
+             is_active=true, sort_order=$11, updated_at=NOW()
            WHERE name=$1`,
           [p.name, p.description, p.price, p.opening_price, p.duration_days,
            p.class_limit, p.class_category, p.morning_only, p.is_non_repeatable,
@@ -895,8 +861,8 @@ async function ensureSchema() {
             `INSERT INTO plans
                (name, description, price, opening_price, currency, duration_days, class_limit,
                 class_category, morning_only, is_non_repeatable, repeat_key, is_non_transferable,
-                includes_video_library, is_active, sort_order)
-             VALUES ($1,$2,$3,$4,'MXN',$5,$6,$7,$8,$9,$10,false,false,true,$11)`,
+                is_active, sort_order)
+             VALUES ($1,$2,$3,$4,'MXN',$5,$6,$7,$8,$9,$10,false,true,$11)`,
             [p.name, p.description, p.price, p.opening_price, p.duration_days,
              p.class_limit, p.class_category, p.morning_only, p.is_non_repeatable,
              p.repeat_key, p.sort_order]
@@ -1107,40 +1073,22 @@ async function ensureSchema() {
     await pool.query(`ALTER TABLE orders ALTER COLUMN plan_id DROP NOT NULL`).catch(() => { });
     // Make user_id nullable (walk-in POS sales may not have a user)
     await pool.query(`ALTER TABLE orders ALTER COLUMN user_id DROP NOT NULL`).catch(() => { });
-    // ── Video library access (2026-05-14) ──────────────────────────────────
-    await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS includes_video_library BOOLEAN NOT NULL DEFAULT false`).catch(() => { });
-    await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS is_trial BOOLEAN NOT NULL DEFAULT false`).catch(() => { });
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS video_access_grants (
-        id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-        user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        granted_by  UUID NOT NULL REFERENCES users(id),
-        granted_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        revoked_at  TIMESTAMPTZ NULL,
-        revoked_by  UUID NULL REFERENCES users(id),
-        note        TEXT NULL
-      )
-    `).catch(() => { });
-    // UNIQUE: prevents race where two concurrent POST grants both create active rows.
-    // The POST grant handler catches code 23505 (unique violation) and treats as alreadyGranted.
-    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_vag_user_active ON video_access_grants(user_id) WHERE revoked_at IS NULL`).catch(() => { });
-    // ── video_plans: qué planes desbloquean cada video (acceso granular) ──────
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS video_plans (
-        video_id  UUID NOT NULL REFERENCES videos(id) ON DELETE CASCADE,
-        plan_id   UUID NOT NULL REFERENCES plans(id)  ON DELETE CASCADE,
-        PRIMARY KEY (video_id, plan_id)
-      )
-    `).catch(() => { });
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_video_plans_plan ON video_plans(plan_id)`).catch(() => { });
+    // ── Feature de videos RETIRADA: el estudio no tiene videoteca/clases grabadas.
+    // Limpia tablas y columnas de raíz para que la BD quede sin restos. ─────────
+    await pool.query(`ALTER TABLE plans DROP COLUMN IF EXISTS includes_video_library`).catch(() => { });
+    await pool.query(`DROP TABLE IF EXISTS video_plans CASCADE`).catch(() => { });
+    await pool.query(`DROP TABLE IF EXISTS video_access_grants CASCADE`).catch(() => { });
+    await pool.query(`DROP TABLE IF EXISTS video_purchases CASCADE`).catch(() => { });
+    await pool.query(`DROP TABLE IF EXISTS videos CASCADE`).catch(() => { });
+    await pool.query(`DROP TABLE IF EXISTS homepage_video_cards CASCADE`).catch(() => { });
     // ── memberships: add order_id column ─────────────────────────────────
     await pool.query(`ALTER TABLE memberships ADD COLUMN IF NOT EXISTS order_id UUID`).catch(() => { });
     await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_memberships_order ON memberships(order_id) WHERE order_id IS NOT NULL`).catch(() => { });
-    // ── orders: complemento online (add-on) ──────────────────────────────
-    // Permite comprar un paquete presencial + el plan online en la misma orden.
+    // ── orders/memberships: columnas legacy del complemento (sin uso) ─────
+    // La feature de complemento online fue retirada con la videoteca; las
+    // columnas se conservan para compatibilidad pero ya no se escriben.
     await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS addon_plan_id UUID`).catch(() => { });
     await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS addon_amount DECIMAL(10,2)`).catch(() => { });
-    // Para distinguir cuál membresía vino como add-on de una orden.
     await pool.query(`ALTER TABLE memberships ADD COLUMN IF NOT EXISTS is_addon BOOLEAN NOT NULL DEFAULT false`).catch(() => { });
     // ── memberships: add fallback name/limit override columns ─────────────
     await pool.query(`ALTER TABLE memberships ADD COLUMN IF NOT EXISTS plan_name_override VARCHAR(255)`).catch(() => { });
@@ -1184,33 +1132,7 @@ async function ensureSchema() {
       ) sub
       WHERE m.id = sub.membership_id AND m.cancellations_used != sub.cnt;
     `).catch(() => { });
-    // ── homepage_video_cards: editable 3-card section on landing page ──────
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS homepage_video_cards (
-        id          SERIAL PRIMARY KEY,
-        sort_order  INTEGER NOT NULL DEFAULT 0,
-        title       VARCHAR(120) NOT NULL,
-        description TEXT NOT NULL DEFAULT '',
-        emoji       VARCHAR(10)  NOT NULL DEFAULT '🎬',
-        video_url   TEXT,
-        updated_at  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-      );
-    `).catch(() => { });
-    // Add video_url column if table already existed
-    await pool.query(`ALTER TABLE homepage_video_cards ADD COLUMN IF NOT EXISTS video_url TEXT`).catch(() => { });
-    // Add thumbnail_url column for custom poster images
-    await pool.query(`ALTER TABLE homepage_video_cards ADD COLUMN IF NOT EXISTS thumbnail_url TEXT`).catch(() => { });
-    // Migrate old emoji values to icon keys
-    await pool.query(`
-      UPDATE homepage_video_cards SET emoji = CASE emoji
-        WHEN '🏋️' THEN 'dumbbell' WHEN '🏋' THEN 'dumbbell'
-        WHEN '💃' THEN 'music' WHEN '🧘' THEN 'waves'
-        WHEN '🔥' THEN 'flame' WHEN '⚡' THEN 'zap'
-        WHEN '❤️' THEN 'heart' WHEN '💪' THEN 'activity'
-        WHEN '✨' THEN 'sparkles' WHEN '🎬' THEN 'activity'
-        ELSE emoji END
-      WHERE emoji NOT IN ('dumbbell','music','waves','flame','zap','heart','activity','sparkles');
-    `).catch(() => { });
+    // (homepage_video_cards retirada junto con la feature de videos — ver DROP arriba)
     // ── discount_codes: normalise discount_type values ────────────────────
     await pool.query(`ALTER TABLE discount_codes ADD COLUMN IF NOT EXISTS min_order_amount DECIMAL(10,2) DEFAULT 0`).catch(() => { });
     await pool.query(`ALTER TABLE discount_codes ADD COLUMN IF NOT EXISTS plan_id UUID REFERENCES plans(id) ON DELETE SET NULL`).catch(() => { });
@@ -1551,25 +1473,7 @@ async function ensureSchema() {
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `);
-    // ── Videos: add price column (may fail if videos table not yet created) ─
-    await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS price DECIMAL(10,2)`).catch(() => { });
-    await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS is_featured BOOLEAN DEFAULT false`).catch(() => { });
-    await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS drive_file_id VARCHAR(500)`).catch(() => { });
-    await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS cloudinary_id VARCHAR(500)`).catch(() => { });
-    await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS thumbnail_drive_id VARCHAR(500)`).catch(() => { });
-    await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS duration_seconds INTEGER DEFAULT 0`).catch(() => { });
-    await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS subtitle VARCHAR(255)`).catch(() => { });
-    await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS tagline VARCHAR(255)`).catch(() => { });
-    await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS days VARCHAR(100)`).catch(() => { });
-    await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS brand_color VARCHAR(7)`).catch(() => { });
-    await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS sales_enabled BOOLEAN DEFAULT false`).catch(() => { });
-    await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS sales_unlocks_video BOOLEAN DEFAULT false`).catch(() => { });
-    await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS sales_price_mxn DECIMAL(10,2)`).catch(() => { });
-    await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS sales_class_credits INTEGER`).catch(() => { });
-    await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS sales_cta_text VARCHAR(100)`).catch(() => { });
-    // ── Video purchases: add admin_notes and verified_at ──────────────────
-    await pool.query(`ALTER TABLE video_purchases ADD COLUMN IF NOT EXISTS admin_notes TEXT`).catch(() => { });
-    await pool.query(`ALTER TABLE video_purchases ADD COLUMN IF NOT EXISTS verified_at TIMESTAMP WITH TIME ZONE`).catch(() => { });
+    // (Tablas videos/video_purchases retiradas — ver DROP en la migración de arriba)
 
     // ── Módulo de Eventos ────────────────────────────────────────────────
     await pool.query(`
@@ -1952,8 +1856,6 @@ async function selectMembershipForClass({ userId, classCategory, client = null }
       WHERE m.user_id = $1
         AND m.status = 'active'
         AND (m.end_date IS NULL OR m.end_date >= CURRENT_DATE)
-        -- Los planes online son solo videos: nunca sirven para reservar clases.
-        AND COALESCE(p.class_category, 'all') <> 'online'
         AND (
           COALESCE(p.class_category, 'all') IN ('all', 'mixto')
           OR COALESCE(p.class_category, 'all') = $2
@@ -2336,57 +2238,6 @@ async function awardBirthdayBonusIfEligible(userId, client = null) {
   return inserted.rows[0] ?? null;
 }
 
-// Regalo de cumpleaños: 1 mes de acceso a la videoteca. Idempotente por año
-// (birthday_gift_year). No toca créditos de clases ni Membresías.
-async function grantBirthdayVideotecaIfEligible(userId, client = null) {
-  if (!userId) return null;
-  const q = client ?? pool;
-  const userRes = await q.query(
-    "SELECT date_of_birth, birthday_gift_year FROM users WHERE id = $1 LIMIT 1",
-    [userId]
-  );
-  const row = userRes.rows[0];
-  const dob = row?.date_of_birth;
-  if (!dob) return null;
-
-  const today = new Date();
-  const birth = new Date(dob);
-  const isBirthdayToday =
-    birth.getUTCDate() === today.getUTCDate() &&
-    birth.getUTCMonth() === today.getUTCMonth();
-  if (!isBirthdayToday) return null;
-
-  const year = today.getUTCFullYear();
-  if (Number(row.birthday_gift_year) === year) return null; // ya otorgado este año
-
-  const upd = await q.query(
-    `UPDATE users
-        SET video_library_access_until = GREATEST(COALESCE(video_library_access_until, NOW()), NOW()) + INTERVAL '1 month',
-            birthday_gift_year = $2
-      WHERE id = $1
-      RETURNING video_library_access_until`,
-    [userId, year]
-  );
-  return upd.rows[0]?.video_library_access_until ?? null;
-}
-
-// Acceso a la videoteca: socia con membresía activa O regalo de cumpleaños vigente.
-async function hasVideoLibraryAccess(userId, client = null) {
-  if (!userId) return false;
-  const q = client ?? pool;
-  const r = await q.query(
-    `SELECT 1 FROM users u
-      WHERE u.id = $1
-        AND (
-          (u.video_library_access_until IS NOT NULL AND u.video_library_access_until > NOW())
-          OR EXISTS (SELECT 1 FROM memberships m WHERE m.user_id = u.id AND m.status = 'active')
-        )
-      LIMIT 1`,
-    [userId]
-  );
-  return r.rows.length > 0;
-}
-
 const NON_REPEATABLE_ORDER_BLOCK_STATUSES = ["pending_payment", "pending_verification", "approved"];
 
 function parseBooleanFlag(value) {
@@ -2707,7 +2558,6 @@ app.post("/api/auth/login", async (req, res) => {
     if (!match) return res.status(401).json({ message: "Credenciales incorrectas" });
     try {
       await awardBirthdayBonusIfEligible(user.id);
-      await grantBirthdayVideotecaIfEligible(user.id);
     } catch (bonusErr) {
       console.error("[Loyalty] birthday bonus login:", bonusErr?.message || bonusErr);
     }
@@ -3024,8 +2874,7 @@ app.get("/api/memberships/my", authMiddleware, async (req, res) => {
 });
 
 // GET /api/memberships/mine/all — TODAS las membresías activas/pendientes del
-// usuario. Permite mostrar presencial + online a la vez (la clienta puede tener
-// un paquete de clases y, como complemento, el plan online de videos).
+// usuario.
 app.get("/api/memberships/mine/all", authMiddleware, async (req, res) => {
   try {
     const r = await pool.query(
@@ -3037,7 +2886,6 @@ app.get("/api/memberships/mine/all", authMiddleware, async (req, res) => {
               COALESCE(p.name, m.plan_name_override, 'Membresía') AS plan_name,
               COALESCE(p.class_limit, m.class_limit_override)      AS class_limit,
               COALESCE(p.duration_days, 30)                        AS duration_days,
-              COALESCE(p.includes_video_library, false)           AS includes_video_library,
               p.features,
               COALESCE(p.class_category, 'all')                    AS class_category
        FROM memberships m
@@ -3047,7 +2895,6 @@ app.get("/api/memberships/mine/all", authMiddleware, async (req, res) => {
          AND (m.end_date IS NULL OR m.end_date >= CURRENT_DATE)
        ORDER BY
          CASE m.status WHEN 'active' THEN 1 WHEN 'pending_activation' THEN 2 ELSE 3 END,
-         (COALESCE(p.class_category,'all') = 'online') ASC,  -- presencial primero, online después
          m.end_date ASC NULLS LAST,
          m.created_at DESC`,
       [req.userId]
@@ -3864,7 +3711,7 @@ async function generateOrderNumber(client) {
 
 // POST /api/orders
 app.post("/api/orders", authMiddleware, async (req, res) => {
-  const { planId, discountCode, paymentMethod = "transfer", addonPlanId } = req.body;
+  const { planId, discountCode, paymentMethod = "transfer" } = req.body;
   if (!planId) return res.status(400).json({ message: "planId requerido" });
   const client = await pool.connect();
   try {
@@ -3880,28 +3727,6 @@ app.post("/api/orders", authMiddleware, async (req, res) => {
     const generalForPrice = await getSettingValueWithDefaults("general_settings");
     const effectivePrice = resolveEffectivePrice(plan, generalForPrice?.opening_pricing_active !== false);
 
-    // ── Complemento online (add-on) ──────────────────────────────────────
-    // Solo válido si el plan principal NO es online (no tiene sentido un add-on
-    // online sobre un plan online), si el plan principal aún no incluye videos,
-    // y si el add-on es efectivamente un plan online. Precio fijo promocional.
-    const ADDON_ONLINE_PRICE = Number(process.env.ADDON_ONLINE_PRICE) || 75;
-    let addonPlan = null;
-    let addonAmount = 0;
-    if (addonPlanId) {
-      const mainIsOnline = String(plan.class_category || "").toLowerCase() === "online";
-      const mainHasVideos = plan.includes_video_library === true;
-      if (mainIsOnline || mainHasVideos) {
-        await client.query("ROLLBACK");
-        return res.status(400).json({ message: "Este plan no admite el complemento online (ya incluye videos o es online)." });
-      }
-      const addRes = await client.query("SELECT * FROM plans WHERE id = $1 AND is_active = true", [addonPlanId]);
-      if (!addRes.rows.length || String(addRes.rows[0].class_category || "").toLowerCase() !== "online") {
-        await client.query("ROLLBACK");
-        return res.status(400).json({ message: "El complemento debe ser un plan en línea válido." });
-      }
-      addonPlan = addRes.rows[0];
-      addonAmount = ADDON_ONLINE_PRICE;
-    }
     const nonRepeatableConflict = await findNonRepeatablePlanConflict({ userId: req.userId, plan, client });
     if (nonRepeatableConflict) {
       await client.query("ROLLBACK");
@@ -3935,13 +3760,13 @@ app.post("/api/orders", authMiddleware, async (req, res) => {
       appliedDiscountCode = discountResult.code;
     }
 
-    const total = subtotal - discount + addonAmount;
+    const total = subtotal - discount;
     const bankInfo = await getConfiguredBankInfo(client);
     const expires = new Date(Date.now() + 48 * 60 * 60 * 1000); // 48h
     const orderNumber = await generateOrderNumber(client);
     const orderRes = await client.query(
-      `INSERT INTO orders (user_id, plan_id, status, payment_method, subtotal, tax_amount, total_amount, discount_amount, discount_code_id, bank_info, expires_at, order_number, addon_plan_id, addon_amount)
-       VALUES ($1, $2, 'pending_payment', $3, $4, 0, $5, $6, $7, $8, $9, $10, $11, $12)
+      `INSERT INTO orders (user_id, plan_id, status, payment_method, subtotal, tax_amount, total_amount, discount_amount, discount_code_id, bank_info, expires_at, order_number)
+       VALUES ($1, $2, 'pending_payment', $3, $4, 0, $5, $6, $7, $8, $9, $10)
        RETURNING *`,
       [
         req.userId,
@@ -3954,8 +3779,6 @@ app.post("/api/orders", authMiddleware, async (req, res) => {
         JSON.stringify(bankInfo),
         expires,
         orderNumber,
-        addonPlan?.id ?? null,
-        addonAmount || null,
       ]
     );
 
@@ -3966,7 +3789,6 @@ app.post("/api/orders", authMiddleware, async (req, res) => {
       data: {
         ...order,
         plan_name: plan.name,
-        addon_plan_name: addonPlan?.name ?? null,
         bank_details: { ...bankInfo, amount: total, currency: "MXN" },
       }
     });
@@ -4569,28 +4391,6 @@ app.get("/api/me/notifications/unread-count", authMiddleware, async (req, res) =
     );
     return res.json({ data: { unread_count: r.rows[0]?.n || 0 } });
   } catch (err) {
-    return res.status(500).json({ message: "Error interno" });
-  }
-});
-
-// GET /api/me/video-access — resumen de biblioteca (banner). El lock real es
-// per-video y viene en /api/videos. Aquí solo: ¿plan full-library activo?
-app.get("/api/me/video-access", authMiddleware, async (req, res) => {
-  try {
-    const fullLib = await pool.query(
-      `SELECT 1 FROM memberships m JOIN plans p ON p.id = m.plan_id
-        WHERE m.user_id = $1 AND m.status = 'active'
-          AND p.includes_video_library = true
-          AND (m.end_date IS NULL OR m.end_date >= CURRENT_DATE) LIMIT 1`,
-      [req.userId]
-    );
-    if (fullLib.rows.length) return res.json({ data: { state: "unlocked" } });
-    const offers = await pool.query(
-      "SELECT id, name, price FROM plans WHERE includes_video_library = true AND is_active = true ORDER BY price ASC"
-    );
-    return res.json({ data: { state: "locked_no_plan", offers: offers.rows } });
-  } catch (err) {
-    console.error("GET /me/video-access error:", err);
     return res.status(500).json({ message: "Error interno" });
   }
 });
@@ -7890,38 +7690,6 @@ app.post("/api/admin/wallet/notify/:userId", adminMiddleware, async (req, res) =
   }
 });
 
-// ─── Routes: /api/admin/video-access ────────────────────────────────────────
-
-// GET /api/admin/users/:userId/video-access — resumen de biblioteca del usuario.
-// El lock real es per-video; aquí solo: ¿plan full-library activo?
-app.get("/api/admin/users/:userId/video-access", adminMiddleware, async (req, res) => {
-  try {
-    const fullLib = await pool.query(
-      `SELECT 1 FROM memberships m JOIN plans p ON p.id = m.plan_id
-        WHERE m.user_id = $1 AND m.status = 'active'
-          AND p.includes_video_library = true
-          AND (m.end_date IS NULL OR m.end_date >= CURRENT_DATE) LIMIT 1`,
-      [req.params.userId]
-    );
-    const grant = await pool.query(
-      "SELECT 1 FROM video_access_grants WHERE user_id = $1 AND revoked_at IS NULL LIMIT 1",
-      [req.params.userId]
-    );
-    const hasFullLib = fullLib.rows.length > 0;
-    const hasGrant = grant.rows.length > 0;
-    if (hasFullLib || hasGrant) {
-      return res.json({ data: { state: "unlocked", has_grant: hasGrant, full_library: hasFullLib } });
-    }
-    const offers = await pool.query(
-      "SELECT id, name, price FROM plans WHERE includes_video_library = true AND is_active = true ORDER BY price ASC"
-    );
-    return res.json({ data: { state: "locked_no_plan", has_grant: false, full_library: false, offers: offers.rows } });
-  } catch (err) {
-    console.error("GET /admin/users/:userId/video-access error:", err);
-    return res.status(500).json({ message: "Error interno" });
-  }
-});
-
 // GET /api/admin/users/:userId/waiver — responsiva firmada por la alumna (admin).
 app.get("/api/admin/users/:userId/waiver", adminMiddleware, async (req, res) => {
   try {
@@ -7929,346 +7697,6 @@ app.get("/api/admin/users/:userId/waiver", adminMiddleware, async (req, res) => 
     return res.json({ data: r.rows[0] ?? null });
   } catch (err) {
     console.error("GET /admin/users/:userId/waiver error:", err);
-    return res.status(500).json({ message: "Error interno" });
-  }
-});
-
-// POST /api/admin/users/:userId/video-access — grant library access (idempotent)
-app.post("/api/admin/users/:userId/video-access", adminMiddleware, async (req, res) => {
-  try {
-    const { note } = req.body || {};
-    const { userId } = req.params;
-
-    // 404 if user doesn't exist
-    const u = await pool.query("SELECT id, display_name, phone FROM users WHERE id = $1", [userId]);
-    if (!u.rows.length) return res.status(404).json({ message: "Usuario no encontrado" });
-
-    // Idempotent: if active grant exists, return it
-    const existing = await pool.query(
-      "SELECT id, granted_at, granted_by FROM video_access_grants WHERE user_id = $1 AND revoked_at IS NULL LIMIT 1",
-      [userId]
-    );
-    if (existing.rows.length) {
-      return res.json({ data: existing.rows[0], alreadyGranted: true });
-    }
-
-    let grant;
-    try {
-      const r = await pool.query(
-        `INSERT INTO video_access_grants (user_id, granted_by, note)
-           VALUES ($1, $2, $3) RETURNING *`,
-        [userId, req.userId, note || null]
-      );
-      grant = r.rows[0];
-    } catch (err) {
-      // Race protection: if a concurrent POST won and created an active grant
-      // between our SELECT and INSERT, the partial UNIQUE index throws 23505.
-      // Re-fetch and return the existing one — same outcome as the SELECT branch above.
-      if (err && err.code === "23505") {
-        const again = await pool.query(
-          "SELECT id, granted_at, granted_by FROM video_access_grants WHERE user_id = $1 AND revoked_at IS NULL LIMIT 1",
-          [userId]
-        );
-        if (again.rows.length) {
-          return res.json({ data: again.rows[0], alreadyGranted: true });
-        }
-      }
-      throw err;
-    }
-
-
-    return res.status(201).json({ data: grant });
-  } catch (err) {
-    console.error("POST /admin/users/:userId/video-access error:", err);
-    return res.status(500).json({ message: "Error interno" });
-  }
-});
-
-// DELETE /api/admin/users/:userId/video-access — revoke access (idempotent)
-app.delete("/api/admin/users/:userId/video-access", adminMiddleware, async (req, res) => {
-  try {
-    const { userId } = req.params;
-    const u = await pool.query("SELECT id FROM users WHERE id = $1", [userId]);
-    if (!u.rows.length) return res.status(404).json({ message: "Usuario no encontrado" });
-
-    const r = await pool.query(
-      `UPDATE video_access_grants
-          SET revoked_at = NOW(), revoked_by = $2
-        WHERE user_id = $1 AND revoked_at IS NULL
-        RETURNING *`,
-      [userId, req.userId]
-    );
-    if (!r.rows.length) {
-      return res.json({ alreadyRevoked: true });
-    }
-    return res.json({ data: r.rows[0] });
-  } catch (err) {
-    console.error("DELETE /admin/users/:userId/video-access error:", err);
-    return res.status(500).json({ message: "Error interno" });
-  }
-});
-
-// GET /api/admin/video-access/pending — alumnas con plan elegible activo SIN grant activo
-app.get("/api/admin/video-access/pending", adminMiddleware, async (_req, res) => {
-  try {
-    const r = await pool.query(`
-      SELECT u.id, u.display_name, u.email, u.phone, p.name AS plan_name, m.end_date
-        FROM users u
-        JOIN memberships m ON m.user_id = u.id AND m.status = 'active'
-                            AND (m.end_date IS NULL OR m.end_date >= CURRENT_DATE)
-        JOIN plans p ON p.id = m.plan_id AND p.includes_video_library = true
-        LEFT JOIN video_access_grants g ON g.user_id = u.id AND g.revoked_at IS NULL
-       WHERE g.id IS NULL
-       ORDER BY m.end_date ASC, u.display_name ASC
-    `);
-    return res.json({ data: r.rows });
-  } catch (err) {
-    console.error("GET /admin/video-access/pending error:", err);
-    return res.status(500).json({ message: "Error interno" });
-  }
-});
-
-// ─── Routes: /api/videos ────────────────────────────────────────────────────
-
-// GET /api/videos/categories
-app.get("/api/videos/categories", async (req, res) => {
-  try {
-    const r = await pool.query(
-      `SELECT ct.id, ct.name, COUNT(v.id) AS video_count
-       FROM class_types ct
-       JOIN videos v ON v.class_type_id = ct.id AND v.is_published = true
-       GROUP BY ct.id, ct.name
-       ORDER BY ct.name`
-    );
-    return res.json({ data: r.rows });
-  } catch (err) {
-    console.error("Videos/categories error:", err);
-    return res.status(500).json({ message: "Error interno" });
-  }
-});
-
-// GET /api/videos?search=&category=&limit=
-app.get("/api/videos", authMiddleware, async (req, res) => {
-  try {
-    const { search = "", category = "", limit, all } = req.query;
-    // Admins/instructors/reception ven también borradores (is_published=false)
-    // para poder gestionarlos. Clientas solo ven publicados.
-    const callerRoleRes = await pool.query("SELECT role FROM users WHERE id = $1", [req.userId]);
-    const callerRole = callerRoleRes.rows[0]?.role || "client";
-    const isAdminCaller = ["admin", "super_admin", "instructor", "reception"].includes(callerRole);
-    const includeUnpublished = isAdminCaller && (all === "1" || all === "true" || all === undefined);
-    let query = `
-      SELECT v.*,
-             ct.name AS category_name,
-             i.display_name AS instructor_name
-      FROM videos v
-      LEFT JOIN class_types ct ON v.class_type_id = ct.id
-      LEFT JOIN instructors i ON v.instructor_id = i.id
-      WHERE 1=1
-    `;
-    if (!includeUnpublished) {
-      query += " AND v.is_published = true";
-    }
-    const params = [];
-    if (search) {
-      params.push(`%${search}%`);
-      query += ` AND (v.title ILIKE $${params.length} OR v.description ILIKE $${params.length})`;
-    }
-    if (category) {
-      params.push(category);
-      query += ` AND ct.id = $${params.length}`;
-    }
-    query += " ORDER BY v.is_featured DESC, v.sort_order ASC, v.created_at DESC";
-    if (limit) { params.push(parseInt(limit)); query += ` LIMIT $${params.length}`; }
-    const r = await pool.query(query, params);
-    // Acceso per-video en un solo query agregado (vias a-e del spec 2026-05-18).
-    const ids = r.rows.map((v) => v.id);
-    const accessByVideo = new Map();
-    // Vía f: regalo de cumpleaños (1 mes de videoteca) — desbloquea todos los videos.
-    const giftRes = await pool.query(
-      "SELECT 1 FROM users WHERE id = $1 AND video_library_access_until IS NOT NULL AND video_library_access_until > NOW() LIMIT 1",
-      [req.userId]
-    );
-    const viaBirthdayGift = giftRes.rows.length > 0;
-    if (ids.length) {
-      const acc = await pool.query(
-        `SELECT v.id,
-          (v.access_type IN ('gratuito','free'))                            AS is_free,
-          v.is_trial,
-          v.sales_enabled,
-          EXISTS (SELECT 1 FROM video_plans vp
-                    JOIN memberships m ON m.plan_id = vp.plan_id
-                   WHERE vp.video_id = v.id AND m.user_id = $1
-                     AND m.status = 'active'
-                     AND (m.end_date IS NULL OR m.end_date >= CURRENT_DATE)) AS via_plan,
-          EXISTS (SELECT 1 FROM memberships m JOIN plans p ON p.id = m.plan_id
-                   WHERE m.user_id = $1 AND m.status = 'active'
-                     AND p.includes_video_library = true
-                     AND (m.end_date IS NULL OR m.end_date >= CURRENT_DATE)) AS via_fulllib,
-          EXISTS (SELECT 1 FROM video_purchases vpur
-                   WHERE vpur.video_id = v.id AND vpur.user_id = $1
-                     AND vpur.has_access = true)                            AS via_purchase,
-          EXISTS (SELECT 1 FROM video_access_grants g
-                   WHERE g.user_id = $1 AND g.revoked_at IS NULL)           AS via_grant,
-          (SELECT COUNT(*)::int FROM video_plans vp WHERE vp.video_id = v.id) AS plan_count
-         FROM videos v WHERE v.id = ANY($2::uuid[])`,
-        [req.userId, ids]
-      );
-      for (const a of acc.rows) {
-        let state;
-        if (a.is_free) state = "free";
-        else if (a.is_trial || a.via_plan || a.via_fulllib || a.via_purchase || a.via_grant || viaBirthdayGift)
-          state = "unlocked";
-        else state = a.sales_enabled ? "locked_purchasable" : "locked_plan_only";
-        accessByVideo.set(a.id, { state, plan_count: a.plan_count ?? 0 });
-      }
-    }
-    const rows = r.rows.map((v) => {
-      // Drive-backed videos: NO leak the public proxy URL. Frontend must request a signed
-      // URL via GET /api/videos/:id/stream-url. Non-Drive keeps video_url for the embed path.
-      const videoUrl = v.drive_file_id ? null : v.video_url;
-      const entry = accessByVideo.get(v.id) || { state: "locked_plan_only", plan_count: 0 };
-      const { state, plan_count } = entry;
-      return {
-        ...v,
-        video_url: videoUrl,
-        access_state: { state },
-        has_access: state === "unlocked" || state === "free",
-        plan_count,
-      };
-    });
-    return res.json({ data: rows });
-  } catch (err) {
-    console.error("Videos error:", err);
-    return res.status(500).json({ message: "Error interno" });
-  }
-});
-
-// GET /api/videos/:id
-app.get("/api/videos/:id", authMiddleware, async (req, res) => {
-  try {
-    // Admin/instructor/reception ven borradores también (para poder editarlos).
-    // Cliente solo ve publicados — mismo criterio que GET /api/videos.
-    const callerRoleRes = await pool.query("SELECT role FROM users WHERE id = $1", [req.userId]);
-    const callerRole = callerRoleRes.rows[0]?.role || "client";
-    const isAdminCaller = ["admin", "super_admin", "instructor", "reception"].includes(callerRole);
-    const r = await pool.query(
-      `SELECT v.*,
-              ct.name AS category_name,
-              i.display_name AS instructor_name, i.bio AS instructor_bio
-       FROM videos v
-       LEFT JOIN class_types ct ON v.class_type_id = ct.id
-       LEFT JOIN instructors i ON v.instructor_id = i.id
-       WHERE v.id = $1 ${isAdminCaller ? "" : "AND v.is_published = true"}`,
-      [req.params.id]
-    );
-    if (r.rows.length === 0) return res.status(404).json({ message: "Video no encontrado" });
-    const video = r.rows[0];
-    // Drive-backed videos: NO leak the public proxy URL. Frontend uses /stream-url to
-    // get a signed token and hits /api/drive/secure-video/:fileId instead. See B1 fix
-    // notes — without this, the legacy public proxy at /api/drive/video/:fileId is
-    // trivially reachable by reading video_url from the response.
-    if (video.drive_file_id) {
-      video.video_url = null;
-    }
-    const accessState = await computeVideoAccessState(req.userId, video.id);
-    video.access_state = accessState;
-    video.has_access = accessState.state === "unlocked" || accessState.state === "free";
-    const vpRes = await pool.query(
-      "SELECT plan_id FROM video_plans WHERE video_id = $1",
-      [video.id]
-    );
-    video.plan_ids = vpRes.rows.map((r) => r.plan_id);
-    // Log view
-    await pool.query("UPDATE videos SET view_count = view_count + 1 WHERE id = $1", [req.params.id]);
-    return res.json({ data: video });
-  } catch (err) {
-    console.error("Videos/:id error:", err);
-    return res.status(500).json({ message: "Error interno" });
-  }
-});
-
-// GET /api/videos/:id/stream-url — gated stream URL with HMAC token
-app.get("/api/videos/:id/stream-url", authMiddleware, async (req, res) => {
-  try {
-    const v = await pool.query(
-      "SELECT id, drive_file_id, is_trial FROM videos WHERE id = $1 AND is_published = true",
-      [req.params.id]
-    );
-    if (!v.rows.length) return res.status(404).json({ message: "Video no encontrado" });
-    const video = v.rows[0];
-    if (!video.drive_file_id) return res.status(404).json({ message: "Video sin archivo en Drive" });
-
-    // Trial bypass: any logged-in user can play
-    if (!video.is_trial) {
-      const access = await computeVideoAccessState(req.userId, video.id);
-      if (access.state !== "unlocked" && access.state !== "free") {
-        const reason = access.state === "locked_purchasable" ? "purchasable" : "no_plan";
-        return res.status(403).json({ message: "Acceso restringido", reason });
-      }
-    }
-
-    const exp = Date.now() + 60 * 60 * 1000; // 60 min
-    const token = signStreamToken({ userId: req.userId, fileId: video.drive_file_id, exp });
-    const url = `/api/drive/secure-video/${video.drive_file_id}?t=${token}&exp=${exp}&u=${req.userId}`;
-    return res.json({ data: { url, expiresAt: exp } });
-  } catch (err) {
-    console.error("GET /videos/:id/stream-url error:", err);
-    return res.status(500).json({ message: "Error interno" });
-  }
-});
-
-// POST /api/videos/:id/view
-app.post("/api/videos/:id/view", authMiddleware, async (req, res) => {
-  try {
-    await pool.query("UPDATE videos SET view_count = view_count + 1 WHERE id = $1", [req.params.id]);
-    return res.json({ ok: true });
-  } catch { return res.json({ ok: true }); }
-});
-
-// POST /api/videos/:id/purchase
-app.post("/api/videos/:id/purchase", authMiddleware, async (req, res) => {
-  try {
-    const vRes = await pool.query(
-      "SELECT * FROM videos WHERE id = $1 AND is_published = true AND sales_enabled = true",
-      [req.params.id]
-    );
-    if (vRes.rows.length === 0) return res.status(404).json({ message: "Video no disponible para compra" });
-    const video = vRes.rows[0];
-    const r = await pool.query(
-      `INSERT INTO video_purchases (video_id, user_id, status, amount_mxn, payment_method)
-       VALUES ($1, $2, 'pending_payment', $3, 'transfer')
-       ON CONFLICT (video_id, user_id) DO UPDATE SET status = EXCLUDED.status
-       RETURNING *`,
-      [req.params.id, req.userId, video.sales_price_mxn]
-    );
-    const bankInfo = await getConfiguredBankInfo(pool);
-    return res.status(201).json({
-      data: {
-        ...r.rows[0],
-        bank_details: {
-          ...bankInfo,
-          amount: Number(video.sales_price_mxn || 0),
-          currency: "MXN",
-        },
-      },
-    });
-  } catch (err) {
-    console.error("Video/purchase error:", err);
-    return res.status(500).json({ message: "Error interno" });
-  }
-});
-
-// POST /api/videos/purchases/:id/proof  (multipart)
-app.post("/api/videos/purchases/:id/proof", authMiddleware, upload.single("proof"), async (req, res) => {
-  try {
-    await pool.query(
-      "UPDATE video_purchases SET status = 'pending_verification', proof_uploaded_at = NOW() WHERE id = $1 AND user_id = $2",
-      [req.params.id, req.userId]
-    );
-    return res.json({ message: "Comprobante recibido" });
-  } catch (err) {
-    console.error("Video/purchase proof error:", err);
     return res.status(500).json({ message: "Error interno" });
   }
 });
@@ -8524,7 +7952,6 @@ app.post("/api/admin/plans", adminMiddleware, async (req, res) => {
   const {
     name, description, price, currency, duration_days, class_limit, class_category,
     features, is_active, sort_order, is_non_transferable, is_non_repeatable, repeat_key,
-    includes_video_library,
   } = req.body;
   if (!name?.trim() || price === undefined) return res.status(400).json({ message: "name y price requeridos" });
   try {
@@ -8533,15 +7960,13 @@ app.post("/api/admin/plans", adminMiddleware, async (req, res) => {
     const nonTransferable = parseBooleanFlag(is_non_transferable);
     const nonRepeatable = parseBooleanFlag(is_non_repeatable);
     const safeRepeatKey = nonRepeatable ? String(repeat_key ?? "").trim() || null : null;
-    const includesVideoLibrary = parseBooleanFlag(includes_video_library);
     const r = await pool.query(
       `INSERT INTO plans
-        (name, description, price, currency, duration_days, class_limit, class_category, features, is_active, sort_order, is_non_transferable, is_non_repeatable, repeat_key, includes_video_library)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
+        (name, description, price, currency, duration_days, class_limit, class_category, features, is_active, sort_order, is_non_transferable, is_non_repeatable, repeat_key)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
       [name.trim(), description || null, price, currency || "MXN",
       duration_days || 30, class_limit || null,
-      cat, JSON.stringify(features || []), is_active ?? true, sort_order ?? 0, nonTransferable, nonRepeatable, safeRepeatKey,
-      includesVideoLibrary]
+      cat, JSON.stringify(features || []), is_active ?? true, sort_order ?? 0, nonTransferable, nonRepeatable, safeRepeatKey]
     );
     return res.status(201).json({ data: r.rows[0] });
   } catch (err) {
@@ -8555,7 +7980,6 @@ app.put("/api/admin/plans/:id", adminMiddleware, async (req, res) => {
   const {
     name, description, price, currency, duration_days, class_limit, class_category,
     features, is_active, sort_order, is_non_transferable, is_non_repeatable, repeat_key,
-    includes_video_library,
   } = req.body;
   try {
     const validCats = ["studio", "reformer_tower", "mixto", "all"];
@@ -8578,14 +8002,12 @@ app.put("/api/admin/plans/:id", adminMiddleware, async (req, res) => {
          is_non_transferable = COALESCE($11, is_non_transferable),
          is_non_repeatable   = COALESCE($12, is_non_repeatable),
          repeat_key          = CASE WHEN COALESCE($12, is_non_repeatable) = true THEN $13 ELSE NULL END,
-         includes_video_library = COALESCE($14, includes_video_library),
          updated_at    = NOW()
-       WHERE id = $15 RETURNING *`,
+       WHERE id = $14 RETURNING *`,
       [name || null, description || null, price ?? null, currency || null,
       duration_days || null, class_limit ?? null,
       cat, features ? JSON.stringify(features) : null,
       is_active ?? null, sort_order ?? null, nonTransferable, nonRepeatable, safeRepeatKey,
-      includes_video_library ?? null,
       req.params.id]
     );
     if (r.rows.length === 0) return res.status(404).json({ message: "No encontrado" });
@@ -8948,64 +8370,6 @@ async function applyCancellationRollback(client, booking, opts = {}) {
   }
 
   return result;
-}
-
-// ─── Video access state ──────────────────────────────────────────────────────
-// Single source of truth for "can this user access the video library?".
-// See docs/superpowers/specs/2026-05-14-video-library-access-design.md.
-async function computeVideoAccessState(userId, videoId) {
-  const vr = await pool.query(
-    "SELECT access_type, is_trial, sales_enabled FROM videos WHERE id = $1",
-    [videoId]
-  );
-  const video = vr.rows[0];
-  if (!video) return { state: "locked_plan_only", offers: [] };
-  if (video.access_type === "gratuito" || video.access_type === "free")
-    return { state: "free" };
-  if (video.is_trial === true) return { state: "unlocked" };
-
-  const planGranular = await pool.query(
-    `SELECT 1 FROM video_plans vp
-       JOIN memberships m ON m.plan_id = vp.plan_id
-      WHERE vp.video_id = $1 AND m.user_id = $2 AND m.status = 'active'
-        AND (m.end_date IS NULL OR m.end_date >= CURRENT_DATE) LIMIT 1`,
-    [videoId, userId]
-  );
-  if (planGranular.rows.length) return { state: "unlocked" };
-
-  const fullLib = await pool.query(
-    `SELECT 1 FROM memberships m JOIN plans p ON p.id = m.plan_id
-      WHERE m.user_id = $1 AND m.status = 'active'
-        AND p.includes_video_library = true
-        AND (m.end_date IS NULL OR m.end_date >= CURRENT_DATE) LIMIT 1`,
-    [userId]
-  );
-  if (fullLib.rows.length) return { state: "unlocked" };
-
-  const purch = await pool.query(
-    "SELECT has_access FROM video_purchases WHERE video_id = $1 AND user_id = $2 LIMIT 1",
-    [videoId, userId]
-  );
-  if (purch.rows[0]?.has_access === true) return { state: "unlocked" };
-
-  const grant = await pool.query(
-    "SELECT 1 FROM video_access_grants WHERE user_id = $1 AND revoked_at IS NULL LIMIT 1",
-    [userId]
-  );
-  if (grant.rows.length) return { state: "unlocked" };
-
-  // Regalo de cumpleaños: 1 mes de videoteca completa.
-  const birthdayGift = await pool.query(
-    "SELECT 1 FROM users WHERE id = $1 AND video_library_access_until IS NOT NULL AND video_library_access_until > NOW() LIMIT 1",
-    [userId]
-  );
-  if (birthdayGift.rows.length) return { state: "unlocked" };
-
-  if (video.sales_enabled === true) return { state: "locked_purchasable" };
-  const offers = await pool.query(
-    "SELECT id, name, price FROM plans WHERE includes_video_library = true AND is_active = true ORDER BY price ASC"
-  );
-  return { state: "locked_plan_only", offers: offers.rows };
 }
 
 // PUT /api/classes/:id/cancel — admin cancela clase completa. Cascada:
@@ -12156,352 +11520,6 @@ app.post("/api/evolution/notify-clients", adminMiddleware, async (req, res) => {
   });
 });
 
-// ─── Videos purchases approve/reject ────────────────────────────────────────
-
-app.post("/api/videos/purchases/:id/approve", adminMiddleware, async (req, res) => {
-  try {
-    const { admin_notes } = req.body;
-    const r = await pool.query(
-      "UPDATE video_purchases SET status='active', has_access=true, admin_notes=$1, verified_at=NOW() WHERE id=$2 RETURNING *",
-      [admin_notes || null, req.params.id]
-    );
-    if (!r.rows.length) return res.status(404).json({ message: "Compra no encontrada" });
-    const purchase = r.rows[0];
-    // Aviso a la clienta — fire-and-forget; un fallo de Resend no debe romper el approve.
-    pool
-      .query(
-        `SELECT u.email, u.display_name, v.title AS video_title, v.id AS video_id
-           FROM video_purchases vp
-           JOIN users u ON u.id = vp.user_id
-           JOIN videos v ON v.id = vp.video_id
-          WHERE vp.id = $1`,
-        [req.params.id],
-      )
-      .then((info) => {
-        const row = info.rows[0];
-        if (!row || !row.email) return;
-        return sendVideoPurchaseApproved({
-          to: row.email,
-          name: row.display_name,
-          videoTitle: row.video_title,
-          videoId: row.video_id,
-          amountMxn: purchase.amount_mxn,
-        });
-      })
-      .catch((e) => console.error("[Email] video purchase approved:", e?.message || e));
-    return res.json({ data: purchase });
-  } catch (err) {
-    console.error("POST /videos/purchases/:id/approve error:", err);
-    return res.status(500).json({ message: "Error interno" });
-  }
-});
-
-app.post("/api/videos/purchases/:id/reject", adminMiddleware, async (req, res) => {
-  try {
-    const { admin_notes } = req.body;
-    const r = await pool.query(
-      "UPDATE video_purchases SET status='rejected', admin_notes=$1, verified_at=NOW() WHERE id=$2 RETURNING *",
-      [admin_notes || null, req.params.id]
-    );
-    if (!r.rows.length) return res.status(404).json({ message: "Compra no encontrada" });
-    return res.json({ data: r.rows[0] });
-  } catch (err) { return res.status(500).json({ message: "Error interno" }); }
-});
-
-// Admin Videos — also available at /api/videos (CRUD) for admin use
-
-// POST /api/videos/upload  — upload video file (+ optional thumbnail) to Google Drive
-app.post("/api/videos/upload", adminMiddleware, uploadVideo.fields([{ name: "video", maxCount: 1 }, { name: "thumbnail", maxCount: 1 }]), async (req, res) => {
-  try {
-    const videoFile = req.files?.video?.[0];
-    const thumbnailFile = req.files?.thumbnail?.[0];
-    if (!videoFile) return res.status(400).json({ message: "Se requiere el archivo de video" });
-
-    const isDriveConfigured = Boolean(
-      process.env.GOOGLE_CLIENT_ID &&
-      process.env.GOOGLE_CLIENT_SECRET &&
-      process.env.GOOGLE_REFRESH_TOKEN
-    );
-    if (!isDriveConfigured) {
-      return res.status(503).json({ message: "Google Drive no configurado. Define GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REFRESH_TOKEN en Railway." });
-    }
-
-    const accessToken = await getGoogleDriveAccessToken();
-
-    // Upload video using resumable upload (streams from disk in 5 MB chunks)
-    const videoResult = await uploadFileToDriveResumable(
-      videoFile.path,
-      videoFile.originalname,
-      videoFile.mimetype,
-      accessToken
-    );
-    // Clean up temp file
-    fs.unlink(videoFile.path, () => {});
-    await makeGoogleDriveFilePublic(videoResult.id, accessToken);
-
-    // Upload thumbnail (optional) — small file, use buffer multipart
-    let thumbnailUrl = `https://drive.google.com/thumbnail?id=${videoResult.id}&sz=w640`;
-    let thumbnailDriveId = "";
-    if (thumbnailFile) {
-      const thumbBuffer = fs.readFileSync(thumbnailFile.path);
-      const thumbResult = await uploadBufferToDrive(
-        thumbBuffer,
-        thumbnailFile.originalname,
-        thumbnailFile.mimetype,
-        accessToken
-      );
-      fs.unlink(thumbnailFile.path, () => {});
-      await makeGoogleDriveFilePublic(thumbResult.id, accessToken);
-      thumbnailUrl = `https://drive.google.com/thumbnail?id=${thumbResult.id}&sz=w640`;
-      thumbnailDriveId = thumbResult.id;
-    }
-
-    return res.json({
-      drive_file_id: videoResult.id,
-      cloudinary_id: videoResult.id,           // same value for compat
-      thumbnail_url: thumbnailUrl,
-      thumbnail_drive_id: thumbnailDriveId,
-      secure_url: `https://drive.google.com/file/d/${videoResult.id}/view`,
-      embed_url: `https://drive.google.com/file/d/${videoResult.id}/preview`,
-      duration_seconds: 0,
-    });
-  } catch (err) {
-    // Clean up temp files on error
-    if (req.files?.video?.[0]?.path) fs.unlink(req.files.video[0].path, () => {});
-    if (req.files?.thumbnail?.[0]?.path) fs.unlink(req.files.thumbnail[0].path, () => {});
-    console.error("Video upload error:", err?.response?.data || err.message);
-    return res.status(500).json({ message: "Error al subir video: " + (err?.response?.data?.error?.message || err.message) });
-  }
-});
-
-app.post("/api/videos", adminMiddleware, async (req, res) => {
-  try {
-    const {
-      title, description, subtitle, tagline, days, brand_color,
-      drive_file_id, cloudinary_id, thumbnail_url, thumbnail_drive_id,
-      class_type_id, instructor_id, duration_seconds,
-      access_type = "free", is_published = false, is_featured = false, sort_order = 0,
-      sales_enabled = false, sales_unlocks_video = false, sales_price_mxn, sales_class_credits, sales_cta_text,
-      category_id, plan_ids = [],
-    } = req.body;
-    if (!title) return res.status(400).json({ message: "title es requerido" });
-    const r = await pool.query(
-      `INSERT INTO videos (
-         title, description, subtitle, tagline, days, brand_color,
-         drive_file_id, cloudinary_id, thumbnail_url, thumbnail_drive_id,
-         class_type_id, instructor_id, duration_seconds,
-         access_type, is_published, is_featured, sort_order,
-         sales_enabled, sales_unlocks_video, sales_price_mxn, sales_class_credits, sales_cta_text
-       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
-       RETURNING *`,
-      [
-        title, description || null, subtitle || null, tagline || null, days || null, brand_color || null,
-        drive_file_id || null, cloudinary_id || drive_file_id || null, thumbnail_url || null, thumbnail_drive_id || null,
-        class_type_id || category_id || null, instructor_id || null, duration_seconds || 0,
-        access_type, is_published, is_featured, sort_order,
-        sales_enabled, sales_unlocks_video, sales_price_mxn || null, sales_class_credits || null, sales_cta_text || null,
-      ]
-    );
-    const newId = r.rows[0].id;
-    if (Array.isArray(plan_ids) && plan_ids.length) {
-      for (const pid of plan_ids) {
-        await pool.query(
-          "INSERT INTO video_plans (video_id, plan_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
-          [newId, pid]
-        );
-      }
-    }
-    return res.status(201).json({ data: r.rows[0] });
-  } catch (err) {
-    console.error("POST /videos error:", err.message);
-    return res.status(500).json({ message: "Error interno" });
-  }
-});
-
-app.put("/api/videos/:id", adminMiddleware, async (req, res) => {
-  try {
-    const {
-      title, description, subtitle, tagline, days, brand_color,
-      drive_file_id, cloudinary_id, thumbnail_url, thumbnail_drive_id,
-      class_type_id, instructor_id, duration_seconds,
-      access_type, is_published, is_featured, sort_order,
-      sales_enabled, sales_unlocks_video, sales_price_mxn, sales_class_credits, sales_cta_text,
-      category_id, plan_ids,
-    } = req.body;
-    const r = await pool.query(
-      `UPDATE videos SET
-         title=$1, description=$2, subtitle=$3, tagline=$4, days=$5, brand_color=$6,
-         drive_file_id=COALESCE($7, drive_file_id),
-         cloudinary_id=COALESCE($8, cloudinary_id),
-         thumbnail_url=COALESCE($9, thumbnail_url),
-         thumbnail_drive_id=COALESCE($10, thumbnail_drive_id),
-         class_type_id=$11, instructor_id=$12,
-         duration_seconds=COALESCE($13, duration_seconds),
-         access_type=COALESCE($14, access_type),
-         is_published=COALESCE($15, is_published),
-         is_featured=COALESCE($16, is_featured),
-         sort_order=COALESCE($17, sort_order),
-         sales_enabled=COALESCE($18, sales_enabled),
-         sales_unlocks_video=COALESCE($19, sales_unlocks_video),
-         sales_price_mxn=$20, sales_class_credits=$21, sales_cta_text=$22,
-         updated_at=NOW()
-       WHERE id=$23 RETURNING *`,
-      [
-        title, description || null, subtitle || null, tagline || null, days || null, brand_color || null,
-        drive_file_id || null, cloudinary_id || drive_file_id || null,
-        thumbnail_url || null, thumbnail_drive_id || null,
-        class_type_id || category_id || null, instructor_id || null,
-        duration_seconds ?? null,
-        access_type || null, is_published ?? null, is_featured ?? null, sort_order ?? null,
-        sales_enabled ?? null, sales_unlocks_video ?? null,
-        sales_price_mxn ?? null, sales_class_credits ?? null, sales_cta_text ?? null,
-        req.params.id,
-      ]
-    );
-    if (!r.rows.length) return res.status(404).json({ message: "Video no encontrado" });
-    if (Array.isArray(plan_ids)) {
-      await pool.query("DELETE FROM video_plans WHERE video_id = $1", [req.params.id]);
-      for (const pid of plan_ids) {
-        await pool.query(
-          "INSERT INTO video_plans (video_id, plan_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
-          [req.params.id, pid]
-        );
-      }
-    }
-    return res.json({ data: r.rows[0] });
-  } catch (err) {
-    console.error("PUT /videos/:id error:", err.message);
-    return res.status(500).json({ message: "Error interno" });
-  }
-});
-
-app.delete("/api/videos/:id", adminMiddleware, async (req, res) => {
-  try {
-    await pool.query("DELETE FROM videos WHERE id=$1", [req.params.id]);
-    return res.json({ message: "Video eliminado" });
-  } catch (err) { return res.status(500).json({ message: "Error interno" }); }
-});
-
-// ─── Homepage Video Cards ────────────────────────────────────────────────────
-// GET /api/homepage-video-cards  (public)
-app.get("/api/homepage-video-cards", async (req, res) => {
-  try {
-    const r = await pool.query("SELECT * FROM homepage_video_cards ORDER BY sort_order ASC");
-    // Normalize any old Google Drive preview URLs to proxy URLs
-    const rows = r.rows.map(card => {
-      if (card.video_url) {
-        const m = card.video_url.match(/drive\.google\.com\/file\/d\/([^/]+)\/preview/);
-        if (m) card.video_url = `/api/drive/video/${m[1]}`;
-      }
-      return card;
-    });
-    return res.json({ data: rows });
-  } catch (err) { return res.status(500).json({ message: "Error interno" }); }
-});
-
-// PUT /api/homepage-video-cards/:id  (admin — text fields)
-app.put("/api/homepage-video-cards/:id", adminMiddleware, async (req, res) => {
-  try {
-    const { title, description, emoji, thumbnail_url } = req.body;
-    if (!title || !description) return res.status(400).json({ message: "title y description requeridos" });
-    const r = await pool.query(
-      `UPDATE homepage_video_cards
-       SET title=$1, description=$2, emoji=$3, thumbnail_url=COALESCE($4, thumbnail_url), updated_at=NOW()
-       WHERE id=$5 RETURNING *`,
-      [title.trim(), description.trim(), (emoji || "🎬").trim(), thumbnail_url || null, req.params.id]
-    );
-    if (!r.rows.length) return res.status(404).json({ message: "Tarjeta no encontrada" });
-    return res.json({ data: r.rows[0] });
-  } catch (err) { return res.status(500).json({ message: "Error interno" }); }
-});
-
-// POST /api/homepage-video-cards/:id/thumbnail — upload a thumbnail image (admin)
-app.post("/api/homepage-video-cards/:id/thumbnail", adminMiddleware, upload.single("file"), async (req, res) => {
-  try {
-    if (!req.file) return res.status(400).json({ message: "No se envió archivo" });
-    const cardId = req.params.id;
-
-    // Upload image to Google Drive (reuse existing OAuth setup)
-    const isDriveConfigured = Boolean(
-      process.env.GOOGLE_DRIVE_FOLDER_ID &&
-      process.env.GOOGLE_CLIENT_ID &&
-      process.env.GOOGLE_CLIENT_SECRET &&
-      process.env.GOOGLE_REFRESH_TOKEN
-    );
-
-    let thumbnailUrl;
-    if (isDriveConfigured) {
-      // Get access token
-      const tokenResp = await fetch("https://oauth2.googleapis.com/token", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-          client_id: process.env.GOOGLE_CLIENT_ID,
-          client_secret: process.env.GOOGLE_CLIENT_SECRET,
-          refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
-          grant_type: "refresh_token",
-        }),
-      });
-      const { access_token } = await tokenResp.json();
-
-      // Upload to Drive
-      const boundary = "thumbnail_boundary_" + Date.now();
-      const metadata = JSON.stringify({
-        name: `thumbnail_card_${cardId}_${Date.now()}.${req.file.originalname.split(".").pop()}`,
-        parents: [getDriveFolderId()],
-      });
-      const body = Buffer.concat([
-        Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadata}\r\n--${boundary}\r\nContent-Type: ${req.file.mimetype}\r\n\r\n`),
-        req.file.buffer,
-        Buffer.from(`\r\n--${boundary}--`),
-      ]);
-
-      const uploadResp = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${access_token}`, "Content-Type": `multipart/related; boundary=${boundary}` },
-        body,
-      });
-      const uploadJson = await uploadResp.json();
-      if (!uploadJson.id) throw new Error("Error al subir imagen a Drive");
-
-      // Make public
-      await fetch(`https://www.googleapis.com/drive/v3/files/${uploadJson.id}/permissions`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${access_token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ role: "reader", type: "anyone" }),
-      });
-
-      // Use proxy URL for consistency
-      thumbnailUrl = `/api/drive/image/${uploadJson.id}`;
-    } else {
-      // Fallback: store as base64 data URI (small images only)
-      thumbnailUrl = `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
-    }
-
-    const r = await pool.query(
-      `UPDATE homepage_video_cards SET thumbnail_url=$1, updated_at=NOW() WHERE id=$2 RETURNING *`,
-      [thumbnailUrl, cardId]
-    );
-    if (!r.rows.length) return res.status(404).json({ message: "Tarjeta no encontrada" });
-    return res.json({ data: r.rows[0] });
-  } catch (err) {
-    console.error("Thumbnail upload error:", err);
-    return res.status(500).json({ message: err.message || "Error al subir miniatura" });
-  }
-});
-
-// DELETE /api/homepage-video-cards/:id/thumbnail — remove thumbnail (admin)
-app.delete("/api/homepage-video-cards/:id/thumbnail", adminMiddleware, async (req, res) => {
-  try {
-    const r = await pool.query(
-      `UPDATE homepage_video_cards SET thumbnail_url=NULL, updated_at=NOW() WHERE id=$1 RETURNING *`,
-      [req.params.id]
-    );
-    if (!r.rows.length) return res.status(404).json({ message: "Tarjeta no encontrada" });
-    return res.json({ data: r.rows[0] });
-  } catch (err) { return res.status(500).json({ message: "Error interno" }); }
-});
-
 // ─── Direct-to-Drive Upload (server proxies upload to avoid CORS) ───────────
 
 // POST /api/drive/init-upload — creates a Google Drive resumable session, returns sessionId
@@ -12669,98 +11687,6 @@ app.post("/api/drive/make-public/:fileId", adminMiddleware, async (req, res) => 
   }
 });
 
-// ── Drive proxy helper (Range requests, used by both routes) ─────────────────
-// Streams a Google Drive file with Range support. Caller is responsible for
-// authentication/authorization before invoking this helper.
-async function streamDriveFile(req, res, fileId) {
-  if (!fileId || fileId.length < 10) return res.status(400).end();
-
-  const accessToken = await getGoogleDriveAccessToken();
-
-  // First, get file metadata to know the mimeType & size
-  const metaResp = await axios.get(
-    `https://www.googleapis.com/drive/v3/files/${fileId}?fields=mimeType,size,name`,
-    { headers: { Authorization: `Bearer ${accessToken}` } }
-  );
-  const { mimeType, size, name } = metaResp.data;
-  const totalSize = parseInt(size, 10);
-
-  // Support Range requests for seeking
-  const rangeHeader = req.headers.range;
-  let start = 0;
-  let end = totalSize - 1;
-
-  if (rangeHeader) {
-    const parts = rangeHeader.replace(/bytes=/, "").split("-");
-    start = parseInt(parts[0], 10);
-    end = parts[1] ? parseInt(parts[1], 10) : totalSize - 1;
-    if (start >= totalSize || end >= totalSize) {
-      res.writeHead(416, { "Content-Range": `bytes */${totalSize}` });
-      return res.end();
-    }
-  }
-
-  const chunkSize = end - start + 1;
-  const driveHeaders = {
-    Authorization: `Bearer ${accessToken}`,
-    Range: `bytes=${start}-${end}`,
-  };
-
-  const driveResp = await axios.get(
-    `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
-    { headers: driveHeaders, responseType: "stream" }
-  );
-
-  const statusCode = rangeHeader ? 206 : 200;
-  res.writeHead(statusCode, {
-    "Content-Type": mimeType || "video/mp4",
-    "Content-Length": chunkSize,
-    "Content-Range": `bytes ${start}-${end}/${totalSize}`,
-    "Accept-Ranges": "bytes",
-    "Cache-Control": "public, max-age=86400",
-    "Content-Disposition": `inline; filename="${name || "video.mp4"}"`,
-  });
-
-  driveResp.data.pipe(res);
-  driveResp.data.on("error", (err) => {
-    console.error("[drive proxy stream error]", err.message);
-    if (!res.headersSent) res.status(500).end();
-  });
-}
-
-// GET /api/drive/video/:fileId — stream a public Google Drive video (proxy).
-// Public by design — used by homepage_video_cards. Gated alumna access goes
-// through /api/drive/secure-video/:fileId instead.
-app.get("/api/drive/video/:fileId", async (req, res) => {
-  try {
-    await streamDriveFile(req, res, req.params.fileId);
-  } catch (err) {
-    console.error("Drive video proxy error:", err?.response?.data || err.message);
-    if (!res.headersSent) res.status(500).json({ message: "Error al obtener video" });
-  }
-});
-
-// GET /api/drive/secure-video/:fileId — gated proxy with HMAC token validation.
-// Token must be issued by /api/videos/:id/stream-url. Public-by-design assets
-// (homepage_video_cards) keep using /api/drive/video/:fileId.
-app.get("/api/drive/secure-video/:fileId", async (req, res) => {
-  try {
-    const { t: token, exp, u: userId } = req.query;
-    if (!token || !exp || !userId) return res.status(401).end();
-    const ok = verifyStreamToken({
-      token: String(token),
-      userId: String(userId),
-      fileId: req.params.fileId,
-      exp: Number(exp),
-    });
-    if (!ok) return res.status(401).end();
-    await streamDriveFile(req, res, req.params.fileId);
-  } catch (err) {
-    console.error("[GET /drive/secure-video] error:", err.message);
-    if (!res.headersSent) res.status(500).end();
-  }
-});
-
 // GET /api/drive/image/:fileId — proxy a public Google Drive image
 app.get("/api/drive/image/:fileId", async (req, res) => {
   try {
@@ -12786,113 +11712,6 @@ app.get("/api/drive/image/:fileId", async (req, res) => {
     console.error("Drive image proxy error:", err?.response?.data || err.message);
     if (!res.headersSent) res.status(500).json({ message: "Error al obtener imagen" });
   }
-});
-
-// POST /api/homepage-video-cards/:id/set-drive-video — save Drive file ID to card
-app.post("/api/homepage-video-cards/:id/set-drive-video", adminMiddleware, async (req, res) => {
-  try {
-    const { driveFileId } = req.body;
-    if (!driveFileId) return res.status(400).json({ message: "driveFileId requerido" });
-
-    // Store the proxy URL instead of the Google Drive preview URL
-    const videoUrl = `/api/drive/video/${driveFileId}`;
-    const r = await pool.query(
-      `UPDATE homepage_video_cards SET video_url=$1, updated_at=NOW() WHERE id=$2 RETURNING *`,
-      [videoUrl, req.params.id]
-    );
-    if (!r.rows.length) return res.status(404).json({ message: "Tarjeta no encontrada" });
-    return res.json({ data: r.rows[0] });
-  } catch (err) {
-    return res.status(500).json({ message: "Error interno" });
-  }
-});
-
-// POST /api/homepage-video-cards/migrate-urls — convert old Google Drive preview URLs to proxy URLs
-app.post("/api/homepage-video-cards/migrate-urls", adminMiddleware, async (req, res) => {
-  try {
-    const result = await pool.query(
-      `UPDATE homepage_video_cards
-       SET video_url = '/api/drive/video/' || regexp_replace(video_url, '^https://drive\\.google\\.com/file/d/([^/]+)/preview$', '\\1'),
-           updated_at = NOW()
-       WHERE video_url LIKE 'https://drive.google.com/file/d/%/preview'
-       RETURNING id, video_url`
-    );
-    return res.json({ migrated: result.rowCount, rows: result.rows });
-  } catch (err) {
-    console.error("Migration error:", err.message);
-    return res.status(500).json({ message: "Error al migrar URLs" });
-  }
-});
-
-// POST /api/homepage-video-cards/:id/upload  (admin — upload video file, max 500 MB)
-app.post("/api/homepage-video-cards/:id/upload", adminMiddleware, (req, res, next) => {
-  uploadVideo.single("video")(req, res, (err) => {
-    if (err) {
-      if (err.code === "LIMIT_FILE_SIZE") {
-        return res.status(413).json({ message: `El archivo es demasiado grande. Máximo ${VIDEO_MAX_MB} MB.` });
-      }
-      return res.status(400).json({ message: err.message || "Error al procesar archivo" });
-    }
-    next();
-  });
-}, async (req, res) => {
-  try {
-    const videoFile = req.file;
-    if (!videoFile) return res.status(400).json({ message: "Se requiere un archivo de video" });
-
-    const isDriveConfigured = Boolean(
-      process.env.GOOGLE_CLIENT_ID &&
-      process.env.GOOGLE_CLIENT_SECRET &&
-      process.env.GOOGLE_REFRESH_TOKEN
-    );
-
-    let videoUrl;
-
-    if (isDriveConfigured) {
-      // Upload to Google Drive using resumable upload (streams in 5 MB chunks)
-      const accessToken = await getGoogleDriveAccessToken();
-      const result = await uploadFileToDriveResumable(
-        videoFile.path,
-        `homepage_card_${req.params.id}_${Date.now()}_${videoFile.originalname}`,
-        videoFile.mimetype,
-        accessToken
-      );
-      // Clean up temp file
-      fs.unlink(videoFile.path, () => {});
-      await makeGoogleDriveFilePublic(result.id, accessToken);
-      videoUrl = `/api/drive/video/${result.id}`;
-    } else {
-      if (videoFile.path) fs.unlink(videoFile.path, () => {});
-      return res.status(503).json({
-        message: "Google Drive no está configurado. Configura GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET y GOOGLE_REFRESH_TOKEN para subir videos.",
-      });
-    }
-
-    // Save video_url to DB
-    const r = await pool.query(
-      `UPDATE homepage_video_cards SET video_url=$1, updated_at=NOW() WHERE id=$2 RETURNING *`,
-      [videoUrl, req.params.id]
-    );
-    if (!r.rows.length) return res.status(404).json({ message: "Tarjeta no encontrada" });
-    return res.json({ data: r.rows[0] });
-  } catch (err) {
-    // Clean up temp file on error
-    if (req.file?.path) fs.unlink(req.file.path, () => {});
-    console.error("Homepage card video upload error:", err?.response?.data || err.message);
-    return res.status(500).json({ message: "Error al subir video: " + (err?.response?.data?.error?.message || err.message) });
-  }
-});
-
-// DELETE /api/homepage-video-cards/:id/video  (admin — remove video)
-app.delete("/api/homepage-video-cards/:id/video", adminMiddleware, async (req, res) => {
-  try {
-    const r = await pool.query(
-      `UPDATE homepage_video_cards SET video_url=NULL, updated_at=NOW() WHERE id=$1 RETURNING *`,
-      [req.params.id]
-    );
-    if (!r.rows.length) return res.status(404).json({ message: "Tarjeta no encontrada" });
-    return res.json({ data: r.rows[0] });
-  } catch (err) { return res.status(500).json({ message: "Error interno" }); }
 });
 
 // GET /api/admin/stats
@@ -14296,14 +13115,12 @@ app.put("/api/admin/orders/:id/verify", adminMiddleware, async (req, res) => {
 
       // Activate membership if this order is for a plan
       if (order.plan_id && plan && order.user_id) {
-        // Carry-over: suma créditos de membresías PRESENCIALES activas (las
-        // online no tienen clases que transferir y NO deben cancelarse).
+        // Carry-over: suma créditos de membresías activas a la nueva membresía.
         let carryOver = 0;
         const activeMemberships = await client.query(
           `SELECT m.id, m.classes_remaining
              FROM memberships m LEFT JOIN plans p ON p.id = m.plan_id
-            WHERE m.user_id = $1 AND m.status = 'active' AND m.classes_remaining > 0
-              AND COALESCE(p.class_category,'all') <> 'online'`,
+            WHERE m.user_id = $1 AND m.status = 'active' AND m.classes_remaining > 0`,
           [order.user_id]
         );
         if (activeMemberships.rows.length > 0) {
@@ -14336,28 +13153,6 @@ app.put("/api/admin/orders/:id/verify", adminMiddleware, async (req, res) => {
              VALUES ($1,$2,'active',$3,NOW(),$4,$5,$6)`,
             [order.user_id, order.plan_id, order.payment_method || "transfer", end.toISOString(), newCredits, order.id]
           );
-        }
-      }
-
-      // ── Complemento online (add-on): crea una SEGUNDA membresía online ───
-      if (order.addon_plan_id && order.user_id) {
-        const addRes = await client.query("SELECT * FROM plans WHERE id = $1", [order.addon_plan_id]);
-        if (addRes.rows.length) {
-          const addonPlan = addRes.rows[0];
-          const addEnd = new Date();
-          addEnd.setDate(addEnd.getDate() + (addonPlan.duration_days || 30));
-          // Evita duplicar si ya se creó (re-verificación).
-          const existsAddon = await client.query(
-            `SELECT id FROM memberships WHERE order_id = $1 AND is_addon = true`, [order.id]
-          );
-          if (!existsAddon.rows.length) {
-            await client.query(
-              `INSERT INTO memberships (user_id, plan_id, status, payment_method, start_date, end_date, classes_remaining, order_id, is_addon)
-               VALUES ($1,$2,'active',$3,NOW(),$4,$5,$6,true)`,
-              [order.user_id, addonPlan.id, order.payment_method || "transfer", addEnd.toISOString(),
-               addonPlan.class_limit === 0 ? null : addonPlan.class_limit, order.id]
-            );
-          }
         }
       }
 
@@ -15289,66 +14084,6 @@ app.get("/api/admin/referrals", adminMiddleware, async (req, res) => {
        ORDER BY referral_count DESC`
     );
     return res.json({ data: r.rows });
-  } catch (err) {
-    return res.status(500).json({ message: "Error interno" });
-  }
-});
-
-// GET /api/admin/videos — video list for admin
-app.get("/api/admin/videos", adminMiddleware, async (req, res) => {
-  try {
-    const r = await pool.query(
-      `SELECT v.*, ct.name AS class_type_name, i.display_name AS instructor_name
-       FROM videos v
-       LEFT JOIN class_types ct ON v.class_type_id = ct.id
-       LEFT JOIN instructors i ON v.instructor_id = i.id
-       ORDER BY v.created_at DESC`
-    );
-    return res.json({ data: r.rows });
-  } catch (err) {
-    return res.status(500).json({ message: "Error interno" });
-  }
-});
-
-// POST /api/admin/videos
-app.post("/api/admin/videos", adminMiddleware, async (req, res) => {
-  try {
-    const { title, description, videoUrl, thumbnailUrl, classTypeId, instructorId, durationMinutes, accessType = "membership", isPublished = false, isFeatured = false, sortOrder = 0 } = req.body;
-    if (!title || !videoUrl) return res.status(400).json({ message: "title y videoUrl requeridos" });
-    const r = await pool.query(
-      `INSERT INTO videos (title, description, video_url, thumbnail_url, class_type_id, instructor_id, duration_minutes, access_type, is_published, is_featured, sort_order)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
-      [title, description || null, videoUrl, thumbnailUrl || null, classTypeId || null, instructorId || null, durationMinutes || null, accessType, isPublished, isFeatured, sortOrder]
-    );
-    return res.status(201).json({ data: r.rows[0] });
-  } catch (err) {
-    return res.status(500).json({ message: "Error interno" });
-  }
-});
-
-// PUT /api/admin/videos/:id
-app.put("/api/admin/videos/:id", adminMiddleware, async (req, res) => {
-  try {
-    const { title, description, videoUrl, thumbnailUrl, classTypeId, instructorId, durationMinutes, accessType, isPublished, isFeatured, sortOrder, isTrial } = req.body;
-    const r = await pool.query(
-      `UPDATE videos SET title=$1, description=$2, video_url=$3, thumbnail_url=$4, class_type_id=$5,
-       instructor_id=$6, duration_minutes=$7, access_type=$8, is_published=$9, is_featured=$10, sort_order=$11,
-       is_trial=COALESCE($12, is_trial), updated_at=NOW()
-       WHERE id=$13 RETURNING *`,
-      [title, description || null, videoUrl, thumbnailUrl || null, classTypeId || null, instructorId || null, durationMinutes || null, accessType || "membership", isPublished !== false, isFeatured === true, sortOrder || 0, isTrial ?? null, req.params.id]
-    );
-    if (!r.rows.length) return res.status(404).json({ message: "Video no encontrado" });
-    return res.json({ data: r.rows[0] });
-  } catch (err) {
-    return res.status(500).json({ message: "Error interno" });
-  }
-});
-
-// DELETE /api/admin/videos/:id
-app.delete("/api/admin/videos/:id", adminMiddleware, async (req, res) => {
-  try {
-    await pool.query("DELETE FROM videos WHERE id = $1", [req.params.id]);
-    return res.json({ message: "Video eliminado" });
   } catch (err) {
     return res.status(500).json({ message: "Error interno" });
   }
@@ -16385,43 +15120,7 @@ function scheduleEmailCrons() {
       console.log("[Cron] Triggering membership-expired sweep...");
       runMembershipExpiredCron();
     }
-
-    // Birthday videoteca gift: every day at 8:00 AM Mexico time
-    if (mexicoHour === 8 && now.getUTCMinutes() < 60) {
-      console.log("[Cron] Triggering birthday videoteca gifts...");
-      runBirthdayGiftCron();
-    }
   }, 60 * 60 * 1000); // every 1 hour
-}
-
-// Otorga el mes de videoteca a quienes cumplen años hoy (para quienes no
-// inician sesión ese día). Idempotente vía grantBirthdayVideotecaIfEligible.
-async function runBirthdayGiftCron() {
-  try {
-    const today = new Date();
-    const res = await pool.query(
-      `SELECT id FROM users
-        WHERE role = 'client'
-          AND date_of_birth IS NOT NULL
-          AND EXTRACT(MONTH FROM date_of_birth) = $1
-          AND EXTRACT(DAY FROM date_of_birth) = $2`,
-      [today.getUTCMonth() + 1, today.getUTCDate()]
-    );
-    let granted = 0;
-    for (const u of res.rows) {
-      try {
-        const r = await grantBirthdayVideotecaIfEligible(u.id);
-        if (r) granted++;
-      } catch (e) {
-        console.error("[Cron] birthday gift user", u.id, e.message);
-      }
-    }
-    if (res.rows.length) {
-      console.log(`[Cron] Birthday videoteca: ${granted}/${res.rows.length} otorgado(s)`);
-    }
-  } catch (err) {
-    console.error("[Cron] Birthday gift error:", err.message);
-  }
 }
 
 // ─── Start ───────────────────────────────────────────────────────────────────
@@ -16433,8 +15132,8 @@ async function bootServer() {
   const server = app.listen(PORT, () => {
     console.log(`🚀 Alma API + Frontend → http://localhost:${PORT}`);
   });
-  // Timeouts amplios para soportar la subida resumible de videos grandes
-  // (chunks de 16MB proxeados a Google Drive). Si no los subimos, Node 18+
+  // Timeouts amplios para soportar la subida resumible de archivos grandes
+  // (chunks proxeados a Google Drive). Si no los subimos, Node 18+
   // corta a los 5 min por requestTimeout y se rompen subidas largas.
   server.requestTimeout = 30 * 60 * 1000; // 30 min por request
   server.headersTimeout = 60 * 1000;      // 60s para recibir los headers
