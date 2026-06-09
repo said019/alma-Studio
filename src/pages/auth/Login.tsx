@@ -86,7 +86,7 @@ const Login = () => {
         brandHeadline={<>Pasa,</>}
         brandHeadlineItalic="te estábamos esperando."
         brandSubline="Tu cuenta guarda tus reservas, tu progreso y los recordatorios de cada clase."
-        brandQuote="Aquí no solo entrenas, vuelves a ti."
+        brandQuote="Aquí el movimiento te regresa a ti."
         formEyebrow="Iniciar sesión"
         formHeadline="Entra a tu"
         formHeadlineItalic="cuenta."

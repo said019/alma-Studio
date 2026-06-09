@@ -232,10 +232,6 @@ const DEFAULT_NOTIFICATION_TEMPLATES = {
     subject: "Comprobante rechazado",
     body: "{firstName}, no pudimos aprobar tu comprobante. Motivo: {reason}. Mándanos uno nuevo desde la app o por WhatsApp.",
   },
-  video_access_granted: {
-    subject: "Tu acceso a videos está activo",
-    body: "Hola {name}, ya tienes acceso a la biblioteca de clases en video Alma. Disfruta cuando quieras desde la app. 💜",
-  },
 
   // ── Lealtad y eventos ──────────────────────────────────────────
   points_earned: {
@@ -1203,16 +1199,6 @@ async function ensureSchema() {
     await pool.query(`ALTER TABLE homepage_video_cards ADD COLUMN IF NOT EXISTS video_url TEXT`).catch(() => { });
     // Add thumbnail_url column for custom poster images
     await pool.query(`ALTER TABLE homepage_video_cards ADD COLUMN IF NOT EXISTS thumbnail_url TEXT`).catch(() => { });
-    // seed default cards only when table is empty
-    await pool.query(`
-      INSERT INTO homepage_video_cards (sort_order, title, description, emoji)
-      SELECT * FROM (VALUES
-        (1, 'Jumping Fitness', 'Cardio de alta intensidad en trampolín con música que te hará volar.', 'dumbbell'),
-        (2, 'Jumping Dance',   'Coreografías sobre el trampolín que combinan ritmo y diversión.',     'music'),
-        (3, 'Pilates Flow',    'Secuencias fluidas para fortalecer tu core y mejorar postura.',        'waves')
-      ) AS v(sort_order, title, description, emoji)
-      WHERE NOT EXISTS (SELECT 1 FROM homepage_video_cards LIMIT 1);
-    `).catch(() => { });
     // Migrate old emoji values to icon keys
     await pool.query(`
       UPDATE homepage_video_cards SET emoji = CASE emoji
@@ -1678,21 +1664,9 @@ async function ensureSchema() {
   }
 
   // ── Seed demo classes for the next 4 weeks (only if classes table is empty) ──
+  // No se siembran instructoras demo: el estudio carga las reales desde el admin.
+  // Sin instructoras activas este bloque no genera clases (no-op), por diseño.
   try {
-    // First ensure at least one instructor exists
-    const instCount = await pool.query("SELECT COUNT(*) FROM instructors");
-    if (parseInt(instCount.rows[0].count) === 0) {
-      await pool.query(`
-        INSERT INTO instructors (display_name, email, bio, specialties, is_active) VALUES
-          ('Valeria Mendoza',  'valeria@almamovement.mx',  'Instructora certificada de Jumping Fitness con 5 años de experiencia.', 'Jumping Fitness,Jumping Dance,Strong Jump', true),
-          ('Daniela Reyes',    'daniela@almamovement.mx',  'Especialista en Pilates y movimiento consciente.', 'Hot Pilates,Flow Pilates,Pilates Mat,Mindful Jump', true),
-          ('Sofía Torres',     'sofia@almamovement.mx',    'Instructora de Jump & Tone y entrenamientos funcionales.', 'Jump & Tone,Strong Jump,Jumping Fitness', true),
-          ('Camila Vargas',    'camila@almamovement.mx',   'Certificada en Pilates mat y reformer.', 'Pilates Mat,Flow Pilates,Hot Pilates', true)
-        ON CONFLICT DO NOTHING;
-      `);
-      console.log("✅ Seeded 4 demo instructors");
-    }
-
     const classCount = await pool.query("SELECT COUNT(*) FROM classes");
     if (parseInt(classCount.rows[0].count) === 0) {
       // Fetch real class_type ids and instructor ids from DB
@@ -3363,23 +3337,8 @@ app.post("/api/bookings", authMiddleware, async (req, res) => {
     });
     if (!membership) {
       await client.query("ROLLBACK");
-      // Si su única membresía activa es online, el mensaje debe ser claro:
-      // ese plan es solo para videos, no incluye clases presenciales.
-      const onlineOnly = await client.query(
-        `SELECT 1 FROM memberships m JOIN plans p ON p.id = m.plan_id
-          WHERE m.user_id = $1 AND m.status = 'active'
-            AND (m.end_date IS NULL OR m.end_date >= CURRENT_DATE)
-            AND COALESCE(p.class_category,'all') = 'online' LIMIT 1`,
-        [req.userId]
-      );
-      if (onlineOnly.rows.length) {
-        return res.status(403).json({
-          message: "Tu plan en línea es solo para la biblioteca de videos y no incluye clases presenciales. Adquiere un paquete de clases para reservar.",
-        });
-      }
-      const label = clsCategory === "jumping" ? "Jumping" : clsCategory === "pilates" ? "Pilates" : "esta";
       return res.status(403).json({
-        message: `No tienes membresía activa con créditos para clases de ${label}.`,
+        message: "No tienes una membresía activa con clases disponibles para reservar.",
       });
     }
 
@@ -4649,7 +4608,6 @@ function prettyTemplateKey(key) {
     membership_expired: "Tu paquete terminó",
     renewal_reminder: "Recordatorio de renovación",
     transfer_rejected: "Comprobante rechazado",
-    video_access_granted: "Acceso a videos otorgado",
     points_earned: "Sumaste puntos",
     reward_redeemed: "Recompensa canjeada",
     event_registered: "Inscrita al evento",
@@ -5509,11 +5467,11 @@ function truncateWalletField(value, max = 26) {
 
 function getAlmaWalletCategoryLabel(category) {
   const normalized = normalizeClassCategory(category, "all");
-  if (normalized === "barre" || normalized === "all" || normalized === "general") return "Barre";
-  if (normalized === "pilates") return "Pilates";
-  if (normalized === "jumping") return "Barre";
-  if (normalized === "mixto") return "Barre";
-  return "Barre";
+  if (normalized === "studio") return "Studio";
+  if (normalized === "reformer_tower") return "Reformer/Tower";
+  if (normalized === "mixto") return "Mixto";
+  if (normalized === "all") return "Todas las disciplinas";
+  return "Pilates";
 }
 
 function getWalletProgressSummary(membership) {
@@ -6927,18 +6885,18 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
     secondaryFields.push({
       key: "muestra",
       label: "PRIMERA CLASE",
-      value: "$50 · Clase muestra",
+      value: "$150 · Clase muestra Studio",
     });
     backFields.push(
       {
         key: "intro_back",
         label: "Bienvenida a Alma",
-        value: "Te recibimos como te recibe una amiga. Cinco lugares por clase, atención personalizada, una persona que te enseña.",
+        value: "Te recibimos como te recibe una amiga. Grupos pequeños (4 en Reformer/Tower, 8 en Studio), atención personalizada y alguien que te conoce por tu nombre.",
       },
       {
         key: "muestra_back",
         label: "Tu primera clase",
-        value: "Reserva tu clase muestra por $50 desde la app o por WhatsApp. Karla te explica la barra y te ajusta cada postura.",
+        value: "Reserva tu clase muestra Studio por $150 desde la app o por WhatsApp. Te explicamos el equipo y te acompañamos en cada movimiento.",
       },
     );
     // Próximo logro como meta aspiracional para alumnas sin paquete
@@ -8020,15 +7978,6 @@ app.post("/api/admin/users/:userId/video-access", adminMiddleware, async (req, r
       throw err;
     }
 
-    // Notify alumna via WA (fire-and-forget). Template added in Task 6.1.
-    if (u.rows[0].phone) {
-      sendConfiguredWhatsAppTemplate({
-        templateKey: "video_access_granted",
-        phone: u.rows[0].phone,
-        vars: { name: u.rows[0].display_name || "Alumna" },
-        fallbackMessage: `Hola ${u.rows[0].display_name || "Alumna"}, ya tienes acceso a la biblioteca de clases en video. Disfruta. 💜`,
-      }).catch((e) => console.error("[WA] video_access_granted:", e.message));
-    }
 
     return res.status(201).json({ data: grant });
   } catch (err) {
@@ -9064,9 +9013,9 @@ async function computeVideoAccessState(userId, videoId) {
 // PUT /api/classes/:id/cancel — admin cancela clase completa. Cascada:
 //   1. classes.status = 'cancelled'
 //   2. Cada booking activo: status='cancelled', cancelled_at=NOW(), restaura
-//      crédito al membership (siempre, sin importar política de 2h).
+//      crédito al membership (siempre, al cancelar el estudio la clase).
 //   3. WA a cada alumna con reason opcional.
-// Body opcional: { reason: "Karla enferma" } se incluye en el WA.
+// Body opcional: { reason: "instructora enferma" } se incluye en el WA.
 app.put("/api/classes/:id/cancel", adminMiddleware, async (req, res) => {
   const { reason } = req.body || {};
   const client = await pool.connect();
@@ -11494,7 +11443,7 @@ app.put("/api/settings/:key", adminMiddleware, async (req, res) => {
   } catch (err) { return res.status(500).json({ message: "Error interno" }); }
 });
 
-// ── Datos de transferencia (SPEI) — editables por el admin ───────────────────
+// ── Datos de transferencia bancaria — editables por el admin ─────────────────
 // GET devuelve los datos actuales (ya normalizados); el cliente los usa en el
 // checkout. PUT valida y guarda en settings.key='bank_info'.
 app.get("/api/admin/bank-info", adminMiddleware, async (_req, res) => {
@@ -11557,7 +11506,6 @@ const TEMPLATE_VARIABLES = {
   membership_expired: ["firstName"],
   renewal_reminder: ["firstName", "plan", "expiresAt"],
   transfer_rejected: ["firstName", "reason"],
-  video_access_granted: ["name"],
   points_earned: ["firstName", "points", "totalPoints"],
   reward_redeemed: ["firstName", "rewardName", "points"],
   event_registered: ["firstName", "eventTitle"],
@@ -11734,17 +11682,17 @@ app.post("/api/admin/whatsapp-templates/test-send", adminMiddleware, async (req,
     }
     // Default sample vars (la dueña puede sobrescribir)
     const sampleVars = {
-      firstName: "Karla",
-      name: "Karla",
-      class: "Barre Flow",
+      firstName: "Estefanía",
+      name: "Estefanía",
+      class: "Pilates Reformer",
       date: "viernes 15 mayo",
       time: "07:00",
       points: 50, totalPoints: 1500,
       classes: 10, classesThisWeek: 1, weekGoal: 4, days: 7,
-      rewardName: "Clase muestra gratis",
+      rewardName: "Clase muestra Studio",
       eventTitle: "Clase muestra",
       message: "esto es una prueba del template",
-      plan: "Barre — 4 Clases por semana",
+      plan: "Studio Ilimitado",
       startDate: "1 mayo", endDate: "31 mayo",
       expiresAt: "31 mayo",
       reason: "comprobante ilegible",
@@ -13671,7 +13619,7 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
 
     if (!isMembershipCategoryCompatible(membership.class_category, clsCategory)) {
       await client.query("ROLLBACK");
-      const label = clsCategory === "jumping" ? "Jumping" : clsCategory === "pilates" ? "Pilates" : "esta";
+      const label = clsCategory === "studio" ? "Studio" : clsCategory === "reformer_tower" ? "Reformer/Tower" : "esta disciplina";
       return res.status(403).json({
         message: `La membresía de la clienta no incluye clases de ${label}.`,
       });
@@ -14682,7 +14630,7 @@ app.post("/api/discount-codes", adminMiddleware, async (req, res) => {
         ? null
         : normalizeClassCategory(classCategory, "__invalid__");
     if (normalizedCategory === "__invalid__") {
-      return res.status(400).json({ message: "Categoría inválida. Usa: all, jumping, pilates o mixto." });
+      return res.status(400).json({ message: "Categoría inválida. Usa: all, studio, reformer_tower o mixto." });
     }
     const normalizedChannel =
       channel === undefined || channel === null || channel === ""
@@ -14752,7 +14700,7 @@ app.put("/api/discount-codes/:id", adminMiddleware, async (req, res) => {
         ? null
         : normalizeClassCategory(classCategory, "__invalid__");
     if (normalizedCategory === "__invalid__") {
-      return res.status(400).json({ message: "Categoría inválida. Usa: all, jumping, pilates o mixto." });
+      return res.status(400).json({ message: "Categoría inválida. Usa: all, studio, reformer_tower o mixto." });
     }
     const normalizedChannel =
       channel === undefined || channel === null || channel === ""
@@ -16199,13 +16147,13 @@ app.post("/api/admin/test-emails", adminMiddleware, async (req, res) => {
   const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 
   const jobs = [
-    { label: "Membresía activada", fn: () => sendMembershipActivated({ to: testTo, name: testName, planName: "Jumping — 4 Clases", startDate: new Date().toISOString(), endDate: new Date(Date.now() + 30 * 86400000).toISOString(), classLimit: 4 }) },
-    { label: "Reserva confirmada", fn: () => sendBookingConfirmed({ to: testTo, name: testName, className: "Jumping Fitness", date: new Date().toISOString(), startTime: "09:00", instructor: "Instructora Diana", classesLeft: 3, isWaitlist: false }) },
-    { label: "Reserva cancelada (a tiempo)", fn: () => sendBookingCancelled({ to: testTo, name: testName, className: "Jumping Dance", date: new Date().toISOString(), startTime: "11:00", creditRestored: true, isLate: false, classesLeft: 4 }) },
-    { label: "Reserva cancelada (tardía)", fn: () => sendBookingCancelled({ to: testTo, name: testName, className: "Strong Jump", date: new Date().toISOString(), startTime: "18:00", creditRestored: false, isLate: true, classesLeft: 3 }) },
+    { label: "Membresía activada", fn: () => sendMembershipActivated({ to: testTo, name: testName, planName: "4 Sesiones Studio", startDate: new Date().toISOString(), endDate: new Date(Date.now() + 30 * 86400000).toISOString(), classLimit: 4 }) },
+    { label: "Reserva confirmada", fn: () => sendBookingConfirmed({ to: testTo, name: testName, className: "Pilates Reformer", date: new Date().toISOString(), startTime: "09:00", instructor: "Instructora Diana", classesLeft: 3, isWaitlist: false }) },
+    { label: "Reserva cancelada (a tiempo)", fn: () => sendBookingCancelled({ to: testTo, name: testName, className: "Pilates Mat", date: new Date().toISOString(), startTime: "11:00", creditRestored: true, isLate: false, classesLeft: 4 }) },
+    { label: "Reserva cancelada (tardía)", fn: () => sendBookingCancelled({ to: testTo, name: testName, className: "Sculpt", date: new Date().toISOString(), startTime: "18:00", creditRestored: false, isLate: true, classesLeft: 3 }) },
     { label: "Recordatorio semanal", fn: () => sendWeeklyReminder({ to: testTo, name: testName, classesLeft: 2, endDate: new Date(Date.now() + 15 * 86400000).toISOString() }) },
-    { label: "Renovación (última clase)", fn: () => sendRenewalReminder({ to: testTo, name: testName, planName: "Jumping — 4 Clases", classesLeft: 1, endDate: new Date(Date.now() + 5 * 86400000).toISOString(), reason: "last_class" }) },
-    { label: "Renovación (por vencer)", fn: () => sendRenewalReminder({ to: testTo, name: testName, planName: "Pilates — Mensual Ilimitado", classesLeft: null, endDate: new Date(Date.now() + 3 * 86400000).toISOString(), reason: "expiring_soon" }) },
+    { label: "Renovación (última clase)", fn: () => sendRenewalReminder({ to: testTo, name: testName, planName: "4 Sesiones Studio", classesLeft: 1, endDate: new Date(Date.now() + 5 * 86400000).toISOString(), reason: "last_class" }) },
+    { label: "Renovación (por vencer)", fn: () => sendRenewalReminder({ to: testTo, name: testName, planName: "Studio Ilimitado", classesLeft: null, endDate: new Date(Date.now() + 3 * 86400000).toISOString(), reason: "expiring_soon" }) },
     { label: "Reset de contraseña", fn: () => sendPasswordResetEmail({ to: testTo, name: testName, token: "test-token-123456" }) },
   ];
 

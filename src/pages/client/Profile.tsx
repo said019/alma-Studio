@@ -15,7 +15,6 @@ import {
   UserRound,
   CreditCard,
   Bell,
-  Sparkles,
   ShieldCheck,
   HelpCircle,
   LogOut,
@@ -165,13 +164,6 @@ const Profile = () => {
               description="Historial de compras"
             />
             <ListRow
-              to="/app/profile/refer"
-              icon={<Sparkles size={17} strokeWidth={1.7} />}
-              iconTint="coral"
-              title="Invita a una amiga"
-              description="Las dos ganan una recompensa"
-            />
-            <ListRow
               to="/app/profile/security"
               icon={<ShieldCheck size={17} strokeWidth={1.7} />}
               iconTint="berry"
@@ -212,7 +204,7 @@ const Profile = () => {
         <Section title="Soporte">
           <ListGroup>
             <ListRow
-              onClick={() => window.open("https://wa.me/527721119216", "_blank", "noopener")}
+              onClick={() => window.open("https://wa.me/5210000000000", "_blank", "noopener")} // TODO: WhatsApp real de Alma
               asButton
               icon={<MessageCircle size={17} strokeWidth={1.7} />}
               iconTint="olive"

@@ -105,8 +105,8 @@ const MyBookings = () => {
       toast({
         title: "Reserva cancelada",
         description: creditRestored
-          ? "Tu clase regresó al paquete."
-          : "La clase no se devuelve, fue cancelación tardía.",
+          ? "Cancelaste a tiempo."
+          : "Si cancelas dentro de las 12 horas previas a tu clase, cuenta como falta. Acumular 5 faltas aplica una penalización con pérdida de puntos.",
       });
       setCancelId(null);
     },
@@ -260,7 +260,7 @@ const MyBookings = () => {
             <AlertDialogHeader>
               <AlertDialogTitle>¿Cancelar reserva?</AlertDialogTitle>
               <AlertDialogDescription>
-                Si cancelas con menos de 4 horas, tu clase no regresa al paquete.
+                Si cancelas dentro de las 12 horas previas a tu clase, cuenta como falta. Acumular 5 faltas aplica una penalización con pérdida de puntos.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

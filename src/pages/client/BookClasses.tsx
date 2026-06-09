@@ -80,8 +80,8 @@ type DecoratedClass = {
 
 function inferClassCat(name: string): ClassCat {
   const n = name?.toLowerCase() ?? "";
-  if (n.includes("pilates") || n.includes("mat") || n.includes("flow") || n.includes("hot")) return "pilates";
-  return "jumping";
+  if (n.includes("reformer") || n.includes("tower")) return "reformer_tower";
+  return "studio";
 }
 
 function canBook(classCat: ClassCat, membershipCat: ClassCat | null): boolean {
@@ -95,7 +95,9 @@ function decorateClass(cls: ScheduleClass): DecoratedClass {
   const name = cls.class_type_name ?? "Clase";
   const classCat = inferClassCat(name);
   const tint = CAT_TINT[classCat];
-  const capacity = Number(cls.max_capacity ?? cls.capacity ?? 5);
+  // Cupo real del backend; si falta, se deriva del área: Reformer/Tower 4, Studio 8.
+  const areaFallback = classCat === "reformer_tower" ? 4 : 8;
+  const capacity = Number(cls.max_capacity ?? cls.capacity ?? areaFallback);
   const booked = Number(cls.current_bookings ?? 0);
   return {
     raw: cls,
@@ -104,7 +106,7 @@ function decorateClass(cls: ScheduleClass): DecoratedClass {
     timeLabel: start ? format(start, "HH:mm") : "--:--",
     endLabel: end ? format(end, "HH:mm") : null,
     name,
-    instructor: cls.instructor_name ?? "Alma Movement",
+    instructor: cls.instructor_name ?? "Por confirmar",
     classCat,
     tint,
     color: ALMA[tint],
@@ -326,7 +328,7 @@ const BookClasses = () => {
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
-              {(["jumping", "pilates"] as ClassCat[]).map((cat) => (
+              {(["studio", "reformer_tower"] as ClassCat[]).map((cat) => (
                 <Tag key={cat} tint={CAT_TINT[cat]}>{CAT_LABEL[cat]}</Tag>
               ))}
               <span

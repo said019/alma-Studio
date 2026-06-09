@@ -8,7 +8,6 @@ import {
   AppShell,
   PageHeader,
   Section,
-  Stat,
   Tag,
   PrimaryButton,
   GhostButton,
@@ -29,10 +28,10 @@ const STATUS: Record<string, { label: string; tone: keyof typeof ALMA }> = {
 };
 
 const CATEGORY_LABEL: Record<string, string> = {
-  jumping: "Barre",
-  pilates: "Pilates",
+  studio: "Studio",
+  reformer_tower: "Reformer/Tower",
   mixto: "Mixto",
-  all: "Todas",
+  all: "Todas las disciplinas",
 };
 
 const ProfileMembership = () => {
@@ -41,22 +40,13 @@ const ProfileMembership = () => {
     queryFn: async () => (await api.get("/memberships/my")).data,
   });
 
-  // Todas las membresías activas (para mostrar presencial + online a la vez).
-  const { data: allData } = useQuery({
-    queryKey: ["my-memberships-all"],
-    queryFn: async () => (await api.get("/memberships/mine/all")).data,
-  });
-  const allMemberships: any[] = Array.isArray(allData?.data) ? allData.data : [];
-
-  const membership: (ClientMembership & { cancellationsUsed?: number; classCategory?: string }) | null =
+  const membership: (ClientMembership & { classCategory?: string }) | null =
     data?.data ?? data ?? null;
 
   const daysRemaining = membership?.end_date
     ? Math.max(differenceInCalendarDays(safeParse(membership.end_date), new Date()), 0)
     : null;
   const status = membership ? STATUS[membership.status] ?? { label: membership.status, tone: "berry" as const } : null;
-  const cancellationsUsed = membership?.cancellationsUsed ?? 0;
-  const cancellationsLeft = Math.max(2 - cancellationsUsed, 0);
   const isUnlimited =
     membership && (membership.class_limit === null || Number(membership.class_limit) >= 9999);
   const classesUsed = membership?.class_limit
@@ -85,7 +75,7 @@ const ProfileMembership = () => {
               <EmptyState
                 icon={<CreditCard size={20} />}
                 title="Compra tu primer paquete."
-                description="Cuando lo actives, las clases empiezan a contar y tus anillos cobran vida."
+                description="Cuando lo actives, cada clase que tomas cuenta y reservas en un tap."
                 ctaLabel="Ver paquetes"
                 ctaTo="/app/checkout"
               />
@@ -95,50 +85,9 @@ const ProfileMembership = () => {
           <>
             <PageHeader
               eyebrow="Tu membresía"
-              title={membership.planName ?? membership.plan_name ?? "Plan Alma"}
+              title={membership.planName ?? membership.plan_name ?? "Tu paquete"}
               actions={status ? <Tag tint={status.tone}>{status.label}</Tag> : null}
             />
-
-            {/* Si tiene más de una membresía activa (ej. paquete presencial +
-                plan online de videos), las mostramos todas aquí. */}
-            {allMemberships.length > 1 && (
-              <Section title="Tus membresías activas">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {allMemberships.map((m) => {
-                    const isOnline = String(m.classCategory) === "online" || m.includesVideoLibrary;
-                    const st = STATUS[m.status] ?? { label: m.status, tone: "berry" as const };
-                    const unlimited = m.classLimit === null || Number(m.classLimit) >= 9999;
-                    return (
-                      <div
-                        key={m.id}
-                        className="rounded-2xl p-4"
-                        style={{ backgroundColor: ALMA.cream, border: `1px solid ${ALMA.border}` }}
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <span className="text-[0.6rem] font-medium uppercase tracking-[0.22em]" style={{ color: isOnline ? ALMA.coral : ALMA.olive }}>
-                            {isOnline ? "En línea · videos" : "Presencial · clases"}
-                          </span>
-                          <Tag tint={st.tone}>{st.label}</Tag>
-                        </div>
-                        <p className="font-bebas mt-1.5 leading-tight text-[1.15rem]" style={{ color: ALMA.ink }}>
-                          {m.planName}
-                        </p>
-                        <div className="mt-2 flex items-baseline gap-3 text-[0.78rem]" style={{ color: ALMA.ink, opacity: 0.62 }}>
-                          {isOnline ? (
-                            <span>Biblioteca completa</span>
-                          ) : (
-                            <span>{unlimited ? "∞" : Number(m.classesRemaining ?? 0)} clases por usar</span>
-                          )}
-                          {m.endDate && (
-                            <span>· vence {format(safeParse(m.endDate), "d MMM", { locale: es })}</span>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </Section>
-            )}
 
             <Section>
               <div className="rounded-3xl p-5 sm:p-7" style={{ backgroundColor: ALMA.blush }}>
@@ -208,15 +157,11 @@ const ProfileMembership = () => {
             )}
 
             <Section title="Cancelaciones">
-              <div className="grid grid-cols-2 gap-5">
-                <Stat value={`${cancellationsUsed}/2`} label="Usadas" tint={cancellationsLeft === 0 ? "destructive" : "berry"} />
-                <Stat value={cancellationsLeft} label="Disponibles" tint="olive" />
-              </div>
-              <ul className="mt-5 list-none m-0 p-0">
+              <ul className="list-none m-0 p-0">
                 {[
-                  "Hasta 2 cancelaciones por paquete que devuelven la clase.",
-                  "Cancela mínimo 2 horas antes para que cuente.",
-                  "Cancelaciones tardías no devuelven el crédito.",
+                  "Cancela con más de 12 horas de anticipación sin penalización.",
+                  "Cancelar dentro de las 12h previas cuenta como falta.",
+                  "Al acumular 5 faltas se aplica una penalización con pérdida de puntos.",
                 ].map((line, i, arr) => (
                   <li
                     key={line}

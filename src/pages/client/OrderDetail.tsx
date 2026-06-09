@@ -106,7 +106,7 @@ const OrderDetail = () => {
                     label="Fecha"
                     value={order.created_at ? format(safeParse(order.created_at), "d MMM yyyy", { locale: es }) : "—"}
                   />
-                  <DataRow label="Método" value={order.payment_method === "cash" ? "Efectivo" : "Transferencia"} />
+                  <DataRow label="Método" value={order.payment_method === "cash" ? "Efectivo" : "Transferencia (Banorte)"} />
                   {(order as any).orderNumber && (
                     <DataRow label="Folio" value={(order as any).orderNumber} mono />
                   )}

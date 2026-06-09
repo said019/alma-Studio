@@ -476,7 +476,7 @@ const Index = () => {
         <dl className="mx-auto max-w-[1480px] grid grid-cols-3 gap-5 sm:gap-8 px-4 sm:px-6 mt-7 sm:mt-9" data-stagger>
           {[
             { k: "5", l: "Disciplinas Alma" },
-            { k: "4–8", l: "Lugares por clase" },
+            { k: "4–8", l: "Lugares por clase · 4 Reformer/Tower, 8 Studio" },
             { k: "50 min", l: "Cada sesión" },
           ].map((stat) => (
             <div key={stat.l} data-stagger-item className="border-t pt-3" style={{ borderColor: ALMA.border }}>
@@ -492,7 +492,7 @@ const Index = () => {
         <div className="mx-auto max-w-[1320px] grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-start">
           <div className="lg:col-span-5 reveal opacity-0 translate-y-8 transition-all duration-700">
             <div className="alma-photo-tint relative aspect-[4/5] overflow-hidden rounded-[24px]">
-              <img src={almaClassEnergy} alt="Una clase llena en Alma Movement" className="alma-photo absolute inset-0 h-full w-full object-cover" loading="lazy" />
+              <img src={almaClassEnergy} alt="Una clase en Alma Movement" className="alma-photo absolute inset-0 h-full w-full object-cover" loading="lazy" />
             </div>
             <p className="mt-3 text-[0.72rem] uppercase tracking-[0.24em]" style={{ color: ALMA.olive }}>
               Plaza Arce, Juriquilla
@@ -551,7 +551,7 @@ const Index = () => {
               <span className="block italic font-alilato font-normal" style={{ color: ALMA.olive }}>en cada clase.</span>
             </h2>
             <p className="mt-6 max-w-[56ch] text-[1.02rem] leading-[1.75] text-[color:var(--ink)]/72">
-              Playlists y rutinas nuevas cada día. Una experiencia diferente con la misma calidad de siempre. Cupos reducidos: 4 lugares en Reformer y Tower, 8 en Studio.
+              Cada clase trabaja técnica, alineación y control en grupos pequeños. Cupos reducidos: 4 lugares en Reformer y Tower, 8 en Studio.
             </p>
           </div>
 
@@ -645,7 +645,7 @@ const Index = () => {
       {/* ═════════ COACHES (Olive drench) ═════════ */}
       <CoachesSection instructors={instructors} />
 
-      {/* ═════════ MEMBRESÍAS (Berry drench) ═════════ */}
+      {/* ═════════ PAQUETES (Berry drench) ═════════ */}
       <PaquetesSection
         trialPlan={trialPlan}
         groupedPlans={groupedPlans}
@@ -687,7 +687,7 @@ const Index = () => {
               </span>
             </button>
             <a
-              href="https://wa.me/527721119216?text=Hola%2C%20me%20interesa%20conocer%20m%C3%A1s%20sobre%20Alma%20Movement"
+              href="https://wa.me/5210000000000?text=Hola%2C%20me%20interesa%20conocer%20m%C3%A1s%20sobre%20Alma%20Movement" /* TODO: WhatsApp real de Alma */
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-3 rounded-full px-7 py-4 text-[0.84rem] uppercase tracking-[0.18em] no-underline transition-colors hover:bg-[color:var(--cream)]/10"
@@ -740,11 +740,11 @@ const CoachesSection = ({ instructors }: { instructors: { id: string; displayNam
             </span>
             <h2 className="font-bebas mt-4 leading-[0.92]" style={{ color: ALMA.cream, fontSize: "clamp(2.4rem, 5.2vw, 4.6rem)" }}>
               Te enseña
-              <span className="block italic font-alilato font-normal" style={{ color: ALMA.cream, opacity: 0.85 }}>una persona, no un sistema.</span>
+              <span className="block italic font-alilato font-normal" style={{ color: ALMA.cream, opacity: 0.85 }}>alguien que te conoce por tu nombre.</span>
             </h2>
           </div>
           <p className="max-w-[40ch] text-[0.95rem] leading-[1.7]" style={{ color: ALMA.cream, opacity: 0.78 }}>
-            Coaches certificadas que ajustan cada clase y siguen tu progreso de cerca.
+            Quien te recibe ajusta cada clase a ti y sigue tu avance de cerca.
           </p>
         </div>
 
@@ -826,7 +826,7 @@ const PaquetesSection = ({
             </h2>
           </div>
           <p className="max-w-[42ch] text-[0.95rem] leading-[1.7]" style={{ color: ALMA.cream, opacity: 0.78 }}>
-            Catálogo completo de planes Alma. Elige por modalidad, número de sesiones y vigencia. Compra directa desde la app.
+            Elige tu paquete por modalidad, número de sesiones y vigencia (30 días). Estamos en modo apertura con precios especiales en los planes ilimitados.
           </p>
         </div>
 
@@ -925,7 +925,7 @@ const PaquetesSection = ({
         </div>
 
         <p className="reveal opacity-0 translate-y-8 transition-all duration-700 mt-6 text-[0.78rem] uppercase tracking-[0.18em] text-center" style={{ color: ALMA.cream, opacity: 0.55 }}>
-          Pagos por transferencia Banorte · Tarjeta o efectivo en estudio · Precios en MXN
+          Pagos por transferencia Banorte o efectivo en el estudio · Precios en MXN
         </p>
       </div>
     </section>
@@ -941,10 +941,10 @@ const PoliticasSection = () => {
     { num: "02", title: "Reservación", text: "Todas las clases requieren reserva previa. Cupo de 4 lugares en Reformer/Tower y 8 en Studio." },
     { num: "03", title: "Cancelaciones", text: "Si cancelas dentro de las 12 horas previas a tu clase y acumulas 5 clases reservadas sin asistir, se aplica una penalización con pérdida de puntos." },
     { num: "04", title: "En el estudio", text: "Respeta el horario de inicio, mantén tu celular en silencio e informa antes cualquier lesión o condición médica." },
-    { num: "05", title: "Pagos", text: "Transferencia Banorte · Estefanía Torres Lanzagorta · CLABE 072298012591154950. También aceptamos pago físico con tarjeta o efectivo." },
+    { num: "05", title: "Pagos", text: "Transferencia Banorte · Estefanía Torres Lanzagorta · CLABE 072298012591154950. También aceptamos efectivo en el estudio." },
     { num: "06", title: "Vigencia", text: "Todos los paquetes tienen vigencia de 30 días a partir de la compra." },
-    { num: "07", title: "Asistencia", text: "El check-in con QR registra tus asistencias, recompensas y progreso semanal." },
-    { num: "08", title: "Comunidad", text: "Recordatorios, promociones y recompensas se comunican principalmente por WhatsApp." },
+    { num: "07", title: "Asistencia", text: "El check-in con QR registra tus asistencias y reservas. Llega 10 minutos antes para registrarte sin prisa." },
+    { num: "08", title: "Comunidad", text: "Avisos y recordatorios de tus clases se comunican principalmente por WhatsApp. Cualquier duda, escríbenos por ahí." },
   ];
   const [open, setOpen] = useState<string | null>("01");
 
@@ -1002,51 +1002,23 @@ const PoliticasSection = () => {
 };
 
 /* ═══════════════════════════════════════════════════════════
-   TESTIMONIOS — pull quote + supporting voices
+   FILOSOFÍA — pull quote de marca (estudio nuevo, sin reseñas reales)
    ═══════════════════════════════════════════════════════════ */
 const TestimoniosSection = () => {
-  const quotes = [
-    { name: "Ana García", time: "Alumna frecuente", text: "Alma se siente cercano desde que entras. Las clases son pequeñas y siempre me corrigen con mucha atención." },
-    { name: "Laura Martínez", time: "Comunidad Alma", text: "Me gusta que cada clase es diferente. Salgo con energía y con la sensación de que hice algo por mí." },
-    { name: "Sofía Hernández", time: "Alumna desde 2025", text: "Reservar es fácil y los recordatorios por WhatsApp me ayudan a no perder mis clases." },
-    { name: "Daniela Ríos", time: "Clase muestra", text: "Fui por una clase muestra y me sentí acompañada, aunque era mi primera vez." },
-    { name: "Mariana López", time: "Paquete mensual", text: "La energía del estudio cambia mi día. Es casual, bonito y muy humano." },
-  ];
-  const [main, ...rest] = quotes;
   return (
     <section className="relative px-5 sm:px-8 lg:px-12 py-28 lg:py-40" style={{ backgroundColor: ALMA.blush }}>
-      <div className="mx-auto max-w-[1320px] grid grid-cols-1 lg:grid-cols-12 gap-10">
-        <div className="lg:col-span-7 reveal opacity-0 translate-y-8 transition-all duration-700">
-          <span className="text-[0.66rem] font-medium uppercase tracking-[0.34em]" style={{ color: ALMA.berry }}>
-            Lo que dicen
-          </span>
-          <blockquote className="mt-6 font-bebas leading-[0.96]" style={{ color: ALMA.ink, fontSize: "clamp(2.2rem, 4.4vw, 3.8rem)" }}>
-            <span className="font-alilato font-normal italic" style={{ color: ALMA.berry }}>“</span>
-            {main.text.replace(/[“”]/g, "")}
-            <span className="font-alilato font-normal italic" style={{ color: ALMA.berry }}>”</span>
-          </blockquote>
-          <div className="mt-6 flex items-center gap-3">
-            <span className="grid h-11 w-11 place-items-center rounded-full text-[0.86rem] font-bold" style={{ backgroundColor: ALMA.berry, color: ALMA.cream }}>
-              {main.name.split(" ").map((w) => w[0]).slice(0, 2).join("")}
-            </span>
-            <div>
-              <div className="font-bebas text-[1.05rem] leading-tight" style={{ color: ALMA.ink }}>{main.name}</div>
-              <div className="text-[0.74rem] uppercase tracking-[0.18em] text-[color:var(--ink)]/55">{main.time}</div>
-            </div>
-          </div>
+      <div className="mx-auto max-w-[900px] text-center reveal opacity-0 translate-y-8 transition-all duration-700">
+        <span className="text-[0.66rem] font-medium uppercase tracking-[0.34em]" style={{ color: ALMA.berry }}>
+          Nuestra filosofía
+        </span>
+        <blockquote className="mt-6 font-bebas leading-[0.96]" style={{ color: ALMA.ink, fontSize: "clamp(2.2rem, 4.4vw, 3.8rem)" }}>
+          <span className="font-alilato font-normal italic" style={{ color: ALMA.berry }}>“</span>
+          Aquí el movimiento te regresa a ti. En grupos pequeños, donde te conocen por tu nombre y cada clase se siente como bienestar.
+          <span className="font-alilato font-normal italic" style={{ color: ALMA.berry }}>”</span>
+        </blockquote>
+        <div className="mt-7 text-[0.74rem] uppercase tracking-[0.24em]" style={{ color: ALMA.berry, opacity: 0.85 }}>
+          Alma Movement
         </div>
-
-        <ul className="lg:col-span-5 reveal opacity-0 translate-y-8 transition-all duration-700 list-none m-0 p-0 grid grid-cols-1 gap-3">
-          {rest.map((t) => (
-            <li key={t.name} className="rounded-[18px] p-5" style={{ backgroundColor: ALMA.cream }}>
-              <p className="text-[0.92rem] leading-[1.65] text-[color:var(--ink)]/80 italic font-alilato">“{t.text}”</p>
-              <div className="mt-3 flex items-center justify-between gap-3">
-                <div className="text-[0.84rem]" style={{ color: ALMA.ink }}>{t.name}</div>
-                <div className="text-[0.66rem] uppercase tracking-[0.2em] text-[color:var(--ink)]/50">{t.time}</div>
-              </div>
-            </li>
-          ))}
-        </ul>
       </div>
     </section>
   );
@@ -1079,7 +1051,7 @@ const GaleriaSection = ({ galleryIdx, setGalleryIdx }: { galleryIdx: number; set
             </h2>
           </div>
           <p className="max-w-[40ch] text-[0.95rem] leading-[1.7] text-[color:var(--ink)]/70">
-            Fotos reales del feed. Sin retoque excesivo, sin stock.
+            El estudio por dentro: el equipo, el espacio y la comunidad de Alma.
           </p>
         </div>
 
@@ -1137,9 +1109,9 @@ const GaleriaSection = ({ galleryIdx, setGalleryIdx }: { galleryIdx: number; set
 const ContactoSection = () => {
   const items = [
     { icon: <MapPin size={18} />, label: "Ubicación", value: "Plaza Arce, Calle Acueducto de Querétaro 513, Jurica Acueducto, 76230 Juriquilla, Qro." },
-    { icon: <Phone size={18} />, label: "Teléfono", value: "444 307 3266", href: "tel:+527721119216" },
+    { icon: <Phone size={18} />, label: "Teléfono", value: "por confirmar", href: "tel:5210000000000" }, // TODO: WhatsApp real de Alma
     { icon: <Mail size={18} />, label: "Email", value: "info@almamovement.mx", href: "mailto:info@almamovement.mx" },
-    { icon: <Clock size={18} />, label: "Horarios", value: "Lun a Vie 7:00 AM, 8:00 AM, 7:00 PM y 8:00 PM · Sáb 7:00 AM, 8:00 AM y 9:00 AM" },
+    { icon: <Clock size={18} />, label: "Horarios", value: "Lun a Sáb · 6:00–11:00 AM y 5:00–8:00 PM" },
   ];
   return (
     <section id="contacto" className="px-5 sm:px-8 lg:px-12 py-28 lg:py-40" style={{ backgroundColor: ALMA.cream }}>
@@ -1178,7 +1150,7 @@ const ContactoSection = () => {
             <a href="https://www.facebook.com/search/top?q=Alma%20Movement%20Quer%C3%A9taro" target="_blank" rel="noopener noreferrer" className="grid h-11 w-11 place-items-center rounded-full no-underline transition-colors hover:bg-[color:var(--blush)]" style={{ border: `1px solid ${ALMA.border}`, color: ALMA.berry }}>
               <IconFacebook size={16} />
             </a>
-            <a href="https://wa.me/527721119216" target="_blank" rel="noopener noreferrer" className="grid h-11 w-11 place-items-center rounded-full no-underline transition-colors hover:bg-[color:var(--blush)]" style={{ border: `1px solid ${ALMA.border}`, color: ALMA.berry }}>
+            <a href="https://wa.me/5210000000000" /* TODO: WhatsApp real de Alma */ target="_blank" rel="noopener noreferrer" className="grid h-11 w-11 place-items-center rounded-full no-underline transition-colors hover:bg-[color:var(--blush)]" style={{ border: `1px solid ${ALMA.border}`, color: ALMA.berry }}>
               <MessageCircle size={16} />
             </a>
           </div>
@@ -1186,7 +1158,7 @@ const ContactoSection = () => {
 
         <div className="lg:col-span-7 reveal opacity-0 translate-y-8 transition-all duration-700 overflow-hidden rounded-[24px] min-h-[420px] lg:min-h-[520px]" style={{ border: `1px solid ${ALMA.border}` }}>
           <iframe
-            src="https://www.google.com/maps?q=Av.%20Nicolas%20Zapata%20845%20Plaza%20San%20Martin%20San%20Luis%20Potosi&output=embed"
+            src="https://www.google.com/maps?q=Plaza%20Arce%2C%20Calle%20Acueducto%20de%20Quer%C3%A9taro%20513%2C%20Jurica%20Acueducto%2C%2076230%20Juriquilla%2C%20Qro.&output=embed"
             width="100%"
             height="100%"
             style={{ border: 0, display: "block", minHeight: 420, filter: "saturate(0.9)" }}
@@ -1250,7 +1222,7 @@ const FooterSection = ({ scrollTo, navigate }: { scrollTo: (id: string) => void;
             <ul className="flex flex-col gap-2 list-none m-0 p-0 text-[0.88rem]">
               <li className="opacity-80">Juriquilla, Querétaro</li>
               <li><a href="mailto:info@almamovement.mx" className="opacity-80 hover:opacity-100 transition-opacity no-underline" style={{ color: ALMA.cream }}>info@almamovement.mx</a></li>
-              <li><a href="https://wa.me/527721119216" target="_blank" rel="noopener noreferrer" className="opacity-80 hover:opacity-100 transition-opacity no-underline" style={{ color: ALMA.cream }}>WhatsApp</a></li>
+              <li><a href="https://wa.me/5210000000000" /* TODO: WhatsApp real de Alma */ target="_blank" rel="noopener noreferrer" className="opacity-80 hover:opacity-100 transition-opacity no-underline" style={{ color: ALMA.cream }}>WhatsApp</a></li>
               <li><a href="https://www.instagram.com/movementalma/" target="_blank" rel="noopener noreferrer" className="opacity-80 hover:opacity-100 transition-opacity no-underline" style={{ color: ALMA.cream }}>Instagram</a></li>
             </ul>
           </div>

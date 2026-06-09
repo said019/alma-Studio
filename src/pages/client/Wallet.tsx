@@ -108,7 +108,7 @@ const Wallet = () => {
       total,
       remaining,
       used,
-      planName: m.plan_name || "Alma Pass",
+      planName: m.plan_name || "Sin paquete activo",
     };
   }, [wallet?.membership]);
 
@@ -166,7 +166,7 @@ const Wallet = () => {
     <ClientAuthGuard requiredRoles={["client"]}>
       <AppShell hideGreeting>
         <PageHeader
-          eyebrow="Alma Club"
+          eyebrow="Tu pase"
           title={<>Tu pase</>}
           titleAccent="del estudio."
           subtitle="Tu membresía y un QR para hacer check-in al llegar al estudio."
@@ -355,7 +355,7 @@ const Wallet = () => {
                           Próxima clase
                         </p>
                         <p className="font-bebas leading-tight truncate mt-0.5" style={{ color: ALMA.cream, fontSize: "1.1rem" }}>
-                          {wallet.next_booking.class_name || "Barre"}
+                          {wallet.next_booking.class_name || "Clase"}
                           <span className="ml-2 text-[0.78rem] font-alilato font-normal italic opacity-85">
                             {formatShortDate(wallet.next_booking.date)} ·{" "}
                             {String(wallet.next_booking.start_time || "").slice(0, 5)}

@@ -177,7 +177,7 @@ const WalletRewards = () => {
                 Has desbloqueado todos los logros.
               </p>
               <p className="mt-1 text-[0.84rem]" style={{ color: ALMA.ink, opacity: 0.65 }}>
-                Eres leyenda Alma. ✨
+                Gracias por tu constancia. Nos encanta verte en cada clase.
               </p>
             </div>
           </Section>

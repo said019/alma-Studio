@@ -23,13 +23,9 @@ import {
 } from "@/components/app/AppShell";
 import {
   CalendarDays,
-  Play,
-  Sparkles,
   Award,
   ClipboardList,
   Wallet as WalletIcon,
-  Film,
-  ArrowRight,
 } from "lucide-react";
 import type { ClientMembership } from "@/types/membership";
 import type { BookingClient } from "@/types/booking";
@@ -68,22 +64,9 @@ const Dashboard = () => {
   });
   const ms = milestonesData?.data ?? null;
 
-  const { data: videosData } = useQuery({
-    queryKey: ["recent-videos"],
-    queryFn: async () => (await api.get("/videos?limit=4")).data,
-  });
-
-  const { data: vaData } = useQuery({
-    queryKey: ["me-video-access"],
-    queryFn: async () => (await api.get("/me/video-access")).data,
-    staleTime: 30_000,
-  });
-  const access = vaData?.data; // { state, planName?, offers? }
-
   const membership: ClientMembership | null = membershipData?.data ?? membershipData ?? null;
   const bookings: BookingClient[] = Array.isArray(bookingsData?.data) ? bookingsData.data : Array.isArray(bookingsData) ? bookingsData : [];
   const wallet = walletData?.data ?? walletData ?? null;
-  const videos = Array.isArray(videosData?.data) ? videosData.data : Array.isArray(videosData) ? videosData : [];
 
   const planName = membership?.planName ?? membership?.plan_name ?? "Sin paquete activo";
   const classLimit = membership?.classLimit ?? membership?.class_limit ?? null;
@@ -329,107 +312,8 @@ const Dashboard = () => {
               title="Recompensas"
               description="Canjea tus puntos"
             />
-            <ListRow
-              to="/app/profile/refer"
-              icon={<Sparkles size={17} strokeWidth={1.7} />}
-              iconTint="coral"
-              title="Invita a una amiga"
-              description="Las dos ganan"
-            />
-            <ListRow
-              to="/app/events"
-              icon={<CalendarDays size={17} strokeWidth={1.7} />}
-              iconTint="olive"
-              title="Eventos del estudio"
-              description="Talleres, invitadas y comunidad"
-            />
           </ListGroup>
         </Section>
-
-        {/* ── Video library access card ── */}
-        {access && access.state !== "locked_no_plan" && (
-          <Section>
-            <Link
-              to="/app/videos"
-              className="block no-underline rounded-3xl p-5 sm:p-6"
-              data-lift
-              style={{
-                backgroundColor: ALMA.blush,
-                border: `1px solid ${ALMA.berry}22`,
-                color: ALMA.ink,
-              }}
-            >
-              <div className="flex items-center gap-4">
-                <span
-                  className="grid h-12 w-12 place-items-center rounded-2xl shrink-0"
-                  style={{
-                    backgroundColor: access.state === "unlocked" ? ALMA.berry : ALMA.orange,
-                    color: ALMA.cream,
-                  }}
-                >
-                  <Film size={20} strokeWidth={1.8} />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p
-                    className="text-[0.66rem] uppercase tracking-[0.22em]"
-                    style={{ color: ALMA.ink, opacity: 0.55 }}
-                  >
-                    Biblioteca de videos
-                  </p>
-                  <p
-                    className="mt-1 text-[1rem] font-medium leading-tight"
-                    style={{ color: ALMA.ink }}
-                  >
-                    {access.state === "unlocked"
-                      ? "Tienes acceso a la biblioteca"
-                      : "Tu acceso está en revisión"}
-                  </p>
-                  <p
-                    className="mt-1 text-[0.82rem]"
-                    style={{ color: ALMA.ink, opacity: 0.65 }}
-                  >
-                    {access.state === "unlocked"
-                      ? "Reproduce las clases cuando quieras."
-                      : "Mientras tanto, puedes ver las clases muestra."}
-                  </p>
-                </div>
-                <ArrowRight size={18} style={{ color: ALMA.berry, opacity: 0.7 }} />
-              </div>
-            </Link>
-          </Section>
-        )}
-
-        {/* ── Recent videos ── */}
-        {videos.length > 0 && (
-          <Section
-            title="Videos recientes"
-            trailing={<Link to="/app/videos" className="no-underline" style={{ color: ALMA.berry }}>Ver todos</Link>}
-          >
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4" data-stagger>
-              {videos.slice(0, 4).map((v: any) => (
-                <Link key={v.id} to={`/app/videos/${v.id}`} data-stagger-item data-lift className="group block no-underline">
-                  <div className="relative aspect-[4/5] overflow-hidden rounded-2xl" style={{ backgroundColor: ALMA.blush }}>
-                    {v.thumbnail_url ? (
-                      <img src={v.thumbnail_url} alt={v.title} loading="lazy" className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.04]" />
-                    ) : (
-                      <div className="absolute inset-0 grid place-items-center" style={{ color: ALMA.berry }}>
-                        <Play size={28} />
-                      </div>
-                    )}
-                    <div className="absolute inset-x-0 bottom-0 p-3" style={{ background: "linear-gradient(180deg, transparent, rgba(46,32,28,0.55))" }}>
-                      <span className="text-[0.66rem] uppercase tracking-[0.2em]" style={{ color: ALMA.cream }}>
-                        {Math.floor((v.duration_seconds ?? 0) / 60)} min
-                      </span>
-                    </div>
-                  </div>
-                  <p className="mt-2 text-[0.86rem] leading-tight line-clamp-2" style={{ color: ALMA.ink }}>
-                    {v.title}
-                  </p>
-                </Link>
-              ))}
-            </div>
-          </Section>
-        )}
 
         <p className="mt-12 lg:mt-16 text-[0.74rem]" style={{ color: ALMA.ink, opacity: 0.45 }}>
           Buena clase, {firstName}.

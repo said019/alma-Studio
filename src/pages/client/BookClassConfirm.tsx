@@ -99,7 +99,7 @@ const BookClassConfirm = () => {
             <Section>
               <div className="rounded-3xl p-5 sm:p-7" style={{ backgroundColor: ALMA.blush }}>
                 <div className="flex flex-wrap items-center gap-2 mb-4">
-                  <Tag tint="berry">{cls.level ?? "Todos los niveles"}</Tag>
+                  {cls.class_type_name && <Tag tint="berry">{cls.class_type_name}</Tag>}
                   {isFull ? (
                     <Tag tint="coral">Lista de espera</Tag>
                   ) : (
@@ -131,7 +131,7 @@ const BookClassConfirm = () => {
               <ul className="list-none m-0 p-0">
                 {[
                   { icon: <CalendarDays size={15} />, text: "Llega 10 minutos antes para acomodarte." },
-                  { icon: <Clock size={15} />, text: "Cancela mínimo 4 horas antes para no perder la clase." },
+                  { icon: <Clock size={15} />, text: "Si cancelas dentro de las 12 horas previas a tu clase, cuenta como falta. Acumular 5 faltas aplica una penalización con pérdida de puntos." },
                   { icon: <Users size={15} />, text: "Cupos limitados. Si está llena entras a lista de espera." },
                   { icon: <UserRound size={15} />, text: "Trae ropa cómoda y algo para hidratarte." },
                 ].map((it, i, arr) => (

@@ -56,7 +56,7 @@ const Privacidad = () => {
 
           <h2 className="font-syne font-bold text-lg text-foreground mt-8 mb-3">1. Responsable del tratamiento</h2>
           <p>
-            <strong className="text-foreground">Alma Movement</strong>, con domicilio en Juriquilla, Querétaro, México, es responsable del tratamiento de los datos personales que recabamos de usted, en los términos de la Ley Federal de Protección de Datos Personales en Posesión de los Particulares (LFPDPPP).
+            <strong className="text-foreground">Alma Movement</strong>, a cargo de Estefanía Torres Lanzagorta, con domicilio en Plaza Arce, Calle Acueducto de Querétaro 513, Jurica Acueducto, 76230 Juriquilla, Querétaro, es responsable del tratamiento de los datos personales que recabamos de usted, en los términos de la Ley Federal de Protección de Datos Personales en Posesión de los Particulares (LFPDPPP).
           </p>
 
           <h2 className="font-syne font-bold text-lg text-foreground mt-8 mb-3">2. Datos personales que recabamos</h2>
@@ -65,7 +65,7 @@ const Privacidad = () => {
             <li><strong className="text-foreground">Datos de identificación:</strong> nombre completo, fecha de nacimiento, género, fotografía de perfil.</li>
             <li><strong className="text-foreground">Datos de contacto:</strong> correo electrónico, número de teléfono, dirección.</li>
             <li><strong className="text-foreground">Datos de salud:</strong> condiciones médicas relevantes (embarazo, lesiones, padecimientos), contacto de emergencia.</li>
-            <li><strong className="text-foreground">Datos financieros:</strong> información de pago para la adquisición de paquetes y membresías.</li>
+            <li><strong className="text-foreground">Datos financieros:</strong> comprobantes de transferencia bancaria para la adquisición de tus paquetes.</li>
             <li><strong className="text-foreground">Datos de uso:</strong> historial de reservaciones, asistencias, preferencias de clase.</li>
           </ul>
 
@@ -75,13 +75,13 @@ const Privacidad = () => {
             <li>Registro y administración de su cuenta de usuario.</li>
             <li>Gestión de reservaciones y asistencia a clases.</li>
             <li>Procesamiento de pagos y facturación.</li>
-            <li>Administración de paquetes, membresías y programas de lealtad.</li>
+            <li>Administración de paquetes y reservaciones de clases.</li>
             <li>Contacto para confirmaciones, recordatorios y notificaciones del servicio.</li>
             <li>Garantizar la seguridad durante las clases, conociendo su estado de salud.</li>
           </ul>
           <p>Finalidades secundarias (opcionales):</p>
           <ul className="list-disc pl-6 space-y-2">
-            <li>Envío de promociones, ofertas y comunicaciones comerciales.</li>
+            <li>Envío de recordatorios de clase y comunicaciones del estudio por WhatsApp.</li>
             <li>Encuestas de satisfacción y mejora del servicio.</li>
             <li>Publicación de fotografías o videos del estudio en redes sociales y materiales publicitarios.</li>
           </ul>
@@ -93,7 +93,7 @@ const Privacidad = () => {
 
           <h2 className="font-syne font-bold text-lg text-foreground mt-8 mb-3">5. Derechos ARCO</h2>
           <p>
-            Usted tiene derecho a Acceder, Rectificar, Cancelar u Oponerse (derechos ARCO) al tratamiento de sus datos personales. Para ejercer estos derechos, envíe una solicitud al correo electrónico <strong className="text-primary">hola@almamovement.mx</strong> indicando:
+            Usted tiene derecho a Acceder, Rectificar, Cancelar u Oponerse (derechos ARCO) al tratamiento de sus datos personales. Para ejercer estos derechos, envíe una solicitud al correo electrónico <strong className="text-primary">info@almamovement.mx</strong> indicando:
           </p>
           <ul className="list-disc pl-6 space-y-2">
             <li>Nombre completo y datos de contacto.</li>
@@ -111,7 +111,7 @@ const Privacidad = () => {
 
           <h2 className="font-syne font-bold text-lg text-foreground mt-8 mb-3">7. Uso de cookies</h2>
           <p>
-            Nuestra plataforma web utiliza cookies y tecnologías de rastreo para mejorar su experiencia de navegación, recordar sus preferencias y analizar el tráfico. Puede configurar su navegador para rechazar cookies, aunque esto podría limitar algunas funcionalidades.
+            Nuestra plataforma usa cookies necesarias para que puedas iniciar sesión, reservar tus clases y recordar tus preferencias. Puedes configurar tu navegador para rechazarlas, aunque esto puede limitar la reserva en línea.
           </p>
 
           <h2 className="font-syne font-bold text-lg text-foreground mt-8 mb-3">8. Cambios al aviso de privacidad</h2>
@@ -124,9 +124,9 @@ const Privacidad = () => {
             Si tiene alguna duda o comentario sobre este Aviso de Privacidad, puede contactarnos en:
           </p>
           <ul className="list-none space-y-1">
-            <li><strong className="text-foreground">Email:</strong> hola@almamovement.mx</li>
-            <li><strong className="text-foreground">Teléfono:</strong> +52 772 111 9216</li>
-            <li><strong className="text-foreground">Dirección:</strong> Juriquilla, Querétaro, México</li>
+            <li><strong className="text-foreground">Email:</strong> info@almamovement.mx</li>
+            <li><strong className="text-foreground">Teléfono:</strong> por confirmar</li>
+            <li><strong className="text-foreground">Dirección:</strong> Plaza Arce, Calle Acueducto de Querétaro 513, Jurica Acueducto, 76230 Juriquilla, Querétaro</li>
           </ul>
           </div>
         )}

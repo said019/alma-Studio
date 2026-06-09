@@ -70,7 +70,7 @@ const ResetPassword = () => {
   return (
     <AuthShell
       brandPhoto={almaReset}
-      brandPhotoAlt="Detalle de la barra del estudio"
+      brandPhotoAlt="Detalle del estudio Alma Movement"
       brandTint="coral"
       brandEyebrow="Nueva contraseña"
       brandHeadline={<>Casi listo,</>}

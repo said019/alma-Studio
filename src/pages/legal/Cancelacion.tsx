@@ -64,9 +64,9 @@ const Cancelacion = () => {
             <div className="flex items-start gap-4">
               <div className="w-10 h-10 rounded-xl bg-green-500/15 border border-green-500/30 flex items-center justify-center flex-shrink-0 text-green-400 text-lg">✓</div>
               <div>
-                <h3 className="font-syne font-bold text-foreground text-sm mb-1">Cancelación con más de 2 horas de anticipación</h3>
+                <h3 className="font-syne font-bold text-foreground text-sm mb-1">Cancelación con más de 12 horas de anticipación</h3>
                 <p className="text-muted-foreground text-sm leading-relaxed">
-                  La clase se devuelve a su paquete sin penalización. Puede reagendar o cancelar desde la app sin costo.
+                  Puedes cancelar o reagendar tu clase desde la app sin penalización.
                 </p>
               </div>
             </div>
@@ -74,9 +74,9 @@ const Cancelacion = () => {
             <div className="flex items-start gap-4">
               <div className="w-10 h-10 rounded-xl bg-yellow-500/15 border border-yellow-500/30 flex items-center justify-center flex-shrink-0 text-yellow-400 text-lg">⚠</div>
               <div>
-                <h3 className="font-syne font-bold text-foreground text-sm mb-1">Cancelación tardía (menos de 2 horas)</h3>
+                <h3 className="font-syne font-bold text-foreground text-sm mb-1">Cancelación dentro de las 12 horas previas</h3>
                 <p className="text-muted-foreground text-sm leading-relaxed">
-                  La clase se marcará como <strong className="text-foreground">utilizada</strong> y se descontará de su paquete. No hay reposición ni reembolso.
+                  Cuenta como una clase reservada sin asistir. Si acumulas <strong className="text-foreground">5 clases reservadas sin asistir</strong>, se aplica una penalización con pérdida de puntos.
                 </p>
               </div>
             </div>
@@ -84,9 +84,9 @@ const Cancelacion = () => {
             <div className="flex items-start gap-4">
               <div className="w-10 h-10 rounded-xl bg-red-500/15 border border-red-500/30 flex items-center justify-center flex-shrink-0 text-red-400 text-lg">✗</div>
               <div>
-                <h3 className="font-syne font-bold text-foreground text-sm mb-1">Inasistencia sin aviso (No-show)</h3>
+                <h3 className="font-syne font-bold text-foreground text-sm mb-1">Inasistencia sin aviso</h3>
                 <p className="text-muted-foreground text-sm leading-relaxed">
-                  La clase se pierde automáticamente. No se otorga reposición, crédito ni reembolso.
+                  Cuenta como una clase reservada sin asistir y suma a tu conteo de faltas. Al acumular 5, se aplica la penalización con pérdida de puntos.
                 </p>
               </div>
             </div>
@@ -109,25 +109,24 @@ const Cancelacion = () => {
             <li>Extender la vigencia por el periodo de incapacidad comprobada.</li>
           </ul>
           <p>
-            Estas excepciones requieren notificación por escrito a <strong className="text-primary">hola@almamovement.mx</strong> con documentación de soporte y quedan a criterio de la administración del estudio.
+            Estas excepciones requieren notificación por escrito a <strong className="text-primary">info@almamovement.mx</strong> con documentación de soporte y quedan a criterio de la administración del estudio.
           </p>
 
           <h2 className="font-syne font-bold text-lg text-foreground mt-8 mb-3">4. Cancelación de clases por parte del estudio</h2>
           <ul className="list-disc pl-6 space-y-2">
-            <li>Si el estudio cancela una clase por causas imputables (falta de instructora, mantenimiento, etc.), la clase se repondrá automáticamente al paquete de cada alumna afectada.</li>
-            <li>Se notificará a las alumnas registradas con la mayor anticipación posible a través de la app y/o WhatsApp.</li>
+            <li>Si necesitamos cancelar una clase (por ejemplo, ausencia de la coach o mantenimiento), te devolvemos la clase a tu paquete y te avisamos lo antes posible por la app y/o WhatsApp.</li>
             <li>En caso de fenómenos naturales o situaciones de fuerza mayor, el estudio podrá cancelar clases sin reposición obligatoria, aunque se hará el mejor esfuerzo por reprogramar.</li>
           </ul>
 
           <h2 className="font-syne font-bold text-lg text-foreground mt-8 mb-3">5. Cambio de horario</h2>
           <ul className="list-disc pl-6 space-y-2">
-            <li>Para cambiar de horario, primero cancele su reservación actual (con más de 2 horas de anticipación) y reserve la nueva clase disponible.</li>
+            <li>Para cambiar de horario, primero cancela tu reservación actual (con más de 12 horas de anticipación) y reserva la nueva clase disponible.</li>
             <li>Los cambios están sujetos a disponibilidad de cupo.</li>
           </ul>
 
-          <h2 className="font-syne font-bold text-lg text-foreground mt-8 mb-3">6. Impuntualidad</h2>
+          <h2 className="font-syne font-bold text-lg text-foreground mt-8 mb-3">6. Puntualidad</h2>
           <p>
-            Existe una tolerancia de <strong className="text-foreground">5 minutos</strong>. Si llega después de este periodo, no se permitirá el acceso a la clase y esta se contará como utilizada. Esto es por seguridad de todas las participantes y respeto al grupo.
+            Te pedimos llegar <strong className="text-foreground">10 minutos antes</strong> de tu clase. Una vez iniciada la sesión no se permite el acceso, por seguridad de todas las participantes y respeto al grupo. Esa clase se contará como utilizada.
           </p>
 
           <h2 className="font-syne font-bold text-lg text-foreground mt-8 mb-3">7. Resumen rápido</h2>
@@ -141,20 +140,24 @@ const Cancelacion = () => {
               </thead>
               <tbody>
                 <tr className="border-t border-border">
-                  <td className="p-4">Cancelación &gt; 2 hrs antes</td>
-                  <td className="p-4 text-green-400">✓ Clase devuelta</td>
+                  <td className="p-4">Cancelación &gt; 12 hrs antes</td>
+                  <td className="p-4 text-green-400">✓ Sin penalización</td>
                 </tr>
                 <tr className="border-t border-border">
-                  <td className="p-4">Cancelación &lt; 2 hrs antes</td>
-                  <td className="p-4 text-yellow-400">⚠ Clase perdida</td>
+                  <td className="p-4">Cancelación &lt; 12 hrs antes</td>
+                  <td className="p-4 text-yellow-400">⚠ Cuenta como falta</td>
                 </tr>
                 <tr className="border-t border-border">
-                  <td className="p-4">No-show (sin aviso)</td>
-                  <td className="p-4 text-red-400">✗ Clase perdida</td>
+                  <td className="p-4">Inasistencia sin aviso</td>
+                  <td className="p-4 text-yellow-400">⚠ Cuenta como falta</td>
                 </tr>
                 <tr className="border-t border-border">
-                  <td className="p-4">Llegada tarde (&gt;5 min)</td>
-                  <td className="p-4 text-red-400">✗ Sin acceso, clase perdida</td>
+                  <td className="p-4">5 clases reservadas sin asistir</td>
+                  <td className="p-4 text-red-400">✗ Penalización con pérdida de puntos</td>
+                </tr>
+                <tr className="border-t border-border">
+                  <td className="p-4">Llegar después del inicio</td>
+                  <td className="p-4 text-red-400">✗ Sin acceso, clase utilizada</td>
                 </tr>
                 <tr className="border-t border-border">
                   <td className="p-4">Reembolso de paquete</td>
@@ -173,9 +176,9 @@ const Cancelacion = () => {
             Para cualquier duda o aclaración respecto a esta Política de Cancelación:
           </p>
           <ul className="list-none space-y-1">
-            <li><strong className="text-foreground">Email:</strong> hola@almamovement.mx</li>
-            <li><strong className="text-foreground">Teléfono:</strong> +52 772 111 9216</li>
-            <li><strong className="text-foreground">Dirección:</strong> Juriquilla, Querétaro, México</li>
+            <li><strong className="text-foreground">Email:</strong> info@almamovement.mx</li>
+            <li><strong className="text-foreground">Teléfono:</strong> por confirmar</li>
+            <li><strong className="text-foreground">Dirección:</strong> Plaza Arce, Calle Acueducto de Querétaro 513, Jurica Acueducto, 76230 Juriquilla, Querétaro</li>
           </ul>
           </div>
         )}

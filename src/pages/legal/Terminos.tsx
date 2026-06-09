@@ -55,14 +55,14 @@ const Terminos = () => {
           </p>
 
           <p>
-            Al utilizar los servicios de <strong className="text-foreground">Alma Movement</strong>, incluyendo nuestra plataforma web, aplicación y clases presenciales, usted acepta los presentes Términos y Condiciones. Le recomendamos leerlos detenidamente.
+            Al utilizar los servicios de <strong className="text-foreground">Alma Movement</strong>, incluyendo nuestra plataforma de reservas en línea y las clases presenciales en el estudio, usted acepta los presentes Términos y Condiciones. Le recomendamos leerlos detenidamente.
           </p>
 
           <h2 className="font-syne font-bold text-lg text-foreground mt-8 mb-3">1. Definiciones</h2>
           <ul className="list-disc pl-6 space-y-2">
             <li><strong className="text-foreground">"Estudio"</strong> se refiere a Alma Movement y sus instalaciones en Juriquilla, Querétaro.</li>
             <li><strong className="text-foreground">"Alumna/o"</strong> se refiere a cualquier persona registrada en la plataforma que asiste a clases.</li>
-            <li><strong className="text-foreground">"Paquete"</strong> se refiere a los planes de clases de Barre adquiridos en el estudio.</li>
+            <li><strong className="text-foreground">"Paquete"</strong> se refiere a los planes de clases (Pilates Reformer, Pilates Tower, Pilates Mat, Barre y Sculpt) adquiridos en el estudio.</li>
             <li><strong className="text-foreground">"Clase"</strong> se refiere a cada sesión de ejercicio programada en el estudio.</li>
           </ul>
 
@@ -82,28 +82,26 @@ const Terminos = () => {
             <li>Los paquetes <strong className="text-foreground">no son reembolsables</strong> una vez adquiridos.</li>
             <li>Las clases no utilizadas dentro del periodo de vigencia se pierden sin derecho a reembolso ni extensión.</li>
             <li>Los pagos deben realizarse antes o el mismo día de la primera clase del paquete.</li>
-            <li>Aceptamos pagos en efectivo, transferencia bancaria y tarjeta.</li>
+            <li>El pago se realiza por transferencia bancaria (Banorte, a nombre de Estefanía Torres Lanzagorta) o en efectivo en el estudio.</li>
           </ul>
 
           <h2 className="font-syne font-bold text-lg text-foreground mt-8 mb-3">4. Reservaciones</h2>
           <ul className="list-disc pl-6 space-y-2">
             <li>Todas las clases requieren <strong className="text-foreground">reservación previa</strong> a través de la plataforma.</li>
-            <li>El cupo máximo por clase es de <strong className="text-foreground">10 personas</strong>.</li>
+            <li>El cupo máximo por clase es de <strong className="text-foreground">4 personas</strong> en el área de Reformer y Tower, y de <strong className="text-foreground">8 personas</strong> en el área de Studio (Mat, Barre y Sculpt).</li>
             <li>Las reservaciones pueden realizarse hasta 5 minutos antes del inicio de la clase, sujeto a disponibilidad.</li>
             <li>No se permiten reservaciones por teléfono ni en persona sin confirmar en la plataforma.</li>
           </ul>
 
           <h2 className="font-syne font-bold text-lg text-foreground mt-8 mb-3">5. Cancelaciones e inasistencias</h2>
           <ul className="list-disc pl-6 space-y-2">
-            <li>Las cancelaciones deben realizarse con un mínimo de <strong className="text-foreground">2 horas de anticipación</strong> al inicio de la clase.</li>
-            <li>Cancelaciones tardías (menos de 2 horas) o inasistencias sin aviso resultarán en la <strong className="text-foreground">pérdida de la clase</strong> del paquete.</li>
-            <li>No se otorgan reposiciones por cancelaciones tardías ni inasistencias.</li>
+            <li>Si cancelas dentro de las <strong className="text-foreground">12 horas previas</strong> a tu clase y acumulas <strong className="text-foreground">5 clases reservadas sin asistir</strong>, se aplica una penalización con pérdida de puntos.</li>
+            <li>Te pedimos avisar con la mayor anticipación posible para liberar tu lugar a otra alumna.</li>
           </ul>
 
           <h2 className="font-syne font-bold text-lg text-foreground mt-8 mb-3">6. Puntualidad</h2>
           <ul className="list-disc pl-6 space-y-2">
-            <li>Se otorgan <strong className="text-foreground">5 minutos de tolerancia</strong> después de la hora programada.</li>
-            <li>Una vez iniciada la sesión, no se permitirá el ingreso por seguridad y respeto al grupo.</li>
+            <li>Te pedimos llegar 10 minutos antes de tu clase. Una vez iniciada la sesión no se permite el acceso, por seguridad y respeto al grupo.</li>
             <li>La inasistencia por impuntualidad se contará como clase utilizada.</li>
           </ul>
 
@@ -112,14 +110,14 @@ const Terminos = () => {
             <li>Cada alumna/o es responsable de informar cualquier condición médica, embarazo, lesión o padecimiento <strong className="text-foreground">antes de tomar su primera clase</strong>.</li>
             <li>El estudio no se hace responsable por lesiones derivadas de condiciones médicas no reportadas.</li>
             <li>Se recomienda consultar a un médico antes de iniciar cualquier programa de ejercicio.</li>
-            <li>En caso de embarazo o postparto, se requiere autorización médica por escrito.</li>
+            <li>Es tu responsabilidad informarnos cualquier condición de salud (embarazo, lesión o padecimiento) antes de tu primera clase para cuidarte durante la práctica.</li>
           </ul>
 
           <h2 className="font-syne font-bold text-lg text-foreground mt-8 mb-3">8. Vestimenta y artículos personales</h2>
           <ul className="list-disc pl-6 space-y-2">
-            <li>Para clases de Barre: ropa deportiva cómoda y <strong className="text-foreground">calcetas antideslizantes obligatorias</strong>.</li>
-            <li>Todos los artículos personales deben guardarse en los lockers proporcionados.</li>
-            <li>No se permite llevar objetos personales (incluida agua) al área de la barra para evitar accidentes.</li>
+            <li>El uso de <strong className="text-foreground">calcetines antiderrapantes es obligatorio en todas las clases</strong>. Te recomendamos ropa deportiva cómoda.</li>
+            <li>Te pedimos guardar tus pertenencias en el espacio destinado para ello dentro del estudio.</li>
+            <li>Mantén tus objetos personales fuera del área de equipo para tu seguridad y la de las demás.</li>
             <li>El celular debe permanecer en silencio durante la clase.</li>
             <li>El estudio no se hace responsable por objetos perdidos o robados.</li>
           </ul>
@@ -146,9 +144,9 @@ const Terminos = () => {
             Para cualquier duda respecto a estos Términos y Condiciones:
           </p>
           <ul className="list-none space-y-1">
-            <li><strong className="text-foreground">Email:</strong> hola@almamovement.mx</li>
-            <li><strong className="text-foreground">Teléfono:</strong> +52 772 111 9216</li>
-            <li><strong className="text-foreground">Dirección:</strong> Juriquilla, Querétaro, México</li>
+            <li><strong className="text-foreground">Email:</strong> info@almamovement.mx</li>
+            <li><strong className="text-foreground">Teléfono:</strong> por confirmar</li>
+            <li><strong className="text-foreground">Dirección:</strong> Plaza Arce, Calle Acueducto de Querétaro 513, Jurica Acueducto, 76230 Juriquilla, Querétaro</li>
           </ul>
           </div>
         )}

@@ -46,13 +46,13 @@ const ProfilePreferences = () => {
     },
     {
       key: "receivePromotions",
-      label: "Promociones y eventos",
-      desc: "Descuentos, masterclasses y eventos especiales.",
+      label: "Novedades del estudio",
+      desc: "Avisos sobre horarios, clases nuevas y comunidad.",
     },
     {
       key: "receiveWeeklySummary",
       label: "Resumen semanal",
-      desc: "Cómo te fue, anillos cerrados y lo que viene.",
+      desc: "Un repaso de tus clases de la semana y lo que viene.",
     },
   ];
 

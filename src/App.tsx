@@ -31,12 +31,8 @@ import ProfileEdit from "./pages/client/ProfileEdit";
 import ProfileMembership from "./pages/client/ProfileMembership";
 import ProfilePreferences from "./pages/client/ProfilePreferences";
 import ProfileSecurity from "./pages/client/ProfileSecurity";
-import ReferFriends from "./pages/client/ReferFriends";
 import Responsiva from "./pages/client/Responsiva";
-import VideoLibrary from "./pages/client/VideoLibrary";
-import VideoPlayer from "./pages/client/VideoPlayer";
 import Notifications from "./pages/client/Notifications";
-import Events from "./pages/client/Events";
 
 // Admin pages
 import AdminDashboard from "./pages/admin/Dashboard";
@@ -116,15 +112,11 @@ const App = () => (
           <Route path="/app/wallet" element={<Wallet />} />
           <Route path="/app/wallet/history" element={<WalletHistory />} />
           <Route path="/app/wallet/rewards" element={<WalletRewards />} />
-          <Route path="/app/videos" element={<VideoLibrary />} />
-          <Route path="/app/videos/:videoId" element={<VideoPlayer />} />
-          <Route path="/app/events" element={<Events />} />
           <Route path="/app/profile" element={<Profile />} />
           <Route path="/app/profile/edit" element={<ProfileEdit />} />
           <Route path="/app/profile/membership" element={<ProfileMembership />} />
           <Route path="/app/profile/preferences" element={<ProfilePreferences />} />
           <Route path="/app/profile/security" element={<ProfileSecurity />} />
-          <Route path="/app/profile/refer" element={<ReferFriends />} />
           <Route path="/app/profile/responsiva" element={<Responsiva />} />
           <Route path="/app/notifications" element={<Notifications />} />
 

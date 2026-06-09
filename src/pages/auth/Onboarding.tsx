@@ -110,7 +110,7 @@ const Onboarding = () => {
   return (
     <AuthShell
       brandPhoto={almaBarre}
-      brandPhotoAlt="Línea de barre en una clase de Alma"
+      brandPhotoAlt="Una clase de Pilates en Alma Movement"
       brandTint="berry"
       brandEyebrow="Casi listas"
       brandHeadline={<>Antes de tu</>}
@@ -149,7 +149,7 @@ const Onboarding = () => {
               className="text-[0.84rem] font-medium"
               style={{ color: ALMA.ink }}
             >
-              Cuéntanos qué debemos saber (lesión, cirugía, embarazo, etc.)
+              Cuéntanos qué debemos saber (lesión, cirugía o molestia reciente)
             </label>
             <textarea
               id="injury-details"
@@ -175,7 +175,7 @@ const Onboarding = () => {
         )}
 
         <YesNoField
-          label="¿Habías practicado barre antes?"
+          label="¿Habías practicado Pilates antes?"
           value={practicedBarre}
           onChange={(v) => setPracticedBarre(v)}
           error={touched && practicedBarre === null ? "Selecciona una opción" : undefined}

@@ -48,7 +48,7 @@ const ForgotPassword = () => {
   return (
     <AuthShell
       brandPhoto={almaForgot}
-      brandPhotoAlt="Detalle de la barra del estudio"
+      brandPhotoAlt="Detalle del estudio Alma Movement"
       brandTint="coral"
       brandEyebrow="Recuperar acceso"
       brandHeadline={<>Te ayudamos</>}

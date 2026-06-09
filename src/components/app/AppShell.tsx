@@ -9,7 +9,6 @@ import {
   ClipboardList,
   Wallet as WalletIcon,
   User as UserIcon,
-  Film,
   Bell,
   ChevronRight,
   LogOut,
@@ -35,7 +34,6 @@ const NAV: readonly NavItem[] = [
   { to: "/app", label: "Inicio", icon: Home, exact: true },
   { to: "/app/classes", label: "Reservar", icon: CalendarDays },
   { to: "/app/bookings", label: "Mis clases", icon: ClipboardList },
-  { to: "/app/videos", label: "Videos", icon: Film },
   { to: "/app/wallet", label: "Wallet", icon: WalletIcon },
   { to: "/app/profile", label: "Perfil", icon: UserIcon },
 ];
@@ -157,19 +155,6 @@ export const AppShell = ({ children, hideGreeting = false }: AppShellProps) => {
             <span>Notificaciones</span>
             <span aria-hidden="true" />
           </Link>
-          <Link
-            to="/app/events"
-            className="grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-2xl px-3.5 py-2.5 text-[0.88rem] no-underline transition-colors"
-            style={{
-              color: pathname.startsWith("/app/events") ? ALMA.berry : ALMA.ink,
-              backgroundColor: pathname.startsWith("/app/events") ? ALMA.blush : "transparent",
-              opacity: pathname.startsWith("/app/events") ? 1 : 0.78,
-            }}
-          >
-            <CalendarDays size={16} strokeWidth={1.8} />
-            <span>Eventos</span>
-            <span aria-hidden="true" />
-          </Link>
         </div>
 
         <div className="mt-auto pt-6" style={{ borderTop: `1px solid ${ALMA.border}` }}>
@@ -265,7 +250,7 @@ export const AppShell = ({ children, hideGreeting = false }: AppShellProps) => {
 
         {/* Mobile bottom nav */}
         <nav
-          className="lg:hidden fixed inset-x-0 bottom-0 z-40 grid grid-cols-6"
+          className="lg:hidden fixed inset-x-0 bottom-0 z-40 grid grid-cols-5"
           style={{
             backgroundColor: `${ALMA.cream}f5`,
             backdropFilter: "blur(14px)",

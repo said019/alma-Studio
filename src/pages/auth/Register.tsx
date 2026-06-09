@@ -117,9 +117,9 @@ const Register = () => {
       brandSubline="Crea tu cuenta y reserva tu primera clase. Grupos pequeños, atención personalizada, técnica cuidada."
       brandList={[
         { label: "Reservas y check-in en línea" },
-        { label: "Anillos de progreso semanales" },
+        { label: "Tus reservas y clases siempre a la mano" },
         { label: "Recordatorios por WhatsApp" },
-        { label: "Eventos y videos exclusivos" },
+        { label: "Atención cercana: te conocen por tu nombre" },
       ]}
       formEyebrow="Crear cuenta"
       formHeadline="Únete a"

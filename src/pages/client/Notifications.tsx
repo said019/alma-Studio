@@ -17,7 +17,7 @@ import {
 } from "@/components/app/AppShell";
 import {
   Bell, BellOff,
-  CalendarCheck2, CreditCard, Megaphone, Trophy, Sparkles, Coins, Gift,
+  CalendarCheck2, CreditCard, Info, Trophy, Sparkles, Coins, Gift,
 } from "lucide-react";
 
 type Category =
@@ -39,7 +39,8 @@ interface Notif {
 const CATEGORY_ICON: Record<Category, React.ReactNode> = {
   booking: <CalendarCheck2 size={17} strokeWidth={1.7} />,
   membership: <CreditCard size={17} strokeWidth={1.7} />,
-  marketing: <Megaphone size={17} strokeWidth={1.7} />,
+  // Aviso del estudio
+  marketing: <Info size={17} strokeWidth={1.7} />,
   milestone: <Trophy size={17} strokeWidth={1.7} />,
   motivation: <Sparkles size={17} strokeWidth={1.7} />,
   loyalty_earn: <Coins size={17} strokeWidth={1.7} />,
@@ -50,7 +51,8 @@ const CATEGORY_ICON: Record<Category, React.ReactNode> = {
 const CATEGORY_TINT: Record<Category, keyof typeof ALMA> = {
   booking: "berry",
   membership: "olive",
-  marketing: "coral",
+  // Aviso del estudio
+  marketing: "berry",
   milestone: "orange",
   motivation: "coral",
   loyalty_earn: "olive",

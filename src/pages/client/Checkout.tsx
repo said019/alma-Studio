@@ -30,7 +30,6 @@ import {
   Tag as TagIcon,
   Upload,
   ArrowLeft,
-  Film,
 } from "lucide-react";
 
 type Step = "select" | "method" | "bank" | "cash" | "upload" | "done";
@@ -43,32 +42,28 @@ const flag = (value: unknown): boolean => {
   return false;
 };
 
-const detectCategory = (plan: any): "barre" | "all" | "online" => {
+const detectCategory = (plan: any): "studio" | "reformer_tower" | "mixto" | "all" => {
   const raw = String(plan.classCategory ?? plan.class_category ?? "").toLowerCase();
-  if (raw === "online") return "online";
-  if (["barre", "pilates", "mixto", "all"].includes(raw)) return raw as any;
+  if (["studio", "reformer_tower", "mixto", "all"].includes(raw)) return raw as any;
   const byName = String(plan.name ?? "").toLowerCase();
-  if (byName.includes("online")) return "online";
-  if (byName.includes("jump")) return "barre";
-  if (byName.includes("pilates")) return "pilates";
+  if (byName.includes("reformer") || byName.includes("tower")) return "reformer_tower";
+  if (byName.includes("studio") || byName.includes("mat") || byName.includes("barre") || byName.includes("sculpt")) return "studio";
   if (byName.includes("mixto")) return "mixto";
   return "all";
 };
 
 const CATEGORY_TINT: Record<string, keyof typeof ALMA> = {
-  jumping: "berry",
-  pilates: "coral",
+  studio: "berry",
+  reformer_tower: "coral",
   mixto: "orange",
   all: "olive",
-  online: "coral",
 };
 
 const CATEGORY_LABEL: Record<string, string> = {
-  jumping: "Barre",
-  pilates: "Pilates",
+  studio: "Studio",
+  reformer_tower: "Reformer/Tower",
   mixto: "Mixto",
-  all: "Suelta",
-  online: "En línea",
+  all: "Todas las disciplinas",
 };
 
 /* ── PlanRow ─────────────────────────────────────────────── */
@@ -76,19 +71,11 @@ const PlanRow = ({ plan, selected, onSelect }: { plan: any; selected: boolean; o
   const category = detectCategory(plan);
   const tint = CATEGORY_TINT[category];
   const c = ALMA[tint];
-  const isOnline = category === "online";
   const durationDays = Number(plan.durationDays ?? plan.duration_days ?? 0);
   const classLimit = plan.classLimit ?? plan.class_limit ?? null;
-  // "Ilimitado" solo aplica a planes presenciales con clases ilimitadas; un
-  // plan online NO da clases presenciales (es solo acceso a videos).
-  const isUnlimited = !isOnline && Number(classLimit) >= 900;
+  const isUnlimited = Number(classLimit) >= 900;
   const nonTransferable = flag(plan.isNonTransferable ?? plan.is_non_transferable);
   const nonRepeatable = flag(plan.isNonRepeatable ?? plan.is_non_repeatable);
-  // Plan presencial que regala la biblioteca online (ej. 5 clases/semana).
-  // El plan online en sí también la incluye, pero ahí es obvio por el nombre.
-  const includesVideos =
-    flag(plan.includesVideoLibrary ?? plan.includes_video_library) &&
-    String(plan.classCategory ?? plan.class_category ?? "").toLowerCase() !== "online";
 
   return (
     <button
@@ -108,27 +95,11 @@ const PlanRow = ({ plan, selected, onSelect }: { plan: any; selected: boolean; o
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2 mb-1">
             <Tag tint={tint}>{CATEGORY_LABEL[category]}</Tag>
-            {isOnline ? (
-              <span className="inline-flex items-center gap-1 text-[0.7rem] uppercase tracking-[0.18em]" style={{ color: ALMA.ink, opacity: 0.55 }}>
-                <Film size={11} /> Solo videos
+            {isUnlimited && <Tag tint="orange">Ilimitado</Tag>}
+            {!isUnlimited && Number(classLimit) > 0 && (
+              <span className="text-[0.7rem] uppercase tracking-[0.18em]" style={{ color: ALMA.ink, opacity: 0.55 }}>
+                {classLimit} clases
               </span>
-            ) : (
-              <>
-                {isUnlimited && <Tag tint="orange">Ilimitado</Tag>}
-                {!isUnlimited && Number(classLimit) > 0 && (
-                  <span className="text-[0.7rem] uppercase tracking-[0.18em]" style={{ color: ALMA.ink, opacity: 0.55 }}>
-                    {classLimit} clases
-                  </span>
-                )}
-                {includesVideos && (
-                  <span
-                    className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.58rem] font-medium uppercase tracking-[0.14em]"
-                    style={{ backgroundColor: `${ALMA.olive}1f`, color: ALMA.olive }}
-                  >
-                    <Film size={10} /> Incluye videos
-                  </span>
-                )}
-              </>
             )}
           </div>
           <h3 className="font-bebas leading-tight" style={{ color: ALMA.ink, fontSize: "clamp(1.1rem, 1.6vw, 1.35rem)" }}>
@@ -141,19 +112,9 @@ const PlanRow = ({ plan, selected, onSelect }: { plan: any; selected: boolean; o
               {nonRepeatable && " · No repetible"}
             </p>
           )}
-          {isOnline && (
-            <p className="text-[0.74rem] mt-0.5" style={{ color: ALMA.coral }}>
-              Acceso a la biblioteca de videos. No incluye clases presenciales.
-            </p>
-          )}
-          {includesVideos && (
-            <p className="text-[0.74rem] mt-0.5 font-medium" style={{ color: ALMA.olive }}>
-              ✓ Incluye la membresía online (biblioteca completa de videos)
-            </p>
-          )}
         </div>
         <div className="text-right hidden sm:block">
-          {!isOnline && !isUnlimited && Number(plan.price) > 0 && Number(classLimit) > 0 && Number(classLimit) < 900 && (
+          {!isUnlimited && Number(plan.price) > 0 && Number(classLimit) > 0 && Number(classLimit) < 900 && (
             <p className="text-[0.72rem]" style={{ color: ALMA.ink, opacity: 0.45 }}>
               ${formatMoneyMX(Math.round(Number(plan.price) / Number(classLimit)))}/clase
             </p>
@@ -194,7 +155,6 @@ const Checkout = () => {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("transfer");
   const [discountCode, setDiscountCode] = useState("");
   const [discountResult, setDiscountResult] = useState<any>(null);
-  const [addOnline, setAddOnline] = useState(false); // complemento biblioteca online +$75
   const [orderId, setOrderId] = useState<string | null>(null);
   const [orderNumber, setOrderNumber] = useState<string | null>(null);
   const [bankDetails, setBankDetails] = useState<any>(null);
@@ -211,7 +171,7 @@ const Checkout = () => {
   const isVisitPack = (p: any): boolean =>
     Boolean(p?.isVisitPack ?? p?.is_visit_pack);
 
-  // Para Alma (estudio de Pilates de una disciplina): no se usan tabs jumping/pilates/mixto.
+  // Para Alma (estudio de Pilates): no se usan tabs por categoría.
   // Sólo se separan las clases sueltas (1 clase) de los paquetes mensuales (>1 clase).
   // Los packs de visitas se muestran aparte para que la socia entienda que son
   // para llevar acompañantes, no para asistir ella misma.
@@ -241,24 +201,6 @@ const Checkout = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plansData]);
 
-  // ── Complemento online ──────────────────────────────────────────────
-  const ADDON_ONLINE_PRICE = 75;
-  const onlineMonthlyPlan = useMemo(() => {
-    return activePlans.find((p) => {
-      const cat = String(p.classCategory ?? p.class_category ?? "").toLowerCase();
-      const name = String(p.name ?? "").toLowerCase();
-      return cat === "online" && name.includes("mensual");
-    }) ?? null;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [plansData]);
-
-  // El plan seleccionado admite complemento online si es presencial y aún no
-  // incluye videos (no tiene sentido sobre un plan online o uno que ya los trae).
-  const selectedIsOnline = String(selectedPlan?.classCategory ?? selectedPlan?.class_category ?? "").toLowerCase() === "online";
-  const selectedHasVideos = (selectedPlan?.includesVideoLibrary ?? selectedPlan?.includes_video_library) === true;
-  const canAddOnline = !!selectedPlan && !selectedIsOnline && !selectedHasVideos && !!onlineMonthlyPlan;
-  const showAddon = canAddOnline && addOnline;
-
   const validateCodeMutation = useMutation({
     mutationFn: () => api.post("/discount-codes/validate", { code: discountCode, planId: selectedPlan?.id }),
     onSuccess: (res) => setDiscountResult(res.data?.data ?? res.data),
@@ -271,7 +213,6 @@ const Checkout = () => {
         planId: selectedPlan.id,
         discountCode: discountResult?.code,
         paymentMethod,
-        ...(showAddon && onlineMonthlyPlan ? { addonPlanId: onlineMonthlyPlan.id } : {}),
       }),
     onSuccess: (res) => {
       const data = res.data?.data ?? res.data;
@@ -306,10 +247,9 @@ const Checkout = () => {
       }),
   });
 
-  const baseAfterDiscount = discountResult
+  const finalAmount = discountResult
     ? (selectedPlan?.price ?? 0) - (discountResult.discount_amount ?? 0)
     : selectedPlan?.price ?? 0;
-  const finalAmount = baseAfterDiscount + (showAddon ? ADDON_ONLINE_PRICE : 0);
 
   const STEPS: { id: Step; label: string }[] = [
     { id: "select", label: "Plan" },
@@ -345,7 +285,7 @@ const Checkout = () => {
                 <PlanRow
                   plan={singleClassPlan}
                   selected={selectedPlan?.id === singleClassPlan.id}
-                  onSelect={() => { setSelectedPlan(singleClassPlan); setAddOnline(false); setDiscountResult(null); }}
+                  onSelect={() => { setSelectedPlan(singleClassPlan); setDiscountResult(null); }}
                 />
               ) : (
                 <p className="text-[0.86rem]" style={{ color: ALMA.ink, opacity: 0.55 }}>
@@ -365,7 +305,7 @@ const Checkout = () => {
                       key={plan.id}
                       plan={plan}
                       selected={selectedPlan?.id === plan.id}
-                      onSelect={() => { setSelectedPlan(plan); setAddOnline(false); setDiscountResult(null); }}
+                      onSelect={() => { setSelectedPlan(plan); setDiscountResult(null); }}
                     />
                   ))}
                 </div>
@@ -388,7 +328,7 @@ const Checkout = () => {
                       key={plan.id}
                       plan={plan}
                       selected={selectedPlan?.id === plan.id}
-                      onSelect={() => { setSelectedPlan(plan); setAddOnline(false); setDiscountResult(null); }}
+                      onSelect={() => { setSelectedPlan(plan); setDiscountResult(null); }}
                     />
                   ))}
                 </div>
@@ -428,54 +368,6 @@ const Checkout = () => {
                       <CheckCircle2 size={14} />
                       Descuento ${formatMoneyMX(discountResult.discount_amount)} MXN aplicado
                     </p>
-                  )}
-
-                  {/* Complemento: agregar la biblioteca online por +$75 */}
-                  {canAddOnline && (
-                    <button
-                      type="button"
-                      onClick={() => setAddOnline((v) => !v)}
-                      className="w-full text-left rounded-2xl p-4 flex items-start gap-3 transition-colors cursor-pointer"
-                      style={{
-                        backgroundColor: showAddon ? `${ALMA.olive}14` : ALMA.cream,
-                        border: `1px solid ${showAddon ? ALMA.olive : ALMA.border}`,
-                      }}
-                    >
-                      <span
-                        className="grid h-6 w-6 shrink-0 place-items-center rounded-md mt-0.5"
-                        style={{
-                          backgroundColor: showAddon ? ALMA.olive : "transparent",
-                          border: showAddon ? "0" : `1.5px solid ${ALMA.border}`,
-                          color: ALMA.cream,
-                        }}
-                      >
-                        {showAddon && <Check size={13} strokeWidth={3} />}
-                      </span>
-                      <span className="flex-1">
-                        <span className="flex items-center gap-1.5 font-medium text-[0.92rem]" style={{ color: ALMA.ink }}>
-                          <Film size={13} style={{ color: ALMA.olive }} />
-                          Agrega la biblioteca online
-                        </span>
-                        <span className="block text-[0.8rem] mt-0.5" style={{ color: ALMA.ink, opacity: 0.6 }}>
-                          Acceso a todos los videos por 30 días. Normalmente $350 — con tu paquete, solo
-                          <strong style={{ color: ALMA.olive }}> +${ADDON_ONLINE_PRICE}</strong>.
-                        </span>
-                      </span>
-                    </button>
-                  )}
-
-                  {/* Desglose cuando hay complemento */}
-                  {showAddon && (
-                    <div className="space-y-1 text-[0.82rem] pt-1" style={{ color: ALMA.ink, opacity: 0.7 }}>
-                      <div className="flex justify-between">
-                        <span>{selectedPlan.name}</span>
-                        <span>${formatMoneyMX(baseAfterDiscount)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Biblioteca online (complemento)</span>
-                        <span>+${formatMoneyMX(ADDON_ONLINE_PRICE)}</span>
-                      </div>
-                    </div>
                   )}
 
                   <div className="flex items-baseline justify-between pt-3" style={{ borderTop: `1px solid ${ALMA.border}` }}>
@@ -522,7 +414,7 @@ const Checkout = () => {
             <Section title="¿Cómo quieres pagar?">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {[
-                  { id: "transfer" as const, label: "Transferencia", sub: "SPEI · BBVA", icon: Building2, tint: "berry" as const },
+                  { id: "transfer" as const, label: "Transferencia", sub: "Banorte", icon: Building2, tint: "berry" as const },
                   { id: "cash" as const, label: "Efectivo", sub: "Pagar en estudio", icon: Banknote, tint: "orange" as const },
                 ].map((opt) => {
                   const Icon = opt.icon;
@@ -588,7 +480,7 @@ const Checkout = () => {
         {/* ── Step 3a: Bank details ── */}
         {step === "bank" && bankDetails && (
           <>
-            <Section title="Transferencia SPEI">
+            <Section title="Datos para transferencia">
               <p className="mb-4 text-[0.92rem] leading-[1.6]" style={{ color: ALMA.ink, opacity: 0.7 }}>
                 Realiza la transferencia con los datos abajo. Después sube el comprobante para que activemos tu paquete.
               </p>

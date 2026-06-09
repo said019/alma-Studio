@@ -6,27 +6,39 @@ import { describe, expect, it } from "vitest";
 const here = dirname(fileURLToPath(import.meta.url));
 const indexSource = readFileSync(resolve(here, "Index.tsx"), "utf8");
 
-describe("Alma landing client copy", () => {
-  it("includes the client-requested landing copy", () => {
-    expect(indexSource).toContain("Fuerza");
-    expect(indexSource).toContain("Equilibrio");
-    expect(indexSource).toContain("Flexibilidad");
+describe("Alma landing — copy fiel al estudio real", () => {
+  it("incluye el copy correcto del estudio de Pilates", () => {
     expect(indexSource).toMatch(/Evoluciona[\s\S]*en cada clase\./);
-    expect(indexSource).toContain("Playlists y rutinas nuevas cada día.");
+    expect(indexSource).toContain("Cada clase trabaja técnica, alineación y control en grupos pequeños.");
     expect(indexSource).toContain("Cupos reducidos: 4 lugares en Reformer y Tower, 8 en Studio.");
+    // Ubicación real (Juriquilla, Querétaro)
+    expect(indexSource).toContain("Plaza Arce");
+    expect(indexSource).toContain("Lun a Sáb");
   });
 
-  it("removes copy the client asked to take out", () => {
-    expect(indexSource).not.toContain("No configures tu meta");
-    expect(indexSource).not.toContain("gánala.");
-    expect(indexSource).not.toContain("Karla decide la recompensa por plan");
+  it("no contiene rastros del estudio anterior (Kala/Karla/barre)", () => {
     expect(indexSource).not.toContain("Karla");
+    expect(indexSource).not.toContain("Playlists y rutinas nuevas cada día.");
   });
 
-  it("ya no ofrece clases grabadas / planes online (eliminado en Fase 1)", () => {
-    // Fase 1 quitó la biblioteca de video y los planes online del catálogo.
+  it("no contiene testimonios inventados", () => {
+    expect(indexSource).not.toContain("Ana García");
+    expect(indexSource).not.toContain("Laura Martínez");
+    expect(indexSource).not.toContain("Sofía Hernández");
+    expect(indexSource).not.toContain("Alumna desde 2025");
+  });
+
+  it("no ofrece funciones inexistentes (videos / gamificación / promos)", () => {
     expect(indexSource).not.toContain("Clases grabadas");
     expect(indexSource).not.toContain("biblioteca de videos");
     expect(indexSource).not.toContain("ONLINE_PLANS");
+    expect(indexSource).not.toContain("anillos");
+    expect(indexSource).not.toContain("Compra directa desde la app");
+  });
+
+  it("no contiene datos de contacto de otra ciudad (San Luis Potosí)", () => {
+    expect(indexSource).not.toContain("444 307");
+    expect(indexSource).not.toContain("Nicolas Zapata");
+    expect(indexSource).not.toContain("Plaza San Martin");
   });
 });
