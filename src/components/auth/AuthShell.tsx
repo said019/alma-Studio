@@ -76,7 +76,7 @@ export const AuthShell = ({
         <img
           src={brandPhoto}
           alt={brandPhotoAlt}
-          className="absolute inset-0 h-full w-full object-cover"
+          className="alma-photo absolute inset-0 h-full w-full object-cover"
           loading="eager"
         />
         {/* Tint wash */}

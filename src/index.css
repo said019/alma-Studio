@@ -142,7 +142,7 @@
    un look cálido y moody tipo Frame: menos saturación, más contraste, tinte
    espresso. Se aplica a toda foto de la landing/app. */
 .alma-photo {
-  filter: grayscale(0.55) sepia(0.38) saturate(0.85) brightness(0.9) contrast(1.08);
+  filter: grayscale(0.78) sepia(0.52) saturate(0.82) brightness(0.82) contrast(1.13);
   transition: filter 700ms var(--ease-alma-out);
 }
 /* Capa cálida espresso por encima de la foto (multiply) para profundidad y
@@ -154,7 +154,7 @@
   pointer-events: none;
   background: #2a1e1b;
   mix-blend-mode: multiply;
-  opacity: 0.24;
+  opacity: 0.3;
 }
 /* Viñeta sutil para dar foco y peso editorial a fotos grandes. */
 .alma-photo-vignette::before {
