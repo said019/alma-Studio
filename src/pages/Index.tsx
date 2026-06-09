@@ -787,7 +787,7 @@ const formatPrice = (plan: PlanRow): string =>
   Number(plan.effectivePrice ?? plan.price).toLocaleString("es-MX");
 
 const sessionsLabel = (plan: PlanRow): string =>
-  plan.classLimit == null ? "Ilimitado" : `${plan.classLimit} sesiones`;
+  plan.classLimit == null ? "Ilimitado" : `${plan.classLimit} ${plan.classLimit === 1 ? "sesión" : "sesiones"}`;
 
 const PaquetesSection = ({
   trialPlan,
