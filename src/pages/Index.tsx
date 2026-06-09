@@ -798,6 +798,23 @@ const PaquetesSection = ({
   groupedPlans: CatalogGroup[];
   onPick: () => void;
 }) => {
+  const byKey = (k: string) => groupedPlans.find((g) => g.key === k)?.items ?? [];
+  const studioPlans = byKey("studio");
+  const reformerPlans = byKey("reformer_tower");
+  const mixtoPlans = byKey("mixto");
+  const premiumPlans = byKey("all");
+  const COLS: { key: string; label: string; match: (p: PlanRow) => boolean }[] = [
+    { key: "c1", label: "1 clase", match: (p) => p.classLimit === 1 },
+    { key: "c4", label: "4 clases", match: (p) => p.classLimit === 4 },
+    { key: "c8", label: "8 clases", match: (p) => p.classLimit === 8 },
+    { key: "c12", label: "12 clases", match: (p) => p.classLimit === 12 },
+    { key: "inf", label: "Ilimitado", match: (p) => p.classLimit == null },
+  ];
+  const matrixRows = [
+    { label: "Studio", sub: "Mat · Barre · Sculpt", plans: studioPlans.filter((p) => !p.morningOnly) },
+    { label: "Reformer / Tower", sub: "Trabajo en equipo", plans: reformerPlans.filter((p) => !p.morningOnly) },
+  ];
+  const amClubPlans = [...studioPlans, ...reformerPlans].filter((p) => p.morningOnly);
   return (
     <section id="paquetes" className="relative overflow-hidden px-5 sm:px-8 lg:px-12 py-28 lg:py-40" style={{ backgroundColor: ALMA.inkDeep }}>
       <div className="absolute inset-0 pointer-events-none opacity-[0.10]" style={{ background: `radial-gradient(circle at 80% 0%, ${ALMA.coral} 0%, transparent 55%), radial-gradient(circle at 0% 100%, ${ALMA.orange} 0%, transparent 60%)` }} />
@@ -851,64 +868,116 @@ const PaquetesSection = ({
           </div>
         )}
 
-        {/* Catálogo real agrupado por modalidad */}
-        <div className="reveal opacity-0 translate-y-8 transition-all duration-700 grid grid-cols-1 gap-6">
-          {groupedPlans.map((group) => (
-            <div key={group.key} className="rounded-[24px] overflow-hidden" style={{ backgroundColor: ALMA.cream }}>
-              <div className="px-7 sm:px-9 pt-7 sm:pt-9 pb-1">
-                <span className="text-[0.62rem] uppercase tracking-[0.24em]" style={{ color: ALMA.olive }}>Modalidad</span>
-                <h3 className="font-bebas mt-2 leading-tight" style={{ color: ALMA.ink, fontSize: "clamp(1.6rem, 2.6vw, 2.3rem)" }}>{group.title}</h3>
-              </div>
-
-              <ul className="mt-4 list-none m-0 p-0">
-                {group.items.map((plan, i) => (
-                  <li
-                    key={plan.id}
-                    className="group relative grid grid-cols-[auto_1fr_auto_auto] sm:grid-cols-[auto_1.8fr_1fr_auto_auto] items-center gap-x-4 sm:gap-x-6 gap-y-1 px-7 sm:px-9 py-5"
-                    style={{ borderTop: `1px solid ${ALMA.border}` }}
-                  >
-                    <span className="font-bebas tabular-nums text-[0.86rem]" style={{ color: ALMA.coral }}>
-                      {String(i + 1).padStart(2, "0")}
+        {/* Tabla comparativa — Studio vs Reformer/Tower (modalidad × sesiones) */}
+        <div className="reveal opacity-0 translate-y-8 transition-all duration-700">
+          <div className="rounded-[24px] overflow-hidden" style={{ backgroundColor: ALMA.cream }}>
+            <div className="overflow-x-auto">
+              <div className="min-w-[660px]">
+                {/* encabezado de columnas */}
+                <div className="grid items-end gap-x-3 px-6 sm:px-9 pt-8 pb-4" style={{ gridTemplateColumns: "1.5fr repeat(5, 1fr)" }}>
+                  <span className="text-[0.6rem] uppercase tracking-[0.24em]" style={{ color: ALMA.olive }}>
+                    Por modalidad y sesiones
+                  </span>
+                  {COLS.map((c) => (
+                    <span key={c.key} className="text-center text-[0.64rem] font-medium uppercase tracking-[0.12em]" style={{ color: ALMA.berry }}>
+                      {c.label}
                     </span>
+                  ))}
+                </div>
+                {/* filas por modalidad */}
+                {matrixRows.map((row) => (
+                  <div key={row.label} className="grid items-center gap-x-3 px-6 sm:px-9 py-6" style={{ gridTemplateColumns: "1.5fr repeat(5, 1fr)", borderTop: `1px solid ${ALMA.border}` }}>
                     <div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h4 className="font-bebas leading-tight" style={{ color: ALMA.ink, fontSize: "clamp(1.15rem, 1.5vw, 1.4rem)" }}>{plan.name}</h4>
-                        {plan.morningOnly && (
-                          <span
-                            className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[0.58rem] font-medium uppercase tracking-[0.16em]"
-                            style={{ backgroundColor: `${ALMA.olive}1f`, color: ALMA.olive }}
-                          >
-                            Solo 7–10am
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-[0.76rem] uppercase tracking-[0.16em] text-[color:var(--ink)]/55 mt-0.5">
-                        {sessionsLabel(plan)} · {plan.durationDays} días
-                      </p>
-                      {plan.description && (
-                        <p className="text-[0.84rem] leading-[1.55] text-[color:var(--ink)]/62 mt-1 max-w-[52ch]">
-                          {plan.description}
-                        </p>
-                      )}
+                      <h3 className="font-bebas leading-none" style={{ color: ALMA.ink, fontSize: "clamp(1.4rem, 2.1vw, 1.95rem)" }}>{row.label}</h3>
+                      <p className="text-[0.62rem] uppercase tracking-[0.14em] text-[color:var(--ink)]/45 mt-1.5">{row.sub}</p>
                     </div>
-                    <div className="hidden sm:block" />
-                    <div className="text-right">
-                      <div className="font-bebas leading-none" style={{ color: ALMA.berry, fontSize: "clamp(1.6rem, 2.4vw, 2.1rem)" }}>${formatPrice(plan)}</div>
-                      <div className="text-[0.66rem] uppercase tracking-[0.18em] text-[color:var(--ink)]/45 mt-0.5">MXN</div>
-                    </div>
-                    <button
-                      onClick={onPick}
-                      className="grid h-11 w-11 sm:h-12 sm:w-12 place-items-center rounded-full transition-transform group-hover:scale-105"
-                      style={{ color: ALMA.berry, border: `1px solid ${ALMA.berry}` }}
-                      aria-label={`Elegir ${plan.name}`}
-                    >
-                      <ArrowUpRight size={16} />
-                    </button>
-                  </li>
+                    {COLS.map((c) => {
+                      const plan = row.plans.find(c.match);
+                      if (!plan) return <div key={c.key} className="text-center text-[1.2rem]" style={{ color: `${ALMA.ink}26` }}>·</div>;
+                      const isInf = c.key === "inf";
+                      return (
+                        <button
+                          key={c.key}
+                          onClick={onPick}
+                          aria-label={`Elegir ${plan.name}`}
+                          className="text-center rounded-[16px] py-3 px-1 transition-all hover:-translate-y-0.5"
+                          style={isInf ? { backgroundColor: `${ALMA.berry}14` } : undefined}
+                        >
+                          <div className="font-bebas leading-none tabular-nums" style={{ color: ALMA.berry, fontSize: "clamp(1.25rem, 1.8vw, 1.6rem)" }}>
+                            ${formatPrice(plan)}
+                          </div>
+                          <div className="mt-1 text-[0.55rem] uppercase tracking-[0.14em]" style={{ color: isInf && plan.openingActive ? ALMA.coral : `${ALMA.ink}66` }}>
+                            {isInf && plan.openingActive ? "apertura" : "MXN"}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
                 ))}
-              </ul>
+              </div>
             </div>
-          ))}
+          </div>
+          <p className="sm:hidden text-center text-[0.6rem] uppercase tracking-[0.2em] mt-2" style={{ color: ALMA.cream, opacity: 0.4 }}>
+            ← desliza para ver toda la tabla →
+          </p>
+        </div>
+
+        {/* Ofertas especiales: AM Club · Mixtos · Premium — tarjetas distintas, no lista */}
+        <div className="reveal opacity-0 translate-y-8 transition-all duration-700 mt-5 grid grid-cols-1 lg:grid-cols-3 gap-4 items-stretch">
+          {amClubPlans.length > 0 && (
+            <div className="rounded-[20px] p-6 flex flex-col" style={{ backgroundColor: ALMA.cream }}>
+              <span className="inline-flex w-fit items-center gap-1.5 rounded-full px-3 py-1 text-[0.56rem] font-medium uppercase tracking-[0.14em]" style={{ backgroundColor: `${ALMA.olive}1f`, color: ALMA.olive }}>
+                Solo mañanas · 7–10am
+              </span>
+              <h3 className="font-bebas mt-3 leading-none" style={{ color: ALMA.ink, fontSize: "1.7rem" }}>AM Club</h3>
+              <p className="text-[0.82rem] leading-[1.5] text-[color:var(--ink)]/60 mt-1.5">8 clases al mes en horario matutino, a precio especial.</p>
+              <div className="mt-4 flex flex-col gap-2">
+                {amClubPlans.map((p) => (
+                  <button key={p.id} onClick={onPick} aria-label={`Elegir ${p.name}`} className="flex items-center justify-between rounded-full px-4 py-2.5 transition-transform hover:-translate-y-0.5" style={{ border: `1px solid ${ALMA.border}` }}>
+                    <span className="text-[0.8rem]" style={{ color: ALMA.ink }}>{p.name.includes("Reformer") ? "Reformer / Tower" : "Studio"}</span>
+                    <span className="font-bebas text-[1.1rem] inline-flex items-center gap-1" style={{ color: ALMA.berry }}>${formatPrice(p)}<ArrowUpRight size={13} /></span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {mixtoPlans.length > 0 && (
+            <div className="rounded-[20px] p-6 flex flex-col" style={{ backgroundColor: ALMA.cream }}>
+              <span className="inline-flex w-fit items-center rounded-full px-3 py-1 text-[0.56rem] font-medium uppercase tracking-[0.14em]" style={{ backgroundColor: `${ALMA.berry}1f`, color: ALMA.berry }}>
+                Combina las dos áreas
+              </span>
+              <h3 className="font-bebas mt-3 leading-none" style={{ color: ALMA.ink, fontSize: "1.7rem" }}>Paquetes mixtos</h3>
+              <p className="text-[0.82rem] leading-[1.5] text-[color:var(--ink)]/60 mt-1.5">Studio y Reformer/Tower en un mismo paquete.</p>
+              <div className="mt-4 flex flex-col gap-2">
+                {mixtoPlans.map((p) => (
+                  <button key={p.id} onClick={onPick} aria-label={`Elegir ${p.name}`} className="flex items-center justify-between gap-3 rounded-full px-4 py-2.5 transition-transform hover:-translate-y-0.5" style={{ border: `1px solid ${ALMA.border}` }}>
+                    <span className="text-[0.8rem] truncate" style={{ color: ALMA.ink }}>{p.name.replace(/^Alma /, "")} <span className="text-[color:var(--ink)]/45">· {sessionsLabel(p)}</span></span>
+                    <span className="font-bebas text-[1.1rem] inline-flex items-center gap-1 shrink-0" style={{ color: ALMA.berry }}>${formatPrice(p)}<ArrowUpRight size={13} /></span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {premiumPlans.length > 0 && (
+            <div className="rounded-[20px] p-6 flex flex-col justify-between" style={{ backgroundColor: ALMA.ink, color: ALMA.cream }}>
+              <div>
+                <span className="inline-flex w-fit items-center rounded-full px-3 py-1 text-[0.56rem] font-medium uppercase tracking-[0.14em]" style={{ backgroundColor: `${ALMA.cream}1f`, color: ALMA.cream }}>
+                  Todo el estudio
+                </span>
+                <h3 className="font-bebas mt-3 leading-none" style={{ color: ALMA.cream, fontSize: "1.7rem" }}>{premiumPlans[0].name}</h3>
+                <p className="text-[0.82rem] leading-[1.5] mt-1.5" style={{ color: ALMA.cream, opacity: 0.72 }}>Acceso ilimitado a Studio y Reformer/Tower.</p>
+              </div>
+              <div className="mt-5 flex items-end justify-between">
+                <div className="flex items-baseline gap-1">
+                  <span className="font-bebas leading-none" style={{ color: ALMA.cream, fontSize: "2.6rem" }}>${formatPrice(premiumPlans[0])}</span>
+                  <span className="text-[0.6rem] uppercase tracking-[0.16em]" style={{ color: ALMA.cream, opacity: 0.55 }}>{premiumPlans[0].openingActive ? "apertura" : "MXN"}</span>
+                </div>
+                <button onClick={onPick} className="grid h-12 w-12 place-items-center rounded-full transition-transform hover:scale-105" style={{ backgroundColor: ALMA.cream, color: ALMA.ink }} aria-label={`Elegir ${premiumPlans[0].name}`}>
+                  <ArrowUpRight size={18} />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         <p className="reveal opacity-0 translate-y-8 transition-all duration-700 mt-6 text-[0.78rem] uppercase tracking-[0.18em] text-center" style={{ color: ALMA.cream, opacity: 0.55 }}>
