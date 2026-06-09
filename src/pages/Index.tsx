@@ -421,7 +421,7 @@ const Index = () => {
           <img
             src={HERO_PHOTOS[0]}
             alt="Estudio de Pilates Alma Movement en Juriquilla, Querétaro"
-            className="absolute inset-0 h-full w-full object-cover"
+            className="alma-photo absolute inset-0 h-full w-full object-cover"
             loading="eager"
             fetchPriority="high"
           />
@@ -485,30 +485,14 @@ const Index = () => {
             </div>
           ))}
         </dl>
-
-        {/* Marquee strip — coral drenched */}
-        <div className="overflow-hidden border-y" style={{ backgroundColor: ALMA.coral, borderColor: ALMA.coral, color: ALMA.cream }}>
-          <div className="flex whitespace-nowrap gap-12 py-3 animate-[scroll-left_38s_linear_infinite]">
-            {[...Array(2)].map((_, dup) => (
-              <div key={dup} className="flex items-center gap-12 pr-12 shrink-0">
-                {["Fuerza", "Equilibrio", "Flexibilidad", "Comunidad", "Energía", "Compromiso"].map((w) => (
-                  <span key={w + dup} className="flex items-center gap-12 text-[0.86rem] uppercase tracking-[0.36em] font-medium">
-                    {w}
-                    <span className="inline-block h-1 w-1 rounded-full" style={{ backgroundColor: ALMA.cream }} />
-                  </span>
-                ))}
-              </div>
-            ))}
-          </div>
-        </div>
       </section>
 
       {/* ═════════ ESTUDIO · Esto es Alma ═════════ */}
-      <section id="estudio" className="relative px-5 sm:px-8 lg:px-12 py-20 lg:py-28">
+      <section id="estudio" className="relative px-5 sm:px-8 lg:px-12 py-28 lg:py-40">
         <div className="mx-auto max-w-[1320px] grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-start">
           <div className="lg:col-span-5 reveal opacity-0 translate-y-8 transition-all duration-700">
-            <div className="relative aspect-[4/5] overflow-hidden rounded-[24px]">
-              <img src={almaClassEnergy} alt="Una clase llena en Alma Movement" className="absolute inset-0 h-full w-full object-cover" loading="lazy" />
+            <div className="alma-photo-tint relative aspect-[4/5] overflow-hidden rounded-[24px]">
+              <img src={almaClassEnergy} alt="Una clase llena en Alma Movement" className="alma-photo absolute inset-0 h-full w-full object-cover" loading="lazy" />
             </div>
             <p className="mt-3 text-[0.72rem] uppercase tracking-[0.24em]" style={{ color: ALMA.olive }}>
               Plaza Arce, Juriquilla
@@ -598,12 +582,12 @@ const Index = () => {
                     className="group block w-full text-left bg-transparent border-0 p-0 cursor-pointer"
                     aria-expanded={isOpen}
                   >
-                    <div className={"relative overflow-hidden rounded-[22px] " + aspect}>
+                    <div className={"alma-photo-tint relative overflow-hidden rounded-[22px] " + aspect}>
                       <img
                         src={img}
                         alt={c.name}
                         loading="lazy"
-                        className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.04]"
+                        className="alma-photo absolute inset-0 h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.04]"
                       />
                       <div className="absolute inset-0 transition-opacity duration-500" style={{ background: "linear-gradient(180deg, rgba(46,32,28,0) 50%, rgba(46,32,28,0.55) 100%)" }} />
                       <div className="absolute left-5 top-5 inline-flex items-center gap-2 rounded-full px-3 py-1 text-[0.6rem] uppercase tracking-[0.22em]" style={{ backgroundColor: ALMA.cream, color: ALMA.berry }}>
@@ -678,7 +662,7 @@ const Index = () => {
       <GaleriaSection galleryIdx={galleryIdx} setGalleryIdx={setGalleryIdx} />
 
       {/* ═════════ CIERRE (Coral drench) ═════════ */}
-      <section className="relative overflow-hidden px-5 sm:px-8 lg:px-12 py-24 lg:py-32" style={{ backgroundColor: ALMA.coral }}>
+      <section className="relative overflow-hidden px-5 sm:px-8 lg:px-12 py-32 lg:py-44" style={{ backgroundColor: ALMA.coral }}>
         <div className="absolute inset-0 pointer-events-none" style={{ background: `radial-gradient(circle at 80% 20%, ${ALMA.orange}55 0%, transparent 55%)` }} />
         <div className="relative mx-auto max-w-[1100px] text-center reveal opacity-0 translate-y-8 transition-all duration-700">
           <span className="text-[0.66rem] font-medium uppercase tracking-[0.34em]" style={{ color: ALMA.cream, opacity: 0.78 }}>
@@ -746,7 +730,7 @@ const CoachesSection = ({ instructors }: { instructors: { id: string; displayNam
   const isSolo = items.length === 1;
 
   return (
-    <section id="coaches" className="relative overflow-hidden px-5 sm:px-8 lg:px-12 py-20 lg:py-28" style={{ backgroundColor: ALMA.olive }}>
+    <section id="coaches" className="relative overflow-hidden px-5 sm:px-8 lg:px-12 py-28 lg:py-40" style={{ backgroundColor: ALMA.olive }}>
       <div className="absolute inset-0 pointer-events-none opacity-[0.07]" style={{ background: `radial-gradient(circle at 20% 30%, ${ALMA.cream} 0%, transparent 55%)` }} />
       <div className="relative mx-auto max-w-[1320px]">
         <div className="reveal opacity-0 translate-y-8 transition-all duration-700 flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-12">
@@ -770,12 +754,12 @@ const CoachesSection = ({ instructors }: { instructors: { id: string; displayNam
               key={inst.key}
               className={isSolo ? "lg:col-span-12 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center" : ""}
             >
-              <div className={(isSolo ? "lg:col-span-6 " : "") + "relative overflow-hidden rounded-[24px] " + (isSolo ? "aspect-[4/5] lg:aspect-[5/6]" : "aspect-[3/4]")}>
+              <div className={(isSolo ? "lg:col-span-6 " : "") + "alma-photo-tint relative overflow-hidden rounded-[24px] " + (isSolo ? "aspect-[4/5] lg:aspect-[5/6]" : "aspect-[3/4]")}>
                 {inst.photoUrl ? (
                   <img
                     src={inst.photoUrl}
                     alt={inst.label}
-                    className="absolute inset-0 h-full w-full object-cover saturate-[0.85] transition-[filter,transform] duration-700 hover:saturate-100 hover:scale-[1.03]"
+                    className="alma-photo absolute inset-0 h-full w-full object-cover transition-transform duration-700 hover:scale-[1.03]"
                     style={{ objectPosition: clampFocus(inst.photoFocusX) + "% " + clampFocus(inst.photoFocusY) + "%" }}
                     loading="lazy"
                   />
@@ -784,7 +768,7 @@ const CoachesSection = ({ instructors }: { instructors: { id: string; displayNam
                     <img
                       src={CLASS_IMAGE_POOL[idx % CLASS_IMAGE_POOL.length]}
                       alt=""
-                      className="absolute inset-0 h-full w-full object-cover saturate-[0.7] opacity-95"
+                      className="alma-photo absolute inset-0 h-full w-full object-cover opacity-95"
                     />
                     <div className="absolute inset-0" style={{ background: `linear-gradient(180deg, transparent 50%, ${ALMA.olive}cc 100%)` }} />
                   </div>
@@ -828,7 +812,7 @@ const PaquetesSection = ({
   onPick: () => void;
 }) => {
   return (
-    <section id="paquetes" className="relative overflow-hidden px-5 sm:px-8 lg:px-12 py-20 lg:py-28" style={{ backgroundColor: ALMA.inkDeep }}>
+    <section id="paquetes" className="relative overflow-hidden px-5 sm:px-8 lg:px-12 py-28 lg:py-40" style={{ backgroundColor: ALMA.inkDeep }}>
       <div className="absolute inset-0 pointer-events-none opacity-[0.10]" style={{ background: `radial-gradient(circle at 80% 0%, ${ALMA.coral} 0%, transparent 55%), radial-gradient(circle at 0% 100%, ${ALMA.orange} 0%, transparent 60%)` }} />
       <div className="relative mx-auto max-w-[1320px]">
         <div className="reveal opacity-0 translate-y-8 transition-all duration-700 flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-12">
@@ -965,7 +949,7 @@ const PoliticasSection = () => {
   const [open, setOpen] = useState<string | null>("01");
 
   return (
-    <section id="politicas" className="relative px-5 sm:px-8 lg:px-12 py-20 lg:py-28" style={{ backgroundColor: ALMA.cream }}>
+    <section id="politicas" className="relative px-5 sm:px-8 lg:px-12 py-28 lg:py-40" style={{ backgroundColor: ALMA.cream }}>
       <div className="mx-auto max-w-[1320px]">
         <div className="reveal opacity-0 translate-y-8 transition-all duration-700 grid grid-cols-1 lg:grid-cols-12 gap-10 mb-10">
           <div className="lg:col-span-5">
@@ -1030,7 +1014,7 @@ const TestimoniosSection = () => {
   ];
   const [main, ...rest] = quotes;
   return (
-    <section className="relative px-5 sm:px-8 lg:px-12 py-20 lg:py-28" style={{ backgroundColor: ALMA.blush }}>
+    <section className="relative px-5 sm:px-8 lg:px-12 py-28 lg:py-40" style={{ backgroundColor: ALMA.blush }}>
       <div className="mx-auto max-w-[1320px] grid grid-cols-1 lg:grid-cols-12 gap-10">
         <div className="lg:col-span-7 reveal opacity-0 translate-y-8 transition-all duration-700">
           <span className="text-[0.66rem] font-medium uppercase tracking-[0.34em]" style={{ color: ALMA.berry }}>
@@ -1082,7 +1066,7 @@ const GaleriaSection = ({ galleryIdx, setGalleryIdx }: { galleryIdx: number; set
   const prev = () => setGalleryIdx((galleryIdx - 1 + GALLERY_IMAGES.length) % GALLERY_IMAGES.length);
 
   return (
-    <section id="galeria" className="relative px-5 sm:px-8 lg:px-12 py-20 lg:py-28" style={{ backgroundColor: ALMA.cream }}>
+    <section id="galeria" className="relative px-5 sm:px-8 lg:px-12 py-28 lg:py-40" style={{ backgroundColor: ALMA.cream }}>
       <div className="mx-auto max-w-[1320px]">
         <div className="reveal opacity-0 translate-y-8 transition-all duration-700 flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-10">
           <div>
@@ -1100,14 +1084,14 @@ const GaleriaSection = ({ galleryIdx, setGalleryIdx }: { galleryIdx: number; set
         </div>
 
         <div className="reveal opacity-0 translate-y-8 transition-all duration-700 grid grid-cols-1 lg:grid-cols-12 gap-5">
-          <div className="lg:col-span-8 relative aspect-[4/3] overflow-hidden rounded-[24px] group" style={{ backgroundColor: ALMA.ink }}>
+          <div className="alma-photo-tint lg:col-span-8 relative aspect-[4/3] overflow-hidden rounded-[24px] group" style={{ backgroundColor: ALMA.ink }}>
             {GALLERY_IMAGES.map((img, i) => (
               <img
                 key={i}
                 src={img}
                 alt={"Alma momento " + (i + 1)}
                 loading="lazy"
-                className={"absolute inset-0 h-full w-full object-cover transition-opacity duration-700 " + (i === galleryIdx ? "opacity-100" : "opacity-0")}
+                className={"alma-photo absolute inset-0 h-full w-full object-cover transition-opacity duration-700 " + (i === galleryIdx ? "opacity-100" : "opacity-0")}
               />
             ))}
             <button onClick={prev} aria-label="Anterior" className="absolute left-4 top-1/2 -translate-y-1/2 grid h-11 w-11 place-items-center rounded-full transition-opacity opacity-0 group-hover:opacity-100" style={{ backgroundColor: ALMA.cream, color: ALMA.berry }}>
@@ -1136,7 +1120,7 @@ const GaleriaSection = ({ galleryIdx, setGalleryIdx }: { galleryIdx: number; set
                 className={"relative aspect-square overflow-hidden rounded-[14px] bg-transparent border-0 p-0 cursor-pointer transition-opacity " + (i === galleryIdx ? "opacity-100" : "opacity-65 hover:opacity-100")}
                 aria-label={"Ver foto " + (i + 1)}
               >
-                <img src={img} alt="" className="absolute inset-0 h-full w-full object-cover" loading="lazy" />
+                <img src={img} alt="" className="alma-photo absolute inset-0 h-full w-full object-cover" loading="lazy" />
                 {i === galleryIdx && <span className="absolute inset-0" style={{ outline: `2px solid ${ALMA.berry}`, outlineOffset: -2, borderRadius: 14 }} />}
               </button>
             ))}
@@ -1158,7 +1142,7 @@ const ContactoSection = () => {
     { icon: <Clock size={18} />, label: "Horarios", value: "Lun a Vie 7:00 AM, 8:00 AM, 7:00 PM y 8:00 PM · Sáb 7:00 AM, 8:00 AM y 9:00 AM" },
   ];
   return (
-    <section id="contacto" className="px-5 sm:px-8 lg:px-12 py-20 lg:py-28" style={{ backgroundColor: ALMA.cream }}>
+    <section id="contacto" className="px-5 sm:px-8 lg:px-12 py-28 lg:py-40" style={{ backgroundColor: ALMA.cream }}>
       <div className="mx-auto max-w-[1320px] grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
         <div className="lg:col-span-5 reveal opacity-0 translate-y-8 transition-all duration-700 flex flex-col">
           <span className="text-[0.66rem] font-medium uppercase tracking-[0.34em]" style={{ color: ALMA.berry }}>

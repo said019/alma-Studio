@@ -138,6 +138,34 @@
   transform: translateY(0);
 }
 
+/* Tratamiento fotográfico editorial — unifica fotos casuales/brillantes en
+   un look cálido y moody tipo Frame: menos saturación, más contraste, tinte
+   espresso. Se aplica a toda foto de la landing/app. */
+.alma-photo {
+  filter: grayscale(0.55) sepia(0.38) saturate(0.85) brightness(0.9) contrast(1.08);
+  transition: filter 700ms var(--ease-alma-out);
+}
+/* Capa cálida espresso por encima de la foto (multiply) para profundidad y
+   cohesión de color. El contenedor debe ser position:relative + overflow. */
+.alma-photo-tint::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: #2a1e1b;
+  mix-blend-mode: multiply;
+  opacity: 0.24;
+}
+/* Viñeta sutil para dar foco y peso editorial a fotos grandes. */
+.alma-photo-vignette::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: radial-gradient(120% 100% at 50% 35%, transparent 55%, rgba(36,27,26,0.34) 100%);
+}
+
 @media (prefers-reduced-motion: reduce) {
   [data-press]:active { transform: none; }
   [data-lift]:hover { transform: none; }
