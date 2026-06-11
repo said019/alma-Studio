@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import api from "@/lib/api";
@@ -41,36 +41,17 @@ import almaGallery02 from "@/assets/alma/alma-gallery-02.jpg";
 import almaGallery03 from "@/assets/alma/alma-gallery-03.jpg";
 import almaGallery04 from "@/assets/alma/alma-gallery-04.jpg";
 import almaGallery05 from "@/assets/alma/alma-gallery-05.jpg";
-import almaGallery06 from "@/assets/alma/alma-gallery-06.jpg";
-import almaGallery07 from "@/assets/alma/alma-gallery-07.jpg";
 import almaGallery08 from "@/assets/alma/alma-gallery-08.jpg";
-import almaInstagram01 from "@/assets/alma/instagram/alma-instagram-01.jpg";
-import almaInstagram02 from "@/assets/alma/instagram/alma-instagram-02.jpg";
 import almaInstagram03 from "@/assets/alma/instagram/alma-instagram-03.jpg";
-import almaIconUrl from "@/assets/alma/alma-icon.png";
+import { ALMA } from "@/components/app/tokens";
+import { STUDIO } from "@/lib/studio";
+import { formatMXN } from "@/lib/format";
 
 
 /* ═════════════════════════════════════════════════════════════
    Alma Movement · Landing
-   Full palette editorial. Berry / Coral / Olive / Orange roles.
+   Paleta canónica (tokens.ts): monocromo cálido terroso, dirección Frame.
    ═════════════════════════════════════════════════════════════ */
-
-/* ── Brand color roles ── */
-// Paleta Frame Pilates Lab (extraída de su sitio): greige cálido + café vino
-// + tan. Lujo terroso monocromático.
-const ALMA = {
-  cream: "#E9E6DF",   // greige cálido, canvas
-  blush: "#E4D2C3",   // tan suave, superficies y CTAs claros
-  ink: "#4A3333",     // café cálido con matiz vino, texto + oscuros
-  inkDeep: "#241B1A", // café casi negro, secciones drenched (footer)
-  berry: "#8A6E60",   // café medio, acento
-  wine: "#76214D",    // reservado (sin uso en la dirección Frame)
-  coral: "#C7A892",   // tan apagado
-  olive: "#8A7C66",   // neutro cálido
-  orange: "#C7A892",  // tan apagado
-  sand: "#DCD3C5",    // neutro greige
-  border: "#D8CFC1",  // borde greige
-} as const;
 
 /* ───── Types ───── */
 // Disciplinas (tipos de clase) que vienen de /api/class-types. Áreas:
@@ -129,35 +110,23 @@ const GALLERY_IMAGES = [
   almaGallery03,
   almaGallery04,
   almaGallery05,
-  almaGallery06,
-  almaGallery07,
   almaGallery08,
   almaDetailAnkleWeights,
   almaInstagram03,
-  almaInstagram02,
-  almaInstagram01,
 ];
 
 const CLASS_IMAGE_POOL = [
   almaHeroClass,
   almaClassEnergy,
   almaBarreLine,
+  almaGallery05,
+  almaGallery03,
   almaDetailAnkleWeights,
-  almaInstagram01,
-  almaInstagram02,
-  almaInstagram03,
-  almaGallery01,
+  almaGallery02,
+  almaGallery08,
 ];
 
 /* ───── Helpers ───── */
-function normalizeVideoUrl(url?: string | null): string | null {
-  if (!url) return null;
-  if (url.startsWith("/api/drive/video/")) return url;
-  const m = url.match(/drive\.google\.com\/file\/d\/([^/]+)\/preview/);
-  if (m) return `/api/drive/video/${m[1]}`;
-  return url;
-}
-
 function clampFocus(value: unknown): number {
   const n = Number(value);
   if (!Number.isFinite(n)) return 50;
@@ -166,8 +135,12 @@ function clampFocus(value: unknown): number {
 
 function pickClassImage(name: string, idx: number): string {
   const lc = (name || "").toLowerCase();
-  // Reformer/Tower usan la foto del estudio; el resto rota por el pool.
-  if (lc.includes("reformer") || lc.includes("tower")) return almaHeroClass;
+  // Cada disciplina con su propia foto del estudio; el resto rota por el pool.
+  if (lc.includes("reformer")) return almaHeroClass;
+  if (lc.includes("tower")) return almaGallery05;
+  if (lc.includes("barre")) return almaBarreLine;
+  if (lc.includes("sculpt")) return almaGallery03;
+  if (lc.includes("mat")) return almaClassEnergy;
   return CLASS_IMAGE_POOL[idx % CLASS_IMAGE_POOL.length];
 }
 
@@ -186,9 +159,7 @@ const Index = () => {
   const [navOpen, setNavOpen] = useState(false);
   const [classTypes, setClassTypes] = useState<ClassTypeRow[]>(FALLBACK_CLASS_TYPES);
   const [openClassId, setOpenClassId] = useState<string | null>(null);
-  const [playingVideoId, setPlayingVideoId] = useState<number | null>(null);
   const [galleryIdx, setGalleryIdx] = useState(0);
-  const videoRefs = useRef<Record<number, HTMLVideoElement | null>>({});
 
   const [instructors, setInstructors] = useState<{
     id: string;
@@ -254,7 +225,7 @@ const Index = () => {
   }, []);
 
   useEffect(() => {
-    api.get<{ data: ClassTypeRow[] }>("/admin/class-types").then(({ data }) => {
+    api.get<{ data: ClassTypeRow[] }>("/class-types").then(({ data }) => {
       const rows = Array.isArray(data?.data) ? data.data.filter((c) => c.is_active) : [];
       if (rows.length > 0) setClassTypes(rows);
     }).catch(() => {});
@@ -290,14 +261,14 @@ const Index = () => {
 
   /* ═══════════════════════════════════════════════════════════ */
   return (
-    <div className="min-h-screen text-[color:var(--ink)] [--ink:#4A3333] [--ink-deep:#241B1A] [--cream:#E9E6DF] [--blush:#E4D2C3] [--berry:#8A6E60] [--wine:#76214D] [--coral:#C7A892] [--olive:#8A7C66] [--orange:#C7A892] [--sand:#DCD3C5] [--border:#D8CFC1]" style={{ backgroundColor: ALMA.cream }}>
+    <div className="min-h-screen text-[color:var(--ink)] [--ink:#43392F] [--ink-deep:#241B1A] [--cream:#FAF9F6] [--blush:#E6DAC8] [--berry:#6E5A46]" style={{ backgroundColor: ALMA.cream }}>
 
       {/* ═════════ NAV ═════════ */}
       <nav
         className={
-          "fixed inset-x-0 top-0 z-[100] transition-[background-color,backdrop-filter,border-color,padding] duration-500 " +
+          "fixed inset-x-0 top-0 z-[100] transition-[background-color,border-color,padding] duration-500 " +
           (navScrolled
-            ? "bg-[#FAF9F6]/92 backdrop-blur-xl border-b border-[#E0D5C6]/70 py-3"
+            ? "bg-[#FAF9F6] border-b border-[#E0D5C6] py-3"
             : "bg-transparent py-5")
         }
       >
@@ -361,7 +332,7 @@ const Index = () => {
             <button
               onClick={() => setNavOpen((v) => !v)}
               aria-label="Menú"
-              className="lg:hidden grid h-10 w-10 place-items-center rounded-full border border-[#E0D5C6]/70 bg-[#FAF9F6]/85 text-[color:var(--ink)] transition-colors hover:border-[color:var(--berry)]"
+              className="lg:hidden grid h-10 w-10 place-items-center rounded-full border border-[#E0D5C6] bg-[#FAF9F6] text-[color:var(--ink)] transition-colors hover:border-[color:var(--berry)]"
             >
               {navOpen ? <Minus size={16} /> : <Plus size={16} />}
             </button>
@@ -442,7 +413,11 @@ const Index = () => {
                 <span className="grid h-7 w-7 place-items-center rounded-full bg-white/15 transition-transform duration-300 group-hover:translate-x-1" style={{ transitionTimingFunction: "var(--ease-alma-out)" }}>
                   <ArrowUpRight size={13} />
                 </span>
-                <span className="ml-1 text-[0.78rem] font-normal opacity-85">$150</span>
+                {trialPlan && (
+                  <span className="nums ml-1 text-[0.78rem] font-normal opacity-85">
+                    {formatMXN(Number(trialPlan.effectivePrice ?? trialPlan.price))}
+                  </span>
+                )}
               </button>
               <button
                 onClick={() => scrollTo("clases")}
@@ -459,19 +434,12 @@ const Index = () => {
           </div>
         </div>
 
-        {/* Datos del estudio, sobre crema */}
-        <dl className="mx-auto max-w-[1480px] grid grid-cols-3 gap-5 sm:gap-8 px-4 sm:px-6 mt-7 sm:mt-9" data-stagger>
-          {[
-            { k: "5", l: "Disciplinas Alma" },
-            { k: "4–8", l: "Lugares por clase · 4 Reformer/Tower, 8 Studio" },
-            { k: "50 min", l: "Cada sesión" },
-          ].map((stat) => (
-            <div key={stat.l} data-stagger-item className="border-t pt-3" style={{ borderColor: ALMA.border }}>
-              <dt className="font-display text-[1.9rem] sm:text-[2.4rem] leading-none" style={{ color: ALMA.berry, fontWeight: 400 }}>{stat.k}</dt>
-              <dd className="mt-1.5 text-[0.7rem] uppercase tracking-[0.18em] text-[color:var(--ink)]/55">{stat.l}</dd>
-            </div>
-          ))}
-        </dl>
+        {/* Datos del estudio, sobre crema: una línea editorial, sin rejilla */}
+        <div className="mx-auto max-w-[1480px] px-4 sm:px-6 mt-7 sm:mt-9">
+          <p className="nums border-t pt-4 text-[0.74rem] uppercase tracking-[0.22em]" style={{ borderColor: ALMA.border, color: ALMA.berry }}>
+            Grupos de 4 en equipo · 8 en studio · 50 minutos
+          </p>
+        </div>
       </section>
 
       {/* ═════════ ESTUDIO · Esto es Alma ═════════ */}
@@ -481,7 +449,7 @@ const Index = () => {
             <div className="alma-photo-tint relative aspect-[4/5] overflow-hidden rounded-[24px]">
               <img src={almaClassEnergy} alt="Una clase en Alma Movement" className="alma-photo absolute inset-0 h-full w-full object-cover" loading="lazy" />
             </div>
-            <p className="mt-3 text-[0.72rem] uppercase tracking-[0.24em]" style={{ color: ALMA.olive }}>
+            <p className="mt-3 text-[0.72rem] uppercase tracking-[0.24em]" style={{ color: ALMA.berry }}>
               Plaza Arce, Juriquilla
             </p>
           </div>
@@ -492,7 +460,7 @@ const Index = () => {
             </span>
             <h2 className="font-bebas mt-4 leading-[0.92]" style={{ color: ALMA.ink, fontSize: "clamp(2.5rem, 5.6vw, 5rem)" }}>
               Un estudio donde
-              <span className="block italic font-alilato font-normal" style={{ color: ALMA.berry }}>te conocen por tu nombre.</span>
+              <span className="block font-display-italic font-normal" style={{ color: ALMA.stone }}>te conocen por tu nombre.</span>
             </h2>
             <div className="mt-7 space-y-5 text-[1.02rem] leading-[1.85] text-[color:var(--ink)]/76 max-w-[60ch]">
               <p>
@@ -516,7 +484,7 @@ const Index = () => {
                   className={"py-5 sm:py-0 sm:pl-6 " + (i === 0 ? "border-t sm:border-t-0 sm:border-l-0" : "border-t sm:border-t-0 sm:border-l")}
                   style={{ borderColor: ALMA.border }}
                 >
-                  <span className="font-bebas text-[0.92rem] tracking-[0.2em]" style={{ color: ALMA.coral }}>{v.tag}</span>
+                  <span className="font-bebas nums text-[0.92rem] tracking-[0.2em]" style={{ color: ALMA.berry }}>{v.tag}</span>
                   <h3 className="font-bebas text-[1.65rem] leading-tight mt-1" style={{ color: ALMA.ink }}>{v.word.toUpperCase()}</h3>
                   <p className="mt-2 text-[0.88rem] leading-[1.65] text-[color:var(--ink)]/65">{v.note}</p>
                 </li>
@@ -530,12 +498,12 @@ const Index = () => {
       <section id="clases" className="relative px-5 sm:px-8 lg:px-12 pb-20 lg:pb-28" style={{ backgroundColor: ALMA.cream }}>
         <div className="mx-auto max-w-[1320px]">
           <div className="reveal opacity-0 translate-y-8 transition-all duration-700 mb-10 lg:mb-14">
-            <span className="text-[0.66rem] font-medium uppercase tracking-[0.34em]" style={{ color: ALMA.olive }}>
+            <span className="text-[0.66rem] font-medium uppercase tracking-[0.34em]" style={{ color: ALMA.berry }}>
               Tu semana en Alma
             </span>
             <h2 className="font-bebas mt-4 leading-[0.92]" style={{ color: ALMA.ink, fontSize: "clamp(2.4rem, 5.2vw, 4.6rem)" }}>
               Evoluciona
-              <span className="block italic font-alilato font-normal" style={{ color: ALMA.olive }}>en cada clase.</span>
+              <span className="block font-display-italic font-normal" style={{ color: ALMA.stone }}>en cada clase.</span>
             </h2>
             <p className="mt-6 max-w-[56ch] text-[1.02rem] leading-[1.75] text-[color:var(--ink)]/72">
               Cada clase trabaja técnica, alineación y control en grupos pequeños. Cupos reducidos: 4 lugares en Reformer y Tower, 8 en Studio.
@@ -563,43 +531,45 @@ const Index = () => {
                 "aspect-[4/5]";
               return (
                 <li key={c.id} className={span} data-stagger-item>
-                  <button
-                    onClick={() => setOpenClassId(isOpen ? null : c.id)}
-                    data-press
-                    className="group block w-full text-left bg-transparent border-0 p-0 cursor-pointer"
-                    aria-expanded={isOpen}
-                  >
-                    <div className={"alma-photo-tint relative overflow-hidden rounded-[22px] " + aspect}>
-                      <img
-                        src={img}
-                        alt={c.name}
-                        loading="lazy"
-                        className="alma-photo absolute inset-0 h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.04]"
-                      />
-                      <div className="absolute inset-0 transition-opacity duration-500" style={{ background: "linear-gradient(180deg, rgba(46,32,28,0) 50%, rgba(46,32,28,0.55) 100%)" }} />
-                      <div className="absolute left-5 top-5 inline-flex items-center gap-2 rounded-full px-3 py-1 text-[0.6rem] uppercase tracking-[0.22em]" style={{ backgroundColor: ALMA.cream, color: ALMA.berry }}>
-                        <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ backgroundColor: ALMA.berry }} />
-                        {c.category === "reformer_tower" ? "Reformer · Tower" : c.category === "studio" ? "Studio" : c.category}
-                      </div>
-                      <div className="absolute inset-x-0 bottom-0 p-5 sm:p-6 flex items-end justify-between gap-4">
-                        <div>
-                          <h3 className="font-bebas text-[1.7rem] sm:text-[2.1rem] leading-[0.95]" style={{ color: ALMA.cream }}>
-                            {c.name}
-                          </h3>
-                          {c.subtitle && (
-                            <p className="mt-1 font-alilato italic text-[0.92rem]" style={{ color: ALMA.cream, opacity: 0.85 }}>
-                              {c.subtitle}
-                            </p>
-                          )}
-                        </div>
-                        <span
-                          className="grid h-10 w-10 shrink-0 place-items-center rounded-full transition-transform group-hover:rotate-45"
-                          style={{ backgroundColor: ALMA.cream, color: ALMA.berry }}
-                        >
-                          {isOpen ? <Minus size={14} /> : <Plus size={14} />}
+                  <div>
+                    <button
+                      onClick={() => setOpenClassId(isOpen ? null : c.id)}
+                      data-press
+                      className="group block w-full text-left bg-transparent border-0 p-0 cursor-pointer"
+                      aria-expanded={isOpen}
+                    >
+                      <span className={"alma-photo-tint relative block overflow-hidden rounded-[22px] " + aspect}>
+                        <img
+                          src={img}
+                          alt={c.name}
+                          loading="lazy"
+                          className="alma-photo absolute inset-0 h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.04]"
+                        />
+                        <span className="absolute inset-0 transition-opacity duration-500" style={{ background: "linear-gradient(180deg, rgba(46,32,28,0) 50%, rgba(46,32,28,0.55) 100%)" }} />
+                        <span className="absolute left-5 top-5 inline-flex items-center gap-2 rounded-full px-3 py-1 text-[0.6rem] uppercase tracking-[0.22em]" style={{ backgroundColor: ALMA.cream, color: ALMA.berry }}>
+                          <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ backgroundColor: ALMA.berry }} />
+                          {c.category === "reformer_tower" ? "Reformer · Tower" : c.category === "studio" ? "Studio" : c.category}
                         </span>
-                      </div>
-                    </div>
+                        <span className="absolute inset-x-0 bottom-0 p-5 sm:p-6 flex items-end justify-between gap-4">
+                          <span className="block">
+                            <span className="block font-bebas text-[1.7rem] sm:text-[2.1rem] leading-[0.95]" style={{ color: ALMA.cream }}>
+                              {c.name}
+                            </span>
+                            {c.subtitle && (
+                              <span className="mt-1 block font-display-italic text-[0.92rem]" style={{ color: ALMA.cream, opacity: 0.85 }}>
+                                {c.subtitle}
+                              </span>
+                            )}
+                          </span>
+                          <span
+                            className="grid h-10 w-10 shrink-0 place-items-center rounded-full transition-transform group-hover:rotate-45"
+                            style={{ backgroundColor: ALMA.cream, color: ALMA.berry }}
+                          >
+                            {isOpen ? <Minus size={14} /> : <Plus size={14} />}
+                          </span>
+                        </span>
+                      </span>
+                    </button>
 
                     <div
                       className="grid overflow-hidden transition-[grid-template-rows] duration-500 ease-out"
@@ -611,14 +581,14 @@ const Index = () => {
                             {c.description}
                           </p>
                           <dl className="mt-4 flex flex-wrap gap-x-7 gap-y-2 text-[0.74rem] uppercase tracking-[0.18em] text-[color:var(--ink)]/55">
-                            <div className="flex items-baseline gap-2"><dt>Duración</dt><dd className="font-bebas text-[0.95rem]" style={{ color: ALMA.ink }}>{c.duration_min} min</dd></div>
+                            <div className="flex items-baseline gap-2"><dt>Duración</dt><dd className="font-bebas nums text-[0.95rem]" style={{ color: ALMA.ink }}>{c.duration_min} min</dd></div>
                             <div className="flex items-baseline gap-2"><dt>Nivel</dt><dd className="font-bebas text-[0.95rem]" style={{ color: ALMA.ink }}>{c.level}</dd></div>
-                            <div className="flex items-baseline gap-2"><dt>Cupo</dt><dd className="font-bebas text-[0.95rem]" style={{ color: ALMA.ink }}>{c.capacity}</dd></div>
+                            <div className="flex items-baseline gap-2"><dt>Cupo</dt><dd className="font-bebas nums text-[0.95rem]" style={{ color: ALMA.ink }}>{c.capacity}</dd></div>
                           </dl>
                         </div>
                       </div>
                     </div>
-                  </button>
+                  </div>
                 </li>
               );
             })}
@@ -629,10 +599,10 @@ const Index = () => {
       {/* ═════════ HORARIO (Schedule embed) ═════════ */}
       <Schedule />
 
-      {/* ═════════ COACHES (Olive drench) ═════════ */}
+      {/* ═════════ COACHES (Sandstone drench) ═════════ */}
       <CoachesSection instructors={instructors} />
 
-      {/* ═════════ PAQUETES (Berry drench) ═════════ */}
+      {/* ═════════ PAQUETES (inkDeep drench) ═════════ */}
       <PaquetesSection
         trialPlan={trialPlan}
         groupedPlans={groupedPlans}
@@ -648,16 +618,15 @@ const Index = () => {
       {/* ═════════ GALERÍA ═════════ */}
       <GaleriaSection galleryIdx={galleryIdx} setGalleryIdx={setGalleryIdx} />
 
-      {/* ═════════ CIERRE (Coral drench) ═════════ */}
-      <section className="relative overflow-hidden px-5 sm:px-8 lg:px-12 py-32 lg:py-44" style={{ backgroundColor: ALMA.coral }}>
-        <div className="absolute inset-0 pointer-events-none" style={{ background: `radial-gradient(circle at 80% 20%, ${ALMA.orange}55 0%, transparent 55%)` }} />
+      {/* ═════════ CIERRE (inkDeep drench) ═════════ */}
+      <section className="relative overflow-hidden px-5 sm:px-8 lg:px-12 py-32 lg:py-44" style={{ backgroundColor: ALMA.inkDeep }}>
         <div className="relative mx-auto max-w-[1100px] text-center reveal opacity-0 translate-y-8 transition-all duration-700">
           <span className="text-[0.66rem] font-medium uppercase tracking-[0.34em]" style={{ color: ALMA.cream, opacity: 0.78 }}>
             Tu turno
           </span>
           <h2 className="font-bebas mt-5 leading-[0.86]" style={{ color: ALMA.cream, fontSize: "clamp(2.8rem, 8vw, 6.5rem)" }}>
             Reserva tu clase muestra,
-            <span className="block italic font-alilato font-normal mt-2" style={{ color: ALMA.cream }}>te recibimos.</span>
+            <span className="block font-display-italic font-normal mt-2" style={{ color: ALMA.blush }}>te recibimos.</span>
           </h2>
           <p className="mt-7 mx-auto max-w-[52ch] text-[1.05rem] leading-[1.7]" style={{ color: ALMA.cream, opacity: 0.88 }}>
             Una clase muestra para conocernos. Te mostramos el equipo, ajustamos tu técnica y te enseñamos cómo se siente entrenar acompañada.
@@ -666,15 +635,15 @@ const Index = () => {
             <button
               onClick={() => navigate(membershipCtaPath)}
               className="group inline-flex items-center gap-3 rounded-full px-8 py-4 text-[0.86rem] font-medium uppercase tracking-[0.18em] transition-transform hover:-translate-y-0.5"
-              style={{ backgroundColor: ALMA.cream, color: ALMA.berry }}
+              style={{ backgroundColor: ALMA.cream, color: ALMA.ink }}
             >
               Reservar clase muestra
-              <span className="grid h-7 w-7 place-items-center rounded-full transition-transform group-hover:translate-x-1" style={{ backgroundColor: ALMA.berry, color: ALMA.cream }}>
+              <span className="grid h-7 w-7 place-items-center rounded-full transition-transform group-hover:translate-x-1" style={{ backgroundColor: ALMA.ink, color: ALMA.cream }}>
                 <ArrowUpRight size={13} />
               </span>
             </button>
             <a
-              href="https://wa.me/5210000000000?text=Hola%2C%20me%20interesa%20conocer%20m%C3%A1s%20sobre%20Alma%20Movement" /* TODO: WhatsApp real de Alma */
+              href={`https://wa.me/${STUDIO.whatsapp}?text=Hola%2C%20me%20interesa%20conocer%20m%C3%A1s%20sobre%20Alma%20Movement`}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-3 rounded-full px-7 py-4 text-[0.84rem] uppercase tracking-[0.18em] no-underline transition-colors hover:bg-[color:var(--cream)]/10"
@@ -696,7 +665,7 @@ const Index = () => {
 };
 
 /* ═══════════════════════════════════════════════════════════
-   COACHES (Olive drench)
+   COACHES (Sandstone drench, texto ink)
    ═══════════════════════════════════════════════════════════ */
 const CoachesSection = ({ instructors }: { instructors: { id: string; displayName: string; bio?: string; specialties?: string | string[]; photoUrl?: string; photoFocusX?: number; photoFocusY?: number }[] }) => {
   if (instructors.length === 0) return null;
@@ -717,20 +686,19 @@ const CoachesSection = ({ instructors }: { instructors: { id: string; displayNam
   const isSolo = items.length === 1;
 
   return (
-    <section id="coaches" className="relative overflow-hidden px-5 sm:px-8 lg:px-12 py-28 lg:py-40" style={{ backgroundColor: ALMA.olive }}>
-      <div className="absolute inset-0 pointer-events-none opacity-[0.07]" style={{ background: `radial-gradient(circle at 20% 30%, ${ALMA.cream} 0%, transparent 55%)` }} />
+    <section id="coaches" className="relative overflow-hidden px-5 sm:px-8 lg:px-12 py-28 lg:py-40" style={{ backgroundColor: ALMA.sandstone }}>
       <div className="relative mx-auto max-w-[1320px]">
         <div className="reveal opacity-0 translate-y-8 transition-all duration-700 flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-12">
           <div>
-            <span className="text-[0.66rem] font-medium uppercase tracking-[0.34em]" style={{ color: ALMA.cream, opacity: 0.7 }}>
+            <span className="text-[0.66rem] font-medium uppercase tracking-[0.34em]" style={{ color: ALMA.ink }}>
               Quién te va a recibir
             </span>
-            <h2 className="font-bebas mt-4 leading-[0.92]" style={{ color: ALMA.cream, fontSize: "clamp(2.4rem, 5.2vw, 4.6rem)" }}>
+            <h2 className="font-bebas mt-4 leading-[0.92]" style={{ color: ALMA.ink, fontSize: "clamp(2.4rem, 5.2vw, 4.6rem)" }}>
               Te enseña
-              <span className="block italic font-alilato font-normal" style={{ color: ALMA.cream, opacity: 0.85 }}>alguien que te conoce por tu nombre.</span>
+              <span className="block font-display-italic font-normal" style={{ color: ALMA.inkDeep }}>alguien que te conoce por tu nombre.</span>
             </h2>
           </div>
-          <p className="max-w-[40ch] text-[0.95rem] leading-[1.7]" style={{ color: ALMA.cream, opacity: 0.78 }}>
+          <p className="max-w-[40ch] text-[0.95rem] leading-[1.7]" style={{ color: ALMA.ink }}>
             Quien te recibe ajusta cada clase a ti y sigue tu avance de cerca.
           </p>
         </div>
@@ -751,23 +719,23 @@ const CoachesSection = ({ instructors }: { instructors: { id: string; displayNam
                     loading="lazy"
                   />
                 ) : (
-                  <div className="absolute inset-0 grid place-items-center" style={{ backgroundColor: ALMA.olive, color: ALMA.cream }}>
+                  <div className="absolute inset-0 grid place-items-center" style={{ backgroundColor: ALMA.sandstone, color: ALMA.ink }}>
                     <img
                       src={CLASS_IMAGE_POOL[idx % CLASS_IMAGE_POOL.length]}
                       alt=""
                       className="alma-photo absolute inset-0 h-full w-full object-cover opacity-95"
                     />
-                    <div className="absolute inset-0" style={{ background: `linear-gradient(180deg, transparent 50%, ${ALMA.olive}cc 100%)` }} />
+                    <div className="absolute inset-0" style={{ background: `linear-gradient(180deg, transparent 50%, ${ALMA.sandstone}cc 100%)` }} />
                   </div>
                 )}
               </div>
               <div className={isSolo ? "lg:col-span-6" : "mt-5"}>
-                <span className="text-[0.62rem] uppercase tracking-[0.24em]" style={{ color: ALMA.cream, opacity: 0.7 }}>{inst.sub}</span>
-                <h3 className="font-bebas mt-2 leading-[0.92]" style={{ color: ALMA.cream, fontSize: isSolo ? "clamp(2.4rem, 4.4vw, 4rem)" : "clamp(1.7rem, 2.4vw, 2.4rem)" }}>
+                <span className="text-[0.62rem] uppercase tracking-[0.24em]" style={{ color: ALMA.ink }}>{inst.sub}</span>
+                <h3 className="font-bebas mt-2 leading-[0.92]" style={{ color: ALMA.inkDeep, fontSize: isSolo ? "clamp(2.4rem, 4.4vw, 4rem)" : "clamp(1.7rem, 2.4vw, 2.4rem)" }}>
                   {inst.coachTitle}
                 </h3>
                 {inst.bio && (
-                  <p className={"text-[0.95rem] leading-[1.75] max-w-[60ch] " + (isSolo ? "mt-5" : "mt-3")} style={{ color: ALMA.cream, opacity: 0.86 }}>
+                  <p className={"text-[0.95rem] leading-[1.75] max-w-[60ch] " + (isSolo ? "mt-5" : "mt-3")} style={{ color: ALMA.ink }}>
                     {inst.bio}
                   </p>
                 )}
@@ -781,7 +749,7 @@ const CoachesSection = ({ instructors }: { instructors: { id: string; displayNam
 };
 
 /* ═══════════════════════════════════════════════════════════
-   PAQUETES (Berry drench)
+   PAQUETES (inkDeep drench)
    ═══════════════════════════════════════════════════════════ */
 const formatPrice = (plan: PlanRow): string =>
   Number(plan.effectivePrice ?? plan.price).toLocaleString("es-MX");
@@ -817,7 +785,6 @@ const PaquetesSection = ({
   const amClubPlans = [...studioPlans, ...reformerPlans].filter((p) => p.morningOnly);
   return (
     <section id="paquetes" className="relative overflow-hidden px-5 sm:px-8 lg:px-12 py-28 lg:py-40" style={{ backgroundColor: ALMA.inkDeep }}>
-      <div className="absolute inset-0 pointer-events-none opacity-[0.10]" style={{ background: `radial-gradient(circle at 80% 0%, ${ALMA.coral} 0%, transparent 55%), radial-gradient(circle at 0% 100%, ${ALMA.orange} 0%, transparent 60%)` }} />
       <div className="relative mx-auto max-w-[1320px]">
         <div className="reveal opacity-0 translate-y-8 transition-all duration-700 flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-12">
           <div>
@@ -826,7 +793,7 @@ const PaquetesSection = ({
             </span>
             <h2 className="font-bebas mt-4 leading-[0.9]" style={{ color: ALMA.cream, fontSize: "clamp(2.6rem, 6vw, 5.4rem)" }}>
               Un paquete
-              <span className="block italic font-alilato font-normal" style={{ color: ALMA.cream, opacity: 0.92 }}>para tu ritmo.</span>
+              <span className="block font-display-italic font-normal" style={{ color: ALMA.blush }}>para tu ritmo.</span>
             </h2>
           </div>
           <p className="max-w-[42ch] text-[0.95rem] leading-[1.7]" style={{ color: ALMA.cream, opacity: 0.78 }}>
@@ -840,14 +807,14 @@ const PaquetesSection = ({
             <div className="rounded-[24px] p-7 sm:p-9 flex flex-col gap-5" style={{ backgroundColor: ALMA.cream }}>
               <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
                 <div>
-                  <span className="text-[0.62rem] uppercase tracking-[0.24em]" style={{ color: ALMA.coral }}>Primera vez en Alma</span>
+                  <span className="text-[0.7rem] uppercase tracking-[0.24em]" style={{ color: ALMA.berry }}>Primera vez en Alma</span>
                   <h3 className="font-bebas mt-2 leading-tight" style={{ color: ALMA.berry, fontSize: "clamp(1.8rem, 3vw, 2.6rem)" }}>{trialPlan.name}</h3>
                 </div>
-                <span className="text-[0.78rem] uppercase tracking-[0.18em] text-[color:var(--ink)]/60">{sessionsLabel(trialPlan)} · {trialPlan.durationDays} días</span>
+                <span className="nums text-[0.78rem] uppercase tracking-[0.18em] text-[color:var(--ink)]/60">{sessionsLabel(trialPlan)} · {trialPlan.durationDays} días</span>
               </div>
               <div className="flex flex-col sm:flex-row sm:items-end gap-5">
                 <div className="flex items-baseline gap-1">
-                  <span className="font-bebas leading-none" style={{ color: ALMA.berry, fontSize: "clamp(3.5rem, 7vw, 5.8rem)" }}>${formatPrice(trialPlan)}</span>
+                  <span className="font-bebas nums leading-none" style={{ color: ALMA.berry, fontSize: "clamp(3.5rem, 7vw, 5.8rem)" }}>${formatPrice(trialPlan)}</span>
                   <span className="text-[0.8rem] uppercase tracking-[0.18em] text-[color:var(--ink)]/55">MXN</span>
                 </div>
                 <div className="flex-1">
@@ -875,11 +842,11 @@ const PaquetesSection = ({
               <div className="min-w-[660px]">
                 {/* encabezado de columnas */}
                 <div className="grid items-end gap-x-3 px-6 sm:px-9 pt-8 pb-4" style={{ gridTemplateColumns: "1.5fr repeat(5, 1fr)" }}>
-                  <span className="text-[0.6rem] uppercase tracking-[0.24em]" style={{ color: ALMA.olive }}>
+                  <span className="text-[0.7rem] uppercase tracking-[0.24em]" style={{ color: ALMA.berry }}>
                     Por modalidad y sesiones
                   </span>
                   {COLS.map((c) => (
-                    <span key={c.key} className="text-center text-[0.64rem] font-medium uppercase tracking-[0.12em]" style={{ color: ALMA.berry }}>
+                    <span key={c.key} className="nums text-center text-[0.7rem] font-medium uppercase tracking-[0.12em]" style={{ color: ALMA.berry }}>
                       {c.label}
                     </span>
                   ))}
@@ -889,7 +856,7 @@ const PaquetesSection = ({
                   <div key={row.label} className="grid items-center gap-x-3 px-6 sm:px-9 py-6" style={{ gridTemplateColumns: "1.5fr repeat(5, 1fr)", borderTop: `1px solid ${ALMA.border}` }}>
                     <div>
                       <h3 className="font-bebas leading-none" style={{ color: ALMA.ink, fontSize: "clamp(1.4rem, 2.1vw, 1.95rem)" }}>{row.label}</h3>
-                      <p className="text-[0.62rem] uppercase tracking-[0.14em] text-[color:var(--ink)]/45 mt-1.5">{row.sub}</p>
+                      <p className="text-[0.7rem] uppercase tracking-[0.14em] mt-1.5" style={{ color: ALMA.berry }}>{row.sub}</p>
                     </div>
                     {COLS.map((c) => {
                       const plan = row.plans.find(c.match);
@@ -903,10 +870,10 @@ const PaquetesSection = ({
                           className="text-center rounded-[16px] py-3 px-1 transition-all hover:-translate-y-0.5"
                           style={isInf ? { backgroundColor: `${ALMA.berry}14` } : undefined}
                         >
-                          <div className="font-bebas leading-none tabular-nums" style={{ color: ALMA.berry, fontSize: "clamp(1.25rem, 1.8vw, 1.6rem)" }}>
+                          <div className="font-bebas nums leading-none" style={{ color: ALMA.berry, fontSize: "clamp(1.25rem, 1.8vw, 1.6rem)" }}>
                             ${formatPrice(plan)}
                           </div>
-                          <div className="mt-1 text-[0.55rem] uppercase tracking-[0.14em]" style={{ color: isInf && plan.openingActive ? ALMA.coral : `${ALMA.ink}66` }}>
+                          <div className={"mt-1 text-[0.7rem] uppercase tracking-[0.14em]" + (isInf && plan.openingActive ? " font-medium" : "")} style={{ color: ALMA.berry }}>
                             {isInf && plan.openingActive ? "apertura" : "MXN"}
                           </div>
                         </button>
@@ -917,67 +884,69 @@ const PaquetesSection = ({
               </div>
             </div>
           </div>
-          <p className="sm:hidden text-center text-[0.6rem] uppercase tracking-[0.2em] mt-2" style={{ color: ALMA.cream, opacity: 0.4 }}>
+          <p className="sm:hidden text-center text-[0.7rem] uppercase tracking-[0.2em] mt-2" style={{ color: ALMA.cream, opacity: 0.65 }}>
             ← desliza para ver toda la tabla →
           </p>
         </div>
 
-        {/* Ofertas especiales: AM Club · Mixtos · Premium — tarjetas distintas, no lista */}
-        <div className="reveal opacity-0 translate-y-8 transition-all duration-700 mt-5 grid grid-cols-1 lg:grid-cols-3 gap-4 items-stretch">
-          {amClubPlans.length > 0 && (
-            <div className="rounded-[20px] p-6 flex flex-col" style={{ backgroundColor: ALMA.cream }}>
-              <span className="inline-flex w-fit items-center gap-1.5 rounded-full px-3 py-1 text-[0.56rem] font-medium uppercase tracking-[0.14em]" style={{ backgroundColor: `${ALMA.olive}1f`, color: ALMA.olive }}>
-                Solo mañanas · 7–10am
-              </span>
-              <h3 className="font-bebas mt-3 leading-none" style={{ color: ALMA.ink, fontSize: "1.7rem" }}>AM Club</h3>
-              <p className="text-[0.82rem] leading-[1.5] text-[color:var(--ink)]/60 mt-1.5">8 clases al mes en horario matutino, a precio especial.</p>
-              <div className="mt-4 flex flex-col gap-2">
-                {amClubPlans.map((p) => (
-                  <button key={p.id} onClick={onPick} aria-label={`Elegir ${p.name}`} className="flex items-center justify-between rounded-full px-4 py-2.5 transition-transform hover:-translate-y-0.5" style={{ border: `1px solid ${ALMA.border}` }}>
-                    <span className="text-[0.8rem]" style={{ color: ALMA.ink }}>{p.name.includes("Reformer") ? "Reformer / Tower" : "Studio"}</span>
-                    <span className="font-bebas text-[1.1rem] inline-flex items-center gap-1" style={{ color: ALMA.berry }}>${formatPrice(p)}<ArrowUpRight size={13} /></span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-          {mixtoPlans.length > 0 && (
-            <div className="rounded-[20px] p-6 flex flex-col" style={{ backgroundColor: ALMA.cream }}>
-              <span className="inline-flex w-fit items-center rounded-full px-3 py-1 text-[0.56rem] font-medium uppercase tracking-[0.14em]" style={{ backgroundColor: `${ALMA.berry}1f`, color: ALMA.berry }}>
-                Combina las dos áreas
-              </span>
-              <h3 className="font-bebas mt-3 leading-none" style={{ color: ALMA.ink, fontSize: "1.7rem" }}>Paquetes mixtos</h3>
-              <p className="text-[0.82rem] leading-[1.5] text-[color:var(--ink)]/60 mt-1.5">Studio y Reformer/Tower en un mismo paquete.</p>
-              <div className="mt-4 flex flex-col gap-2">
-                {mixtoPlans.map((p) => (
-                  <button key={p.id} onClick={onPick} aria-label={`Elegir ${p.name}`} className="flex items-center justify-between gap-3 rounded-full px-4 py-2.5 transition-transform hover:-translate-y-0.5" style={{ border: `1px solid ${ALMA.border}` }}>
-                    <span className="text-[0.8rem] truncate" style={{ color: ALMA.ink }}>{p.name.replace(/^Alma /, "")} <span className="text-[color:var(--ink)]/45">· {sessionsLabel(p)}</span></span>
-                    <span className="font-bebas text-[1.1rem] inline-flex items-center gap-1 shrink-0" style={{ color: ALMA.berry }}>${formatPrice(p)}<ArrowUpRight size={13} /></span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+        {/* Ofertas especiales: Premium protagonista + AM Club y Mixtos como filas editoriales */}
+        <div className="reveal opacity-0 translate-y-8 transition-all duration-700 mt-12 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-start">
           {premiumPlans.length > 0 && (
-            <div className="rounded-[20px] p-6 flex flex-col justify-between" style={{ backgroundColor: ALMA.ink, color: ALMA.cream }}>
+            <div className="lg:col-span-5 rounded-[24px] p-7 sm:p-9 flex flex-col justify-between min-h-[300px]" style={{ backgroundColor: ALMA.cream }}>
               <div>
-                <span className="inline-flex w-fit items-center rounded-full px-3 py-1 text-[0.56rem] font-medium uppercase tracking-[0.14em]" style={{ backgroundColor: `${ALMA.cream}1f`, color: ALMA.cream }}>
+                <span className="text-[0.7rem] font-medium uppercase tracking-[0.2em]" style={{ color: ALMA.berry }}>
                   Todo el estudio
                 </span>
-                <h3 className="font-bebas mt-3 leading-none" style={{ color: ALMA.cream, fontSize: "1.7rem" }}>{premiumPlans[0].name}</h3>
-                <p className="text-[0.82rem] leading-[1.5] mt-1.5" style={{ color: ALMA.cream, opacity: 0.72 }}>Acceso ilimitado a Studio y Reformer/Tower.</p>
+                <h3 className="font-bebas mt-3 leading-none" style={{ color: ALMA.ink, fontSize: "clamp(1.9rem, 3.2vw, 2.8rem)" }}>{premiumPlans[0].name}</h3>
+                <p className="text-[0.9rem] leading-[1.6] mt-2 max-w-[36ch] text-[color:var(--ink)]/72">Acceso ilimitado a Studio y Reformer/Tower.</p>
               </div>
-              <div className="mt-5 flex items-end justify-between">
-                <div className="flex items-baseline gap-1">
-                  <span className="font-bebas leading-none" style={{ color: ALMA.cream, fontSize: "2.6rem" }}>${formatPrice(premiumPlans[0])}</span>
-                  <span className="text-[0.6rem] uppercase tracking-[0.16em]" style={{ color: ALMA.cream, opacity: 0.55 }}>{premiumPlans[0].openingActive ? "apertura" : "MXN"}</span>
+              <div className="mt-8 flex items-end justify-between">
+                <div className="flex items-baseline gap-2">
+                  <span className="font-bebas nums leading-none" style={{ color: ALMA.berry, fontSize: "clamp(2.8rem, 4.6vw, 4rem)" }}>${formatPrice(premiumPlans[0])}</span>
+                  <span className="text-[0.7rem] uppercase tracking-[0.16em]" style={{ color: ALMA.berry }}>{premiumPlans[0].openingActive ? "apertura" : "MXN"}</span>
                 </div>
-                <button onClick={onPick} className="grid h-12 w-12 place-items-center rounded-full transition-transform hover:scale-105" style={{ backgroundColor: ALMA.cream, color: ALMA.ink }} aria-label={`Elegir ${premiumPlans[0].name}`}>
+                <button onClick={onPick} className="grid h-12 w-12 place-items-center rounded-full transition-transform hover:scale-105" style={{ backgroundColor: ALMA.ink, color: ALMA.cream }} aria-label={`Elegir ${premiumPlans[0].name}`}>
                   <ArrowUpRight size={18} />
                 </button>
               </div>
             </div>
           )}
+          <div className="lg:col-span-7 flex flex-col">
+            {amClubPlans.length > 0 && (
+              <div className="pb-8" style={{ borderBottom: mixtoPlans.length > 0 ? `1px solid ${ALMA.cream}22` : undefined }}>
+                <div className="flex flex-wrap items-baseline justify-between gap-3">
+                  <h3 className="font-bebas leading-none" style={{ color: ALMA.cream, fontSize: "1.6rem" }}>AM Club</h3>
+                  <span className="nums text-[0.7rem] uppercase tracking-[0.18em]" style={{ color: ALMA.cream, opacity: 0.7 }}>Solo mañanas · 7–10am</span>
+                </div>
+                <p className="mt-2 text-[0.88rem] leading-[1.6] max-w-[52ch]" style={{ color: ALMA.cream, opacity: 0.75 }}>8 clases al mes en horario matutino, a precio especial.</p>
+                <div className="mt-4 flex flex-wrap gap-2.5">
+                  {amClubPlans.map((p) => (
+                    <button key={p.id} onClick={onPick} aria-label={`Elegir ${p.name}`} className="inline-flex items-center gap-3 rounded-full px-5 py-2.5 transition-transform hover:-translate-y-0.5" style={{ border: `1px solid ${ALMA.cream}3d`, color: ALMA.cream, backgroundColor: "transparent", cursor: "pointer" }}>
+                      <span className="text-[0.82rem]">{p.name.includes("Reformer") ? "Reformer / Tower" : "Studio"}</span>
+                      <span className="font-bebas nums text-[1.05rem] inline-flex items-center gap-1">${formatPrice(p)}<ArrowUpRight size={13} /></span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {mixtoPlans.length > 0 && (
+              <div className={amClubPlans.length > 0 ? "pt-8" : ""}>
+                <div className="flex flex-wrap items-baseline justify-between gap-3">
+                  <h3 className="font-bebas leading-none" style={{ color: ALMA.cream, fontSize: "1.6rem" }}>Paquetes mixtos</h3>
+                  <span className="text-[0.7rem] uppercase tracking-[0.18em]" style={{ color: ALMA.cream, opacity: 0.7 }}>Combina las dos áreas</span>
+                </div>
+                <p className="mt-2 text-[0.88rem] leading-[1.6] max-w-[52ch]" style={{ color: ALMA.cream, opacity: 0.75 }}>Studio y Reformer/Tower en un mismo paquete.</p>
+                <div className="mt-4 flex flex-wrap gap-2.5">
+                  {mixtoPlans.map((p) => (
+                    <button key={p.id} onClick={onPick} aria-label={`Elegir ${p.name}`} className="inline-flex items-center gap-3 rounded-full px-5 py-2.5 transition-transform hover:-translate-y-0.5" style={{ border: `1px solid ${ALMA.cream}3d`, color: ALMA.cream, backgroundColor: "transparent", cursor: "pointer" }}>
+                      <span className="nums text-[0.82rem]">{p.name.replace(/^Alma /, "")} · {sessionsLabel(p)}</span>
+                      <span className="font-bebas nums text-[1.05rem] inline-flex items-center gap-1">${formatPrice(p)}<ArrowUpRight size={13} /></span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         <p className="reveal opacity-0 translate-y-8 transition-all duration-700 mt-6 text-[0.78rem] uppercase tracking-[0.18em] text-center" style={{ color: ALMA.cream, opacity: 0.55 }}>
@@ -997,7 +966,7 @@ const PoliticasSection = () => {
     { num: "02", title: "Reservación", text: "Todas las clases requieren reserva previa. Cupo de 4 lugares en Reformer/Tower y 8 en Studio." },
     { num: "03", title: "Cancelaciones", text: "Si cancelas dentro de las 12 horas previas a tu clase y acumulas 5 clases reservadas sin asistir, se aplica una penalización con pérdida de puntos." },
     { num: "04", title: "En el estudio", text: "Respeta el horario de inicio, mantén tu celular en silencio e informa antes cualquier lesión o condición médica." },
-    { num: "05", title: "Pagos", text: "Transferencia Banorte · Estefanía Torres Lanzagorta · CLABE 072298012591154950. También aceptamos efectivo en el estudio." },
+    { num: "05", title: "Pagos", text: "Aceptamos transferencia y efectivo. Los datos bancarios te los compartimos al reservar, y puedes pagar en recepción." },
     { num: "06", title: "Vigencia", text: "Todos los paquetes tienen vigencia de 30 días a partir de la compra." },
     { num: "07", title: "Asistencia", text: "El check-in con QR registra tus asistencias y reservas. Llega 10 minutos antes para registrarte sin prisa." },
     { num: "08", title: "Comunidad", text: "Avisos y recordatorios de tus clases se comunican principalmente por WhatsApp. Cualquier duda, escríbenos por ahí." },
@@ -1009,12 +978,12 @@ const PoliticasSection = () => {
       <div className="mx-auto max-w-[1320px]">
         <div className="reveal opacity-0 translate-y-8 transition-all duration-700 grid grid-cols-1 lg:grid-cols-12 gap-10 mb-10">
           <div className="lg:col-span-5">
-            <span className="text-[0.66rem] font-medium uppercase tracking-[0.34em]" style={{ color: ALMA.olive }}>
+            <span className="text-[0.66rem] font-medium uppercase tracking-[0.34em]" style={{ color: ALMA.berry }}>
               Lo que tienes que saber
             </span>
             <h2 className="font-bebas mt-4 leading-[0.92]" style={{ color: ALMA.ink, fontSize: "clamp(2.2rem, 4.6vw, 4rem)" }}>
               Reglas de la casa,
-              <span className="block italic font-alilato font-normal" style={{ color: ALMA.olive }}>en una página.</span>
+              <span className="block font-display-italic font-normal" style={{ color: ALMA.stone }}>en una página.</span>
             </h2>
           </div>
           <p className="lg:col-span-7 lg:pl-6 text-[0.96rem] leading-[1.75] text-[color:var(--ink)]/70 max-w-[60ch] self-end">
@@ -1033,7 +1002,7 @@ const PoliticasSection = () => {
                   className="w-full grid grid-cols-[auto_1fr_auto] items-center gap-5 px-2 py-6 bg-transparent border-0 cursor-pointer text-left"
                   aria-expanded={isOpen}
                 >
-                  <span className="font-bebas tabular-nums text-[1rem]" style={{ color: ALMA.coral, opacity: 0.85 }}>{it.num}</span>
+                  <span className="font-bebas nums text-[1rem]" style={{ color: ALMA.berry }}>{it.num}</span>
                   <h3 className="font-bebas tracking-tight leading-tight" style={{ color: ALMA.ink, fontSize: "clamp(1.3rem, 2.4vw, 2rem)" }}>
                     {it.title}
                   </h3>
@@ -1067,12 +1036,11 @@ const TestimoniosSection = () => {
         <span className="text-[0.66rem] font-medium uppercase tracking-[0.34em]" style={{ color: ALMA.berry }}>
           Nuestra filosofía
         </span>
-        <blockquote className="mt-6 font-bebas leading-[0.96]" style={{ color: ALMA.ink, fontSize: "clamp(2.2rem, 4.4vw, 3.8rem)" }}>
-          <span className="font-alilato font-normal italic" style={{ color: ALMA.berry }}>“</span>
-          Aquí el movimiento te regresa a ti. En grupos pequeños, donde te conocen por tu nombre y cada clase se siente como bienestar.
-          <span className="font-alilato font-normal italic" style={{ color: ALMA.berry }}>”</span>
+        <blockquote className="mt-6 font-display leading-[1.04]" style={{ color: ALMA.ink, fontSize: "clamp(2rem, 4vw, 3.4rem)", fontWeight: 380 }}>
+          “Aquí el movimiento te regresa a ti. En grupos pequeños, donde te conocen por tu nombre y{" "}
+          <span className="font-display-italic" style={{ color: ALMA.berry }}>cada clase se siente como bienestar</span>.”
         </blockquote>
-        <div className="mt-7 text-[0.74rem] uppercase tracking-[0.24em]" style={{ color: ALMA.berry, opacity: 0.85 }}>
+        <div className="mt-7 text-[0.74rem] uppercase tracking-[0.24em]" style={{ color: ALMA.berry }}>
           Alma Movement
         </div>
       </div>
@@ -1084,26 +1052,37 @@ const TestimoniosSection = () => {
    GALERÍA — featured + masonry
    ═══════════════════════════════════════════════════════════ */
 const GaleriaSection = ({ galleryIdx, setGalleryIdx }: { galleryIdx: number; setGalleryIdx: (n: number) => void }) => {
+  // Autoplay: respeta prefers-reduced-motion, se pausa en hover/focus y se
+  // detiene en cuanto la usuaria toma el control (flechas, dots, touch).
+  const [hovered, setHovered] = useState(false);
+  const [stopped, setStopped] = useState(false);
+
   useEffect(() => {
+    if (hovered || stopped) return;
+    if (typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const t = setInterval(() => setGalleryIdx((galleryIdx + 1) % GALLERY_IMAGES.length), 5000);
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [galleryIdx]);
+  }, [galleryIdx, hovered, stopped]);
 
-  const next = () => setGalleryIdx((galleryIdx + 1) % GALLERY_IMAGES.length);
-  const prev = () => setGalleryIdx((galleryIdx - 1 + GALLERY_IMAGES.length) % GALLERY_IMAGES.length);
+  const goTo = (n: number) => {
+    setStopped(true);
+    setGalleryIdx((n + GALLERY_IMAGES.length) % GALLERY_IMAGES.length);
+  };
+  const next = () => goTo(galleryIdx + 1);
+  const prev = () => goTo(galleryIdx - 1);
 
   return (
     <section id="galeria" className="relative px-5 sm:px-8 lg:px-12 py-28 lg:py-40" style={{ backgroundColor: ALMA.cream }}>
       <div className="mx-auto max-w-[1320px]">
         <div className="reveal opacity-0 translate-y-8 transition-all duration-700 flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-10">
           <div>
-            <span className="text-[0.66rem] font-medium uppercase tracking-[0.34em]" style={{ color: ALMA.coral }}>
+            <span className="text-[0.66rem] font-medium uppercase tracking-[0.34em]" style={{ color: ALMA.berry }}>
               Por dentro
             </span>
             <h2 className="font-bebas mt-4 leading-[0.92]" style={{ color: ALMA.ink, fontSize: "clamp(2.4rem, 5.2vw, 4.6rem)" }}>
               El estudio,
-              <span className="block italic font-alilato font-normal" style={{ color: ALMA.coral }}>en sus mejores momentos.</span>
+              <span className="block font-display-italic font-normal" style={{ color: ALMA.stone }}>en sus mejores momentos.</span>
             </h2>
           </div>
           <p className="max-w-[40ch] text-[0.95rem] leading-[1.7] text-[color:var(--ink)]/70">
@@ -1112,7 +1091,15 @@ const GaleriaSection = ({ galleryIdx, setGalleryIdx }: { galleryIdx: number; set
         </div>
 
         <div className="reveal opacity-0 translate-y-8 transition-all duration-700 grid grid-cols-1 lg:grid-cols-12 gap-5">
-          <div className="alma-photo-tint lg:col-span-8 relative aspect-[4/3] overflow-hidden rounded-[24px] group" style={{ backgroundColor: ALMA.ink }}>
+          <div
+            className="alma-photo-tint lg:col-span-8 relative aspect-[4/3] overflow-hidden rounded-[24px]"
+            style={{ backgroundColor: ALMA.ink }}
+            onMouseEnter={() => setHovered(true)}
+            onMouseLeave={() => setHovered(false)}
+            onFocusCapture={() => setHovered(true)}
+            onBlurCapture={() => setHovered(false)}
+            onTouchStart={() => setStopped(true)}
+          >
             {GALLERY_IMAGES.map((img, i) => (
               <img
                 key={i}
@@ -1122,17 +1109,17 @@ const GaleriaSection = ({ galleryIdx, setGalleryIdx }: { galleryIdx: number; set
                 className={"alma-photo absolute inset-0 h-full w-full object-cover transition-opacity duration-700 " + (i === galleryIdx ? "opacity-100" : "opacity-0")}
               />
             ))}
-            <button onClick={prev} aria-label="Anterior" className="absolute left-4 top-1/2 -translate-y-1/2 grid h-11 w-11 place-items-center rounded-full transition-opacity opacity-0 group-hover:opacity-100" style={{ backgroundColor: ALMA.cream, color: ALMA.berry }}>
+            <button onClick={prev} aria-label="Anterior" className="absolute left-4 top-1/2 -translate-y-1/2 grid h-11 w-11 place-items-center rounded-full transition-opacity opacity-60 hover:opacity-100 focus-visible:opacity-100" style={{ backgroundColor: ALMA.cream, color: ALMA.berry }}>
               <ChevronLeft size={18} />
             </button>
-            <button onClick={next} aria-label="Siguiente" className="absolute right-4 top-1/2 -translate-y-1/2 grid h-11 w-11 place-items-center rounded-full transition-opacity opacity-0 group-hover:opacity-100" style={{ backgroundColor: ALMA.cream, color: ALMA.berry }}>
+            <button onClick={next} aria-label="Siguiente" className="absolute right-4 top-1/2 -translate-y-1/2 grid h-11 w-11 place-items-center rounded-full transition-opacity opacity-60 hover:opacity-100 focus-visible:opacity-100" style={{ backgroundColor: ALMA.cream, color: ALMA.berry }}>
               <ChevronRight size={18} />
             </button>
             <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5">
               {GALLERY_IMAGES.map((_, i) => (
                 <button
                   key={i}
-                  onClick={() => setGalleryIdx(i)}
+                  onClick={() => goTo(i)}
                   className="h-1.5 rounded-full transition-all"
                   style={{ width: i === galleryIdx ? 24 : 6, backgroundColor: i === galleryIdx ? ALMA.cream : ALMA.cream + "66" }}
                   aria-label={"Ir a foto " + (i + 1)}
@@ -1144,7 +1131,7 @@ const GaleriaSection = ({ galleryIdx, setGalleryIdx }: { galleryIdx: number; set
             {GALLERY_IMAGES.slice(0, 6).map((img, i) => (
               <button
                 key={i}
-                onClick={() => setGalleryIdx(i)}
+                onClick={() => goTo(i)}
                 className={"relative aspect-square overflow-hidden rounded-[14px] bg-transparent border-0 p-0 cursor-pointer transition-opacity " + (i === galleryIdx ? "opacity-100" : "opacity-65 hover:opacity-100")}
                 aria-label={"Ver foto " + (i + 1)}
               >
@@ -1163,9 +1150,10 @@ const GaleriaSection = ({ galleryIdx, setGalleryIdx }: { galleryIdx: number; set
    CONTACTO + MAPA
    ═══════════════════════════════════════════════════════════ */
 const ContactoSection = () => {
-  const items = [
+  const items: { icon: JSX.Element; label: string; value: string; href?: string }[] = [
     { icon: <MapPin size={18} />, label: "Ubicación", value: "Plaza Arce, Calle Acueducto de Querétaro 513, Jurica Acueducto, 76230 Juriquilla, Qro." },
-    { icon: <Phone size={18} />, label: "Teléfono", value: "por confirmar", href: "tel:5210000000000" }, // TODO: WhatsApp real de Alma
+    // El teléfono solo se muestra cuando exista línea directa (STUDIO.phone).
+    ...(STUDIO.phone ? [{ icon: <Phone size={18} />, label: "Teléfono", value: STUDIO.phone, href: `tel:${STUDIO.phone}` }] : []),
     { icon: <Mail size={18} />, label: "Email", value: "info@almamovement.mx", href: "mailto:info@almamovement.mx" },
     { icon: <Clock size={18} />, label: "Horarios", value: "Lun a Sáb · 6:00–11:00 AM y 5:00–8:00 PM" },
   ];
@@ -1178,7 +1166,7 @@ const ContactoSection = () => {
           </span>
           <h2 className="font-bebas mt-4 leading-[0.92]" style={{ color: ALMA.ink, fontSize: "clamp(2.2rem, 4.6vw, 4rem)" }}>
             Plaza Arce,
-            <span className="block italic font-alilato font-normal" style={{ color: ALMA.berry }}>Juriquilla, Querétaro.</span>
+            <span className="block font-display-italic font-normal" style={{ color: ALMA.stone }}>Juriquilla, Querétaro.</span>
           </h2>
           <ul className="mt-8 list-none m-0 p-0 grid gap-5">
             {items.map((it) => (
@@ -1206,7 +1194,7 @@ const ContactoSection = () => {
             <a href="https://www.facebook.com/search/top?q=Alma%20Movement%20Quer%C3%A9taro" target="_blank" rel="noopener noreferrer" className="grid h-11 w-11 place-items-center rounded-full no-underline transition-colors hover:bg-[color:var(--blush)]" style={{ border: `1px solid ${ALMA.border}`, color: ALMA.berry }}>
               <IconFacebook size={16} />
             </a>
-            <a href="https://wa.me/5210000000000" /* TODO: WhatsApp real de Alma */ target="_blank" rel="noopener noreferrer" className="grid h-11 w-11 place-items-center rounded-full no-underline transition-colors hover:bg-[color:var(--blush)]" style={{ border: `1px solid ${ALMA.border}`, color: ALMA.berry }}>
+            <a href={`https://wa.me/${STUDIO.whatsapp}`} target="_blank" rel="noopener noreferrer" className="grid h-11 w-11 place-items-center rounded-full no-underline transition-colors hover:bg-[color:var(--blush)]" style={{ border: `1px solid ${ALMA.border}`, color: ALMA.berry }}>
               <MessageCircle size={16} />
             </a>
           </div>
@@ -1217,7 +1205,7 @@ const ContactoSection = () => {
             src="https://www.google.com/maps?q=Plaza%20Arce%2C%20Calle%20Acueducto%20de%20Quer%C3%A9taro%20513%2C%20Jurica%20Acueducto%2C%2076230%20Juriquilla%2C%20Qro.&output=embed"
             width="100%"
             height="100%"
-            style={{ border: 0, display: "block", minHeight: 420, filter: "saturate(0.9)" }}
+            style={{ border: 0, display: "block", minHeight: 420, filter: "grayscale(0.4) sepia(0.25) saturate(0.7) contrast(1.05)" }}
             allowFullScreen
             loading="lazy"
             referrerPolicy="no-referrer-when-downgrade"
@@ -1235,7 +1223,6 @@ const ContactoSection = () => {
 const FooterSection = ({ scrollTo, navigate }: { scrollTo: (id: string) => void; navigate: (path: string) => void }) => {
   return (
     <footer className="relative overflow-hidden px-5 sm:px-8 lg:px-12 pt-20 pb-8" style={{ backgroundColor: ALMA.inkDeep, color: ALMA.cream }}>
-      <div className="absolute inset-0 pointer-events-none opacity-[0.10]" style={{ background: `radial-gradient(circle at 88% 8%, ${ALMA.berry} 0%, transparent 55%)` }} />
       <div className="relative mx-auto max-w-[1320px]">
         {/* Giant serif wordmark (estilo Frame) */}
         <div className="pb-12">
@@ -1278,7 +1265,7 @@ const FooterSection = ({ scrollTo, navigate }: { scrollTo: (id: string) => void;
             <ul className="flex flex-col gap-2 list-none m-0 p-0 text-[0.88rem]">
               <li className="opacity-80">Juriquilla, Querétaro</li>
               <li><a href="mailto:info@almamovement.mx" className="opacity-80 hover:opacity-100 transition-opacity no-underline" style={{ color: ALMA.cream }}>info@almamovement.mx</a></li>
-              <li><a href="https://wa.me/5210000000000" /* TODO: WhatsApp real de Alma */ target="_blank" rel="noopener noreferrer" className="opacity-80 hover:opacity-100 transition-opacity no-underline" style={{ color: ALMA.cream }}>WhatsApp</a></li>
+              <li><a href={`https://wa.me/${STUDIO.whatsapp}`} target="_blank" rel="noopener noreferrer" className="opacity-80 hover:opacity-100 transition-opacity no-underline" style={{ color: ALMA.cream }}>WhatsApp</a></li>
               <li><a href="https://www.instagram.com/movementalma/" target="_blank" rel="noopener noreferrer" className="opacity-80 hover:opacity-100 transition-opacity no-underline" style={{ color: ALMA.cream }}>Instagram</a></li>
             </ul>
           </div>

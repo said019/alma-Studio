@@ -2,17 +2,14 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { AlertCircle } from "lucide-react";
 import api from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { useAuthStore } from "@/stores/authStore";
 import { useNavigate } from "react-router-dom";
-import {
-  AuthPasswordField,
-  AuthSubmit,
-  AuthErrorBanner,
-  AuthPasswordRules,
-  ALMA,
-} from "@/components/auth/AuthShell";
+import { ALMA } from "@/components/app/tokens";
+import { PrimaryButton } from "@/components/app/AppShell";
+import { PasswordField, PasswordRules } from "@/components/app/fields";
 
 const schema = z
   .object({
@@ -38,6 +35,8 @@ type FormValues = z.infer<typeof schema>;
 /**
  * Tarjeta reutilizable para cambiar la contraseña estando logueado.
  * La usan tanto el perfil del cliente como la config del admin.
+ * Campos, errores y CTA usan los tokens canónicos de la app
+ * (vía fields.tsx y PrimaryButton), no la paleta legacy de AuthShell.
  *
  * Props:
  *  - logoutAfter: si true, al cambiar la contraseña cierra sesión y manda
@@ -73,7 +72,7 @@ export const ChangePassword = ({
       });
       setDone(true);
       reset();
-      toast({ title: "✅ Contraseña actualizada" });
+      toast({ title: "Contraseña actualizada." });
       if (logoutAfter) {
         setTimeout(() => {
           logout();
@@ -89,8 +88,13 @@ export const ChangePassword = ({
   if (done && !logoutAfter) {
     return (
       <div
-        className="rounded-2xl px-5 py-4 text-[0.9rem]"
-        style={{ backgroundColor: `${ALMA.olive}14`, border: `1px solid ${ALMA.olive}40`, color: ALMA.ink }}
+        role="status"
+        className="rounded-2xl px-5 py-4 text-[0.9rem] leading-[1.55]"
+        style={{
+          backgroundColor: `${ALMA.olive}14`,
+          border: `1px solid ${ALMA.olive}40`,
+          color: ALMA.ink,
+        }}
       >
         Tu contraseña se actualizó correctamente.{" "}
         <button
@@ -107,9 +111,22 @@ export const ChangePassword = ({
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-5">
-      {serverError && <AuthErrorBanner message={serverError} />}
+      {serverError && (
+        <div
+          role="alert"
+          className="flex items-start gap-3 rounded-2xl px-4 py-3 text-[0.86rem]"
+          style={{
+            backgroundColor: `${ALMA.destructive}10`,
+            border: `1px solid ${ALMA.destructive}30`,
+            color: ALMA.destructive,
+          }}
+        >
+          <AlertCircle size={16} className="mt-0.5 shrink-0" />
+          <span className="leading-[1.5]">{serverError}</span>
+        </div>
+      )}
 
-      <AuthPasswordField
+      <PasswordField
         label="Contraseña actual"
         placeholder="Tu contraseña actual"
         autoComplete="current-password"
@@ -118,17 +135,17 @@ export const ChangePassword = ({
       />
 
       <div className="flex flex-col gap-3">
-        <AuthPasswordField
+        <PasswordField
           label="Nueva contraseña"
           placeholder="Mínimo 8 caracteres"
           autoComplete="new-password"
           error={errors.newPassword?.message}
           {...register("newPassword")}
         />
-        <AuthPasswordRules password={newPassword} />
+        <PasswordRules password={newPassword} />
       </div>
 
-      <AuthPasswordField
+      <PasswordField
         label="Confirmar nueva contraseña"
         placeholder="Repite la nueva contraseña"
         autoComplete="new-password"
@@ -136,9 +153,16 @@ export const ChangePassword = ({
         {...register("confirmPassword")}
       />
 
-      <AuthSubmit loading={isSubmitting} loadingLabel="Guardando…">
-        Cambiar contraseña
-      </AuthSubmit>
+      <div className="pt-1">
+        <PrimaryButton
+          type="submit"
+          className="w-full sm:w-auto"
+          loading={isSubmitting}
+          loadingLabel="Guardando…"
+        >
+          Cambiar contraseña
+        </PrimaryButton>
+      </div>
     </form>
   );
 };

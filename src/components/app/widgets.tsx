@@ -44,7 +44,7 @@ export function SegmentedTabs<T extends string>({ options, value, onChange }: Se
             {opt.label}
             {typeof opt.count === "number" && (
               <span
-                className="text-[0.66rem] font-bebas tabular-nums"
+                className="nums text-[0.72rem] font-display"
                 style={{ opacity: 0.85 }}
               >
                 {opt.count}
@@ -202,11 +202,9 @@ export const StickyCta = ({ children }: StickyCtaProps) => {
       <div
         className="rounded-3xl p-3 transition-shadow"
         style={{
-          backgroundColor: stuck ? `${ALMA.cream}f5` : "transparent",
+          backgroundColor: stuck ? ALMA.cream : "transparent",
           border: stuck ? `1px solid ${ALMA.border}` : "0",
-          boxShadow: stuck ? "0 12px 32px rgba(46,32,28,0.08)" : "none",
-          backdropFilter: stuck ? "blur(12px)" : "none",
-          WebkitBackdropFilter: stuck ? "blur(12px)" : "none",
+          boxShadow: stuck ? "0 8px 24px rgba(36,27,26,0.08)" : "none",
         }}
       >
         {children}
@@ -228,7 +226,7 @@ export const StatusPill = ({ label, tone, variant = "soft" }: StatusPillProps) =
   const isSoft = variant === "soft";
   return (
     <span
-      className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[0.66rem] font-medium uppercase tracking-[0.18em]"
+      className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[0.72rem] font-medium uppercase tracking-[0.18em]"
       style={
         isSoft
           ? { backgroundColor: `${c}1a`, color: c }

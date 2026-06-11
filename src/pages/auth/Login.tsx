@@ -4,7 +4,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuthStore } from "@/stores/authStore";
-import { useToast } from "@/hooks/use-toast";
 import { InstallAppPrompt } from "@/components/InstallAppPrompt";
 import {
   AuthShell,
@@ -28,7 +27,6 @@ const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [params] = useSearchParams();
-  const { toast } = useToast();
 
   const { register, handleSubmit, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -67,11 +65,7 @@ const Login = () => {
         navigate("/app", { replace: true });
       }
     } catch {
-      toast({
-        title: "No pudimos entrar",
-        description: error ?? "Verifica tu correo y contraseña.",
-        variant: "destructive",
-      });
+      // El error del store se muestra en el AuthErrorBanner, único canal de error.
     }
   };
 

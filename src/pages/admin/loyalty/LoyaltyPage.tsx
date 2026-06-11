@@ -17,8 +17,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { MoreHorizontal, Plus, Settings, Sparkles, Trophy } from "lucide-react";
+import { useConfirm } from "@/components/admin/ConfirmDialog";
+import { ErrorState, EmptyState } from "@/components/app/AppShell";
+import { formatDateTime } from "@/lib/format";
+import { Gift, MoreHorizontal, Plus, Settings, Sparkles, Trophy } from "lucide-react";
 
 // ── Loyalty Config ──────────────────────────────────────
 const defaultConfig = { enabled: true, points_per_class: 10, points_per_peso: 1, welcome_bonus: 50, birthday_bonus: 100 };
@@ -26,7 +30,7 @@ const defaultConfig = { enabled: true, points_per_class: 10, points_per_peso: 1,
 const LoyaltyConfig = () => {
   const { toast } = useToast();
   const qc = useQueryClient();
-  const { data, isLoading } = useQuery({ queryKey: ["loyalty-config"], queryFn: async () => (await api.get("/loyalty/config")).data });
+  const { data, isLoading, isError, refetch } = useQuery({ queryKey: ["loyalty-config"], queryFn: async () => (await api.get("/loyalty/config")).data });
   const config = data?.data ?? data ?? {};
 
   const [form, setForm] = useState({ ...defaultConfig });
@@ -44,7 +48,21 @@ const LoyaltyConfig = () => {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["loyalty-config"] }); toast({ title: "Configuración guardada" }); },
   });
 
-  if (isLoading) return <p className="text-sm text-muted-foreground">Cargando…</p>;
+  if (isLoading) {
+    return (
+      <div className="max-w-md space-y-4">
+        {[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-10 w-full" />)}
+      </div>
+    );
+  }
+  if (isError) {
+    return (
+      <ErrorState
+        title="No pudimos cargar la configuración"
+        onRetry={() => refetch()}
+      />
+    );
+  }
 
   return (
     <div className="max-w-md space-y-4">
@@ -83,10 +101,11 @@ interface Reward extends RewardFormData { id: string }
 const LoyaltyRewards = () => {
   const { toast } = useToast();
   const qc = useQueryClient();
+  const { confirm, dialog } = useConfirm();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Reward | null>(null);
 
-  const { data } = useQuery<{ data: Reward[] }>({ queryKey: ["loyalty-rewards"], queryFn: async () => (await api.get("/loyalty/rewards")).data });
+  const { data, isLoading, isError, refetch } = useQuery<{ data: Reward[] }>({ queryKey: ["loyalty-rewards"], queryFn: async () => (await api.get("/loyalty/rewards")).data });
   const rewards = Array.isArray(data?.data) ? data.data : [];
 
   const form = useForm<RewardFormData>({ resolver: zodResolver(rewardSchema), defaultValues: { reward_type: "discount", is_active: true, stock: null } });
@@ -103,29 +122,60 @@ const LoyaltyRewards = () => {
           <Plus size={14} className="mr-1" />Nueva
         </Button>
       </div>
-      <Table>
-        <TableHeader><TableRow><TableHead>Nombre</TableHead><TableHead>Puntos</TableHead><TableHead>Tipo</TableHead><TableHead>Stock</TableHead><TableHead>Estado</TableHead><TableHead /></TableRow></TableHeader>
-        <TableBody>
-          {rewards.map((r) => (
-            <TableRow key={r.id}>
-              <TableCell className="font-medium">{r.name}</TableCell>
-              <TableCell>{r.points_cost} pts</TableCell>
-              <TableCell><Badge variant="outline">{r.reward_type}</Badge></TableCell>
-              <TableCell>{r.stock ?? "∞"}</TableCell>
-              <TableCell><Badge variant={r.is_active ? "default" : "secondary"}>{r.is_active ? "Activa" : "Inactiva"}</Badge></TableCell>
-              <TableCell>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal size={14} /></Button></DropdownMenuTrigger>
-                  <DropdownMenuContent>
-                    <DropdownMenuItem onClick={() => { form.reset(r); setEditing(r); setOpen(true); }}>Editar</DropdownMenuItem>
-                    <DropdownMenuItem className="text-destructive" onClick={() => { if (window.confirm("¿Eliminar esta recompensa?")) deleteMutation.mutate(r.id); }}>Eliminar</DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+      {isError ? (
+        <ErrorState
+          title="No pudimos cargar las recompensas"
+          onRetry={() => refetch()}
+        />
+      ) : isLoading ? (
+        <div className="space-y-2">{[1, 2, 3].map((i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
+      ) : rewards.length === 0 ? (
+        <EmptyState
+          icon={<Gift size={20} />}
+          title="Aún no hay recompensas"
+          description="Crea la primera para que las alumnas canjeen sus puntos."
+          ctaLabel="Nueva recompensa"
+          onCta={() => { form.reset({ reward_type: "discount", is_active: true, stock: null }); setEditing(null); setOpen(true); }}
+        />
+      ) : (
+        <Table>
+          <TableHeader><TableRow><TableHead>Nombre</TableHead><TableHead>Puntos</TableHead><TableHead>Tipo</TableHead><TableHead>Stock</TableHead><TableHead>Estado</TableHead><TableHead /></TableRow></TableHeader>
+          <TableBody>
+            {rewards.map((r) => (
+              <TableRow key={r.id}>
+                <TableCell className="font-medium">{r.name}</TableCell>
+                <TableCell className="nums">{r.points_cost} pts</TableCell>
+                <TableCell><Badge variant="outline">{r.reward_type}</Badge></TableCell>
+                <TableCell className="nums">{r.stock ?? "Sin límite"}</TableCell>
+                <TableCell><Badge variant={r.is_active ? "default" : "secondary"}>{r.is_active ? "Activa" : "Inactiva"}</Badge></TableCell>
+                <TableCell>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal size={14} /></Button></DropdownMenuTrigger>
+                    <DropdownMenuContent>
+                      <DropdownMenuItem onClick={() => { form.reset(r); setEditing(r); setOpen(true); }}>Editar</DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="text-destructive"
+                        onClick={async () => {
+                          const ok = await confirm({
+                            title: `¿Eliminar "${r.name}"?`,
+                            description: "Las alumnas ya no podrán canjearla. Los canjes anteriores no se tocan.",
+                            confirmLabel: "Eliminar",
+                            destructive: true,
+                          });
+                          if (ok) deleteMutation.mutate(r.id);
+                        }}
+                      >
+                        Eliminar
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
+      {dialog}
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-md">
@@ -134,7 +184,7 @@ const LoyaltyRewards = () => {
             <div className="space-y-1"><Label>Nombre</Label><Input {...form.register("name")} /></div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1"><Label>Costo en puntos</Label><Input type="number" {...form.register("points_cost")} /></div>
-              <div className="space-y-1"><Label>Stock (vacío=∞)</Label><Input type="number" {...form.register("stock")} /></div>
+              <div className="space-y-1"><Label>Stock (vacío = sin límite)</Label><Input type="number" {...form.register("stock")} /></div>
             </div>
             <div className="space-y-1">
               <Label>Tipo</Label>
@@ -202,10 +252,11 @@ const PERIOD_LABEL: Record<string, string> = {
 const LoyaltyMilestones = () => {
   const { toast } = useToast();
   const qc = useQueryClient();
+  const { confirm, dialog } = useConfirm();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Milestone | null>(null);
 
-  const { data, isLoading } = useQuery<{ data: Milestone[] }>({
+  const { data, isLoading, isError, refetch } = useQuery<{ data: Milestone[] }>({
     queryKey: ["loyalty-milestones"],
     queryFn: async () => (await api.get("/admin/loyalty-milestones")).data,
   });
@@ -217,13 +268,13 @@ const LoyaltyMilestones = () => {
   });
   const rewards = Array.isArray(rewardsData?.data) ? rewardsData.data : [];
 
-  const { data: templatesData } = useQuery<{ data: { templates: Record<string, { subject: string; body: string }> } }>({
+  const { data: templatesData, isError: templatesError } = useQuery<{ data: { templates: Record<string, { subject: string; body: string }> } }>({
     queryKey: ["whatsapp-templates"],
     queryFn: async () => (await api.get("/admin/whatsapp-templates")).data,
   });
   const templateKeys = Object.keys(templatesData?.data?.templates ?? {});
 
-  const { data: awardsData } = useQuery<{ data: AwardLog[] }>({
+  const { data: awardsData, isError: awardsError, refetch: refetchAwards } = useQuery<{ data: AwardLog[] }>({
     queryKey: ["loyalty-milestone-awards"],
     queryFn: async () => (await api.get("/admin/loyalty-milestones/awards?limit=50")).data,
     refetchInterval: 30000,
@@ -319,17 +370,31 @@ const LoyaltyMilestones = () => {
 
   const awardType = form.watch("award_type");
 
-  if (isLoading) return <p className="text-sm text-muted-foreground">Cargando milestones…</p>;
+  if (isLoading) {
+    return (
+      <div className="space-y-2">
+        {[1, 2, 3].map((i) => <Skeleton key={i} className="h-12 w-full" />)}
+      </div>
+    );
+  }
+  if (isError) {
+    return (
+      <ErrorState
+        title="No pudimos cargar los milestones"
+        onRetry={() => refetch()}
+      />
+    );
+  }
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-lg font-semibold flex items-center gap-2">
-            <Trophy size={18} className="text-[#C7A892]" />
+          <h2 className="text-lg font-semibold flex items-center gap-2 text-alma-ink">
+            <Trophy size={18} className="text-alma-berry" />
             Recompensas por asistencia
           </h2>
-          <p className="text-xs text-muted-foreground mt-0.5">
+          <p className="text-xs text-alma-ink/55 mt-0.5">
             Otorga puntos automáticamente cuando una alumna alcanza N clases (lifetime/mes/año).
           </p>
         </div>
@@ -338,6 +403,15 @@ const LoyaltyMilestones = () => {
         </Button>
       </div>
 
+      {milestones.length === 0 ? (
+        <EmptyState
+          icon={<Trophy size={20} />}
+          title="Sin milestones configurados"
+          description="Crea el primero para premiar la constancia de tus alumnas en automático."
+          ctaLabel="Nuevo milestone"
+          onCta={openCreate}
+        />
+      ) : (
       <Table>
         <TableHeader>
           <TableRow>
@@ -352,42 +426,35 @@ const LoyaltyMilestones = () => {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {milestones.length === 0 && (
-            <TableRow>
-              <TableCell colSpan={8} className="text-center text-sm text-muted-foreground py-8">
-                Sin milestones configurados. Click "Nuevo milestone" para crear el primero.
-              </TableCell>
-            </TableRow>
-          )}
           {milestones.map((m) => (
             <TableRow key={m.id}>
               <TableCell>
                 <div className="font-medium">{m.name}</div>
                 {m.description && (
-                  <div className="text-xs text-muted-foreground mt-0.5">{m.description}</div>
+                  <div className="text-xs text-alma-ink/55 mt-0.5">{m.description}</div>
                 )}
               </TableCell>
-              <TableCell className="tabular-nums">{m.classes_required}</TableCell>
+              <TableCell className="nums">{m.classes_required}</TableCell>
               <TableCell>
                 <Badge variant="outline">{PERIOD_LABEL[m.period] || m.period}</Badge>
               </TableCell>
               <TableCell>
                 {m.award_type === "points" ? (
-                  <span className="text-sm">+{m.award_points} pts</span>
+                  <span className="nums text-sm">+{m.award_points} pts</span>
                 ) : (
                   <Badge variant="outline">Reward</Badge>
                 )}
               </TableCell>
               <TableCell>
                 {m.message_template_key ? (
-                  <code className="text-[11px] px-1.5 py-0.5 rounded bg-secondary">
+                  <code className="text-[11px] px-1.5 py-0.5 rounded bg-alma-oat/60 text-alma-ink">
                     {m.message_template_key}
                   </code>
                 ) : (
-                  <span className="text-xs text-muted-foreground">—</span>
+                  <span className="text-xs text-alma-ink/55">—</span>
                 )}
               </TableCell>
-              <TableCell className="tabular-nums text-center">
+              <TableCell className="nums text-center">
                 <Badge variant={m.awarded_count ? "default" : "secondary"}>
                   {m.awarded_count ?? 0}
                 </Badge>
@@ -406,10 +473,14 @@ const LoyaltyMilestones = () => {
                     <DropdownMenuItem onClick={() => openEdit(m)}>Editar</DropdownMenuItem>
                     <DropdownMenuItem
                       className="text-destructive"
-                      onClick={() => {
-                        if (window.confirm(`¿Eliminar milestone "${m.name}"?\n\nLas alumnas que ya lo recibieron mantienen sus puntos, pero el registro de award se borra.`)) {
-                          deleteMutation.mutate(m.id);
-                        }
+                      onClick={async () => {
+                        const ok = await confirm({
+                          title: `¿Eliminar milestone "${m.name}"?`,
+                          description: "Las alumnas que ya lo recibieron mantienen sus puntos, pero el registro de premiación se borra.",
+                          confirmLabel: "Eliminar",
+                          destructive: true,
+                        });
+                        if (ok) deleteMutation.mutate(m.id);
                       }}
                     >
                       Eliminar
@@ -421,15 +492,21 @@ const LoyaltyMilestones = () => {
           ))}
         </TableBody>
       </Table>
+      )}
 
       {/* ── Recent awards feed ── */}
       <div>
-        <h3 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
-          <Sparkles size={14} className="text-[#C7A892]" />
+        <h3 className="text-sm font-semibold mb-2 flex items-center gap-1.5 text-alma-ink">
+          <Sparkles size={14} className="text-alma-berry" />
           Últimas alumnas premiadas
         </h3>
-        {awards.length === 0 ? (
-          <p className="text-xs text-muted-foreground py-4">
+        {awardsError ? (
+          <ErrorState
+            title="No pudimos cargar las premiaciones"
+            onRetry={() => refetchAwards()}
+          />
+        ) : awards.length === 0 ? (
+          <p className="text-xs text-alma-ink/55 py-4">
             Aún ninguna alumna ha alcanzado un milestone.
           </p>
         ) : (
@@ -447,16 +524,16 @@ const LoyaltyMilestones = () => {
                   <TableRow key={a.id}>
                     <TableCell>
                       <div className="font-medium text-sm">{a.display_name || "—"}</div>
-                      <div className="text-[11px] text-muted-foreground">{a.phone}</div>
+                      <div className="nums text-[11px] text-alma-ink/55">{a.phone}</div>
                     </TableCell>
                     <TableCell>
                       <div className="text-sm">{a.milestone_name}</div>
-                      <div className="text-[11px] text-muted-foreground">
+                      <div className="nums text-[11px] text-alma-ink/55">
                         {a.classes_at_award} clases · +{a.award_points} pts
                       </div>
                     </TableCell>
-                    <TableCell className="text-right text-[11px] text-muted-foreground tabular-nums">
-                      {new Date(a.awarded_at).toLocaleDateString("es-MX", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                    <TableCell className="nums text-right text-[11px] text-alma-ink/55">
+                      {formatDateTime(a.awarded_at)}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -557,8 +634,10 @@ const LoyaltyMilestones = () => {
                     ))}
                 </SelectContent>
               </Select>
-              <p className="text-[11px] text-muted-foreground">
-                Se manda a la alumna cuando alcanza este milestone. Edita el texto en /admin/settings.
+              <p className="text-[11px] text-alma-ink/55">
+                {templatesError
+                  ? "No se pudieron cargar los templates; puedes guardar sin notificación y asignarla después."
+                  : "Se manda a la alumna cuando alcanza este milestone. Edita el texto en /admin/settings."}
               </p>
             </div>
             <div className="grid grid-cols-2 gap-3 items-end">
@@ -583,6 +662,7 @@ const LoyaltyMilestones = () => {
           </form>
         </DialogContent>
       </Dialog>
+      {dialog}
     </div>
   );
 };
@@ -598,7 +678,7 @@ const LoyaltyPage = () => (
             { label: "Descuentos", to: "/admin/discount-codes" },
           ]}
         />
-        <h1 className="text-2xl font-bold mb-6">Programa de Lealtad</h1>
+        <h1 className="admin-title font-display leading-none text-alma-ink mb-6">Programa de lealtad</h1>
         <Tabs defaultValue="rewards">
           <TabsList>
             <TabsTrigger value="rewards">Recompensas</TabsTrigger>

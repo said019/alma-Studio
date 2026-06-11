@@ -9,9 +9,8 @@ import {
   PageHeader,
   Section,
   ListGroup,
-  ListRow,
   EmptyState,
-  Tag,
+  ErrorState,
   SkeletonRow,
   ALMA,
 } from "@/components/app/AppShell";
@@ -19,7 +18,7 @@ import { BackLink } from "@/components/app/widgets";
 import { ArrowDownRight, ArrowUpRight, History as HistoryIcon } from "lucide-react";
 
 const WalletHistory = () => {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["loyalty-history"],
     queryFn: async () => (await api.get("/loyalty/my-history")).data,
   });
@@ -38,6 +37,12 @@ const WalletHistory = () => {
         <Section>
           {isLoading ? (
             <div className="space-y-2">{[1, 2, 3].map((i) => <SkeletonRow key={i} height={60} />)}</div>
+          ) : isError ? (
+            <ErrorState
+              title="Tu historial no cargó"
+              description="No pudimos traer tus movimientos. Revisa tu conexión y vuelve a intentarlo."
+              onRetry={() => refetch()}
+            />
           ) : history.length === 0 ? (
             <EmptyState
               icon={<HistoryIcon size={20} />}
@@ -46,24 +51,44 @@ const WalletHistory = () => {
             />
           ) : (
             <ListGroup>
-              {history.map((item, i) => {
+              {history.map((item) => {
                 const earned = item.type === "earned";
+                const key = item.id ?? `${item.created_at ?? "sin-fecha"}-${item.reason ?? "movimiento"}-${item.points}`;
                 return (
-                  <ListRow
-                    key={i}
-                    icon={earned ? <ArrowUpRight size={17} strokeWidth={1.7} /> : <ArrowDownRight size={17} strokeWidth={1.7} />}
-                    iconTint={earned ? "olive" : "coral"}
-                    title={item.reason || (earned ? "Puntos ganados" : "Puntos usados")}
-                    description={
-                      item.created_at ? format(safeParse(item.created_at), "d MMM yyyy", { locale: es }) : "—"
-                    }
-                    trailing={
-                      <Tag tint={earned ? "olive" : "coral"}>
-                        {earned ? "+" : "−"}
-                        {item.points}
-                      </Tag>
-                    }
-                  />
+                  <div
+                    key={key}
+                    className="grid grid-cols-[auto_1fr_auto] items-center gap-4 px-1 py-4"
+                    style={{ borderTop: `1px solid ${ALMA.border}` }}
+                  >
+                    <span
+                      className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl"
+                      style={{
+                        backgroundColor: ALMA.blush,
+                        color: earned ? ALMA.olive : ALMA.ink,
+                      }}
+                    >
+                      {earned
+                        ? <ArrowUpRight size={17} strokeWidth={1.7} />
+                        : <ArrowDownRight size={17} strokeWidth={1.7} />}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="truncate text-[0.94rem] font-medium leading-tight" style={{ color: ALMA.ink }}>
+                        {item.reason || (earned ? "Puntos ganados" : "Puntos usados")}
+                      </p>
+                      <p className="mt-0.5 truncate text-[0.78rem]" style={{ color: ALMA.ink, opacity: 0.55 }}>
+                        {item.created_at
+                          ? format(safeParse(item.created_at), "d MMM yyyy", { locale: es })
+                          : "Sin fecha"}
+                      </p>
+                    </div>
+                    <p
+                      className="nums shrink-0 text-[0.94rem] font-medium"
+                      style={earned ? { color: ALMA.olive } : { color: ALMA.ink, opacity: 0.55 }}
+                    >
+                      {earned ? "+" : "−"}
+                      {item.points}
+                    </p>
+                  </div>
                 );
               })}
             </ListGroup>

@@ -5,31 +5,40 @@ import { AuthGuard } from "@/components/admin/AuthGuard";
 import AdminLayout from "@/components/admin/AdminLayout";
 import SectionTabs from "@/components/admin/SectionTabs";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ErrorState, EmptyState } from "@/components/app/AppShell";
+import { formatMXN, formatDate, formatDateTime } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, LineChart, Line, Area, AreaChart, Cell,
 } from "recharts";
 import { useNavigate } from "react-router-dom";
-import { TrendingUp, TrendingDown, Minus, Download, Printer, Sparkles, AlertTriangle } from "lucide-react";
+import {
+  TrendingUp, TrendingDown, Minus, Download, Printer, Sparkles,
+  AlertTriangle, Star, BarChart3, CalendarDays, Users,
+} from "lucide-react";
 
 /* ════════════════════════════════════════════════════════════════
-   ReportsPage — product register, Impeccable principles
+   ReportsPage — página patrón del admin (Hero / Secondary / Strip)
    ════════════════════════════════════════════════════════════════ */
 
-// Alma palette references
+// Paleta canónica Alma. Solo para recharts (necesita hex);
+// en el markup se usan las utilidades alma-* de Tailwind.
 const C = {
-  ink: "#4A3333",
-  berry: "#8A6E60",
-  coral: "#C7A892",
-  olive: "#8A7C66",
-  orange: "#C7A892",
-  cream: "#E9E6DF",
-  blush: "#E4D2C3",
-  border: "#D8CFC1",
-  muted: "rgba(46,32,28,0.55)",
+  ink: "#43392F",
+  inkSoft: "rgba(67, 57, 47, 0.55)",
+  berry: "#6E5A46",
+  stone: "#A48D78",
+  sandstone: "#CBB9A4",
+  oat: "#E6DAC8",
+  mist: "#F4F1EA",
+  canvas: "#FAF9F6",
+  hairline: "#E0D5C6",
+  olive: "#5F6B4A",
+  destructive: "#B23A48",
 };
 
 type RangeKey = "this_month" | "30d" | "90d" | "ytd";
@@ -58,7 +67,6 @@ function rangeToDates(r: RangeKey): { from: string; to: string } {
   return { from, to };
 }
 
-const fmtMoney = (n: number) => `$${Math.round(n).toLocaleString("es-MX")}`;
 const fmtPct = (n: number) => `${n.toFixed(1)}%`;
 const safeArray = (v: any) => (Array.isArray(v) ? v : []);
 const fmtMonth = (raw: any) => {
@@ -68,15 +76,19 @@ const fmtMonth = (raw: any) => {
   return new Intl.DateTimeFormat("es-MX", { month: "short" }).format(d);
 };
 
-/* ═══════════ Delta indicator (▲ +12% green / ▼ -3% red) ═══════════ */
+/* ═══════════ Delta indicator ═══════════ */
 function Delta({ pct, suffix = "" }: { pct: number | undefined; suffix?: string }) {
   if (pct === undefined || pct === null || Number.isNaN(pct)) return null;
   const isUp = pct > 0;
   const isFlat = Math.abs(pct) < 0.5;
-  const color = isFlat ? C.muted : isUp ? C.olive : C.coral;
   const Icon = isFlat ? Minus : isUp ? TrendingUp : TrendingDown;
   return (
-    <span className="inline-flex items-center gap-1 text-[11px] font-medium" style={{ color }}>
+    <span
+      className={cn(
+        "nums inline-flex items-center gap-1 text-[11px] font-medium",
+        isFlat ? "text-alma-ink/55" : isUp ? "text-alma-olive" : "text-destructive",
+      )}
+    >
       <Icon size={11} strokeWidth={2.2} />
       {isFlat ? "sin cambio" : `${isUp ? "+" : ""}${pct.toFixed(1)}%${suffix}`}
     </span>
@@ -90,13 +102,7 @@ function Sparkline({ data, color, height = 30 }: { data: number[]; color: string
   return (
     <ResponsiveContainer width="100%" height={height}>
       <AreaChart data={points} margin={{ top: 2, right: 0, left: 0, bottom: 2 }}>
-        <defs>
-          <linearGradient id={`spark-${color.replace("#", "")}`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={color} stopOpacity={0.35} />
-            <stop offset="100%" stopColor={color} stopOpacity={0} />
-          </linearGradient>
-        </defs>
-        <Area type="monotone" dataKey="v" stroke={color} strokeWidth={1.5} fill={`url(#spark-${color.replace("#", "")})`} />
+        <Area type="monotone" dataKey="v" stroke={color} strokeWidth={1.5} fill={color} fillOpacity={0.12} />
       </AreaChart>
     </ResponsiveContainer>
   );
@@ -115,10 +121,10 @@ function HeroKPI({
   loading?: boolean;
 }) {
   return (
-    <Card className="border-2" style={{ borderColor: C.border, backgroundColor: C.cream }} data-stagger-item>
+    <Card className="h-full border-alma-sandstone/70 bg-alma-mist" data-stagger-item>
       <CardContent className="p-5 sm:p-6">
-        <div className="flex items-start justify-between gap-3 mb-2">
-          <p className="text-[11px] uppercase tracking-[0.18em] font-medium" style={{ color: C.muted }}>
+        <div className="mb-2 flex items-start justify-between gap-3">
+          <p className="text-[0.72rem] font-medium uppercase tracking-[0.16em] text-alma-ink/55">
             {label}
           </p>
           <Delta pct={delta} suffix={deltaSuffix} />
@@ -126,12 +132,12 @@ function HeroKPI({
         {loading ? (
           <Skeleton className="h-10 w-32" />
         ) : (
-          <p className="font-bebas leading-none" style={{ color: C.ink, fontSize: "clamp(2.2rem, 4vw, 3rem)" }}>
+          <p className="font-display nums leading-none text-alma-ink" style={{ fontSize: "clamp(2.2rem, 4vw, 3rem)" }}>
             {value}
           </p>
         )}
         {sparkData && sparkData.length > 0 && (
-          <div className="mt-3 -mx-1">
+          <div className="-mx-1 mt-3">
             <Sparkline data={sparkData} color={sparkColor || C.berry} height={42} />
           </div>
         )}
@@ -142,28 +148,24 @@ function HeroKPI({
 
 /* ═══════════ Secondary KPI (3 medianos) ═══════════ */
 function SecondaryKPI({
-  label, value, delta, deltaSuffix, accent, loading,
+  label, value, delta, deltaSuffix, loading,
 }: {
   label: string;
   value: string;
   delta?: number;
   deltaSuffix?: string;
-  accent: string;
   loading?: boolean;
 }) {
   return (
-    <Card style={{ borderColor: C.border }} data-stagger-item>
+    <Card className="h-full border-alma-hairline bg-alma-mist" data-stagger-item>
       <CardContent className="p-4">
-        <div className="flex items-center gap-1.5 mb-1.5">
-          <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: accent }} />
-          <p className="text-[10px] uppercase tracking-[0.16em] font-medium" style={{ color: C.muted }}>
-            {label}
-          </p>
-        </div>
+        <p className="mb-1.5 text-[0.72rem] font-medium uppercase tracking-[0.14em] text-alma-ink/55">
+          {label}
+        </p>
         {loading ? (
           <Skeleton className="h-7 w-20" />
         ) : (
-          <p className="font-bebas leading-none" style={{ color: C.ink, fontSize: "1.7rem" }}>{value}</p>
+          <p className="font-display nums leading-none text-alma-ink" style={{ fontSize: "1.7rem" }}>{value}</p>
         )}
         {delta !== undefined && (
           <div className="mt-1.5">
@@ -175,26 +177,26 @@ function SecondaryKPI({
   );
 }
 
-/* ═══════════ Strip stat (mini compactos) ═══════════ */
-function StripStat({ label, value, accent }: { label: string; value: string | number; accent?: string }) {
+/* ═══════════ Strip stat (mini compactos sobre hairline superior) ═══════════ */
+function StripStat({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="px-3 py-2.5 border-l-2" style={{ borderLeftColor: accent || C.border }} data-stagger-item>
-      <p className="text-[9px] uppercase tracking-[0.18em]" style={{ color: C.muted }}>{label}</p>
-      <p className="font-bebas leading-none mt-1" style={{ color: C.ink, fontSize: "1.15rem" }}>{value}</p>
+    <div className="border-t border-alma-hairline pb-1 pt-2.5" data-stagger-item>
+      <p className="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-alma-ink/60">{label}</p>
+      <p className="font-display nums mt-1.5 leading-none text-alma-ink" style={{ fontSize: "1.15rem" }}>{value}</p>
     </div>
   );
 }
 
 /* ═══════════ Action panel — sugerencias contextuales ═══════════ */
 function ActionPanel({ dorm, conv, cancelRate, cancelled, navigate }: { dorm: any; conv: any; cancelRate?: number; cancelled?: number; navigate: (p: string) => void }) {
-  const actions: { icon: any; label: string; cta: string; link: string; tone: string }[] = [];
+  const actions: { icon: any; label: string; cta: string; link: string; urgent?: boolean }[] = [];
   if (cancelRate !== undefined && cancelRate >= 15 && (cancelled ?? 0) >= 3) {
     actions.push({
       icon: AlertTriangle,
       label: `Cancelaciones altas: ${cancelRate.toFixed(1)}% (${cancelled} canceladas)`,
       cta: "Revisar política",
       link: "/admin/whatsapp-templates",
-      tone: C.coral,
+      urgent: true,
     });
   }
   if (dorm) {
@@ -205,42 +207,34 @@ function ActionPanel({ dorm, conv, cancelRate, cancelled, navigate }: { dorm: an
         label: `${r60} alumnas perdidas (60+ días)`,
         cta: "Win-back con descuento",
         link: "/admin/discount-codes",
-        tone: C.orange,
       });
     }
   }
   if (conv && Number(conv.muestras_total || 0) > 0 && Number(conv.conversion_rate || 0) < 30) {
     actions.push({
       icon: Sparkles,
-      label: `Conversión muestra→paquete: ${conv.conversion_rate}%`,
+      label: `Conversión muestra a paquete: ${conv.conversion_rate}%`,
       cta: "Revisar follow-up post-muestra",
       link: "/admin/whatsapp-templates",
-      tone: C.berry,
     });
   }
   if (actions.length === 0) return null;
   return (
-    <Card className="mb-6" style={{ borderColor: C.border, backgroundColor: C.blush }}>
+    <Card className="mb-6 border-alma-hairline bg-alma-oat/50">
       <CardContent className="p-4">
-        <p className="text-[10px] uppercase tracking-[0.18em] font-medium mb-3" style={{ color: C.berry }}>
+        <p className="mb-3 text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-alma-berry">
           Acciones sugeridas
         </p>
         <div className="space-y-2">
           {actions.map((a, i) => {
             const Icon = a.icon;
             return (
-              <div key={i} className="flex items-center justify-between gap-3 p-2.5 rounded-lg" style={{ backgroundColor: C.cream }}>
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <Icon size={15} style={{ color: a.tone }} />
-                  <span className="text-[13px] truncate" style={{ color: C.ink }}>{a.label}</span>
+              <div key={i} className="flex items-center justify-between gap-3 rounded-lg border border-alma-hairline bg-alma-canvas p-2.5">
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <Icon size={15} className={a.urgent ? "shrink-0 text-destructive" : "shrink-0 text-alma-berry"} />
+                  <span className="truncate text-[13px] text-alma-ink">{a.label}</span>
                 </div>
-                <Button
-                  size="sm"
-                  onClick={() => navigate(a.link)}
-                  data-press
-                  className="text-white shrink-0"
-                  style={{ backgroundColor: a.tone }}
-                >
+                <Button size="sm" onClick={() => navigate(a.link)} data-press className="shrink-0">
                   {a.cta}
                 </Button>
               </div>
@@ -274,71 +268,76 @@ function downloadCSV(filename: string, rows: any[], columns: { key: string; labe
   URL.revokeObjectURL(url);
 }
 
-/* ═══════════ Tab pill ═══════════ */
-function TabPill({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      onClick={onClick}
-      data-press
-      className="px-4 py-2 rounded-full text-[13px] font-medium transition-colors whitespace-nowrap"
-      style={{
-        backgroundColor: active ? C.berry : "transparent",
-        color: active ? C.cream : C.ink,
-        border: `1px solid ${active ? C.berry : C.border}`,
-      }}
-    >
-      {children}
-    </button>
-  );
-}
+/* ═══════════ Chart helpers ═══════════ */
+const ChartSkeleton = () => <Skeleton className="h-[280px] w-full" />;
+const tooltipStyle = { fontSize: 12, borderColor: C.hairline, backgroundColor: C.canvas, borderRadius: 8 };
 
 /* ═══════════════════════════════════════════════════════════════
    Main Component
    ═══════════════════════════════════════════════════════════════ */
+type TabKey = "revenue" | "classes" | "retention" | "top" | "instructors";
+
 const ReportsPage = () => {
   const navigate = useNavigate();
   const [rangeKey, setRangeKey] = useState<RangeKey>("this_month");
-  const [tab, setTab] = useState<"revenue" | "classes" | "retention" | "top" | "instructors">("revenue");
+  const [tab, setTab] = useState<TabKey>("revenue");
   const dateRange = useMemo(() => rangeToDates(rangeKey), [rangeKey]);
 
-  const { data: overview, isLoading } = useQuery({
+  const {
+    data: overview, isLoading, isError: overviewError, refetch: refetchOverview,
+  } = useQuery({
     queryKey: ["reports-overview", dateRange.from, dateRange.to],
     queryFn: async () => (await api.get(`/reports/overview?from=${dateRange.from}&to=${dateRange.to}`)).data,
   });
   const o = overview?.data ?? {};
   const deltas = o.deltas ?? {};
 
-  const { data: revenue } = useQuery({
+  const {
+    data: revenue, isLoading: revenueLoading, isError: revenueError, refetch: refetchRevenue,
+  } = useQuery({
     queryKey: ["reports-revenue"],
     queryFn: async () => (await api.get("/reports/revenue")).data,
   });
+  // El sparkline es decorativo: si falla, el hero simplemente no lo muestra.
   const { data: revSparkData } = useQuery({
     queryKey: ["reports-revenue-sparkline"],
     queryFn: async () => (await api.get("/reports/revenue-sparkline")).data,
   });
   const revSparkValues = safeArray(revSparkData?.data).map((r: any) => Number(r.amount || 0));
 
-  const { data: classes } = useQuery({
+  const {
+    data: classes, isLoading: classesLoading, isError: classesError, refetch: refetchClasses,
+  } = useQuery({
     queryKey: ["reports-classes"],
     queryFn: async () => (await api.get("/reports/classes")).data,
   });
-  const { data: retention } = useQuery({
+  const {
+    data: retention, isLoading: retentionLoading, isError: retentionError, refetch: refetchRetention,
+  } = useQuery({
     queryKey: ["reports-retention"],
     queryFn: async () => (await api.get("/reports/retention")).data,
   });
-  const { data: instructors } = useQuery({
+  const {
+    data: instructors, isLoading: instructorsLoading, isError: instructorsError, refetch: refetchInstructors,
+  } = useQuery({
     queryKey: ["reports-instructors"],
     queryFn: async () => (await api.get("/reports/instructors")).data,
   });
-  const { data: topAttendance } = useQuery({
+  const {
+    data: topAttendance, isLoading: topLoading, isError: topError, refetch: refetchTop,
+  } = useQuery({
     queryKey: ["reports-top-attendance"],
     queryFn: async () => (await api.get("/reports/top-attendance?limit=10")).data,
   });
-  const { data: conversion } = useQuery({
+  const {
+    data: conversion, isError: conversionError, refetch: refetchConversion,
+  } = useQuery({
     queryKey: ["reports-conversion"],
     queryFn: async () => (await api.get("/reports/conversion")).data,
   });
-  const { data: dormant } = useQuery({
+  const {
+    data: dormant, isError: dormantError, refetch: refetchDormant,
+  } = useQuery({
     queryKey: ["reports-dormant"],
     queryFn: async () => (await api.get("/reports/dormant")).data,
   });
@@ -396,28 +395,29 @@ const ReportsPage = () => {
             ]}
           />
           {/* ═════ Header con range picker ═════ */}
-          <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-7">
+          <div className="mb-7 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <h1 className="font-bebas leading-none mb-1" style={{ color: C.ink, fontSize: "2.2rem" }}>
+              <h1 className="admin-title font-display mb-1 leading-none text-alma-ink">
                 Reportes
               </h1>
-              <p className="text-[13px]" style={{ color: C.muted }}>
-                Última actualización · {new Date().toLocaleDateString("es-MX", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+              <p className="text-[13px] text-alma-ink/55">
+                Última actualización · <span className="nums">{formatDateTime(new Date())}</span>
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              {RANGES.map((r) => (
-                <TabPill key={r.key} active={rangeKey === r.key} onClick={() => setRangeKey(r.key)}>
-                  {r.label}
-                </TabPill>
-              ))}
+              <Tabs value={rangeKey} onValueChange={(v) => setRangeKey(v as RangeKey)}>
+                <TabsList>
+                  {RANGES.map((r) => (
+                    <TabsTrigger key={r.key} value={r.key}>{r.label}</TabsTrigger>
+                  ))}
+                </TabsList>
+              </Tabs>
               <Button
                 size="sm"
                 variant="outline"
                 onClick={() => window.print()}
                 data-press
-                className="hidden sm:inline-flex"
-                style={{ borderColor: C.border }}
+                className="hidden border-alma-sandstone sm:inline-flex"
               >
                 <Printer size={13} className="mr-1.5" /> Imprimir
               </Button>
@@ -433,125 +433,140 @@ const ReportsPage = () => {
             navigate={navigate}
           />
 
-          {/* ═════ KPI Layout: 1 Hero + 3 Secondary + 4 Strip ═════ */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 mb-3" data-stagger>
-            {/* Hero: ingresos */}
-            <div className="lg:col-span-6">
-              <HeroKPI
-                label="Ingresos del período"
-                value={fmtMoney(o.monthlyRevenue || 0)}
-                delta={deltas.revenue}
-                sparkData={revSparkValues}
-                sparkColor={C.berry}
-                loading={isLoading}
-              />
-            </div>
-            {/* 3 secondary */}
-            <div className="lg:col-span-2">
-              <SecondaryKPI
-                label="Miembros activos"
-                value={String(o.activeMembers ?? "—")}
-                accent={C.olive}
-                loading={isLoading}
-              />
-            </div>
-            <div className="lg:col-span-2">
-              <SecondaryKPI
-                label="Ocupación"
-                value={fmtPct(o.classOccupancyRate || 0)}
-                delta={deltas.occupancy}
-                accent={C.orange}
-                loading={isLoading}
-              />
-            </div>
-            <div className="lg:col-span-2">
-              <SecondaryKPI
-                label="Churn 30d"
-                value={fmtPct(o.churnRate || 0)}
-                accent={C.coral}
-                loading={isLoading}
-              />
-            </div>
-          </div>
-
-          {/* Strip de stats compactos */}
-          <Card className="mb-6" style={{ borderColor: C.border }}>
-            <CardContent className="p-2">
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-0" data-stagger>
-                <StripStat
-                  label="Reservas"
-                  value={String(o.monthlyBookings ?? 0)}
-                  accent={C.berry}
+          {overviewError ? (
+            <Card className="mb-6 border-alma-hairline bg-alma-mist">
+              <CardContent className="px-5">
+                <ErrorState
+                  title="No pudimos cargar el resumen"
+                  description="Los indicadores del período no están disponibles ahora mismo."
+                  onRetry={() => refetchOverview()}
                 />
+              </CardContent>
+            </Card>
+          ) : (
+            <>
+              {/* ═════ KPI Layout: 1 Hero + 3 Secondary + 5 Strip ═════ */}
+              <div className="mb-5 grid grid-cols-1 gap-3 lg:grid-cols-12" data-stagger>
+                {/* Hero: ingresos */}
+                <div className="lg:col-span-6">
+                  <HeroKPI
+                    label="Ingresos del período"
+                    value={formatMXN(o.monthlyRevenue || 0)}
+                    delta={deltas.revenue}
+                    sparkData={revSparkValues}
+                    sparkColor={C.berry}
+                    loading={isLoading}
+                  />
+                </div>
+                {/* 3 secondary */}
+                <div className="lg:col-span-2">
+                  <SecondaryKPI
+                    label="Miembros activos"
+                    value={String(o.activeMembers ?? "—")}
+                    loading={isLoading}
+                  />
+                </div>
+                <div className="lg:col-span-2">
+                  <SecondaryKPI
+                    label="Ocupación"
+                    value={fmtPct(o.classOccupancyRate || 0)}
+                    delta={deltas.occupancy}
+                    loading={isLoading}
+                  />
+                </div>
+                <div className="lg:col-span-2">
+                  <SecondaryKPI
+                    label="Churn 30d"
+                    value={fmtPct(o.churnRate || 0)}
+                    loading={isLoading}
+                  />
+                </div>
+              </div>
+
+              {/* Strip de stats compactos */}
+              <div className="mb-6 grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-5" data-stagger>
+                <StripStat label="Reservas" value={String(o.monthlyBookings ?? 0)} />
                 <StripStat
                   label="Canceladas"
                   value={`${o.cancelledBookings ?? 0} · ${(o.cancelRate ?? 0).toFixed(1)}%`}
-                  accent={C.coral}
                 />
+                <StripStat label="Nuevos miembros" value={String(o.newMembersThisMonth ?? 0)} />
+                <StripStat label="Reseñas" value={String(o.reviewsTotal ?? 0)} />
                 <StripStat
-                  label="Nuevos miembros"
-                  value={String(o.newMembersThisMonth ?? 0)}
-                  accent={C.olive}
-                />
-                <StripStat
-                  label="Reseñas"
-                  value={String(o.reviewsTotal ?? 0)}
-                  accent={C.orange}
-                />
-                <StripStat
-                  label="Promedio ⭐"
-                  value={o.reviewsAverage ? Number(o.reviewsAverage).toFixed(1) : "—"}
-                  accent={C.berry}
+                  label="Promedio"
+                  value={
+                    <span className="inline-flex items-center gap-1">
+                      {o.reviewsAverage ? Number(o.reviewsAverage).toFixed(1) : "—"}
+                      <Star size={13} className="text-alma-berry" fill="currentColor" strokeWidth={0} />
+                    </span>
+                  }
                 />
               </div>
-            </CardContent>
-          </Card>
+            </>
+          )}
 
           {/* ═════ Conversión + dormant cohorts (side-by-side cuando aplica) ═════ */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-6">
-            {conv && (
-              <Card style={{ borderColor: C.border }} data-stagger-item>
+          <div className="mb-6 grid grid-cols-1 gap-3 lg:grid-cols-2">
+            {conversionError ? (
+              <Card className="border-alma-hairline bg-alma-mist" data-stagger-item>
+                <CardContent className="px-5">
+                  <ErrorState
+                    title="Conversión no disponible"
+                    description="No pudimos calcular la conversión de muestras."
+                    onRetry={() => refetchConversion()}
+                  />
+                </CardContent>
+              </Card>
+            ) : conv && (
+              <Card className="border-alma-hairline bg-alma-mist" data-stagger-item>
                 <CardContent className="p-5">
-                  <p className="text-[10px] uppercase tracking-[0.18em] font-medium mb-3" style={{ color: C.muted }}>
-                    Conversión muestra → paquete
+                  <p className="mb-3 text-[0.72rem] font-medium uppercase tracking-[0.14em] text-alma-ink/55">
+                    Conversión muestra a paquete
                   </p>
                   <div className="flex items-baseline gap-3">
-                    <span className="font-bebas" style={{ color: C.berry, fontSize: "2.5rem", lineHeight: 1 }}>
+                    <span className="font-display nums leading-none text-alma-berry" style={{ fontSize: "2.5rem" }}>
                       {conv.conversion_rate ?? 0}%
                     </span>
-                    <span className="text-[12px]" style={{ color: C.muted }}>
+                    <span className="nums text-[12px] text-alma-ink/55">
                       {conv.converted_total ?? 0} de {conv.muestras_total ?? 0} muestras
                     </span>
                   </div>
-                  <div className="mt-4 h-2 rounded-full overflow-hidden" style={{ backgroundColor: C.blush }}>
+                  <div className="mt-4 h-2 overflow-hidden rounded-full bg-alma-oat">
                     <div
-                      className="h-full rounded-full transition-[width] duration-700"
-                      style={{
-                        width: `${conv.conversion_rate || 0}%`,
-                        background: `linear-gradient(90deg, ${C.berry}, ${C.coral})`,
-                      }}
+                      className="h-full rounded-full bg-alma-berry transition-[width] duration-700"
+                      style={{ width: `${conv.conversion_rate || 0}%` }}
                     />
                   </div>
                 </CardContent>
               </Card>
             )}
-            {dorm && (
-              <Card style={{ borderColor: C.border }} data-stagger-item>
+            {dormantError ? (
+              <Card className="border-alma-hairline bg-alma-mist" data-stagger-item>
+                <CardContent className="px-5">
+                  <ErrorState
+                    title="Cohortes no disponibles"
+                    description="No pudimos cargar el desglose por última visita."
+                    onRetry={() => refetchDormant()}
+                  />
+                </CardContent>
+              </Card>
+            ) : dorm && (
+              <Card className="border-alma-hairline bg-alma-mist" data-stagger-item>
                 <CardContent className="p-5">
-                  <p className="text-[10px] uppercase tracking-[0.18em] font-medium mb-3" style={{ color: C.muted }}>
+                  <p className="mb-3 text-[0.72rem] font-medium uppercase tracking-[0.14em] text-alma-ink/55">
                     Por última visita
                   </p>
                   <div className="grid grid-cols-5 gap-1 text-center">
                     {[
-                      { l: "≤7d", v: dorm.active_7d, c: C.olive },
-                      { l: "8-14", v: dorm.dormant_8_14d, c: C.orange },
-                      { l: "15-30", v: dorm.dormant_15_30d, c: C.coral },
-                      { l: "31-60", v: dorm.dormant_31_60d, c: C.berry },
-                      { l: "60+", v: dorm.lost_60d, c: C.muted },
+                      { l: "≤7d", v: dorm.active_7d },
+                      { l: "8-14", v: dorm.dormant_8_14d },
+                      { l: "15-30", v: dorm.dormant_15_30d },
+                      { l: "31-60", v: dorm.dormant_31_60d },
+                      { l: "60+", v: dorm.lost_60d },
                     ].map((b) => (
                       <div key={b.l}>
-                        <p className="font-bebas leading-none" style={{ color: b.c, fontSize: "1.5rem" }}>{b.v ?? 0}</p>
-                        <p className="text-[9px] uppercase tracking-[0.14em] mt-1" style={{ color: C.muted }}>{b.l}</p>
+                        <p className="font-display nums leading-none text-alma-ink" style={{ fontSize: "1.5rem" }}>{b.v ?? 0}</p>
+                        <p className="mt-1 text-[0.72rem] uppercase tracking-[0.1em] text-alma-ink/55">{b.l}</p>
                       </div>
                     ))}
                   </div>
@@ -560,191 +575,244 @@ const ReportsPage = () => {
             )}
           </div>
 
-          {/* ═════ Tabs pills (no shadcn TabsList) ═════ */}
-          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-            <div className="flex flex-wrap items-center gap-2">
-              <TabPill active={tab === "revenue"} onClick={() => setTab("revenue")}>Ingresos</TabPill>
-              <TabPill active={tab === "classes"} onClick={() => setTab("classes")}>Clases</TabPill>
-              <TabPill active={tab === "retention"} onClick={() => setTab("retention")}>Retención</TabPill>
-              <TabPill active={tab === "top"} onClick={() => setTab("top")}>Top alumnas</TabPill>
-              <TabPill active={tab === "instructors"} onClick={() => setTab("instructors")}>Instructoras</TabPill>
+          {/* ═════ Tabs de detalle (shadcn) ═════ */}
+          <Tabs value={tab} onValueChange={(v) => setTab(v as TabKey)}>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <TabsList>
+                <TabsTrigger value="revenue">Ingresos</TabsTrigger>
+                <TabsTrigger value="classes">Clases</TabsTrigger>
+                <TabsTrigger value="retention">Retención</TabsTrigger>
+                <TabsTrigger value="top">Top alumnas</TabsTrigger>
+                <TabsTrigger value="instructors">Instructoras</TabsTrigger>
+              </TabsList>
+              {/* Export CSV button changes per tab */}
+              {tab === "revenue" && revenueData.length > 0 && (
+                <Button size="sm" variant="outline" onClick={exportRevenueCsv} data-press className="border-alma-sandstone">
+                  <Download size={13} className="mr-1.5" /> Exportar CSV
+                </Button>
+              )}
+              {tab === "top" && topAttendanceData.length > 0 && (
+                <Button size="sm" variant="outline" onClick={exportTopCsv} data-press className="border-alma-sandstone">
+                  <Download size={13} className="mr-1.5" /> Exportar CSV
+                </Button>
+              )}
+              {tab === "retention" && retentionData.length > 0 && (
+                <Button size="sm" variant="outline" onClick={exportRetentionCsv} data-press className="border-alma-sandstone">
+                  <Download size={13} className="mr-1.5" /> Exportar CSV
+                </Button>
+              )}
             </div>
-            {/* Export CSV button changes per tab */}
-            {tab === "revenue" && revenueData.length > 0 && (
-              <Button size="sm" variant="outline" onClick={exportRevenueCsv} data-press style={{ borderColor: C.border }}>
-                <Download size={13} className="mr-1.5" /> Exportar CSV
-              </Button>
-            )}
-            {tab === "top" && topAttendanceData.length > 0 && (
-              <Button size="sm" variant="outline" onClick={exportTopCsv} data-press style={{ borderColor: C.border }}>
-                <Download size={13} className="mr-1.5" /> Exportar CSV
-              </Button>
-            )}
-            {tab === "retention" && retentionData.length > 0 && (
-              <Button size="sm" variant="outline" onClick={exportRetentionCsv} data-press style={{ borderColor: C.border }}>
-                <Download size={13} className="mr-1.5" /> Exportar CSV
-              </Button>
-            )}
-          </div>
 
-          {/* ═════ Tab content ═════ */}
-          <Card style={{ borderColor: C.border, backgroundColor: C.cream }}>
-            <CardContent className="p-5">
-              {tab === "revenue" && (
-                revenueData.length === 0 ? (
-                  <div className="text-center py-12">
-                    <p className="text-sm mb-2" style={{ color: C.muted }}>Aún no hay órdenes en este período.</p>
-                    <Button size="sm" onClick={() => navigate("/admin/orders")} data-press style={{ backgroundColor: C.berry, color: C.cream }}>
-                      Ver órdenes
-                    </Button>
-                  </div>
-                ) : (
-                  <>
-                    <p className="text-[10px] uppercase tracking-[0.18em] font-medium mb-3" style={{ color: C.muted }}>
-                      Ingresos mensuales · últimos 12 meses
-                    </p>
-                    <ResponsiveContainer width="100%" height={280}>
-                      <BarChart data={revenueData} margin={{ top: 10, right: 5, left: 5, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke={C.border} />
-                        <XAxis dataKey="month" tick={{ fontSize: 11, fill: C.muted }} axisLine={false} tickLine={false} />
-                        <YAxis tick={{ fontSize: 11, fill: C.muted }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
-                        <Tooltip formatter={(v: any) => fmtMoney(Number(v))} contentStyle={{ fontSize: 12, borderColor: C.border }} />
-                        <Bar dataKey="amount" radius={[6, 6, 0, 0]}>
-                          {revenueData.map((_, i) => (
-                            <Cell key={i} fill={i === revenueData.length - 1 ? C.berry : C.coral} fillOpacity={i === revenueData.length - 1 ? 1 : 0.55} />
-                          ))}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </>
-                )
-              )}
+            {/* ═════ Tab content ═════ */}
+            <Card className="border-alma-hairline bg-alma-mist">
+              <CardContent className="p-5">
+                {tab === "revenue" && (
+                  revenueError ? (
+                    <ErrorState
+                      title="No pudimos cargar los ingresos"
+                      onRetry={() => refetchRevenue()}
+                    />
+                  ) : revenueLoading ? (
+                    <ChartSkeleton />
+                  ) : revenueData.length === 0 ? (
+                    <EmptyState
+                      icon={<BarChart3 size={20} />}
+                      title="Aún no hay órdenes en este período"
+                      description="Cuando se registren cobros, aquí verás los ingresos mes a mes."
+                      ctaLabel="Ver órdenes"
+                      onCta={() => navigate("/admin/orders")}
+                    />
+                  ) : (
+                    <>
+                      <p className="mb-3 text-[0.72rem] font-medium uppercase tracking-[0.14em] text-alma-ink/55">
+                        Ingresos mensuales · últimos 12 meses
+                      </p>
+                      <ResponsiveContainer width="100%" height={280}>
+                        <BarChart data={revenueData} margin={{ top: 10, right: 5, left: 5, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke={C.hairline} />
+                          <XAxis dataKey="month" tick={{ fontSize: 11, fill: C.inkSoft }} axisLine={false} tickLine={false} />
+                          <YAxis tick={{ fontSize: 11, fill: C.inkSoft }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
+                          <Tooltip formatter={(v: any) => formatMXN(Number(v))} contentStyle={tooltipStyle} />
+                          <Bar dataKey="amount" radius={[6, 6, 0, 0]}>
+                            {revenueData.map((_, i) => (
+                              <Cell key={i} fill={i === revenueData.length - 1 ? C.berry : C.stone} fillOpacity={i === revenueData.length - 1 ? 1 : 0.55} />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </>
+                  )
+                )}
 
-              {tab === "classes" && (
-                classesData.length === 0 ? (
-                  <div className="text-center py-12">
-                    <p className="text-sm" style={{ color: C.muted }}>Aún no hay clases con reservas.</p>
-                  </div>
-                ) : (
-                  <>
-                    <p className="text-[10px] uppercase tracking-[0.18em] font-medium mb-3" style={{ color: C.muted }}>
-                      Reservas vs asistencias por tipo
-                    </p>
-                    <ResponsiveContainer width="100%" height={280}>
-                      <BarChart data={classesData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke={C.border} />
-                        <XAxis dataKey="label" tick={{ fontSize: 11, fill: C.muted }} />
-                        <YAxis tick={{ fontSize: 11, fill: C.muted }} />
-                        <Tooltip contentStyle={{ fontSize: 12, borderColor: C.border }} />
-                        <Bar dataKey="bookings" fill={C.berry} radius={[4, 4, 0, 0]} name="Reservas" />
-                        <Bar dataKey="attended" fill={C.olive} radius={[4, 4, 0, 0]} name="Asistencias" />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </>
-                )
-              )}
+                {tab === "classes" && (
+                  classesError ? (
+                    <ErrorState
+                      title="No pudimos cargar las clases"
+                      onRetry={() => refetchClasses()}
+                    />
+                  ) : classesLoading ? (
+                    <ChartSkeleton />
+                  ) : classesData.length === 0 ? (
+                    <EmptyState
+                      icon={<CalendarDays size={20} />}
+                      title="Aún no hay clases con reservas"
+                      description="En cuanto las alumnas reserven, aquí comparas reservas contra asistencias por tipo de clase."
+                    />
+                  ) : (
+                    <>
+                      <p className="mb-3 text-[0.72rem] font-medium uppercase tracking-[0.14em] text-alma-ink/55">
+                        Reservas vs asistencias por tipo
+                      </p>
+                      <ResponsiveContainer width="100%" height={280}>
+                        <BarChart data={classesData}>
+                          <CartesianGrid strokeDasharray="3 3" stroke={C.hairline} />
+                          <XAxis dataKey="label" tick={{ fontSize: 11, fill: C.inkSoft }} />
+                          <YAxis tick={{ fontSize: 11, fill: C.inkSoft }} />
+                          <Tooltip contentStyle={tooltipStyle} />
+                          <Bar dataKey="bookings" fill={C.berry} radius={[4, 4, 0, 0]} name="Reservas" />
+                          <Bar dataKey="attended" fill={C.sandstone} radius={[4, 4, 0, 0]} name="Asistencias" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </>
+                  )
+                )}
 
-              {tab === "retention" && (
-                retentionData.length === 0 ? (
-                  <div className="text-center py-12">
-                    <p className="text-sm" style={{ color: C.muted }}>Sin data de retención todavía.</p>
-                  </div>
-                ) : (
-                  <>
-                    <p className="text-[10px] uppercase tracking-[0.18em] font-medium mb-3" style={{ color: C.muted }}>
-                      Tasa de retención mensual · 12 meses
-                    </p>
-                    <ResponsiveContainer width="100%" height={280}>
-                      <LineChart data={retentionData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke={C.border} />
-                        <XAxis dataKey="month" tick={{ fontSize: 11, fill: C.muted }} />
-                        <YAxis tick={{ fontSize: 11, fill: C.muted }} tickFormatter={(v) => `${v}%`} domain={[0, 100]} />
-                        <Tooltip formatter={(v: any) => `${v}%`} contentStyle={{ fontSize: 12, borderColor: C.border }} />
-                        <Line
-                          type="monotone"
-                          dataKey="rate"
-                          stroke={C.olive}
-                          strokeWidth={2.5}
-                          dot={{ fill: C.olive, r: 3 }}
-                          activeDot={{ r: 5 }}
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </>
-                )
-              )}
+                {tab === "retention" && (
+                  retentionError ? (
+                    <ErrorState
+                      title="No pudimos cargar la retención"
+                      onRetry={() => refetchRetention()}
+                    />
+                  ) : retentionLoading ? (
+                    <ChartSkeleton />
+                  ) : retentionData.length === 0 ? (
+                    <EmptyState
+                      icon={<TrendingUp size={20} />}
+                      title="Sin datos de retención todavía"
+                      description="Se calcula con la asistencia mes a mes; necesita al menos dos meses de actividad."
+                    />
+                  ) : (
+                    <>
+                      <p className="mb-3 text-[0.72rem] font-medium uppercase tracking-[0.14em] text-alma-ink/55">
+                        Tasa de retención mensual · 12 meses
+                      </p>
+                      <ResponsiveContainer width="100%" height={280}>
+                        <LineChart data={retentionData}>
+                          <CartesianGrid strokeDasharray="3 3" stroke={C.hairline} />
+                          <XAxis dataKey="month" tick={{ fontSize: 11, fill: C.inkSoft }} />
+                          <YAxis tick={{ fontSize: 11, fill: C.inkSoft }} tickFormatter={(v) => `${v}%`} domain={[0, 100]} />
+                          <Tooltip formatter={(v: any) => `${v}%`} contentStyle={tooltipStyle} />
+                          <Line
+                            type="monotone"
+                            dataKey="rate"
+                            stroke={C.berry}
+                            strokeWidth={2.5}
+                            dot={{ fill: C.berry, r: 3 }}
+                            activeDot={{ r: 5 }}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </>
+                  )
+                )}
 
-              {tab === "top" && (
-                topAttendanceData.length === 0 ? (
-                  <div className="text-center py-12">
-                    <p className="text-sm" style={{ color: C.muted }}>Aún no hay asistencias registradas.</p>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {topAttendanceData.map((u: any, idx: number) => {
-                      const maxLifetime = Math.max(...topAttendanceData.map((x: any) => Number(x.lifetime || 0)));
-                      const pct = maxLifetime > 0 ? (Number(u.lifetime || 0) / maxLifetime) * 100 : 0;
-                      return (
-                        <div key={u.id} className="flex items-center gap-3 py-2" style={{ borderBottom: idx < topAttendanceData.length - 1 ? `1px solid ${C.border}` : "none" }}>
-                          <span
-                            className="grid h-8 w-8 place-items-center rounded-full text-[11px] font-bold shrink-0"
-                            style={{
-                              backgroundColor: idx < 3 ? C.berry : C.blush,
-                              color: idx < 3 ? C.cream : C.berry,
-                            }}
+                {tab === "top" && (
+                  topError ? (
+                    <ErrorState
+                      title="No pudimos cargar el ranking"
+                      onRetry={() => refetchTop()}
+                    />
+                  ) : topLoading ? (
+                    <div className="space-y-3">
+                      {[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-12 w-full" />)}
+                    </div>
+                  ) : topAttendanceData.length === 0 ? (
+                    <EmptyState
+                      icon={<Users size={20} />}
+                      title="Aún no hay asistencias registradas"
+                      description="Cuando pases lista en las clases, aquí aparece el ranking de alumnas más constantes."
+                    />
+                  ) : (
+                    <div className="space-y-2">
+                      {topAttendanceData.map((u: any, idx: number) => {
+                        const maxLifetime = Math.max(...topAttendanceData.map((x: any) => Number(x.lifetime || 0)));
+                        const pct = maxLifetime > 0 ? (Number(u.lifetime || 0) / maxLifetime) * 100 : 0;
+                        return (
+                          <div
+                            key={u.id}
+                            className={cn(
+                              "flex items-center gap-3 py-2",
+                              idx < topAttendanceData.length - 1 && "border-b border-alma-hairline",
+                            )}
                           >
-                            {idx + 1}
-                          </span>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-[14px] font-medium truncate" style={{ color: C.ink }}>{u.display_name}</p>
-                            <p className="text-[11px] mt-0.5" style={{ color: C.muted }}>
-                              {u.this_month} este mes · última {u.last_visit ? new Date(u.last_visit).toLocaleDateString("es-MX", { day: "numeric", month: "short" }) : "—"}
-                            </p>
-                          </div>
-                          <div className="w-32 h-1.5 rounded-full overflow-hidden hidden sm:block" style={{ backgroundColor: C.blush }}>
-                            <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: C.berry }} />
-                          </div>
-                          <Badge variant="default" className="shrink-0" style={{ backgroundColor: C.ink, color: C.cream }}>
-                            {u.lifetime}
-                          </Badge>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )
-              )}
-
-              {tab === "instructors" && (
-                instructorsData.length === 0 ? (
-                  <div className="text-center py-12">
-                    <p className="text-sm mb-2" style={{ color: C.muted }}>Aún no hay instructoras con clases.</p>
-                    <Button size="sm" onClick={() => navigate("/admin/staff")} data-press style={{ backgroundColor: C.berry, color: C.cream }}>
-                      Crear instructora
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {instructorsData.map((ins: any) => {
-                      const max = Math.max(...instructorsData.map((x: any) => Number(x.classCount || x.class_count || 0)));
-                      const count = Number(ins.classCount || ins.class_count || 0);
-                      const pct = max > 0 ? (count / max) * 100 : 0;
-                      return (
-                        <div key={ins.id} className="flex items-center justify-between text-sm gap-3">
-                          <span className="font-medium truncate flex-1" style={{ color: C.ink }}>{ins.name || ins.display_name}</span>
-                          <div className="flex items-center gap-3">
-                            <div className="w-40 h-2 rounded-full overflow-hidden" style={{ backgroundColor: C.blush }}>
-                              <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: C.berry }} />
+                            <span
+                              className={cn(
+                                "nums grid h-8 w-8 shrink-0 place-items-center rounded-full text-[11px] font-bold",
+                                idx < 3 ? "bg-alma-berry text-alma-canvas" : "bg-alma-oat text-alma-berry",
+                              )}
+                            >
+                              {idx + 1}
+                            </span>
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-[14px] font-medium text-alma-ink">{u.display_name}</p>
+                              <p className="nums mt-0.5 text-[11px] text-alma-ink/55">
+                                {u.this_month} este mes · última {u.last_visit ? formatDate(u.last_visit) : "—"}
+                              </p>
                             </div>
-                            <span className="font-bebas w-8 text-right" style={{ color: C.ink }}>{count}</span>
+                            <div className="hidden h-1.5 w-32 overflow-hidden rounded-full bg-alma-oat sm:block">
+                              <div className="h-full rounded-full bg-alma-berry" style={{ width: `${pct}%` }} />
+                            </div>
+                            <span className="nums shrink-0 rounded-full bg-alma-ink-deep px-2.5 py-0.5 text-[12px] font-semibold text-alma-canvas">
+                              {u.lifetime}
+                            </span>
                           </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )
-              )}
-            </CardContent>
-          </Card>
+                        );
+                      })}
+                    </div>
+                  )
+                )}
+
+                {tab === "instructors" && (
+                  instructorsError ? (
+                    <ErrorState
+                      title="No pudimos cargar a las instructoras"
+                      onRetry={() => refetchInstructors()}
+                    />
+                  ) : instructorsLoading ? (
+                    <div className="space-y-3">
+                      {[1, 2, 3].map((i) => <Skeleton key={i} className="h-8 w-full" />)}
+                    </div>
+                  ) : instructorsData.length === 0 ? (
+                    <EmptyState
+                      icon={<Users size={20} />}
+                      title="Aún no hay instructoras con clases"
+                      ctaLabel="Crear instructora"
+                      onCta={() => navigate("/admin/staff")}
+                    />
+                  ) : (
+                    <div className="space-y-3">
+                      {instructorsData.map((ins: any) => {
+                        const max = Math.max(...instructorsData.map((x: any) => Number(x.classCount || x.class_count || 0)));
+                        const count = Number(ins.classCount || ins.class_count || 0);
+                        const pct = max > 0 ? (count / max) * 100 : 0;
+                        return (
+                          <div key={ins.id} className="flex items-center justify-between gap-3 text-sm">
+                            <span className="flex-1 truncate font-medium text-alma-ink">{ins.name || ins.display_name}</span>
+                            <div className="flex items-center gap-3">
+                              <div className="h-2 w-40 overflow-hidden rounded-full bg-alma-oat">
+                                <div className="h-full rounded-full bg-alma-berry" style={{ width: `${pct}%` }} />
+                              </div>
+                              <span className="font-display nums w-8 text-right text-alma-ink">{count}</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )
+                )}
+              </CardContent>
+            </Card>
+          </Tabs>
         </div>
       </AdminLayout>
     </AuthGuard>

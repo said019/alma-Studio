@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef } from "react";
+import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { AuthGuard } from "@/components/admin/AuthGuard";
 import AdminLayout from "@/components/admin/AdminLayout";
 import SectionTabs from "@/components/admin/SectionTabs";
+import { ErrorState } from "@/components/app/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,10 +13,35 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Send, MessageSquare, RefreshCw, Wifi, WifiOff, Pencil, BellDot, Upload, Image as ImageIcon, Video, Trash2 } from "lucide-react";
+import { formatDateTime } from "@/lib/format";
+import {
+  Loader2,
+  Send,
+  MessageSquare,
+  RefreshCw,
+  Wifi,
+  WifiOff,
+  Pencil,
+  BellDot,
+  Upload,
+  Image as ImageIcon,
+  Video,
+  Trash2,
+  Info,
+  CalendarCheck,
+  CalendarX,
+  CalendarClock,
+  BadgeCheck,
+  CreditCard,
+  Bell,
+  UserPlus,
+  KeyRound,
+  type LucideIcon,
+} from "lucide-react";
 import { ChangePassword } from "@/components/account/ChangePassword";
 
 function normalizeQrDataUrl(raw: unknown): string | null {
@@ -43,6 +70,9 @@ function inferVenueMediaType(url: string, explicitType?: string): "image" | "vid
   return "";
 }
 
+// Etiqueta pequeña de sección (uppercase, tracking amplio)
+const sectionLabelClass = "text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-alma-ink/60";
+
 // Generic settings section — reads { data: <value_object> } from server
 const SettingsSection = ({ settingKey, fields }: { settingKey: string; fields: { key: string; label: string; type?: string; multiline?: boolean }[] }) => {
   const { toast } = useToast();
@@ -50,7 +80,7 @@ const SettingsSection = ({ settingKey, fields }: { settingKey: string; fields: {
   const [values, setValues] = useState<Record<string, any>>({});
   const [loaded, setLoaded] = useState(false);
 
-  const { data } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["settings", settingKey],
     queryFn: async () => (await api.get(`/settings/${settingKey}`)).data,
     staleTime: Infinity, // don't re-fetch unless explicitly invalidated
@@ -70,10 +100,34 @@ const SettingsSection = ({ settingKey, fields }: { settingKey: string; fields: {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["settings", settingKey] });
       setLoaded(false); // allow re-sync after save
-      toast({ title: "✅ Configuración guardada" });
+      toast({ title: "Configuración guardada" });
     },
     onError: () => toast({ title: "Error al guardar", variant: "destructive" }),
   });
+
+  if (isError) {
+    return (
+      <div className="max-w-md">
+        <ErrorState
+          description="No pudimos cargar esta configuración. Revisa tu conexión y vuelve a intentarlo."
+          onRetry={() => refetch()}
+        />
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4 max-w-md">
+        {fields.map((f) => (
+          <div key={f.key} className="space-y-1">
+            <Skeleton className="h-4 w-40" />
+            <Skeleton className={f.multiline ? "h-24 w-full" : "h-10 w-full"} />
+          </div>
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4 max-w-md">
@@ -88,7 +142,7 @@ const SettingsSection = ({ settingKey, fields }: { settingKey: string; fields: {
           }
         </div>
       ))}
-      <Button onClick={() => updateMutation.mutate()} disabled={updateMutation.isPending}>
+      <Button onClick={() => updateMutation.mutate()} disabled={updateMutation.isPending} className="bg-alma-ink text-alma-canvas hover:bg-alma-ink-deep">
         {updateMutation.isPending ? <Loader2 className="animate-spin mr-2" size={14} /> : null}
         Guardar cambios
       </Button>
@@ -96,7 +150,6 @@ const SettingsSection = ({ settingKey, fields }: { settingKey: string; fields: {
   );
 };
 
-// WhatsApp Evolution API
 // ── Datos de transferencia SPEI (editables) ──────────────────────────────────
 const BankInfoSettings = () => {
   const { toast } = useToast();
@@ -107,7 +160,7 @@ const BankInfoSettings = () => {
   const [accountNumber, setAccountNumber] = useState("");
   const [loaded, setLoaded] = useState(false);
 
-  const { data } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["bank-info"],
     queryFn: async () => (await api.get("/admin/bank-info")).data,
     staleTime: Infinity,
@@ -138,7 +191,7 @@ const BankInfoSettings = () => {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["bank-info"] });
       setLoaded(false);
-      toast({ title: "✅ Datos de transferencia guardados" });
+      toast({ title: "Datos de transferencia guardados" });
     },
     onError: (e: any) =>
       toast({ title: e?.response?.data?.message ?? "Error al guardar", variant: "destructive" }),
@@ -146,9 +199,34 @@ const BankInfoSettings = () => {
 
   const canSave = bank.trim() && holder.trim() && clabeValid && !save.isPending;
 
+  if (isError) {
+    return (
+      <div className="max-w-md">
+        <ErrorState
+          description="No pudimos cargar los datos de transferencia. Revisa tu conexión y vuelve a intentarlo."
+          onRetry={() => refetch()}
+        />
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="space-y-5 max-w-md">
+        <Skeleton className="h-4 w-72" />
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="space-y-1">
+            <Skeleton className="h-4 w-40" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-5 max-w-md">
-      <p className="text-sm text-white/50">
+      <p className="text-sm text-alma-ink/70">
         Estos datos se muestran a las clientas en la pantalla de pago por transferencia (SPEI).
       </p>
 
@@ -169,9 +247,10 @@ const BankInfoSettings = () => {
           onChange={(e) => setClabe(e.target.value.replace(/\D/g, "").slice(0, 18))}
           placeholder="012700015394444888"
           inputMode="numeric"
+          className="nums"
         />
-        <p className="text-xs" style={{ color: clabeValid || clabeDigits.length === 0 ? undefined : "#f87171" }}>
-          {clabeDigits.length}/18 dígitos{!clabeValid && clabeDigits.length > 0 ? " — debe tener 18" : ""}
+        <p className={`nums text-xs ${clabeValid || clabeDigits.length === 0 ? "text-alma-ink/55" : "text-destructive"}`}>
+          {clabeDigits.length}/18 dígitos{!clabeValid && clabeDigits.length > 0 ? " (debe tener 18)" : ""}
         </p>
       </div>
 
@@ -182,10 +261,11 @@ const BankInfoSettings = () => {
           onChange={(e) => setAccountNumber(e.target.value.replace(/\D/g, ""))}
           placeholder="Opcional"
           inputMode="numeric"
+          className="nums"
         />
       </div>
 
-      <Button onClick={() => save.mutate()} disabled={!canSave}>
+      <Button onClick={() => save.mutate()} disabled={!canSave} className="bg-alma-ink text-alma-canvas hover:bg-alma-ink-deep">
         {save.isPending ? <Loader2 className="animate-spin mr-2" size={14} /> : null}
         Guardar datos de transferencia
       </Button>
@@ -198,7 +278,7 @@ const WhatsAppSettings = () => {
   const qc = useQueryClient();
 
   // ── Connection ──────────────────────────────────────────────────────
-  const { data: statusData, refetch, isFetching } = useQuery({
+  const { data: statusData, refetch, isFetching, isLoading, isError } = useQuery({
     queryKey: ["evolution-status"],
     queryFn: async () => (await api.get("/evolution/status")).data,
     refetchInterval: (query) => {
@@ -238,42 +318,66 @@ const WhatsAppSettings = () => {
   const [testPhone, setTestPhone] = useState("");
   const testMutation = useMutation({
     mutationFn: () => api.post("/evolution/send-test", { phone: testPhone }),
-    onSuccess: () => toast({ title: "✅ Mensaje de prueba enviado" }),
+    onSuccess: () => toast({ title: "Mensaje de prueba enviado" }),
     onError: (e: any) => toast({ title: e?.response?.data?.message ?? "Error al enviar prueba", variant: "destructive" }),
   });
+
+  if (isError) {
+    return (
+      <div className="max-w-xl">
+        <ErrorState
+          title="No pudimos consultar la conexión"
+          description="No fue posible leer el estado de WhatsApp. Revisa tu conexión y vuelve a intentarlo."
+          onRetry={() => refetch()}
+        />
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="space-y-8 max-w-xl">
+        <Skeleton className="h-40 w-full rounded-xl" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 max-w-xl">
       {/* ── Status ─────────────────────────────────────────────────── */}
-      <div className="rounded-xl border p-5 space-y-4">
+      <div className="rounded-xl border border-alma-hairline bg-alma-mist p-5 space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="font-semibold flex items-center gap-2">
-            {status.connected ? <Wifi size={16} className="text-green-500" /> : <WifiOff size={16} className="text-muted-foreground" />}
+          <p className={`${sectionLabelClass} flex items-center gap-2`}>
+            {status.connected ? <Wifi size={15} className="text-alma-olive" /> : <WifiOff size={15} className="text-alma-ink/45" />}
             Conexión WhatsApp
-          </h3>
-          <Button variant="ghost" size="sm" onClick={() => refetch()} disabled={isFetching}>
+          </p>
+          <Button variant="ghost" size="sm" onClick={() => refetch()} disabled={isFetching} aria-label="Actualizar estado">
             <RefreshCw size={14} className={isFetching ? "animate-spin" : ""} />
           </Button>
         </div>
 
         <div className="flex items-center gap-3">
-          <Badge variant={status.connected ? "default" : "secondary"} className={status.connected ? "bg-green-500" : ""}>
-            {status.connected ? "Conectado" : status.state === "qr_pending" ? "Esperando QR" : "Desconectado"}
-          </Badge>
-          {status.number && <span className="text-sm text-muted-foreground">{status.number}</span>}
+          {status.connected ? (
+            <Badge variant="outline" className="border-transparent bg-alma-olive/15 text-alma-olive hover:bg-alma-olive/15">Conectado</Badge>
+          ) : (
+            <Badge variant="outline" className="border-alma-hairline bg-transparent text-alma-ink/55">
+              {status.state === "qr_pending" ? "Esperando QR" : "Desconectado"}
+            </Badge>
+          )}
+          {status.number && <span className="nums text-sm text-alma-ink/60">{status.number}</span>}
         </div>
 
         {status.state === "qr_pending" && status.qrCode && (
           <div className="space-y-2">
-            <p className="text-sm text-muted-foreground">Escanea con WhatsApp para conectar:</p>
-            <img src={status.qrCode} alt="QR Code" className="w-52 h-52 border border-border rounded-xl" />
-            <p className="text-xs text-muted-foreground">Actualizando cada 3 segundos…</p>
+            <p className="text-sm text-alma-ink/70">Escanea con WhatsApp para conectar:</p>
+            <img src={status.qrCode} alt="QR Code" className="w-52 h-52 border border-alma-hairline rounded-xl bg-alma-canvas" />
+            <p className="text-xs text-alma-ink/55">Actualizando cada 3 segundos…</p>
           </div>
         )}
 
         <div className="flex gap-3">
           {!status.connected ? (
-            <Button onClick={() => connectMutation.mutate()} disabled={connectMutation.isPending}>
+            <Button onClick={() => connectMutation.mutate()} disabled={connectMutation.isPending} className="bg-alma-ink text-alma-canvas hover:bg-alma-ink-deep">
               {connectMutation.isPending ? <Loader2 className="animate-spin mr-2" size={14} /> : null}
               {status.state === "qr_pending" ? "Obtener nuevo QR" : "Conectar WhatsApp"}
             </Button>
@@ -288,26 +392,29 @@ const WhatsAppSettings = () => {
 
       {/* ── Test message ────────────────────────────────────────────── */}
       {status.connected && (
-        <div className="rounded-xl border p-5 space-y-4">
-          <h3 className="font-semibold flex items-center gap-2">
-            <MessageSquare size={16} />
+        <div className="rounded-xl border border-alma-hairline bg-alma-mist p-5 space-y-4">
+          <p className={`${sectionLabelClass} flex items-center gap-2`}>
+            <MessageSquare size={15} />
             Mensaje de prueba
-          </h3>
+          </p>
           <div className="flex gap-3">
             <Input
               placeholder="Ej. 5219991234567"
               value={testPhone}
               onChange={(e) => setTestPhone(e.target.value)}
-              className="flex-1"
+              className="flex-1 bg-alma-canvas nums"
+              inputMode="numeric"
             />
             <Button
               onClick={() => testMutation.mutate()}
               disabled={testMutation.isPending || !testPhone}
+              className="bg-alma-ink text-alma-canvas hover:bg-alma-ink-deep"
+              aria-label="Enviar mensaje de prueba"
             >
               {testMutation.isPending ? <Loader2 className="animate-spin" size={14} /> : <Send size={14} />}
             </Button>
           </div>
-          <p className="text-xs text-muted-foreground">Incluye código de país. Ej: 521 + 10 dígitos para México.</p>
+          <p className="text-xs text-alma-ink/55">Incluye código de país. Ej: 521 + 10 dígitos para México.</p>
         </div>
       )}
     </div>
@@ -315,15 +422,15 @@ const WhatsAppSettings = () => {
 };
 
 // ── Notification Templates Section ─────────────────────────────────────────
-const NOTIFICATION_TEMPLATES = [
-  { key: "booking_confirmed",     label: "✅ Reserva confirmada",         icon: "📅", hint: "Se envía al confirmar una reserva. Vars: {name}, {class}, {date}, {time}" },
-  { key: "booking_cancelled",     label: "❌ Reserva cancelada",          icon: "🚫", hint: "Se envía al cancelar. Vars: {name}, {class}, {date}, {creditRestored}" },
-  { key: "membership_activated",  label: "🎉 Membresía activada",         icon: "🏋️", hint: "Se envía al activar membresía. Vars: {name}, {plan}, {startDate}, {endDate}" },
-  { key: "transfer_rejected",     label: "⚠️ Transferencia rechazada",    icon: "💳", hint: "Se envía cuando se rechaza un comprobante. Vars: {name}, {reason}" },
-  { key: "class_reminder",        label: "⏰ Recordatorio de clase",       icon: "🔔", hint: "Se envía horas antes de la clase. Vars: {name}, {class}, {time}" },
-  { key: "renewal_reminder",      label: "🔄 Recordatorio de renovación", icon: "📆", hint: "Se envía cuando la membresía está por vencer. Vars: {name}, {plan}, {expiresAt}" },
-  { key: "welcome",               label: "👋 Bienvenida",                 icon: "🌟", hint: "Se envía al registrarse. Vars: {name}" },
-  { key: "password_reset",        label: "🔐 Recuperación de contraseña", icon: "🔑", hint: "Se envía para restablecer contraseña. Vars: {name}, {link}" },
+const NOTIFICATION_TEMPLATES: { key: string; label: string; icon: LucideIcon; hint: string }[] = [
+  { key: "booking_confirmed",    label: "Reserva confirmada",          icon: CalendarCheck, hint: "Se envía al confirmar una reserva. Vars: {name}, {class}, {date}, {time}" },
+  { key: "booking_cancelled",    label: "Reserva cancelada",           icon: CalendarX,     hint: "Se envía al cancelar. Vars: {name}, {class}, {date}, {creditRestored}" },
+  { key: "membership_activated", label: "Membresía activada",          icon: BadgeCheck,    hint: "Se envía al activar membresía. Vars: {name}, {plan}, {startDate}, {endDate}" },
+  { key: "transfer_rejected",    label: "Transferencia rechazada",     icon: CreditCard,    hint: "Se envía cuando se rechaza un comprobante. Vars: {name}, {reason}" },
+  { key: "class_reminder",       label: "Recordatorio de clase",       icon: Bell,          hint: "Se envía horas antes de la clase. Vars: {name}, {class}, {time}" },
+  { key: "renewal_reminder",     label: "Recordatorio de renovación",  icon: CalendarClock, hint: "Se envía cuando la membresía está por vencer. Vars: {name}, {plan}, {expiresAt}" },
+  { key: "welcome",              label: "Bienvenida",                  icon: UserPlus,      hint: "Se envía al registrarse. Vars: {name}" },
+  { key: "password_reset",       label: "Recuperación de contraseña",  icon: KeyRound,      hint: "Se envía para restablecer contraseña. Vars: {name}, {link}" },
 ];
 
 const NotificationTemplates = () => {
@@ -333,18 +440,18 @@ const NotificationTemplates = () => {
   const [editText, setEditText] = useState("");
   const [editSubject, setEditSubject] = useState("");
 
-  const { data: tplData } = useQuery({
+  const { data: tplData, isLoading: tplLoading, isError: tplError, refetch: refetchTpl } = useQuery({
     queryKey: ["settings", "notification_templates"],
     queryFn: async () => (await api.get("/settings/notification_templates")).data,
     staleTime: Infinity,
   });
 
-  const { data: configData, refetch: refetchConfig } = useQuery({
+  const { data: configData, refetch: refetchConfig, isError: configError } = useQuery({
     queryKey: ["settings", "notification_settings"],
     queryFn: async () => (await api.get("/settings/notification_settings")).data,
     staleTime: Infinity,
   });
-  const { data: walletLogsData, refetch: refetchWalletLogs, isFetching: walletLogsFetching } = useQuery({
+  const { data: walletLogsData, refetch: refetchWalletLogs, isFetching: walletLogsFetching, isError: walletLogsError } = useQuery({
     queryKey: ["wallet-notification-logs"],
     queryFn: async () => (await api.get("/admin/wallet/notifications?limit=30")).data,
     staleTime: 60_000,
@@ -369,7 +476,7 @@ const NotificationTemplates = () => {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["settings", "notification_templates"] });
-      toast({ title: "✅ Plantilla guardada" });
+      toast({ title: "Plantilla guardada" });
       setEditingKey(null);
     },
     onError: () => toast({ title: "Error al guardar", variant: "destructive" }),
@@ -381,7 +488,7 @@ const NotificationTemplates = () => {
       qc.invalidateQueries({ queryKey: ["settings", "notification_settings"] });
       setConfigLoaded(false);
       refetchConfig();
-      toast({ title: "✅ Configuración guardada" });
+      toast({ title: "Configuración guardada" });
     },
   });
 
@@ -396,63 +503,96 @@ const NotificationTemplates = () => {
 
   return (
     <div className="space-y-6 max-w-xl">
-      {/* Config toggles */}
-      <div className="rounded-xl border p-4 space-y-3">
-        <h3 className="font-semibold text-sm">Canales activos</h3>
-        {[
-          { key: "email_reminders", label: "Recordatorios por email" },
-          { key: "whatsapp_reminders", label: "Recordatorios por WhatsApp" },
-        ].map((f) => (
-          <div key={f.key} className="flex items-center gap-3">
-            <Switch checked={!!config[f.key]} onCheckedChange={(v) => setConfig((p) => ({ ...p, [f.key]: v }))} />
-            <Label>{f.label}</Label>
-          </div>
-        ))}
-        <div className="space-y-1 pt-1">
-          <Label>Horas antes del recordatorio</Label>
-          <Input type="number" className="w-28" value={config.reminder_hours_before ?? 2} onChange={(e) => setConfig((p) => ({ ...p, reminder_hours_before: Number(e.target.value) }))} />
-        </div>
-        <Button size="sm" onClick={() => saveConfigMutation.mutate()} disabled={saveConfigMutation.isPending}>
-          {saveConfigMutation.isPending ? <Loader2 className="animate-spin mr-1" size={12} /> : null}Guardar
-        </Button>
+      {/* Alcance: sistema vs Templates de WhatsApp */}
+      <div className="flex items-start gap-2.5 rounded-xl border border-alma-hairline bg-alma-oat/40 px-3.5 py-3">
+        <Info size={15} className="mt-0.5 shrink-0 text-alma-berry" />
+        <p className="text-xs leading-relaxed text-alma-ink/80">
+          Estos son los mensajes del sistema. Para las plantillas de WhatsApp ve a{" "}
+          <Link
+            to="/admin/whatsapp-templates"
+            className="font-medium text-alma-berry underline underline-offset-2 hover:text-alma-ink"
+          >
+            Templates de WhatsApp
+          </Link>.
+        </p>
       </div>
 
-      <div className="rounded-xl border p-4 space-y-3">
+      {/* Config toggles */}
+      <div className="rounded-xl border border-alma-hairline bg-alma-mist p-4 space-y-3">
+        <p className={sectionLabelClass}>Canales activos</p>
+        {configError ? (
+          <p className="text-xs text-destructive">
+            No pudimos cargar los canales.{" "}
+            <button type="button" className="underline underline-offset-2" onClick={() => refetchConfig()}>Reintentar</button>
+          </p>
+        ) : (
+          <>
+            {[
+              { key: "email_reminders", label: "Recordatorios por email" },
+              { key: "whatsapp_reminders", label: "Recordatorios por WhatsApp" },
+            ].map((f) => (
+              <div key={f.key} className="flex items-center gap-3">
+                <Switch checked={!!config[f.key]} onCheckedChange={(v) => setConfig((p) => ({ ...p, [f.key]: v }))} />
+                <Label>{f.label}</Label>
+              </div>
+            ))}
+            <div className="space-y-1 pt-1">
+              <Label>Horas antes del recordatorio</Label>
+              <Input
+                type="number"
+                className="w-28 bg-alma-canvas nums"
+                value={config.reminder_hours_before ?? 2}
+                onChange={(e) => setConfig((p) => ({ ...p, reminder_hours_before: Number(e.target.value) }))}
+              />
+            </div>
+            <Button size="sm" onClick={() => saveConfigMutation.mutate()} disabled={saveConfigMutation.isPending} className="bg-alma-ink text-alma-canvas hover:bg-alma-ink-deep">
+              {saveConfigMutation.isPending ? <Loader2 className="animate-spin mr-1" size={12} /> : null}Guardar
+            </Button>
+          </>
+        )}
+      </div>
+
+      <div className="rounded-xl border border-alma-hairline bg-alma-mist p-4 space-y-3">
         <div className="flex items-center justify-between gap-2">
-          <h3 className="font-semibold text-sm flex items-center gap-2">
+          <p className={`${sectionLabelClass} flex items-center gap-2`}>
             <BellDot size={15} />
             Notificaciones de pase (Wallet)
-          </h3>
-          <Button variant="ghost" size="sm" onClick={() => refetchWalletLogs()} disabled={walletLogsFetching}>
+          </p>
+          <Button variant="ghost" size="sm" onClick={() => refetchWalletLogs()} disabled={walletLogsFetching} aria-label="Actualizar notificaciones de pase">
             <RefreshCw size={14} className={walletLogsFetching ? "animate-spin" : ""} />
           </Button>
         </div>
 
-        {!walletLogs.length ? (
-          <p className="text-xs text-muted-foreground">Aún no hay notificaciones de pase registradas.</p>
+        {walletLogsError ? (
+          <p className="text-xs text-destructive">
+            No pudimos cargar las notificaciones de pase.{" "}
+            <button type="button" className="underline underline-offset-2" onClick={() => refetchWalletLogs()}>Reintentar</button>
+          </p>
+        ) : !walletLogs.length ? (
+          <p className="text-xs text-alma-ink/55">Aún no hay notificaciones de pase registradas.</p>
         ) : (
           <div className="space-y-2 max-h-72 overflow-auto pr-1">
             {walletLogs.map((row) => (
-              <div key={row.id} className="rounded-lg border border-border bg-card/40 px-3 py-2 text-xs">
+              <div key={row.id} className="rounded-lg border border-alma-hairline bg-alma-canvas px-3 py-2 text-xs">
                 <div className="flex items-center justify-between gap-2">
-                  <p className="font-medium truncate">{row.display_name || row.email || row.user_id || "Usuario"}</p>
+                  <p className="font-medium text-alma-ink truncate">{row.display_name || row.email || row.user_id || "Usuaria"}</p>
                   <Badge
-                    variant="secondary"
+                    variant="outline"
                     className={
                       row.status === "ok"
-                        ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
+                        ? "border-transparent bg-alma-olive/15 text-alma-olive hover:bg-alma-olive/15"
                         : row.status === "partial"
-                          ? "bg-amber-500/15 text-amber-300 border-amber-500/30"
-                          : "bg-red-500/15 text-red-300 border-red-500/30"
+                          ? "border-alma-sandstone/60 bg-alma-oat/50 text-alma-berry"
+                          : "border-transparent bg-destructive/10 text-destructive"
                     }
                   >
                     {row.status === "ok" ? "OK" : row.status === "partial" ? "Parcial" : "Error"}
                   </Badge>
                 </div>
-                <p className="mt-0.5 text-muted-foreground">
-                  {new Date(row.created_at).toLocaleString("es-MX")} · motivo: {row.reason}
+                <p className="mt-0.5 text-alma-ink/60">
+                  <span className="nums">{formatDateTime(row.created_at)}</span> · motivo: {row.reason}
                 </p>
-                <p className="mt-1 text-muted-foreground">
+                <p className="mt-1 text-alma-ink/60 nums">
                   Apple: {row.apple_sent ?? 0} enviadas / {row.apple_failed ?? 0} fallidas · Google: {row.google_synced ? `sincronizado (${row.google_mode || "updated"})` : "sin sincronizar"}
                 </p>
               </div>
@@ -463,23 +603,40 @@ const NotificationTemplates = () => {
 
       {/* Templates list */}
       <div className="space-y-2">
-        <h3 className="font-semibold text-sm mb-3">Plantillas de mensajes</h3>
-        {NOTIFICATION_TEMPLATES.map((t) => {
-          const tpl = templates[t.key];
-          return (
-            <div key={t.key} className="flex items-start justify-between gap-3 p-3 rounded-xl border border-border bg-card">
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium">{t.label}</p>
-                <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                  {tpl?.body ? tpl.body.slice(0, 80) + (tpl.body.length > 80 ? "…" : "") : <span className="italic opacity-60">Sin personalizar (usa plantilla por defecto)</span>}
-                </p>
+        <p className={`${sectionLabelClass} mb-3`}>Plantillas de mensajes</p>
+        {tplError ? (
+          <ErrorState
+            description="No pudimos cargar las plantillas de mensajes. Revisa tu conexión y vuelve a intentarlo."
+            onRetry={() => refetchTpl()}
+          />
+        ) : tplLoading ? (
+          <div className="space-y-2">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} className="h-16 w-full rounded-xl" />
+            ))}
+          </div>
+        ) : (
+          NOTIFICATION_TEMPLATES.map((t) => {
+            const tpl = templates[t.key];
+            const Icon = t.icon;
+            return (
+              <div key={t.key} className="flex items-start justify-between gap-3 p-3 rounded-xl border border-alma-hairline bg-alma-mist">
+                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-alma-oat/60 text-alma-berry">
+                  <Icon size={15} strokeWidth={1.8} />
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-alma-ink">{t.label}</p>
+                  <p className="text-xs text-alma-ink/55 mt-0.5 truncate">
+                    {tpl?.body ? tpl.body.slice(0, 80) + (tpl.body.length > 80 ? "…" : "") : <span className="italic text-alma-ink/45">Sin personalizar (usa plantilla por defecto)</span>}
+                  </p>
+                </div>
+                <Button size="icon" variant="ghost" className="shrink-0" onClick={() => openEdit(t.key)} aria-label={`Editar plantilla ${t.label}`}>
+                  <Pencil size={13} />
+                </Button>
               </div>
-              <Button size="icon" variant="ghost" className="shrink-0" onClick={() => openEdit(t.key)}>
-                <Pencil size={13} />
-              </Button>
-            </div>
-          );
-        })}
+            );
+          })
+        )}
       </div>
 
       {/* Edit dialog */}
@@ -489,7 +646,7 @@ const NotificationTemplates = () => {
             <DialogTitle>Editar plantilla · {currentTpl?.label}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
-            <p className="text-xs text-muted-foreground bg-muted rounded-lg px-3 py-2">{currentTpl?.hint}</p>
+            <p className="text-xs text-alma-ink/70 bg-alma-oat/40 rounded-lg px-3 py-2">{currentTpl?.hint}</p>
             <div className="space-y-1">
               <Label>Asunto (email)</Label>
               <Input value={editSubject} onChange={(e) => setEditSubject(e.target.value)} placeholder="Asunto del email..." />
@@ -497,7 +654,7 @@ const NotificationTemplates = () => {
             <div className="space-y-1">
               <Label>Cuerpo del mensaje (WhatsApp / Email)</Label>
               <Textarea rows={6} value={editText} onChange={(e) => setEditText(e.target.value)} placeholder="Escribe el mensaje aquí..." />
-              <p className="text-xs text-muted-foreground">{editText.length} caracteres</p>
+              <p className="nums text-xs text-alma-ink/55">{editText.length} caracteres</p>
             </div>
           </div>
           <DialogFooter>
@@ -505,6 +662,7 @@ const NotificationTemplates = () => {
             <Button
               onClick={() => editingKey && saveTplMutation.mutate({ key: editingKey, subject: editSubject, body: editText })}
               disabled={saveTplMutation.isPending}
+              className="bg-alma-ink text-alma-canvas hover:bg-alma-ink-deep"
             >
               {saveTplMutation.isPending ? <Loader2 className="animate-spin mr-1" size={12} /> : null}Guardar plantilla
             </Button>
@@ -522,7 +680,7 @@ const VenueMediaSettings = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
 
-  const { data: generalData } = useQuery({
+  const { data: generalData, isLoading, isError, refetch } = useQuery({
     queryKey: ["settings", "general_settings"],
     queryFn: async () => (await api.get("/settings/general_settings")).data,
     staleTime: Infinity,
@@ -536,7 +694,7 @@ const VenueMediaSettings = () => {
     mutationFn: (nextValue: Record<string, any>) => api.put("/settings/general_settings", { value: nextValue }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["settings", "general_settings"] });
-      toast({ title: "✅ Media del lugar guardada" });
+      toast({ title: "Media del lugar guardada" });
     },
     onError: (err: any) => {
       toast({ title: err?.response?.data?.message || "Error al guardar media", variant: "destructive" });
@@ -626,7 +784,7 @@ const VenueMediaSettings = () => {
 
       setUploadProgress(100);
       qc.invalidateQueries({ queryKey: ["settings", "general_settings"] });
-      toast({ title: "✅ Archivo subido correctamente" });
+      toast({ title: "Archivo subido correctamente" });
     } catch (err: any) {
       toast({ title: err?.response?.data?.message || err?.message || "Error al subir archivo", variant: "destructive" });
     } finally {
@@ -636,11 +794,26 @@ const VenueMediaSettings = () => {
     }
   };
 
+  if (isError) {
+    return (
+      <div className="max-w-2xl">
+        <ErrorState
+          description="No pudimos cargar la media del lugar. Revisa tu conexión y vuelve a intentarlo."
+          onRetry={() => refetch()}
+        />
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return <Skeleton className="h-40 w-full max-w-2xl rounded-xl" />;
+  }
+
   return (
-    <div className="rounded-xl border p-4 space-y-4 max-w-2xl">
+    <div className="rounded-xl border border-alma-hairline bg-alma-mist p-4 space-y-4 max-w-2xl">
       <div className="space-y-1">
-        <h3 className="font-semibold text-sm">Media del lugar</h3>
-        <p className="text-xs text-muted-foreground">
+        <p className={sectionLabelClass}>Media del lugar</p>
+        <p className="text-xs text-alma-ink/60">
           Sube una imagen o video para mostrar el estudio desde el admin.
         </p>
       </div>
@@ -661,6 +834,7 @@ const VenueMediaSettings = () => {
           type="button"
           onClick={() => fileInputRef.current?.click()}
           disabled={isUploading || saveGeneralMutation.isPending}
+          className="bg-alma-ink text-alma-canvas hover:bg-alma-ink-deep"
         >
           {isUploading ? <Loader2 className="animate-spin mr-2" size={14} /> : <Upload size={14} className="mr-2" />}
           Subir imagen o video
@@ -681,26 +855,26 @@ const VenueMediaSettings = () => {
       {isUploading ? (
         <div className="space-y-2">
           <Progress value={uploadProgress} />
-          <p className="text-xs text-muted-foreground">{uploadProgress}% subido</p>
+          <p className="nums text-xs text-alma-ink/55">{uploadProgress}% subido</p>
         </div>
       ) : null}
 
       {mediaUrl ? (
         <div className="space-y-2">
-          <div className="rounded-lg border border-border overflow-hidden bg-black/30">
+          <div className="rounded-lg border border-alma-hairline overflow-hidden bg-alma-ink-deep">
             {mediaType === "video" ? (
-              <video src={mediaUrl} controls className="w-full max-h-[360px] object-cover bg-black" />
+              <video src={mediaUrl} controls className="w-full max-h-[360px] object-cover bg-alma-ink-deep" />
             ) : (
               <img src={mediaUrl} alt="Media del lugar" className="w-full max-h-[360px] object-cover" />
             )}
           </div>
-          <p className="text-xs text-muted-foreground flex items-center gap-2">
+          <p className="text-xs text-alma-ink/60 flex items-center gap-2">
             {mediaType === "video" ? <Video size={13} /> : <ImageIcon size={13} />}
             {generalSettings.venue_media_name || "Archivo cargado"}
           </p>
         </div>
       ) : (
-        <div className="rounded-lg border border-dashed border-border p-4 text-xs text-muted-foreground">
+        <div className="rounded-lg border border-dashed border-alma-hairline p-4 text-xs text-alma-ink/55">
           Aún no hay media cargada.
         </div>
       )}
@@ -719,7 +893,7 @@ const SettingsPage = () => (
             { label: "Templates WA", to: "/admin/whatsapp-templates" },
           ]}
         />
-        <h1 className="text-2xl font-bold mb-6">Configuración</h1>
+        <h1 className="admin-title font-semibold text-alma-ink mb-6">Configuración</h1>
         <Tabs defaultValue="general">
           <TabsList className="flex-wrap h-auto gap-1 mb-6">
             <TabsTrigger value="general">General</TabsTrigger>
@@ -774,12 +948,10 @@ const SettingsPage = () => (
           </TabsContent>
 
           <TabsContent value="security">
-            {/* La tarjeta usa los campos claros de AuthShell; la envolvemos en
-                un contenedor cream para que se lean sobre el panel oscuro. */}
-            <div className="rounded-2xl bg-[#E9E6DF] p-6 sm:p-8 max-w-md">
-              <h2 className="font-bold text-[#4A3333] text-lg mb-1">Cambiar mi contraseña</h2>
-              <p className="text-[#4A3333]/60 text-sm mb-6">
-                Cambia la contraseña de tu cuenta de administrador. Por seguridad cerraremos tu sesión al terminar.
+            <div className="max-w-md">
+              <h2 className="text-lg font-semibold text-alma-ink mb-1">Cambiar mi contraseña</h2>
+              <p className="text-sm text-alma-ink/70 mb-6">
+                Cambia la contraseña de tu cuenta de administradora. Por seguridad cerraremos tu sesión al terminar.
               </p>
               <ChangePassword logoutAfter />
             </div>

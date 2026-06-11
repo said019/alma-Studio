@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ComponentType, type ReactNode } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -9,16 +9,19 @@ import api from "@/lib/api";
 import { AuthGuard } from "@/components/admin/AuthGuard";
 import AdminLayout from "@/components/admin/AdminLayout";
 import SectionTabs from "@/components/admin/SectionTabs";
+import { useConfirm } from "@/components/admin/ConfirmDialog";
+import { ErrorState } from "@/components/app/AppShell";
+import { formatMXN, formatDate } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { MoreHorizontal, Plus, Search, UserPlus, CreditCard, Banknote, Building2 } from "lucide-react";
+import { MoreHorizontal, Search, SearchX, UserPlus, UsersRound, CreditCard, Banknote, Building2, type LucideProps } from "lucide-react";
 import { useDebounce } from "@/hooks/use-debounce";
 import { cn } from "@/lib/utils";
 import { DatePicker } from "@/components/ui/date-picker";
@@ -56,6 +59,7 @@ type ManualFormData = z.infer<typeof manualSchema>;
 interface Client extends EditFormData {
   id: string;
   role: string;
+  createdAt?: string;
 }
 
 interface Plan { id: string; name: string; price: number; category: string; }
@@ -67,23 +71,51 @@ const PAYMENT_METHODS = [
   { value: "transfer", label: "Transferencia",Icon: Building2 },
 ] as const;
 
+// ── Clases compartidas de campos (tema claro nativo) ──────────────────────────
+const fieldCls = "bg-alma-canvas border-alma-sandstone/60 text-alma-ink placeholder:text-alma-ink/40";
+const outlineBtnCls = "border-alma-sandstone/70 bg-transparent text-alma-ink hover:bg-alma-mist hover:text-alma-ink";
+const primaryBtnCls = "bg-alma-ink-deep text-alma-canvas hover:bg-alma-ink";
+
+const SectionLabel = ({ children }: { children: ReactNode }) => (
+  <p className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-alma-berry mb-3">{children}</p>
+);
+
+const EmptyBlock = ({ Icon, title, description, action }: {
+  Icon: ComponentType<LucideProps>;
+  title: string;
+  description: string;
+  action?: ReactNode;
+}) => (
+  <div className="flex flex-col items-center gap-3 py-14 text-center px-6">
+    <span className="grid h-12 w-12 place-items-center rounded-2xl bg-alma-oat text-alma-berry">
+      <Icon size={20} strokeWidth={1.8} />
+    </span>
+    <div>
+      <p className="font-display text-lg text-alma-ink">{title}</p>
+      <p className="text-sm text-alma-ink/55 mt-1 max-w-[44ch]">{description}</p>
+    </div>
+    {action}
+  </div>
+);
+
 // ── Main component ─────────────────────────────────────────────────────────────
 const ClientsList = () => {
   const { toast } = useToast();
   const qc = useQueryClient();
   const navigate = useNavigate();
+  const { confirm, dialog } = useConfirm();
 
-  // Edit dialog
+  // Edit sheet
   const [editOpen, setEditOpen] = useState(false);
   const [editing, setEditing]   = useState<Client | null>(null);
-  // Manual registration dialog
+  // Manual registration sheet
   const [manualOpen, setManualOpen] = useState(false);
 
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 300);
 
   // Clients list
-  const { data, isLoading } = useQuery<{ data: Client[] }>({
+  const { data, isLoading, isError, refetch } = useQuery<{ data: Client[] }>({
     queryKey: ["clients", debouncedSearch],
     queryFn: async () => (await api.get(`/users?role=client&search=${debouncedSearch}`)).data,
   });
@@ -91,8 +123,8 @@ const ClientsList = () => {
 
   const filteredClients = clients;
 
-  // Plans for the manual dialog
-  const { data: plansData } = useQuery<{ data: Plan[] }>({
+  // Plans for the manual sheet
+  const { data: plansData, isError: plansError, refetch: refetchPlans } = useQuery<{ data: Plan[] }>({
     queryKey: ["plans-active"],
     queryFn: async () => (await api.get("/plans?active=true")).data,
     staleTime: 60_000,
@@ -106,7 +138,7 @@ const ClientsList = () => {
     mutationFn: ({ id, ...d }: Client) => api.put(`/users/${id}`, d),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["clients"] });
-      toast({ title: "Cliente actualizado" });
+      toast({ title: "Clienta actualizada" });
       setEditOpen(false);
     },
   });
@@ -115,13 +147,23 @@ const ClientsList = () => {
     mutationFn: (id: string) => api.delete(`/users/${id}`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["clients"] });
-      toast({ title: "Cliente eliminado" });
+      toast({ title: "Clienta eliminada" });
     },
   });
 
   const openEdit = (c: Client) => { editForm.reset(c); setEditing(c); setEditOpen(true); };
   const onEditSubmit = (d: EditFormData) => {
     if (editing) updateMutation.mutate({ ...d, id: editing.id, role: "client" });
+  };
+
+  const askDelete = async (c: Client) => {
+    const ok = await confirm({
+      title: `¿Eliminar a ${c.displayName}?`,
+      description: "Se borra su cuenta y su acceso al estudio. Esta acción no se puede deshacer.",
+      confirmLabel: "Eliminar clienta",
+      destructive: true,
+    });
+    if (ok) deleteMutation.mutate(c.id);
   };
 
   // ── Manual registration form ───────────────────────────────────────────────
@@ -138,8 +180,8 @@ const ClientsList = () => {
     onSuccess: (res) => {
       qc.invalidateQueries({ queryKey: ["clients"] });
       const msg = res.data?.data?.membershipId
-        ? "Clienta registrada y membresía activada ✓"
-        : "Clienta registrada ✓";
+        ? "Clienta registrada y membresía activada"
+        : "Clienta registrada";
       toast({ title: msg });
       setManualOpen(false);
       manualForm.reset({ startDate: format(new Date(), "yyyy-MM-dd") });
@@ -155,6 +197,8 @@ const ClientsList = () => {
 
   const onManualSubmit = (d: ManualFormData) => manualMutation.mutate(d);
 
+  const hasPlanSelected = !!selectedPlanId && selectedPlanId !== "none";
+
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <AuthGuard>
@@ -162,31 +206,28 @@ const ClientsList = () => {
         <div className="admin-page max-w-6xl">
           <SectionTabs
             tabs={[
-              { label: "Clientes", to: "/admin/clients" },
+              { label: "Clientas", to: "/admin/clients" },
               { label: "Visitas", to: "/admin/visitas" },
             ]}
           />
           {/* Header */}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-7">
             <div>
-              <h1 className="text-3xl font-bold text-white mb-1">Clientas</h1>
-              <p className="text-sm text-white/35">
-                {clients.length} clientas registradas
+              <h1 className="admin-title font-display text-alma-ink mb-1">Clientas</h1>
+              <p className="text-sm text-alma-ink/55">
+                <span className="nums">{clients.length}</span> clientas registradas
               </p>
             </div>
-            <button
-              onClick={() => setManualOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-[#8A6E60] to-[#C7A892] hover:opacity-90 transition-opacity"
-            >
+            <Button onClick={() => setManualOpen(true)} className={cn(primaryBtnCls, "gap-2 rounded-xl")}>
               <UserPlus size={15} /> Nueva clienta
-            </button>
+            </Button>
           </div>
 
           {/* Search */}
           <div className="relative mb-5 max-w-sm">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-alma-ink/40" />
             <Input
-              className="pl-8 bg-white/[0.03] border-white/[0.08] text-white placeholder:text-white/25 focus:border-[#8A6E60]/40"
+              className={cn(fieldCls, "pl-8")}
               placeholder="Buscar clienta..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -194,205 +235,269 @@ const ClientsList = () => {
           </div>
 
           {/* Table */}
-          <div className="rounded-2xl border border-white/[0.07] overflow-hidden bg-white/[0.01]">
-            <Table>
-              <TableHeader>
-                <TableRow className="border-white/[0.07] hover:bg-transparent">
-                  <TableHead className="text-white/40 font-semibold text-xs uppercase tracking-wider">Nombre</TableHead>
-                  <TableHead className="text-white/40 font-semibold text-xs uppercase tracking-wider">Email</TableHead>
-                  <TableHead className="text-white/40 font-semibold text-xs uppercase tracking-wider">Teléfono</TableHead>
-                  <TableHead />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading
-                  ? Array(5).fill(0).map((_, i) => (
-                    <TableRow key={i} className="border-white/[0.05]">
-                      {Array(4).fill(0).map((_, j) => (
-                        <TableCell key={j}><Skeleton className="h-4 w-full bg-white/[0.05]" /></TableCell>
-                      ))}
-                    </TableRow>
-                  ))
-                  : filteredClients.map((c) => (
-                    <TableRow key={c.id} className="border-white/[0.05] hover:bg-white/[0.03] transition-colors">
-                      <TableCell className="font-semibold text-white/85">
-                        <span>{c.displayName}</span>
-                      </TableCell>
-                      <TableCell className="text-sm text-white/45">{c.email}</TableCell>
-                      <TableCell className="text-sm text-white/45">{c.phone ?? "—"}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center justify-end gap-2">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="text-white/30 hover:text-white/70 hover:bg-white/5">
-                                <MoreHorizontal size={14} />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent className="bg-[#0f0518] border-white/10">
-                              <DropdownMenuItem
-                                className="text-white/70 hover:text-white focus:text-white hover:bg-white/5 focus:bg-white/5"
-                                onClick={() => navigate(`/admin/clients/${c.id}`)}
-                              >
-                                Ver detalle
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                className="text-white/70 hover:text-white focus:text-white hover:bg-white/5 focus:bg-white/5"
-                                onClick={() => openEdit(c)}
-                              >
-                                Editar
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                className="text-[#f87171] hover:text-[#f87171] focus:text-[#f87171] hover:bg-[#f87171]/5 focus:bg-[#f87171]/5"
-                                onClick={() => { if (window.confirm("¿Eliminar este cliente?")) deleteMutation.mutate(c.id); }}
-                              >
-                                Eliminar
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-              </TableBody>
-            </Table>
+          <div className="rounded-2xl border border-alma-hairline overflow-hidden bg-alma-canvas">
+            {isError ? (
+              <div className="px-6">
+                <ErrorState
+                  title="No pudimos cargar a las clientas"
+                  onRetry={() => refetch()}
+                />
+              </div>
+            ) : !isLoading && filteredClients.length === 0 ? (
+              search.trim() ? (
+                <EmptyBlock
+                  Icon={SearchX}
+                  title="No encontramos a nadie con ese nombre"
+                  description="Revisa la escritura o intenta con el email o el teléfono."
+                  action={
+                    <Button variant="outline" size="sm" className={outlineBtnCls} onClick={() => setSearch("")}>
+                      Limpiar búsqueda
+                    </Button>
+                  }
+                />
+              ) : (
+                <EmptyBlock
+                  Icon={UsersRound}
+                  title="Aún no hay clientas registradas"
+                  description="Registra a tu primera clienta para llevar su expediente, membresías y reservas."
+                  action={
+                    <Button size="sm" className={cn(primaryBtnCls, "gap-2")} onClick={() => setManualOpen(true)}>
+                      <UserPlus size={14} /> Nueva clienta
+                    </Button>
+                  }
+                />
+              )
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-alma-hairline hover:bg-transparent">
+                    <TableHead className="text-alma-ink/55 font-semibold text-xs uppercase tracking-wider">Nombre</TableHead>
+                    <TableHead className="text-alma-ink/55 font-semibold text-xs uppercase tracking-wider hidden md:table-cell">Email</TableHead>
+                    <TableHead className="text-alma-ink/55 font-semibold text-xs uppercase tracking-wider">Teléfono</TableHead>
+                    <TableHead className="text-alma-ink/55 font-semibold text-xs uppercase tracking-wider hidden lg:table-cell">Clienta desde</TableHead>
+                    <TableHead className="w-12" />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {isLoading
+                    ? Array(5).fill(0).map((_, i) => (
+                      <TableRow key={i} className="border-alma-hairline hover:bg-transparent">
+                        {Array(5).fill(0).map((_, j) => (
+                          <TableCell key={j} className={cn(j === 1 && "hidden md:table-cell", j === 3 && "hidden lg:table-cell")}>
+                            <Skeleton className="h-4 w-full bg-alma-oat/60" />
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    ))
+                    : filteredClients.map((c) => (
+                      <TableRow
+                        key={c.id}
+                        onClick={() => navigate(`/admin/clients/${c.id}`)}
+                        className="border-alma-hairline cursor-pointer transition-colors hover:bg-alma-mist"
+                      >
+                        <TableCell className="font-semibold text-alma-ink">
+                          <span>{c.displayName}</span>
+                        </TableCell>
+                        <TableCell className="text-sm text-alma-ink/60 hidden md:table-cell">{c.email}</TableCell>
+                        <TableCell className="text-sm text-alma-ink/60 nums">{c.phone ?? "—"}</TableCell>
+                        <TableCell className="text-sm text-alma-ink/60 nums hidden lg:table-cell">
+                          {c.createdAt ? formatDate(c.createdAt) : "—"}
+                        </TableCell>
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center justify-end">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="text-alma-ink/45 hover:text-alma-ink hover:bg-alma-oat/60">
+                                  <MoreHorizontal size={14} />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent className="bg-alma-canvas border-alma-hairline">
+                                <DropdownMenuItem
+                                  className="text-alma-ink/80 focus:text-alma-ink focus:bg-alma-mist"
+                                  onClick={() => openEdit(c)}
+                                >
+                                  Editar
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                                  onClick={() => askDelete(c)}
+                                >
+                                  Eliminar
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                </TableBody>
+              </Table>
+            )}
           </div>
         </div>
 
-        {/* ── Edit dialog ──────────────────────────────────────────────────── */}
-        <Dialog open={editOpen} onOpenChange={setEditOpen}>
-          <DialogContent className="max-w-lg bg-[#0f0518] border-white/10 text-white">
-            <DialogHeader>
-              <DialogTitle className="text-white">Editar clienta</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label className="text-white/60 text-xs">Nombre</Label>
-                  <Input className="bg-white/[0.04] border-white/[0.08] text-white" {...editForm.register("displayName")} />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-white/60 text-xs">Email</Label>
-                  <Input type="email" className="bg-white/[0.04] border-white/[0.08] text-white" {...editForm.register("email")} />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-white/60 text-xs">Teléfono</Label>
-                  <Input className="bg-white/[0.04] border-white/[0.08] text-white" {...editForm.register("phone")} />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-white/60 text-xs">Fecha de nacimiento</Label>
-                  <DatePicker value={editForm.watch("dateOfBirth")} onChange={(v) => editForm.setValue("dateOfBirth", v)} />
-                </div>
-              </div>
-              <div className="space-y-1">
-                <Label className="text-white/60 text-xs">Notas de salud</Label>
-                <Input className="bg-white/[0.04] border-white/[0.08] text-white" {...editForm.register("healthNotes")} />
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label className="text-white/60 text-xs">Contacto de emergencia</Label>
-                  <Input className="bg-white/[0.04] border-white/[0.08] text-white" placeholder="Nombre" {...editForm.register("emergencyContactName")} />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-white/60 text-xs">Teléfono emergencia</Label>
-                  <Input className="bg-white/[0.04] border-white/[0.08] text-white" {...editForm.register("emergencyContactPhone")} />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button type="button" variant="outline" className="border-white/10 text-white/60 hover:bg-white/5" onClick={() => setEditOpen(false)}>Cancelar</Button>
-                <Button
-                  type="submit"
-                  disabled={updateMutation.isPending}
-                  className="bg-gradient-to-r from-[#8A6E60] to-[#C7A892] text-white border-0"
-                >
-                  Actualizar
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
-
-        {/* ── Manual registration dialog ───────────────────────────────────── */}
-        <Dialog open={manualOpen} onOpenChange={(v) => { setManualOpen(v); if (!v) manualForm.reset({ startDate: format(new Date(), "yyyy-MM-dd") }); }}>
-          <DialogContent className="max-w-xl bg-[#0f0518] border-white/10 text-white max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="text-white flex items-center gap-2">
-                <UserPlus size={18} className="text-[#8A6E60]" />
-                Nueva clienta
-              </DialogTitle>
-              <p className="text-xs text-white/35 mt-0.5">Registro manual · La clienta recibe su contraseña por email</p>
-            </DialogHeader>
-
-            <form onSubmit={manualForm.handleSubmit(onManualSubmit)} className="space-y-5 pt-1">
-              {/* Personal info */}
+        {/* ── Edit sheet ───────────────────────────────────────────────────── */}
+        <Sheet open={editOpen} onOpenChange={setEditOpen}>
+          <SheetContent className="w-full sm:max-w-md overflow-y-auto bg-alma-canvas border-alma-hairline text-alma-ink">
+            <SheetHeader>
+              <SheetTitle className="font-display text-xl text-alma-ink">Editar clienta</SheetTitle>
+              <SheetDescription className="text-alma-ink/55">
+                Actualiza los datos del expediente de {editing?.displayName ?? "la clienta"}.
+              </SheetDescription>
+            </SheetHeader>
+            <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="mt-6 space-y-6">
               <div>
-                <p className="text-[11px] text-[#8A6E60]/70 font-semibold uppercase tracking-wider mb-3">Datos personales</p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="space-y-1 col-span-2">
-                    <Label className="text-white/60 text-xs">Nombre completo *</Label>
-                    <Input
-                      className="bg-white/[0.04] border-white/[0.08] text-white placeholder:text-white/20"
-                      placeholder="Ana García"
-                      {...manualForm.register("displayName")}
-                    />
-                    {manualForm.formState.errors.displayName && (
-                      <p className="text-[10px] text-[#f87171]">{manualForm.formState.errors.displayName.message}</p>
-                    )}
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-white/60 text-xs">Email *</Label>
-                    <Input
-                      type="email"
-                      className="bg-white/[0.04] border-white/[0.08] text-white placeholder:text-white/20"
-                      placeholder="ana@email.com"
-                      {...manualForm.register("email")}
-                    />
-                    {manualForm.formState.errors.email && (
-                      <p className="text-[10px] text-[#f87171]">{manualForm.formState.errors.email.message}</p>
-                    )}
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-white/60 text-xs">Teléfono</Label>
-                    <Input
-                      className="bg-white/[0.04] border-white/[0.08] text-white placeholder:text-white/20"
-                      placeholder="55 1234 5678"
-                      {...manualForm.register("phone")}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-white/60 text-xs">Fecha de nacimiento</Label>
-                    <DatePicker value={manualForm.watch("dateOfBirth")} onChange={(v) => manualForm.setValue("dateOfBirth", v)} />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-white/60 text-xs">Notas de salud</Label>
-                    <Input
-                      className="bg-white/[0.04] border-white/[0.08] text-white placeholder:text-white/20"
-                      placeholder="Lesiones, condiciones..."
-                      {...manualForm.register("healthNotes")}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Plan (optional) */}
-              <div>
-                <p className="text-[11px] text-[#C7A892]/70 font-semibold uppercase tracking-wider mb-3">Membresía (opcional)</p>
+                <SectionLabel>Datos</SectionLabel>
                 <div className="space-y-3">
                   <div className="space-y-1">
-                    <Label className="text-white/60 text-xs">Plan</Label>
+                    <Label className="text-alma-ink/70 text-xs">Nombre</Label>
+                    <Input className={fieldCls} {...editForm.register("displayName")} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-alma-ink/70 text-xs">Fecha de nacimiento</Label>
+                    <DatePicker value={editForm.watch("dateOfBirth")} onChange={(v) => editForm.setValue("dateOfBirth", v)} />
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-t border-alma-hairline pt-5">
+                <SectionLabel>Contacto</SectionLabel>
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <Label className="text-alma-ink/70 text-xs">Email</Label>
+                    <Input type="email" className={fieldCls} {...editForm.register("email")} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-alma-ink/70 text-xs">Teléfono</Label>
+                    <Input className={fieldCls} {...editForm.register("phone")} />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label className="text-alma-ink/70 text-xs">Contacto de emergencia</Label>
+                      <Input className={fieldCls} placeholder="Nombre" {...editForm.register("emergencyContactName")} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-alma-ink/70 text-xs">Teléfono emergencia</Label>
+                      <Input className={fieldCls} {...editForm.register("emergencyContactPhone")} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-t border-alma-hairline pt-5">
+                <SectionLabel>Salud</SectionLabel>
+                <div className="space-y-1">
+                  <Label className="text-alma-ink/70 text-xs">Notas de salud</Label>
+                  <Input className={fieldCls} placeholder="Lesiones, condiciones..." {...editForm.register("healthNotes")} />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 border-t border-alma-hairline pt-4">
+                <Button type="button" variant="outline" className={outlineBtnCls} onClick={() => setEditOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={updateMutation.isPending} className={primaryBtnCls}>
+                  {updateMutation.isPending ? "Guardando…" : "Actualizar"}
+                </Button>
+              </div>
+            </form>
+          </SheetContent>
+        </Sheet>
+
+        {/* ── Manual registration sheet ────────────────────────────────────── */}
+        <Sheet open={manualOpen} onOpenChange={(v) => { setManualOpen(v); if (!v) manualForm.reset({ startDate: format(new Date(), "yyyy-MM-dd") }); }}>
+          <SheetContent className="w-full sm:max-w-lg overflow-y-auto bg-alma-canvas border-alma-hairline text-alma-ink">
+            <SheetHeader>
+              <SheetTitle className="font-display text-xl text-alma-ink flex items-center gap-2">
+                <UserPlus size={18} className="text-alma-berry" />
+                Nueva clienta
+              </SheetTitle>
+              <SheetDescription className="text-alma-ink/55">
+                Registro manual. La clienta recibe su contraseña por email.
+              </SheetDescription>
+            </SheetHeader>
+
+            <form onSubmit={manualForm.handleSubmit(onManualSubmit)} className="mt-6 space-y-6">
+              {/* Datos */}
+              <div>
+                <SectionLabel>Datos</SectionLabel>
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <Label className="text-alma-ink/70 text-xs">Nombre completo *</Label>
+                    <Input className={fieldCls} placeholder="Ana García" {...manualForm.register("displayName")} />
+                    {manualForm.formState.errors.displayName && (
+                      <p className="text-xs text-destructive">{manualForm.formState.errors.displayName.message}</p>
+                    )}
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-alma-ink/70 text-xs">Fecha de nacimiento</Label>
+                    <DatePicker value={manualForm.watch("dateOfBirth")} onChange={(v) => manualForm.setValue("dateOfBirth", v)} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Contacto */}
+              <div className="border-t border-alma-hairline pt-5">
+                <SectionLabel>Contacto</SectionLabel>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-alma-ink/70 text-xs">Email *</Label>
+                    <Input type="email" className={fieldCls} placeholder="ana@email.com" {...manualForm.register("email")} />
+                    {manualForm.formState.errors.email && (
+                      <p className="text-xs text-destructive">{manualForm.formState.errors.email.message}</p>
+                    )}
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-alma-ink/70 text-xs">Teléfono</Label>
+                    <Input className={fieldCls} placeholder="55 1234 5678" {...manualForm.register("phone")} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-alma-ink/70 text-xs">Contacto de emergencia</Label>
+                    <Input className={fieldCls} placeholder="Nombre" {...manualForm.register("emergencyContactName")} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-alma-ink/70 text-xs">Teléfono emergencia</Label>
+                    <Input className={fieldCls} {...manualForm.register("emergencyContactPhone")} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Salud */}
+              <div className="border-t border-alma-hairline pt-5">
+                <SectionLabel>Salud</SectionLabel>
+                <div className="space-y-1">
+                  <Label className="text-alma-ink/70 text-xs">Notas de salud</Label>
+                  <Input className={fieldCls} placeholder="Lesiones, condiciones..." {...manualForm.register("healthNotes")} />
+                </div>
+              </div>
+
+              {/* Membresía (opcional) */}
+              <div className="border-t border-alma-hairline pt-5">
+                <SectionLabel>Membresía (opcional)</SectionLabel>
+                {plansError ? (
+                  <ErrorState
+                    title="No pudimos cargar los planes"
+                    description="Puedes registrar a la clienta sin plan y asignarlo después, o reintentar."
+                    onRetry={() => refetchPlans()}
+                  />
+                ) : (
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <Label className="text-alma-ink/70 text-xs">Plan</Label>
                     <Select
                       value={selectedPlanId ?? "none"}
                       onValueChange={(v) => manualForm.setValue("planId", v === "none" ? undefined : v)}
                     >
-                      <SelectTrigger className="bg-white/[0.04] border-white/[0.08] text-white">
+                      <SelectTrigger className={fieldCls}>
                         <SelectValue placeholder="Sin plan (solo crear cuenta)" />
                       </SelectTrigger>
-                      <SelectContent className="bg-[#0f0518] border-white/10">
-                        <SelectItem value="none" className="text-white/50">Sin plan</SelectItem>
+                      <SelectContent className="bg-alma-canvas border-alma-hairline text-alma-ink">
+                        <SelectItem value="none" className="text-alma-ink/60 focus:bg-alma-mist">Sin plan</SelectItem>
                         {plans.map((p) => (
-                          <SelectItem key={p.id} value={p.id} className="text-white">
+                          <SelectItem key={p.id} value={p.id} className="text-alma-ink focus:bg-alma-mist">
                             {p.name}
                             {p.price > 0 && (
-                              <span className="ml-2 text-white/40">${p.price.toLocaleString("es-MX")}</span>
+                              <span className="ml-2 text-alma-ink/50 nums">{formatMXN(p.price)}</span>
                             )}
                           </SelectItem>
                         ))}
@@ -402,16 +507,16 @@ const ClientsList = () => {
 
                   {/* Show price of selected plan */}
                   {selectedPlan && (
-                    <div className="flex items-center justify-between rounded-xl border border-[#C7A892]/20 bg-[#C7A892]/5 px-4 py-2.5">
-                      <span className="text-sm text-white/70">{selectedPlan.name}</span>
-                      <span className="text-lg font-bold text-[#C7A892]">${selectedPlan.price.toLocaleString("es-MX")}</span>
+                    <div className="flex items-center justify-between rounded-xl border border-alma-sandstone/60 bg-alma-oat/50 px-4 py-2.5">
+                      <span className="text-sm text-alma-ink/70">{selectedPlan.name}</span>
+                      <span className="text-lg font-semibold text-alma-ink nums">{formatMXN(selectedPlan.price)}</span>
                     </div>
                   )}
 
                   {/* Payment method — only if plan selected */}
-                  {selectedPlanId && selectedPlanId !== "none" && (
+                  {hasPlanSelected && (
                     <div className="space-y-1">
-                      <Label className="text-white/60 text-xs">Método de pago</Label>
+                      <Label className="text-alma-ink/70 text-xs">Método de pago</Label>
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                         {PAYMENT_METHODS.map(({ value, label, Icon }) => (
                           <button
@@ -419,10 +524,10 @@ const ClientsList = () => {
                             type="button"
                             onClick={() => manualForm.setValue("paymentMethod", value)}
                             className={cn(
-                              "flex flex-col items-center gap-1.5 p-3 rounded-xl border text-xs font-semibold transition-all",
+                              "flex flex-col items-center gap-1.5 p-3 rounded-xl border text-xs font-semibold transition-colors",
                               paymentMethod === value
-                                ? "border-[#8A6E60]/50 bg-[#8A6E60]/10 text-[#8A6E60]"
-                                : "border-white/[0.07] bg-white/[0.02] text-white/40 hover:border-white/20 hover:text-white/60"
+                                ? "border-alma-sandstone bg-alma-oat text-alma-ink"
+                                : "border-alma-hairline bg-alma-mist text-alma-ink/55 hover:border-alma-sandstone hover:text-alma-ink"
                             )}
                           >
                             <Icon size={16} />
@@ -434,59 +539,48 @@ const ClientsList = () => {
                   )}
 
                   {/* Start date — only if plan selected */}
-                  {selectedPlanId && selectedPlanId !== "none" && (
+                  {hasPlanSelected && (
                     <div className="space-y-1">
-                      <Label className="text-white/60 text-xs">Fecha de inicio</Label>
+                      <Label className="text-alma-ink/70 text-xs">Fecha de inicio</Label>
                       <DatePicker value={manualForm.watch("startDate")} onChange={(v) => manualForm.setValue("startDate", v)} />
                     </div>
                   )}
 
                   {/* Discount code — only if plan selected */}
-                  {selectedPlanId && selectedPlanId !== "none" && (
+                  {hasPlanSelected && (
                     <div className="space-y-1">
-                      <Label className="text-white/60 text-xs">Cupón de descuento (opcional)</Label>
+                      <Label className="text-alma-ink/70 text-xs">Cupón de descuento (opcional)</Label>
                       <Input
-                        className="bg-white/[0.04] border-white/[0.08] text-white placeholder:text-white/20 uppercase"
+                        className={cn(fieldCls, "uppercase")}
                         placeholder="Ej: ONLINE75"
                         {...manualForm.register("discountCode")}
                       />
-                      <p className="text-[10px] text-white/35">Se valida contra el plan elegido y queda anotado en la membresía.</p>
+                      <p className="text-xs text-alma-ink/50">Se valida contra el plan elegido y queda anotado en la membresía.</p>
                     </div>
                   )}
                 </div>
+                )}
               </div>
 
               {/* Internal notes */}
-              <div className="space-y-1">
-                <Label className="text-white/60 text-xs">Notas internas</Label>
-                <Input
-                  className="bg-white/[0.04] border-white/[0.08] text-white placeholder:text-white/20"
-                  placeholder="Referida por, observaciones..."
-                  {...manualForm.register("notes")}
-                />
+              <div className="border-t border-alma-hairline pt-5 space-y-1">
+                <Label className="text-alma-ink/70 text-xs">Notas internas</Label>
+                <Input className={fieldCls} placeholder="Referida por, observaciones..." {...manualForm.register("notes")} />
               </div>
 
-              <DialogFooter className="pt-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="border-white/10 text-white/60 hover:bg-white/5"
-                  onClick={() => setManualOpen(false)}
-                >
+              <div className="flex justify-end gap-2 border-t border-alma-hairline pt-4">
+                <Button type="button" variant="outline" className={outlineBtnCls} onClick={() => setManualOpen(false)}>
                   Cancelar
                 </Button>
-                <Button
-                  type="submit"
-                  disabled={manualMutation.isPending}
-                  className="bg-gradient-to-r from-[#8A6E60] to-[#C7A892] text-white border-0 min-w-[140px]"
-                >
-                  {manualMutation.isPending ? "Registrando…" : selectedPlanId && selectedPlanId !== "none" ? "Registrar + activar plan" : "Registrar clienta"}
+                <Button type="submit" disabled={manualMutation.isPending} className={cn(primaryBtnCls, "min-w-[140px]")}>
+                  {manualMutation.isPending ? "Registrando…" : hasPlanSelected ? "Registrar + activar plan" : "Registrar clienta"}
                 </Button>
-              </DialogFooter>
+              </div>
             </form>
-          </DialogContent>
-        </Dialog>
+          </SheetContent>
+        </Sheet>
 
+        {dialog}
       </AdminLayout>
     </AuthGuard>
   );

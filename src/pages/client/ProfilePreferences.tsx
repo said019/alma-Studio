@@ -7,36 +7,53 @@ import {
   AppShell,
   PageHeader,
   Section,
-  PrimaryButton,
   ALMA,
 } from "@/components/app/AppShell";
 import { BackLink } from "@/components/app/widgets";
+// Switch shadcn ya tematizado: track activo = --primary (#43392F, ink),
+// track inactivo = --input (hairline) y focus ring = --ring (#6E5A46, berry).
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 
 type PrefKey = "receiveReminders" | "receivePromotions" | "receiveWeeklySummary";
+type Prefs = Record<PrefKey, boolean>;
 
 const ProfilePreferences = () => {
   const { user, updateUser } = useAuthStore();
   const { toast } = useToast();
   const qc = useQueryClient();
 
-  const [prefs, setPrefs] = useState<Record<PrefKey, boolean>>({
+  const [prefs, setPrefs] = useState<Prefs>({
     receiveReminders: user?.receiveReminders ?? user?.receive_reminders ?? true,
     receivePromotions: user?.receivePromotions ?? user?.receive_promotions ?? false,
     receiveWeeklySummary: user?.receiveWeeklySummary ?? user?.receive_weekly_summary ?? false,
   });
 
+  // Autosave por toggle: optimista, con revert si el servidor falla.
   const mutation = useMutation({
-    mutationFn: () => api.put(`/users/${user?.id}`, prefs),
+    mutationFn: (vars: { next: Prefs; prev: Prefs }) =>
+      api.put(`/users/${user?.id}`, vars.next),
     onSuccess: (res) => {
       const updated = res.data?.data ?? res.data;
       if (updated?.user) updateUser(updated.user);
       qc.invalidateQueries({ queryKey: ["me"] });
-      toast({ title: "Preferencias guardadas." });
     },
-    onError: () => toast({ title: "No se guardaron", variant: "destructive" }),
+    onError: (_err, vars) => {
+      setPrefs(vars.prev);
+      toast({
+        title: "No se guardó el cambio",
+        description: "Revisa tu conexión e inténtalo de nuevo.",
+        variant: "destructive",
+      });
+    },
   });
+
+  const handleToggle = (key: PrefKey, value: boolean) => {
+    const prev = prefs;
+    const next = { ...prefs, [key]: value };
+    setPrefs(next);
+    mutation.mutate({ next, prev });
+  };
 
   const items: { key: PrefKey; label: string; desc: string }[] = [
     {
@@ -64,10 +81,20 @@ const ProfilePreferences = () => {
           eyebrow="Preferencias"
           title={<>Qué te</>}
           titleAccent="avisamos."
-          subtitle="Tú decides qué mensajes te llegan por WhatsApp y email."
+          subtitle="Tú decides qué mensajes te llegan por WhatsApp y email. Tus cambios se guardan solos."
         />
 
-        <Section>
+        <Section
+          trailing={
+            <span
+              aria-live="polite"
+              className="text-[0.72rem] uppercase tracking-[0.18em]"
+              style={{ color: ALMA.ink, opacity: 0.5 }}
+            >
+              {mutation.isPending ? "Guardando…" : ""}
+            </span>
+          }
+        >
           <ul className="list-none m-0 p-0">
             {items.map((it, i, arr) => (
               <li
@@ -88,23 +115,13 @@ const ProfilePreferences = () => {
                 </div>
                 <Switch
                   checked={prefs[it.key]}
-                  onCheckedChange={(v) => setPrefs((p) => ({ ...p, [it.key]: v }))}
+                  onCheckedChange={(v) => handleToggle(it.key, v)}
+                  aria-label={it.label}
                 />
               </li>
             ))}
           </ul>
         </Section>
-
-        <div className="mt-8">
-          <PrimaryButton
-            onClick={() => mutation.mutate()}
-            disabled={mutation.isPending}
-            loading={mutation.isPending}
-            loadingLabel="Guardando…"
-          >
-            Guardar preferencias
-          </PrimaryButton>
-        </div>
       </AppShell>
     </ClientAuthGuard>
   );

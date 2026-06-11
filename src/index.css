@@ -1,27 +1,15 @@
 /* ──────────────────────────────────────────────────────────────
    ALMA MOVEMENT — TIPOGRAFÍAS BASE
-   Bricolage Grotesque → headings / display  (font-gulfs, font-bebas)
-   Alilato        →  body / text         (font-alilato)
-
-   Archivos propietarios en public/fonts/
-   Fallback vía Google Fonts: Jost
+   Fraunces (variable) → display / titulares (font-display, h1-h6)
+   Jost                → body / UI
+   Carga vía <link> con preconnect en index.html (no @import).
+   Alilato (propietaria) queda solo como detalle opcional.
    ────────────────────────────────────────────────────────────── */
-@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;600;700;800&family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..600&family=Jost:wght@300;400;500;600;700&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* ── font-face: fuentes propietarias desde public/fonts/ ── */
-@font-face {
-  font-family: 'Gulfs';
-  src: url('/fonts/gulfs-display-normal.woff2') format('woff2'),
-       url('/fonts/gulfs-display-normal.woff') format('woff');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-
+/* ── font-face: fuente propietaria desde public/fonts/ ── */
 @font-face {
   font-family: 'Alilato';
   src: url('/fonts/Alilato-ExtraLight.ttf') format('truetype');
@@ -31,14 +19,18 @@
 }
 
 /* ──────────────────────────────────────────────────────────────
-   PALETA ALMA MOVEMENT — Instagram / estudio
-   Background : #FAF9F6  (blanco rosado)
-   Primario   : #A48D78  (vino berry)
-   Acento 1   : #CBB9A4  (coral activo)
-   Acento 2   : #9C8E72  (oliva de estudio)
-   Foreground : #43392F  (espresso cálido)
-   Energía    : #C0A688  (naranja fruta)
-   Suave      : #E6DAC8  (blush floral)
+   PALETA ALMA MOVEMENT — canónica (brand kit greige + espresso)
+   canvas    #FAF9F6  Feather White — fondo principal
+   mist      #F4F1EA  Porcelain Mist — superficies suaves
+   oat       #E6DAC8  Creamed Oat — bloques tintados, pills
+   sandstone #CBB9A4  Soft Sandstone — bordes fuertes, detalle
+   stone     #A48D78  Desert Rock — acento decorativo (solo texto grande)
+   berry     #6E5A46  taupe profundo — acento con AA en texto pequeño
+   ink       #43392F  espresso — texto y CTAs sólidos
+   ink-deep  #241B1A  espresso profundo — secciones drenched
+   hairline  #E0D5C6  divisores
+   olive     #5F6B4A  SOLO éxito/confirmación (funcional, no decorativo)
+   destructive #B23A48
    ────────────────────────────────────────────────────────────── */
 
 /* ──────────────────────────────────────────────────────────────
@@ -185,49 +177,38 @@
        botones (causa de fechas/valores que se veían en blanco). */
     color-scheme: light;
 
-    /* Tema Frame Pilates Lab: greige cálido + café vino + tan */
-    --background: 42 19% 89%;            /* #E9E6DF greige */
-    --foreground: 0 18% 25%;             /* #4A3333 café */
+    /* Paleta canónica: brand kit greige cálido + espresso */
+    --background: 45 29% 97%;            /* #FAF9F6 canvas */
+    --foreground: 30 18% 22%;            /* #43392F ink */
 
-    --card: 40 24% 93%;                  /* #F1EEE8 */
-    --card-foreground: 0 18% 25%;
+    --card: 42 31% 94%;                  /* #F4F1EA mist */
+    --card-foreground: 30 18% 22%;
 
-    --popover: 40 24% 93%;
-    --popover-foreground: 0 18% 25%;
+    --popover: 42 31% 94%;
+    --popover-foreground: 30 18% 22%;
 
-    /* Primario: café espresso (botones oscuros estilo Frame) */
-    --primary: 0 18% 25%;                /* #4A3333 */
-    --primary-foreground: 42 19% 89%;
+    /* Primario: espresso (botones oscuros estilo Frame) */
+    --primary: 30 18% 22%;               /* #43392F */
+    --primary-foreground: 45 29% 97%;
 
-    --secondary: 40 22% 91%;
-    --secondary-foreground: 0 18% 25%;
+    --secondary: 36 38% 84%;             /* #E6DAC8 oat */
+    --secondary-foreground: 30 18% 22%;
 
-    --muted: 40 20% 90%;
-    --muted-foreground: 20 14% 45%;
+    --muted: 42 31% 94%;                 /* #F4F1EA mist */
+    --muted-foreground: 30 22% 35%;      /* #6E5A46 berry (AA) */
 
-    /* Acento: tan suave #E4D2C3 */
-    --accent: 27 38% 83%;
-    --accent-foreground: 0 18% 25%;
+    /* Acento: oat #E6DAC8 */
+    --accent: 36 38% 84%;
+    --accent-foreground: 30 18% 22%;
 
-    --destructive: 0 72% 45%;
-    --destructive-foreground: 0 0% 100%;
+    --destructive: 353 51% 46%;          /* #B23A48 */
+    --destructive-foreground: 45 29% 97%;
 
-    --border: 37 23% 80%;                /* #D8CFC1 */
-    --input: 37 23% 80%;
-    --ring: 20 18% 46%;
+    --border: 35 30% 83%;                /* #E0D5C6 hairline */
+    --input: 35 30% 83%;
+    --ring: 30 22% 35%;                  /* #6E5A46 */
 
     --radius: 0.75rem;
-
-    /* Tokens legacy (mapeados a la paleta Frame) */
-    --alma-purple:    0 18% 25%;      /* #4A3333 */
-    --alma-magenta:   20 18% 46%;     /* #8A6E60 */
-    --alma-violet:    35 12% 48%;
-    --alma-lime:      25 32% 68%;     /* #C7A892 */
-    --alma-cream:     42 19% 89%;     /* #E9E6DF */
-    --alma-lilac:     25 32% 68%;     /* #C7A892 */
-    --alma-pinklight: 27 38% 83%;     /* #E4D2C3 */
-
-    --pink-glow: 20 18% 46%;
   }
 }
 
@@ -238,28 +219,32 @@
 
   body {
     @apply bg-background text-foreground;
-    font-family: 'Alilato', 'Jost', sans-serif;
+    font-family: 'Jost', system-ui, sans-serif;
     overflow-x: hidden;
   }
 
+  /* Serif protagonista: todos los titulares son Fraunces editorial. */
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Bricolage Grotesque', 'Jost', sans-serif;
-    font-weight: 800;
+    font-family: 'Fraunces', Georgia, serif;
+    font-optical-sizing: auto;
+    font-weight: 500;
+    letter-spacing: -0.01em;
   }
 
   .font-gulfs {
-    font-family: 'Bricolage Grotesque', 'Jost', sans-serif;
-    font-weight: 800;
+    font-family: 'Fraunces', Georgia, serif;
+    font-optical-sizing: auto;
+    font-weight: 500;
   }
 
   .font-alilato {
     font-family: 'Alilato', 'Jost', sans-serif;
   }
 
-  /* Dirección Frame: los titulares (legacy .font-bebas) ahora son serif
-     editorial Fraunces en vez del grotesque chunky. */
+  /* Alias legacy: .font-bebas = Fraunces con opsz de titular. El token
+     de tailwind.config.ts apunta a la misma familia (sin conflicto). */
   .font-bebas {
-    font-family: 'Fraunces', 'Bricolage Grotesque', Georgia, serif;
+    font-family: 'Fraunces', Georgia, serif;
     font-optical-sizing: auto;
     font-variation-settings: 'opsz' 110;
     font-weight: 500;
@@ -267,18 +252,18 @@
   }
 
   .font-syne {
-    font-family: 'Alilato', 'Jost', sans-serif;
-    font-weight: 700;
+    font-family: 'Jost', system-ui, sans-serif;
+    font-weight: 600;
   }
 
   .font-dm {
-    font-family: 'Alilato', 'Jost', sans-serif;
+    font-family: 'Jost', system-ui, sans-serif;
   }
 
   /* Display serif editorial (Fraunces) — lujo cálido, dirección Frame.
      opsz alto para titulares; line-height apretado lo fija cada uso. */
   .font-display {
-    font-family: 'Fraunces', 'Bricolage Grotesque', Georgia, serif;
+    font-family: 'Fraunces', Georgia, serif;
     font-optical-sizing: auto;
     font-variation-settings: 'opsz' 120, 'SOFT' 0, 'WONK' 0;
     letter-spacing: -0.015em;
@@ -291,13 +276,11 @@
     letter-spacing: -0.01em;
   }
 
-  /* Admin panel: titulares editoriales (coincide con el estilo Frame del landing) */
-  .alma-admin h1, .alma-admin h2 {
-    font-family: 'Fraunces', 'Bricolage Grotesque', Georgia, serif;
-    font-optical-sizing: auto;
-    font-weight: 500;
-    letter-spacing: -0.01em;
+  /* Números alineados para precios, cupos, fechas y rankings. */
+  .nums {
+    font-variant-numeric: tabular-nums;
   }
+
 }
 
 /* Noise overlay */
@@ -307,7 +290,7 @@ body::before {
   inset: 0;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
   pointer-events: none;
-  z-index: 50;
+  z-index: 40;
   opacity: 0.4;
 }
 
@@ -325,81 +308,6 @@ body::before {
 ::-webkit-scrollbar-thumb:hover {
   background: hsl(var(--primary));
 }
-
-/* Animations */
-@keyframes fade-up {
-  from { opacity: 0; transform: translateY(30px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes jump {
-  0%, 100% { transform: translateY(0); }
-  40% { transform: translateY(-90px) scaleX(0.9); }
-  50% { transform: translateY(-100px) scaleX(1.05); }
-  70% { transform: translateY(-20px); }
-}
-
-@keyframes ring-pulse {
-  0% { opacity: 0.5; transform: scale(0.9); }
-  100% { opacity: 0; transform: scale(1.2); }
-}
-
-@keyframes pulse-dot {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.4; transform: scale(0.7); }
-}
-
-@keyframes float1 {
-  0%, 100% { transform: translateY(0) scale(1); }
-  50% { transform: translateY(-30px) scale(1.05); }
-}
-
-@keyframes scroll-left {
-  from { transform: translateX(0); }
-  to { transform: translateX(-50%); }
-}
-
-.animate-fade-up {
-  animation: fade-up 0.8s ease both;
-}
-
-.animate-jump {
-  animation: jump 1.8s ease-in-out infinite;
-}
-
-.animate-ring-pulse {
-  animation: ring-pulse 3s ease-out infinite;
-}
-
-.animate-pulse-dot {
-  animation: pulse-dot 2s infinite;
-}
-
-.animate-float {
-  animation: float1 8s ease-in-out infinite;
-}
-
-.animate-float-reverse {
-  animation: float1 10s ease-in-out infinite reverse;
-}
-
-.animate-scroll-left {
-  animation: scroll-left 30s linear infinite;
-}
-
-.animate-scroll-left:hover {
-  animation-play-state: paused;
-}
-
-/* Delay utilities */
-.delay-100 { animation-delay: 0.1s; }
-.delay-200 { animation-delay: 0.2s; }
-.delay-300 { animation-delay: 0.3s; }
-.delay-400 { animation-delay: 0.4s; }
-.delay-500 { animation-delay: 0.5s; }
-.delay-600 { animation-delay: 0.6s; }
-.delay-800 { animation-delay: 0.8s; }
-.delay-1000 { animation-delay: 1s; }
 
 /* ── Date/time inputs: clickable on entire field, not just the icon ── */
 input[type="date"],
@@ -431,12 +339,6 @@ input[type="time"]::-webkit-calendar-picker-indicator {
     padding: 1rem;
   }
 
-  .admin-card-grid {
-    display: grid;
-    gap: 0.75rem;
-    grid-template-columns: repeat(1, minmax(0, 1fr));
-  }
-
   .admin-title {
     font-size: clamp(1.25rem, 2.6vw, 1.85rem);
     line-height: 1.1;
@@ -454,119 +356,10 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   .admin-page {
     padding: 1.5rem;
   }
-
-  .admin-card-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }
 
 @media (max-width: 1023px) {
   .admin-mobile-main {
     overflow-x: hidden;
   }
-}
-
-/* ──────────────────────────────────────────────────────────────
-   ALMA ADMIN — light theme overrides
-   La mayoría de páginas admin usan utilidades dark inline tipo
-   bg-white/[0.0X], text-white, border-white/[0.0X]. En vez de
-   reescribir cada página, sobreescribimos esos patrones dentro
-   del scope .alma-admin para traducirlos a la paleta cream/ink.
-   ────────────────────────────────────────────────────────────── */
-.alma-admin .text-white,
-.alma-admin .text-foreground { color: #43392F !important; }
-.alma-admin .text-white\/95 { color: rgba(46, 32, 28, 0.95) !important; }
-.alma-admin .text-white\/90 { color: rgba(46, 32, 28, 0.92) !important; }
-.alma-admin .text-white\/85 { color: rgba(46, 32, 28, 0.92) !important; }
-.alma-admin .text-white\/80 { color: rgba(46, 32, 28, 0.88) !important; }
-.alma-admin .text-white\/70 { color: rgba(46, 32, 28, 0.78) !important; }
-.alma-admin .text-white\/65 { color: rgba(46, 32, 28, 0.72) !important; }
-.alma-admin .text-white\/60 { color: rgba(46, 32, 28, 0.68) !important; }
-.alma-admin .text-white\/55 { color: rgba(46, 32, 28, 0.62) !important; }
-.alma-admin .text-white\/45 { color: rgba(46, 32, 28, 0.55) !important; }
-.alma-admin .text-white\/40 { color: rgba(46, 32, 28, 0.5) !important; }
-.alma-admin .text-white\/35 { color: rgba(46, 32, 28, 0.45) !important; }
-.alma-admin .text-white\/30 { color: rgba(46, 32, 28, 0.42) !important; }
-.alma-admin .text-white\/25 { color: rgba(46, 32, 28, 0.38) !important; }
-.alma-admin .text-white\/20 { color: rgba(46, 32, 28, 0.32) !important; }
-.alma-admin .text-muted-foreground { color: rgba(46, 32, 28, 0.55) !important; }
-
-/* Card / surface overrides — usar blanco con border crema */
-.alma-admin .bg-white\/\[0\.01\],
-.alma-admin .bg-white\/\[0\.02\],
-.alma-admin .bg-white\/\[0\.03\],
-.alma-admin .bg-white\/\[0\.04\],
-.alma-admin .bg-white\/\[0\.05\] {
-  background-color: #FFFFFF !important;
-}
-.alma-admin .bg-white\/\[0\.07\],
-.alma-admin .bg-white\/\[0\.08\] {
-  background-color: #E6DAC8 !important;
-}
-.alma-admin .bg-card { background-color: #FFFFFF !important; }
-.alma-admin .bg-secondary { background-color: #E6DAC8 !important; }
-.alma-admin .bg-background { background-color: #FAF9F6 !important; }
-
-/* Borders */
-.alma-admin .border-white\/\[0\.04\],
-.alma-admin .border-white\/\[0\.05\],
-.alma-admin .border-white\/\[0\.06\],
-.alma-admin .border-white\/\[0\.07\],
-.alma-admin .border-white\/\[0\.08\],
-.alma-admin .border-white\/10,
-.alma-admin .border-white\/15,
-.alma-admin .border-white\/20,
-.alma-admin .border-border {
-  border-color: #E0D5C6 !important;
-}
-
-/* Hover states */
-.alma-admin .hover\:bg-white\/5:hover,
-.alma-admin .hover\:bg-white\/\[0\.04\]:hover,
-.alma-admin .hover\:bg-white\/\[0\.05\]:hover,
-.alma-admin .hover\:bg-white\/\[0\.08\]:hover,
-.alma-admin .hover\:bg-white\/10:hover {
-  background-color: rgba(118, 33, 77, 0.06) !important;
-}
-.alma-admin .hover\:text-white:hover,
-.alma-admin .hover\:text-foreground:hover {
-  color: #A48D78 !important;
-}
-
-/* Skeleton loaders */
-.alma-admin [class*="bg-white/[0.05]"],
-.alma-admin .bg-muted {
-  background-color: rgba(232, 202, 193, 0.5) !important;
-}
-
-/* Inputs / placeholders */
-.alma-admin input::placeholder,
-.alma-admin textarea::placeholder,
-.alma-admin .placeholder\:text-white\/25::placeholder,
-.alma-admin .placeholder\:text-white\/30::placeholder {
-  color: rgba(46, 32, 28, 0.4) !important;
-}
-
-/* Dialog / dropdown content backgrounds (hardcoded #0f0518 etc) */
-.alma-admin .bg-\[\#0f0518\],
-.alma-admin .bg-\[\#080808\],
-.alma-admin .bg-\[\#0b0b0bcc\] {
-  background-color: #FFFFFF !important;
-}
-
-/* Radix portals for Dialog/Select/Dropdown content render at <body>, fuera
-   del scope .alma-admin. Hacemos las reglas globales — el #0f0518 solo
-   se usa en admin, así que no rompe el resto del app. */
-.bg-\[\#0f0518\] { background-color: #FFFFFF !important; color: #43392F !important; }
-.bg-\[\#0f0518\] .text-white,
-.bg-\[\#0f0518\] [class*="text-white"] { color: #43392F !important; }
-.bg-\[\#0f0518\] .border-white\/10 { border-color: #E0D5C6 !important; }
-
-/* Table rows */
-.alma-admin table tbody tr {
-  border-color: #E0D5C6 !important;
-}
-.alma-admin .border-t.border-white\/\[0\.04\],
-.alma-admin .border-b.border-white\/\[0\.04\] {
-  border-color: #F0EBE1 !important;
 }

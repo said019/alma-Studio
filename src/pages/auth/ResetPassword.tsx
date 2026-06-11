@@ -4,7 +4,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import api from "@/lib/api";
-import { useToast } from "@/hooks/use-toast";
 import { CheckCircle2, AlertTriangle } from "lucide-react";
 import {
   AuthShell,
@@ -14,7 +13,7 @@ import {
   AuthPasswordRules,
   ALMA,
 } from "@/components/auth/AuthShell";
-import almaReset from "@/assets/alma/alma-barre-line.jpg";
+import almaReset from "@/assets/alma/alma-detail-ankle-weights.jpg";
 
 const schema = z.object({
   password: z
@@ -36,7 +35,6 @@ const ResetPassword = () => {
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [params] = useSearchParams();
   const navigate = useNavigate();
-  const { toast } = useToast();
   const token = params.get("token");
 
   const { register, handleSubmit, watch, formState: { errors } } = useForm<FormValues>({
@@ -61,7 +59,6 @@ const ResetPassword = () => {
     } catch (err: any) {
       const msg = err?.response?.data?.message ?? "El enlace ya no es válido. Pide uno nuevo.";
       setGlobalError(msg);
-      toast({ title: "No pudimos cambiar la contraseña", description: msg, variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -70,15 +67,15 @@ const ResetPassword = () => {
   return (
     <AuthShell
       brandPhoto={almaReset}
-      brandPhotoAlt="Detalle del estudio Alma Movement"
+      brandPhotoAlt="Detalle de tobilleras en una clase de Alma Movement"
       brandTint="coral"
       brandEyebrow="Nueva contraseña"
       brandHeadline={<>Casi listo,</>}
       brandHeadlineItalic="elige una clave nueva."
       brandSubline="Algo que recuerdes pero que no sea fácil de adivinar. Mínimo 8 caracteres, una mayúscula y un número."
       formEyebrow="Restablecer contraseña"
-      formHeadline={done ? "Listo." : "Crea tu"}
-      formHeadlineItalic={done ? "Te llevamos a iniciar sesión." : "nueva contraseña."}
+      formHeadline={done ? "Listo," : "Crea tu"}
+      formHeadlineItalic={done ? "ya puedes entrar." : "nueva contraseña."}
     >
       {done ? (
         <div
@@ -142,7 +139,7 @@ const ResetPassword = () => {
               placeholder="Repite tu contraseña"
               autoComplete="new-password"
               error={errors.confirmPassword?.message}
-              hint={matches ? "Coincide" : undefined}
+              success={matches ? "Coincide" : undefined}
               {...register("confirmPassword")}
             />
 

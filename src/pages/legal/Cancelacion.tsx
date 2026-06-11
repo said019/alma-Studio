@@ -1,98 +1,91 @@
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import almaLogo from "@/assets/alma/alma-logo.png";
-import api from "@/lib/api";
+import type { ReactNode } from "react";
+import { ALMA } from "@/components/app/tokens";
+import LegalLayout, {
+  LegalContact,
+  LegalDynamicBody,
+  LegalH2,
+  LegalSkeleton,
+  LegalUpdated,
+  usePolicyText,
+} from "./LegalLayout";
+
+// Escenarios de cancelación: veredicto en TEXTO (sin chips ni glifos).
+// olive solo para el resultado positivo; destructive solo para pérdidas.
+const ESCENARIOS: { veredicto: string; tono: string; titulo: string; detalle: ReactNode }[] = [
+  {
+    veredicto: "Sin penalización",
+    tono: ALMA.olive,
+    titulo: "Cancelación con más de 12 horas de anticipación",
+    detalle: "Puedes cancelar o reagendar tu clase desde la app sin penalización.",
+  },
+  {
+    veredicto: "Cuenta como falta",
+    tono: ALMA.ink,
+    titulo: "Cancelación dentro de las 12 horas previas",
+    detalle: (
+      <>
+        Cuenta como una clase reservada sin asistir. Si acumulas <strong className="text-foreground">5 clases reservadas sin asistir</strong>, se aplica una penalización con pérdida de puntos.
+      </>
+    ),
+  },
+  {
+    veredicto: "Cuenta como falta",
+    tono: ALMA.ink,
+    titulo: "Inasistencia sin aviso",
+    detalle:
+      "Cuenta como una clase reservada sin asistir y suma a tu conteo de faltas. Al acumular 5, se aplica la penalización con pérdida de puntos.",
+  },
+];
+
+// Resumen rápido: resultado en texto con color semántico AA sobre cream.
+const RESUMEN: { situacion: string; resultado: string; tono: string }[] = [
+  { situacion: "Cancelas con más de 12 horas de anticipación", resultado: "Sin penalización", tono: ALMA.olive },
+  { situacion: "Cancelas dentro de las 12 horas previas", resultado: "Cuenta como falta", tono: ALMA.ink },
+  { situacion: "No asistes y no avisas", resultado: "Cuenta como falta", tono: ALMA.ink },
+  { situacion: "Acumulas 5 clases reservadas sin asistir", resultado: "Pérdida de puntos", tono: ALMA.destructive },
+  { situacion: "Llegas después del inicio de la clase", resultado: "Sin acceso, clase utilizada", tono: ALMA.destructive },
+  { situacion: "Pides reembolso de un paquete", resultado: "No aplica", tono: ALMA.destructive },
+  { situacion: "Emergencia médica comprobable", resultado: "Depende, se evalúa caso por caso", tono: ALMA.ink },
+];
 
 const Cancelacion = () => {
-  const navigate = useNavigate();
-  const [dynamicPolicy, setDynamicPolicy] = useState("");
-
-  useEffect(() => {
-    api.get("/public/settings/policies_settings").then(({ data }) => {
-      const value = data?.data;
-      const text = typeof value?.cancellation_policy === "string" ? value.cancellation_policy.trim() : "";
-      setDynamicPolicy(text);
-    }).catch(() => {});
-  }, []);
+  const { text, loading } = usePolicyText("cancellation_policy");
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      {/* Nav */}
-      <nav className="sticky top-0 z-50 bg-background/95 backdrop-blur-md border-b border-border px-6 lg:px-[60px] py-4 flex items-center justify-between">
-        <button onClick={() => navigate("/")} className="flex items-center bg-transparent border-none cursor-pointer">
-          <img src={almaLogo} alt="Alma Movement" className="h-14 w-auto object-contain" />
-        </button>
-        <button
-          onClick={() => navigate(-1)}
-          className="text-muted-foreground text-sm hover:text-foreground transition-colors bg-transparent border-none cursor-pointer"
-        >
-          ← Volver
-        </button>
-      </nav>
-
-      <main className="max-w-3xl mx-auto px-6 py-16">
-        <div className="text-[0.72rem] tracking-[0.15em] uppercase text-primary font-medium mb-4 flex items-center gap-[10px]">
-          <span className="w-[30px] h-[1px] bg-primary inline-block" />
-          Legal
-        </div>
-        <h1 className="font-bebas text-[clamp(2.5rem,5vw,4rem)] leading-[0.95] text-foreground mb-10">
-          POLÍTICA DE CANCELACIÓN
-        </h1>
-
-        {dynamicPolicy ? (
-          <div className="prose-alma space-y-6 text-[0.92rem] text-muted-foreground leading-[1.8]">
-            <p className="text-foreground font-medium">
-              Última actualización: {new Date().toLocaleDateString("es-MX")}
-            </p>
-            <div className="rounded-2xl border border-border bg-secondary/40 p-6 whitespace-pre-wrap leading-[1.9]">
-              {dynamicPolicy}
-            </div>
-          </div>
-        ) : (
-          <div className="prose-alma space-y-6 text-[0.92rem] text-muted-foreground leading-[1.8]">
-          <p className="text-foreground font-medium">
-            Última actualización: 26 de febrero de 2026
-          </p>
+    <LegalLayout
+      current="/legal/cancelacion"
+      title={
+        <>
+          Política de <span className="font-display-italic">cancelación</span>
+        </>
+      }
+    >
+      {loading ? (
+        <LegalSkeleton />
+      ) : text ? (
+        <LegalDynamicBody text={text} />
+      ) : (
+        <div className="space-y-6">
+          <LegalUpdated>26 de febrero de 2026</LegalUpdated>
 
           <p>
             En <strong className="text-foreground">Alma Movement</strong> nos esforzamos por ofrecer la mejor experiencia a todas nuestras alumnas. Las siguientes políticas de cancelación nos permiten mantener un servicio de calidad y garantizar disponibilidad para todas.
           </p>
 
-          <h2 className="font-syne font-bold text-lg text-foreground mt-8 mb-3">1. Cancelación de reservaciones</h2>
-
-          <div className="rounded-2xl border border-border bg-secondary/50 p-6 space-y-4">
-            <div className="flex items-start gap-4">
-              <div className="w-10 h-10 rounded-xl bg-green-500/15 border border-green-500/30 flex items-center justify-center flex-shrink-0 text-green-400 text-lg">✓</div>
-              <div>
-                <h3 className="font-syne font-bold text-foreground text-sm mb-1">Cancelación con más de 12 horas de anticipación</h3>
-                <p className="text-muted-foreground text-sm leading-relaxed">
-                  Puedes cancelar o reagendar tu clase desde la app sin penalización.
+          <LegalH2>1. Cancelación de reservaciones</LegalH2>
+          <div style={{ borderTop: `1px solid ${ALMA.border}` }}>
+            {ESCENARIOS.map((esc) => (
+              <div key={esc.titulo} className="py-5" style={{ borderBottom: `1px solid ${ALMA.border}` }}>
+                <p className="text-[0.7rem] uppercase tracking-[0.18em] font-semibold mb-1.5" style={{ color: esc.tono }}>
+                  {esc.veredicto}
                 </p>
+                <p className="font-semibold text-[0.95rem] mb-1 text-foreground">{esc.titulo}</p>
+                <p className="text-sm leading-relaxed m-0">{esc.detalle}</p>
               </div>
-            </div>
-            <div className="border-t border-border" />
-            <div className="flex items-start gap-4">
-              <div className="w-10 h-10 rounded-xl bg-yellow-500/15 border border-yellow-500/30 flex items-center justify-center flex-shrink-0 text-yellow-400 text-lg">⚠</div>
-              <div>
-                <h3 className="font-syne font-bold text-foreground text-sm mb-1">Cancelación dentro de las 12 horas previas</h3>
-                <p className="text-muted-foreground text-sm leading-relaxed">
-                  Cuenta como una clase reservada sin asistir. Si acumulas <strong className="text-foreground">5 clases reservadas sin asistir</strong>, se aplica una penalización con pérdida de puntos.
-                </p>
-              </div>
-            </div>
-            <div className="border-t border-border" />
-            <div className="flex items-start gap-4">
-              <div className="w-10 h-10 rounded-xl bg-red-500/15 border border-red-500/30 flex items-center justify-center flex-shrink-0 text-red-400 text-lg">✗</div>
-              <div>
-                <h3 className="font-syne font-bold text-foreground text-sm mb-1">Inasistencia sin aviso</h3>
-                <p className="text-muted-foreground text-sm leading-relaxed">
-                  Cuenta como una clase reservada sin asistir y suma a tu conteo de faltas. Al acumular 5, se aplica la penalización con pérdida de puntos.
-                </p>
-              </div>
-            </div>
+            ))}
           </div>
 
-          <h2 className="font-syne font-bold text-lg text-foreground mt-8 mb-3">2. Cancelación de paquetes</h2>
+          <LegalH2>2. Cancelación de paquetes</LegalH2>
           <ul className="list-disc pl-6 space-y-2">
             <li>Los paquetes adquiridos <strong className="text-foreground">no son reembolsables</strong> bajo ninguna circunstancia una vez activados.</li>
             <li>Un paquete se considera activado al momento de tomar la primera clase.</li>
@@ -100,7 +93,7 @@ const Cancelacion = () => {
             <li>Los paquetes no utilizados dentro de su vigencia expiran automáticamente.</li>
           </ul>
 
-          <h2 className="font-syne font-bold text-lg text-foreground mt-8 mb-3">3. Excepciones</h2>
+          <LegalH2>3. Excepciones</LegalH2>
           <p>
             En casos excepcionales de fuerza mayor (accidente, hospitalización, emergencia médica comprobable), el estudio podrá evaluar caso por caso la posibilidad de:
           </p>
@@ -109,86 +102,58 @@ const Cancelacion = () => {
             <li>Extender la vigencia por el periodo de incapacidad comprobada.</li>
           </ul>
           <p>
-            Estas excepciones requieren notificación por escrito a <strong className="text-primary">info@almamovement.mx</strong> con documentación de soporte y quedan a criterio de la administración del estudio.
+            Estas excepciones requieren notificación por escrito a <a href="mailto:info@almamovement.mx" className="font-medium underline underline-offset-2 text-foreground">info@almamovement.mx</a> con documentación de soporte y quedan a criterio de la administración del estudio.
           </p>
 
-          <h2 className="font-syne font-bold text-lg text-foreground mt-8 mb-3">4. Cancelación de clases por parte del estudio</h2>
+          <LegalH2>4. Cancelación de clases por parte del estudio</LegalH2>
           <ul className="list-disc pl-6 space-y-2">
             <li>Si necesitamos cancelar una clase (por ejemplo, ausencia de la coach o mantenimiento), te devolvemos la clase a tu paquete y te avisamos lo antes posible por la app y/o WhatsApp.</li>
             <li>En caso de fenómenos naturales o situaciones de fuerza mayor, el estudio podrá cancelar clases sin reposición obligatoria, aunque se hará el mejor esfuerzo por reprogramar.</li>
           </ul>
 
-          <h2 className="font-syne font-bold text-lg text-foreground mt-8 mb-3">5. Cambio de horario</h2>
+          <LegalH2>5. Cambio de horario</LegalH2>
           <ul className="list-disc pl-6 space-y-2">
             <li>Para cambiar de horario, primero cancela tu reservación actual (con más de 12 horas de anticipación) y reserva la nueva clase disponible.</li>
             <li>Los cambios están sujetos a disponibilidad de cupo.</li>
           </ul>
 
-          <h2 className="font-syne font-bold text-lg text-foreground mt-8 mb-3">6. Puntualidad</h2>
+          <LegalH2>6. Puntualidad</LegalH2>
           <p>
             Te pedimos llegar <strong className="text-foreground">10 minutos antes</strong> de tu clase. Una vez iniciada la sesión no se permite el acceso, por seguridad de todas las participantes y respeto al grupo. Esa clase se contará como utilizada.
           </p>
 
-          <h2 className="font-syne font-bold text-lg text-foreground mt-8 mb-3">7. Resumen rápido</h2>
-          <div className="rounded-2xl border border-border overflow-hidden">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-secondary">
-                  <th className="text-left p-4 font-syne font-bold text-foreground">Situación</th>
-                  <th className="text-left p-4 font-syne font-bold text-foreground">Resultado</th>
+          <LegalH2>7. Resumen rápido</LegalH2>
+          <table className="w-full text-sm border-collapse">
+            <thead>
+              <tr style={{ borderBottom: `1px solid ${ALMA.sandstone}` }}>
+                <th className="py-3 pr-4 text-left text-[0.68rem] uppercase tracking-[0.2em] font-semibold" style={{ color: ALMA.berry }}>
+                  Situación
+                </th>
+                <th className="py-3 text-left text-[0.68rem] uppercase tracking-[0.2em] font-semibold" style={{ color: ALMA.berry }}>
+                  Resultado
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {RESUMEN.map((fila) => (
+                <tr key={fila.situacion} style={{ borderBottom: `1px solid ${ALMA.border}` }}>
+                  <td className="py-3 pr-4 align-top">{fila.situacion}</td>
+                  <td className="py-3 align-top font-medium" style={{ color: fila.tono }}>
+                    {fila.resultado}
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                <tr className="border-t border-border">
-                  <td className="p-4">Cancelación &gt; 12 hrs antes</td>
-                  <td className="p-4 text-green-400">✓ Sin penalización</td>
-                </tr>
-                <tr className="border-t border-border">
-                  <td className="p-4">Cancelación &lt; 12 hrs antes</td>
-                  <td className="p-4 text-yellow-400">⚠ Cuenta como falta</td>
-                </tr>
-                <tr className="border-t border-border">
-                  <td className="p-4">Inasistencia sin aviso</td>
-                  <td className="p-4 text-yellow-400">⚠ Cuenta como falta</td>
-                </tr>
-                <tr className="border-t border-border">
-                  <td className="p-4">5 clases reservadas sin asistir</td>
-                  <td className="p-4 text-red-400">✗ Penalización con pérdida de puntos</td>
-                </tr>
-                <tr className="border-t border-border">
-                  <td className="p-4">Llegar después del inicio</td>
-                  <td className="p-4 text-red-400">✗ Sin acceso, clase utilizada</td>
-                </tr>
-                <tr className="border-t border-border">
-                  <td className="p-4">Reembolso de paquete</td>
-                  <td className="p-4 text-red-400">✗ No aplica</td>
-                </tr>
-                <tr className="border-t border-border">
-                  <td className="p-4">Emergencia médica comprobable</td>
-                  <td className="p-4 text-yellow-400">⚠ Evaluación caso por caso</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </table>
 
-          <h2 className="font-syne font-bold text-lg text-foreground mt-8 mb-3">8. Contacto</h2>
+          <LegalH2>8. Contacto</LegalH2>
           <p>
             Para cualquier duda o aclaración respecto a esta Política de Cancelación:
           </p>
-          <ul className="list-none space-y-1">
-            <li><strong className="text-foreground">Email:</strong> info@almamovement.mx</li>
-            <li><strong className="text-foreground">Teléfono:</strong> por confirmar</li>
-            <li><strong className="text-foreground">Dirección:</strong> Plaza Arce, Calle Acueducto de Querétaro 513, Jurica Acueducto, 76230 Juriquilla, Querétaro</li>
-          </ul>
-          </div>
-        )}
-      </main>
-
-      {/* Footer */}
-      <footer className="border-t border-border px-6 lg:px-[60px] py-6 text-center">
-        <p className="text-xs text-muted-foreground/50">© 2026 Alma Movement. Todos los derechos reservados.</p>
-      </footer>
-    </div>
+          <LegalContact />
+        </div>
+      )}
+    </LegalLayout>
   );
 };
 

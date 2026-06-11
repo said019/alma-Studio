@@ -1,5 +1,5 @@
-import { useEffect } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { format, isToday, isYesterday, differenceInDays } from "date-fns";
 import { es } from "date-fns/locale";
@@ -12,7 +12,9 @@ import {
   ListGroup,
   ListRow,
   EmptyState,
+  ErrorState,
   SkeletonRow,
+  GhostButton,
   ALMA,
 } from "@/components/app/AppShell";
 import {
@@ -36,6 +38,8 @@ interface Notif {
   unread?: boolean;
 }
 
+// Icono por categoría para escanear rápido; el tinte es uno solo (berry)
+// porque el color por categoría no comunicaba nada real.
 const CATEGORY_ICON: Record<Category, React.ReactNode> = {
   booking: <CalendarCheck2 size={17} strokeWidth={1.7} />,
   membership: <CreditCard size={17} strokeWidth={1.7} />,
@@ -48,17 +52,7 @@ const CATEGORY_ICON: Record<Category, React.ReactNode> = {
   system: <Bell size={17} strokeWidth={1.7} />,
 };
 
-const CATEGORY_TINT: Record<Category, keyof typeof ALMA> = {
-  booking: "berry",
-  membership: "olive",
-  // Aviso del estudio
-  marketing: "berry",
-  milestone: "orange",
-  motivation: "coral",
-  loyalty_earn: "olive",
-  loyalty_spend: "berry",
-  system: "orange",
-};
+const PAGE_SIZE = 40;
 
 function formatTime(iso: string): string {
   const d = new Date(iso);
@@ -73,13 +67,16 @@ function formatTime(iso: string): string {
 const Notifications = () => {
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const [limit, setLimit] = useState(PAGE_SIZE);
 
-  const { data, isLoading } = useQuery<{ data: Notif[]; meta?: { unread_count: number } }>({
-    queryKey: ["my-notifications"],
-    queryFn: async () => (await api.get("/me/notifications?limit=40")).data,
+  const { data, isLoading, isError, isFetching, refetch } = useQuery<{ data: Notif[]; meta?: { unread_count: number } }>({
+    queryKey: ["my-notifications", limit],
+    queryFn: async () => (await api.get(`/me/notifications?limit=${limit}`)).data,
     refetchInterval: 30_000,
+    placeholderData: keepPreviousData,
   });
   const items = Array.isArray(data?.data) ? data!.data : [];
+  const hasUnread = items.some((n) => n.unread);
 
   const markReadMutation = useMutation({
     mutationFn: () => api.post("/me/notifications/mark-read"),
@@ -88,15 +85,15 @@ const Notifications = () => {
       qc.invalidateQueries({ queryKey: ["notifications-unread-count"] });
     },
   });
+  const { mutate: markAllRead } = markReadMutation;
 
   // Marca todo como leído al entrar (después de un breve delay para que la
-  // alumna vea el dot de unread brevemente).
+  // alumna alcance a ver qué era nuevo). `mutate` es estable en react-query v5.
   useEffect(() => {
-    if (items.length === 0) return;
-    const t = setTimeout(() => markReadMutation.mutate(), 1200);
+    if (!hasUnread) return;
+    const t = setTimeout(() => markAllRead(), 1200);
     return () => clearTimeout(t);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items.length > 0]);
+  }, [hasUnread, markAllRead]);
 
   return (
     <ClientAuthGuard requiredRoles={["client"]}>
@@ -110,6 +107,12 @@ const Notifications = () => {
         <Section>
           {isLoading ? (
             <div className="space-y-2">{[1, 2, 3, 4].map((i) => <SkeletonRow key={i} height={64} />)}</div>
+          ) : isError ? (
+            <ErrorState
+              title="No pudimos cargar tu bandeja"
+              description="Revisa tu conexión y vuelve a intentarlo."
+              onRetry={() => refetch()}
+            />
           ) : items.length === 0 ? (
             <EmptyState
               icon={<BellOff size={20} />}
@@ -117,40 +120,53 @@ const Notifications = () => {
               description="Aquí van a aparecer tus reservas, logros, puntos ganados y avisos del estudio."
             />
           ) : (
-            <ListGroup>
-              {items.map((n) => (
-                <ListRow
-                  key={n.id}
-                  asButton={!!n.link}
-                  onClick={n.link ? () => navigate(n.link!) : undefined}
-                  icon={CATEGORY_ICON[n.category] ?? <Bell size={17} strokeWidth={1.7} />}
-                  iconTint={CATEGORY_TINT[n.category] ?? "berry"}
-                  title={
-                    <span style={{ opacity: n.unread ? 1 : 0.7 }}>
-                      {n.title}
-                    </span>
-                  }
-                  description={
-                    <>
-                      {n.body}
-                      <span style={{ color: ALMA.ink, opacity: 0.4 }}> · {formatTime(n.time)}</span>
-                    </>
-                  }
-                  trailing={n.unread ? (
-                    <span
-                      className="h-2 w-2 rounded-full"
-                      style={{ backgroundColor: ALMA.berry }}
-                      aria-label="Sin leer"
-                    />
-                  ) : undefined}
-                />
-              ))}
-            </ListGroup>
+            <>
+              <ListGroup>
+                {items.map((n) => (
+                  <ListRow
+                    key={n.id}
+                    asButton={!!n.link}
+                    onClick={n.link ? () => navigate(n.link!) : undefined}
+                    icon={CATEGORY_ICON[n.category] ?? <Bell size={17} strokeWidth={1.7} />}
+                    iconTint="berry"
+                    title={
+                      <span style={{ fontWeight: n.unread ? 600 : 500, opacity: n.unread ? 1 : 0.75 }}>
+                        {n.title}
+                      </span>
+                    }
+                    description={
+                      <>
+                        {n.body}
+                        <span className="nums" style={{ color: ALMA.ink, opacity: 0.4 }}> · {formatTime(n.time)}</span>
+                      </>
+                    }
+                    trailing={n.unread ? (
+                      <span
+                        className="h-2 w-2 rounded-full"
+                        style={{ backgroundColor: ALMA.berry }}
+                        aria-label="Sin leer"
+                      />
+                    ) : undefined}
+                  />
+                ))}
+              </ListGroup>
+
+              {items.length >= limit && (
+                <div className="mt-6 flex justify-center">
+                  <GhostButton
+                    onClick={() => setLimit((l) => l + PAGE_SIZE)}
+                    disabled={isFetching}
+                  >
+                    {isFetching ? "Cargando…" : "Cargar más"}
+                  </GhostButton>
+                </div>
+              )}
+            </>
           )}
         </Section>
 
         <p className="mt-10 text-[0.74rem]" style={{ color: ALMA.ink, opacity: 0.45 }}>
-          Configura cuáles avisos recibes desde Perfil → Preferencias.
+          Configura cuáles avisos recibes desde Perfil, en Preferencias.
         </p>
       </AppShell>
     </ClientAuthGuard>

@@ -1,26 +1,79 @@
-import { forwardRef, useState, type InputHTMLAttributes, type ReactNode } from "react";
+import {
+  forwardRef,
+  useState,
+  type InputHTMLAttributes,
+  type ReactNode,
+  type SelectHTMLAttributes,
+  type TextareaHTMLAttributes,
+} from "react";
 import { Link } from "react-router-dom";
-import { Eye, EyeOff, Loader2, ArrowRight, Check, AlertCircle } from "lucide-react";
+import { Eye, EyeOff, Loader2, ArrowRight, Check, AlertCircle, ChevronDown } from "lucide-react";
+import { ALMA } from "@/components/app/tokens";
 
-/* ── Brand color roles, mirror landing ── */
-export const ALMA = {
-  cream: "#FAF9F6",
-  blush: "#E6DAC8",
-  ink: "#43392F",
-  berry: "#A48D78",
-  coral: "#CBB9A4",
-  olive: "#9C8E72",
-  orange: "#C0A688",
-  border: "#E0D5C6",
-  destructive: "#B23A48",
-} as const;
+/* Paleta canónica re-exportada: las páginas de auth y ChangePassword
+   importan ALMA desde aquí. Única fuente de verdad: app/tokens. */
+export { ALMA };
 
 type Tint = "berry" | "coral" | "olive";
 
-const TINT_VALUE: Record<Tint, string> = {
-  berry: ALMA.berry,
-  coral: ALMA.coral,
-  olive: ALMA.olive,
+/* Wash decorativo sobre la foto del panel de marca. Solo greige grande,
+   nunca semántico: coral → sandstone, el resto → stone. */
+const TINT_WASH: Record<Tint, string> = {
+  berry: ALMA.stone,
+  coral: ALMA.sandstone,
+  olive: ALMA.stone,
+};
+
+/* ── Micro-sistema de campos: label uppercase ≥0.72rem en berry (AA),
+   input cream con hairline y focus ring de marca. ── */
+const LABEL_CLASS = "text-[0.72rem] font-medium uppercase tracking-[0.22em]";
+
+const INPUT_CLASS =
+  "w-full rounded-2xl px-4 py-3.5 text-[0.95rem] outline-none transition-all duration-200 placeholder:text-[color:rgba(67,57,47,0.38)] focus-visible:ring-2 focus-visible:ring-alma-berry";
+
+const inputStyle = (error?: string) => ({
+  backgroundColor: ALMA.cream,
+  color: ALMA.ink,
+  border: `1px solid ${error ? ALMA.destructive : ALMA.border}`,
+});
+
+type FieldFeedbackProps = {
+  errorId: string;
+  error?: string;
+  success?: string;
+  hint?: string;
+};
+
+const FieldFeedback = ({ errorId, error, success, hint }: FieldFeedbackProps) => {
+  if (error) {
+    return (
+      <p id={errorId} className="mt-0.5 flex items-center gap-1.5 text-[0.78rem]" style={{ color: ALMA.destructive }}>
+        <AlertCircle size={13} className="shrink-0" />
+        {error}
+      </p>
+    );
+  }
+  if (success) {
+    return (
+      <p className="mt-0.5 flex items-center gap-1.5 text-[0.78rem]" style={{ color: ALMA.olive }}>
+        <span
+          className="grid h-4 w-4 shrink-0 place-items-center rounded-full"
+          style={{ backgroundColor: ALMA.olive, color: ALMA.cream }}
+        >
+          <Check size={9} strokeWidth={3.5} />
+        </span>
+        {success}
+      </p>
+    );
+  }
+  if (hint) {
+    return (
+      <p className="text-[0.78rem]" style={{ color: ALMA.ink, opacity: 0.55 }}>
+        {hint}
+      </p>
+    );
+  }
+  return null;
 };
 
 export type AuthShellProps = {
@@ -64,7 +117,7 @@ export const AuthShell = ({
   children,
   footer,
 }: AuthShellProps) => {
-  const tint = TINT_VALUE[brandTint];
+  const wash = TINT_WASH[brandTint];
 
   return (
     <div className="min-h-screen w-full grid grid-cols-1 lg:grid-cols-2" style={{ backgroundColor: ALMA.cream, color: ALMA.ink }}>
@@ -79,47 +132,41 @@ export const AuthShell = ({
           className="alma-photo absolute inset-0 h-full w-full object-cover"
           loading="eager"
         />
-        {/* Tint wash */}
+        {/* Wash de marca: opacidad baja para que la foto se sienta */}
+        <div aria-hidden className="absolute inset-0" style={{ backgroundColor: wash, opacity: 0.32 }} />
+        {/* Scrim vertical: solo legibilidad del texto */}
         <div
+          aria-hidden
           className="absolute inset-0"
           style={{
-            background: `linear-gradient(140deg, ${tint}d9 0%, ${tint}80 45%, ${tint}40 100%)`,
-          }}
-        />
-        {/* Vertical readability gradient */}
-        <div
-          className="absolute inset-0"
-          style={{
-            background: `linear-gradient(180deg, ${ALMA.ink}59 0%, transparent 35%, ${ALMA.ink}73 100%)`,
+            background: `linear-gradient(180deg, ${ALMA.inkDeep}59 0%, ${ALMA.inkDeep}00 38%, ${ALMA.inkDeep}80 100%)`,
           }}
         />
 
         <div className="relative z-10 flex h-full min-h-[30vh] lg:min-h-screen flex-col justify-between p-6 sm:p-9 lg:p-12">
           <Link
             to="/"
-            className="inline-flex items-center no-underline"
+            className="inline-flex w-fit items-baseline rounded-md no-underline transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-alma-canvas"
             aria-label="Inicio Alma Movement"
+            style={{ color: ALMA.cream }}
           >
-            <img
-              src="/wallet-logo@2x.png"
-              alt="Alma Movement"
-              className="h-14 w-14 sm:h-16 sm:w-16 rounded-[18px] object-cover"
-              style={{ boxShadow: "0 2px 12px rgba(36,27,26,0.28)" }}
-            />
+            <span className="font-display text-[1.55rem] sm:text-[1.7rem] leading-none">
+              Alma.
+            </span>
           </Link>
 
           <div className="max-w-[440px]">
-            <span className="text-[0.62rem] font-medium uppercase tracking-[0.32em]" style={{ color: ALMA.cream, opacity: 0.78 }}>
+            <span className="text-[0.72rem] font-medium uppercase tracking-[0.32em]" style={{ color: ALMA.cream, opacity: 0.78 }}>
               {brandEyebrow}
             </span>
             <h2
-              className="font-bebas mt-4 leading-[0.92]"
+              className="font-display mt-4 leading-[0.96]"
               style={{ color: ALMA.cream, fontSize: "clamp(2.1rem, 4.4vw, 3.8rem)" }}
             >
               {brandHeadline}
               {brandHeadlineItalic && (
                 <span
-                  className="block italic font-alilato font-normal"
+                  className="block font-display-italic font-normal"
                   style={{ color: ALMA.cream, opacity: 0.92, fontSize: "0.78em" }}
                 >
                   {brandHeadlineItalic}
@@ -145,7 +192,7 @@ export const AuthShell = ({
                   >
                     <span
                       className="grid h-7 w-7 place-items-center rounded-full"
-                      style={{ backgroundColor: ALMA.cream, color: tint }}
+                      style={{ backgroundColor: ALMA.cream, color: ALMA.berry }}
                     >
                       <Check size={12} strokeWidth={3} />
                     </span>
@@ -158,13 +205,13 @@ export const AuthShell = ({
             )}
 
             {brandQuote && (
-              <p className="mt-7 hidden lg:block font-alilato italic text-[0.95rem] leading-[1.55] max-w-[32ch]" style={{ color: ALMA.cream, opacity: 0.85 }}>
+              <p className="mt-7 hidden lg:block font-display-italic text-[1.05rem] leading-[1.55] max-w-[32ch]" style={{ color: ALMA.cream, opacity: 0.85 }}>
                 «{brandQuote}»
               </p>
             )}
           </div>
 
-          <div className="hidden lg:flex items-center justify-between text-[0.7rem] uppercase tracking-[0.22em]" style={{ color: ALMA.cream, opacity: 0.55 }}>
+          <div className="hidden lg:flex items-center justify-between text-[0.72rem] uppercase tracking-[0.22em]" style={{ color: ALMA.cream, opacity: 0.55 }}>
             <span>Alma Movement</span>
             <span>Juriquilla, Querétaro, MX</span>
           </div>
@@ -175,19 +222,19 @@ export const AuthShell = ({
       <main className="relative flex flex-col justify-center px-6 sm:px-10 lg:px-14 py-10 lg:py-12">
         <div className="mx-auto w-full max-w-[460px]">
           <div className="mb-9">
-            <span className="inline-flex items-center gap-2 text-[0.66rem] font-medium uppercase tracking-[0.32em]" style={{ color: tint }}>
-              <span className="inline-block h-px w-5" style={{ backgroundColor: tint }} />
+            <span className="inline-flex items-center gap-2 text-[0.72rem] font-medium uppercase tracking-[0.32em]" style={{ color: ALMA.berry }}>
+              <span className="inline-block h-px w-5" style={{ backgroundColor: ALMA.berry }} />
               {formEyebrow}
             </span>
             <h1
-              className="font-bebas mt-4 leading-[0.92] tracking-[-0.005em]"
+              className="font-display mt-4 leading-[0.96] tracking-[-0.005em]"
               style={{ color: ALMA.ink, fontSize: "clamp(2.3rem, 4vw, 3.2rem)" }}
             >
               {formHeadline}
               {formHeadlineItalic && (
                 <span
-                  className="block italic font-alilato font-normal"
-                  style={{ color: tint, fontSize: "0.78em" }}
+                  className="block font-display-italic font-normal"
+                  style={{ color: ALMA.stone, fontSize: "0.78em" }}
                 >
                   {formHeadlineItalic}
                 </span>
@@ -204,8 +251,8 @@ export const AuthShell = ({
 
           {footer && <div className="mt-8">{footer}</div>}
 
-          <p className="mt-10 text-[0.7rem] uppercase tracking-[0.2em]" style={{ color: ALMA.ink, opacity: 0.42 }}>
-            © {new Date().getFullYear()} Alma Movement
+          <p className="mt-10 text-[0.72rem] uppercase tracking-[0.2em]" style={{ color: ALMA.ink, opacity: 0.42 }}>
+            © <span className="nums">{new Date().getFullYear()}</span> Alma Movement
           </p>
         </div>
       </main>
@@ -214,27 +261,25 @@ export const AuthShell = ({
 };
 
 /* ═══════════════════════════════════════════════════════════
-   AuthField — input with label + error
+   AuthField — input with label + error/success/hint
    ═══════════════════════════════════════════════════════════ */
 
 type AuthFieldProps = InputHTMLAttributes<HTMLInputElement> & {
   label: string;
   error?: string;
+  success?: string;
   hint?: string;
   rightSlot?: ReactNode;
 };
 
 export const AuthField = forwardRef<HTMLInputElement, AuthFieldProps>(
-  ({ label, error, hint, rightSlot, className, id, ...rest }, ref) => {
+  ({ label, error, success, hint, rightSlot, className, id, ...rest }, ref) => {
     const inputId = id ?? `f-${label.replace(/\s+/g, "-").toLowerCase()}`;
+    const errorId = `${inputId}-error`;
     return (
       <div className="flex flex-col gap-1.5">
         <div className="flex items-center justify-between gap-2">
-          <label
-            htmlFor={inputId}
-            className="text-[0.64rem] font-medium uppercase tracking-[0.22em]"
-            style={{ color: ALMA.ink, opacity: 0.62 }}
-          >
+          <label htmlFor={inputId} className={LABEL_CLASS} style={{ color: ALMA.berry }}>
             {label}
           </label>
           {rightSlot}
@@ -242,28 +287,13 @@ export const AuthField = forwardRef<HTMLInputElement, AuthFieldProps>(
         <input
           ref={ref}
           id={inputId}
-          className={
-            "w-full rounded-2xl px-4 py-3.5 text-[0.95rem] outline-none transition-all duration-200 placeholder:text-[color:rgba(46,32,28,0.32)] focus-visible:ring-2 " +
-            (className ?? "")
-          }
-          style={{
-            backgroundColor: ALMA.cream,
-            color: ALMA.ink,
-            border: `1px solid ${error ? ALMA.destructive : ALMA.border}`,
-            boxShadow: error ? `0 0 0 2px ${ALMA.destructive}1a` : undefined,
-          }}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? errorId : undefined}
+          className={INPUT_CLASS + " " + (className ?? "")}
+          style={inputStyle(error)}
           {...rest}
         />
-        {error ? (
-          <p className="flex items-center gap-1.5 text-[0.78rem] mt-0.5" style={{ color: ALMA.destructive }}>
-            <AlertCircle size={13} />
-            {error}
-          </p>
-        ) : hint ? (
-          <p className="text-[0.78rem]" style={{ color: ALMA.ink, opacity: 0.55 }}>
-            {hint}
-          </p>
-        ) : null}
+        <FieldFeedback errorId={errorId} error={error} success={success} hint={hint} />
       </div>
     );
   }
@@ -279,23 +309,20 @@ type AuthPasswordFieldProps = Omit<AuthFieldProps, "type" | "rightSlot"> & {
 };
 
 export const AuthPasswordField = forwardRef<HTMLInputElement, AuthPasswordFieldProps>(
-  ({ label, error, hint, forgotLink, className, id, ...rest }, ref) => {
+  ({ label, error, success, hint, forgotLink, className, id, ...rest }, ref) => {
     const [show, setShow] = useState(false);
     const inputId = id ?? `f-${label.replace(/\s+/g, "-").toLowerCase()}`;
+    const errorId = `${inputId}-error`;
     return (
       <div className="flex flex-col gap-1.5">
         <div className="flex items-center justify-between gap-2">
-          <label
-            htmlFor={inputId}
-            className="text-[0.64rem] font-medium uppercase tracking-[0.22em]"
-            style={{ color: ALMA.ink, opacity: 0.62 }}
-          >
+          <label htmlFor={inputId} className={LABEL_CLASS} style={{ color: ALMA.berry }}>
             {label}
           </label>
           {forgotLink && (
             <Link
               to={forgotLink}
-              className="text-[0.74rem] no-underline transition-colors hover:opacity-80"
+              className="rounded-md text-[0.74rem] no-underline transition-opacity hover:opacity-75 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-alma-berry"
               style={{ color: ALMA.berry }}
             >
               ¿Olvidaste?
@@ -307,16 +334,10 @@ export const AuthPasswordField = forwardRef<HTMLInputElement, AuthPasswordFieldP
             ref={ref}
             id={inputId}
             type={show ? "text" : "password"}
-            className={
-              "w-full rounded-2xl pl-4 pr-12 py-3.5 text-[0.95rem] outline-none transition-all duration-200 placeholder:text-[color:rgba(46,32,28,0.32)] focus-visible:ring-2 " +
-              (className ?? "")
-            }
-            style={{
-              backgroundColor: ALMA.cream,
-              color: ALMA.ink,
-              border: `1px solid ${error ? ALMA.destructive : ALMA.border}`,
-              boxShadow: error ? `0 0 0 2px ${ALMA.destructive}1a` : undefined,
-            }}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? errorId : undefined}
+            className={INPUT_CLASS + " pl-4 pr-14 " + (className ?? "")}
+            style={inputStyle(error)}
             {...rest}
           />
           <button
@@ -324,22 +345,13 @@ export const AuthPasswordField = forwardRef<HTMLInputElement, AuthPasswordFieldP
             aria-pressed={show}
             aria-label={show ? "Ocultar contraseña" : "Mostrar contraseña"}
             onClick={() => setShow((v) => !v)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 grid h-8 w-8 place-items-center rounded-full transition-colors"
-            style={{ color: ALMA.ink, opacity: 0.55 }}
+            className="absolute right-1.5 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full transition-colors hover:bg-alma-mist focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-alma-berry"
+            style={{ color: ALMA.berry }}
           >
-            {show ? <EyeOff size={15} /> : <Eye size={15} />}
+            {show ? <EyeOff size={16} /> : <Eye size={16} />}
           </button>
         </div>
-        {error ? (
-          <p className="flex items-center gap-1.5 text-[0.78rem] mt-0.5" style={{ color: ALMA.destructive }}>
-            <AlertCircle size={13} />
-            {error}
-          </p>
-        ) : hint ? (
-          <p className="text-[0.78rem]" style={{ color: ALMA.ink, opacity: 0.55 }}>
-            {hint}
-          </p>
-        ) : null}
+        <FieldFeedback errorId={errorId} error={error} success={success} hint={hint} />
       </div>
     );
   }
@@ -347,7 +359,88 @@ export const AuthPasswordField = forwardRef<HTMLInputElement, AuthPasswordFieldP
 AuthPasswordField.displayName = "AuthPasswordField";
 
 /* ═══════════════════════════════════════════════════════════
-   AuthSubmit — pill button with loading
+   AuthSelect — select nativo con chevron ink y label del sistema
+   ═══════════════════════════════════════════════════════════ */
+
+type AuthSelectProps = SelectHTMLAttributes<HTMLSelectElement> & {
+  label: string;
+  error?: string;
+  hint?: string;
+  children: ReactNode;
+};
+
+export const AuthSelect = forwardRef<HTMLSelectElement, AuthSelectProps>(
+  ({ label, error, hint, className, id, children, ...rest }, ref) => {
+    const inputId = id ?? `f-${label.replace(/\s+/g, "-").toLowerCase()}`;
+    const errorId = `${inputId}-error`;
+    return (
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor={inputId} className={LABEL_CLASS} style={{ color: ALMA.berry }}>
+          {label}
+        </label>
+        <div className="relative">
+          <select
+            ref={ref}
+            id={inputId}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? errorId : undefined}
+            className={INPUT_CLASS + " appearance-none pr-11 " + (className ?? "")}
+            style={inputStyle(error)}
+            {...rest}
+          >
+            {children}
+          </select>
+          <ChevronDown
+            size={15}
+            aria-hidden
+            className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2"
+            style={{ color: ALMA.ink }}
+          />
+        </div>
+        <FieldFeedback errorId={errorId} error={error} hint={hint} />
+      </div>
+    );
+  }
+);
+AuthSelect.displayName = "AuthSelect";
+
+/* ═══════════════════════════════════════════════════════════
+   AuthTextarea — textarea con label del sistema + aria de error
+   ═══════════════════════════════════════════════════════════ */
+
+type AuthTextareaProps = TextareaHTMLAttributes<HTMLTextAreaElement> & {
+  label: string;
+  error?: string;
+  hint?: string;
+};
+
+export const AuthTextarea = forwardRef<HTMLTextAreaElement, AuthTextareaProps>(
+  ({ label, error, hint, className, id, ...rest }, ref) => {
+    const inputId = id ?? `f-${label.replace(/\s+/g, "-").toLowerCase()}`;
+    const errorId = `${inputId}-error`;
+    return (
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor={inputId} className={LABEL_CLASS} style={{ color: ALMA.berry }}>
+          {label}
+        </label>
+        <textarea
+          ref={ref}
+          id={inputId}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? errorId : undefined}
+          className={INPUT_CLASS + " resize-none " + (className ?? "")}
+          style={inputStyle(error)}
+          {...rest}
+        />
+        <FieldFeedback errorId={errorId} error={error} hint={hint} />
+      </div>
+    );
+  }
+);
+AuthTextarea.displayName = "AuthTextarea";
+
+/* ═══════════════════════════════════════════════════════════
+   AuthSubmit — CTA primario ink sólido con loading
    ═══════════════════════════════════════════════════════════ */
 
 type AuthSubmitProps = {
@@ -361,8 +454,8 @@ export const AuthSubmit = ({ loading, loadingLabel, children, disabled }: AuthSu
   <button
     type="submit"
     disabled={disabled || loading}
-    className="group relative mt-2 inline-flex w-full items-center justify-center gap-3 rounded-full px-7 py-4 text-[0.84rem] font-medium uppercase tracking-[0.18em] transition-transform duration-200 hover:-translate-y-0.5 disabled:opacity-60 disabled:translate-y-0 disabled:cursor-not-allowed"
-    style={{ backgroundColor: ALMA.berry, color: ALMA.cream, boxShadow: `0 12px 28px ${ALMA.berry}30` }}
+    className="group relative mt-2 inline-flex w-full items-center justify-center gap-3 rounded-full bg-alma-ink px-7 py-4 text-[0.84rem] font-medium uppercase tracking-[0.18em] text-alma-canvas transition-transform duration-200 hover:-translate-y-0.5 hover:bg-alma-ink-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-alma-berry focus-visible:ring-offset-2 disabled:opacity-60 disabled:translate-y-0 disabled:cursor-not-allowed"
+    style={{ boxShadow: `0 12px 28px ${ALMA.ink}30` }}
   >
     {loading ? (
       <>
@@ -395,15 +488,14 @@ type AuthSecondaryLinkProps = {
 export const AuthSecondaryLink = ({ to, children }: AuthSecondaryLinkProps) => (
   <Link
     to={to}
-    className="inline-flex w-full items-center justify-center gap-2 rounded-full px-6 py-3.5 text-[0.78rem] font-medium uppercase tracking-[0.2em] no-underline transition-colors duration-200"
-    style={{ border: `1px solid ${ALMA.border}`, color: ALMA.ink, opacity: 0.85 }}
+    className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-alma-hairline px-6 py-3.5 text-[0.78rem] font-medium uppercase tracking-[0.2em] text-alma-ink no-underline transition-colors duration-200 hover:border-alma-sandstone hover:bg-alma-mist focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-alma-berry focus-visible:ring-offset-2"
   >
     {children}
   </Link>
 );
 
 /* ═══════════════════════════════════════════════════════════
-   AuthErrorBanner — global form error
+   AuthErrorBanner — único canal de error global del formulario
    ═══════════════════════════════════════════════════════════ */
 
 export const AuthErrorBanner = ({ message }: { message: string }) => (
@@ -429,7 +521,7 @@ export const AuthDivider = ({ label }: { label?: string }) => (
   <div className="my-7 flex items-center gap-4">
     <span className="flex-1 h-px" style={{ backgroundColor: ALMA.border }} />
     {label && (
-      <span className="text-[0.66rem] uppercase tracking-[0.22em]" style={{ color: ALMA.ink, opacity: 0.45 }}>
+      <span className="text-[0.72rem] uppercase tracking-[0.22em]" style={{ color: ALMA.ink, opacity: 0.45 }}>
         {label}
       </span>
     )}
@@ -456,15 +548,15 @@ export const AuthCheckbox = ({ checked, onChange, children, error }: AuthCheckbo
         role="checkbox"
         aria-checked={checked}
         onClick={() => onChange(!checked)}
-        className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-md transition-all"
+        className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-alma-berry focus-visible:ring-offset-1"
         style={{
           backgroundColor: checked ? ALMA.berry : "transparent",
-          border: `1px solid ${checked ? ALMA.berry : ALMA.border}`,
+          border: `1px solid ${checked ? ALMA.berry : ALMA.sandstone}`,
         }}
       >
         {checked && <Check size={12} strokeWidth={3} style={{ color: ALMA.cream }} />}
       </button>
-      <span className="text-[0.86rem] leading-[1.5]" style={{ color: ALMA.ink, opacity: 0.78 }}>
+      <span className="text-[0.86rem] leading-[1.5] transition-opacity group-hover:opacity-100" style={{ color: ALMA.ink, opacity: 0.78 }}>
         {children}
       </span>
     </label>
@@ -478,7 +570,7 @@ export const AuthCheckbox = ({ checked, onChange, children, error }: AuthCheckbo
 );
 
 /* ═══════════════════════════════════════════════════════════
-   AuthPasswordRules — live requirements list
+   AuthPasswordRules — live requirements list (olive = éxito)
    ═══════════════════════════════════════════════════════════ */
 
 type Rule = { label: string; ok: boolean };

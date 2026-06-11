@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { CheckCircle2, XCircle, Clock, Camera as CameraIcon } from "lucide-react";
+import { CheckCircle2, XCircle, Clock, Camera as CameraIcon, ListChecks } from "lucide-react";
 
 interface ScanResult {
   status: "ok" | "already" | "no_booking" | "not_found" | "error";
@@ -222,8 +222,8 @@ export const CheckinScanner = ({ open, onOpenChange }: Props) => {
   }, [open]);
 
   const styleFor = (status: ScanResult["status"]) => {
-    if (status === "ok") return "bg-emerald-500/10 text-emerald-700 border-emerald-500/20";
-    if (status === "already") return "bg-amber-500/10 text-amber-700 border-amber-500/20";
+    if (status === "ok") return "bg-alma-olive/10 text-alma-olive border-alma-olive/25";
+    if (status === "already") return "bg-alma-oat/60 text-alma-berry border-alma-sandstone/50";
     return "bg-destructive/10 text-destructive border-destructive/20";
   };
 
@@ -282,7 +282,7 @@ export const CheckinScanner = ({ open, onOpenChange }: Props) => {
           Cuando hay error, ocultamos visualmente el contenedor de la cámara.
         */}
         <div className="space-y-3" style={error ? { display: "none" } : undefined}>
-          <div className="relative overflow-hidden rounded-xl bg-black aspect-[4/3]">
+          <div className="relative overflow-hidden rounded-xl bg-alma-ink-deep aspect-[4/3]">
             <video
               ref={videoRef}
               className="h-full w-full object-cover"
@@ -291,11 +291,11 @@ export const CheckinScanner = ({ open, onOpenChange }: Props) => {
               autoPlay
             />
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-              <div className="h-40 w-40 rounded-2xl border-2 border-white/80 shadow-[0_0_0_4000px_rgba(0,0,0,0.25)]" />
+              <div className="h-40 w-40 rounded-2xl border-2 border-alma-canvas/80 shadow-[0_0_0_4000px_rgba(36,27,26,0.25)]" />
             </div>
             {/* Placeholder mientras la cámara arranca: evita el flash del cuadro negro */}
             {!streamReady && !needsTap && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black text-white/80 text-xs font-medium">
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-alma-ink-deep text-alma-canvas/80 text-xs font-medium">
                 <CameraIcon size={22} className="animate-pulse" />
                 <span>Iniciando cámara…</span>
               </div>
@@ -304,14 +304,14 @@ export const CheckinScanner = ({ open, onOpenChange }: Props) => {
               <button
                 type="button"
                 onClick={handleTapToStart}
-                className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/70 text-white text-sm font-semibold"
+                className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-alma-ink-deep/70 text-alma-canvas text-sm font-semibold"
               >
                 <CameraIcon size={28} />
                 Tocar para iniciar la cámara
               </button>
             )}
           </div>
-          <p className="text-center text-xs text-muted-foreground">
+          <p className="text-center text-xs text-alma-ink/55">
             Apunta al <strong>QR del pase</strong> de la clienta para registrar su asistencia.
           </p>
         </div>
@@ -335,8 +335,8 @@ export const CheckinScanner = ({ open, onOpenChange }: Props) => {
                 <Button
                   type="button"
                   onClick={handleRetryCamera}
-                  className="w-full"
-                  variant="secondary"
+                  className="w-full border-alma-sandstone bg-alma-canvas text-alma-ink hover:bg-alma-oat/50 hover:text-alma-ink"
+                  variant="outline"
                 >
                   <CameraIcon size={14} className="mr-1.5" />
                   Reintentar cámara
@@ -352,16 +352,19 @@ export const CheckinScanner = ({ open, onOpenChange }: Props) => {
         })()}
 
         {/* ── Modo manual: pegar/escribir el código ─────────────────────────── */}
-        <form onSubmit={handleManualSubmit} className="space-y-2 border-t border-border pt-3">
-          <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
+        <form onSubmit={handleManualSubmit} className="space-y-2 border-t border-alma-hairline pt-3">
+          <label className="text-xs font-semibold uppercase tracking-[0.14em] text-alma-ink/55 flex items-center gap-1.5">
             <CameraIcon size={12} />
             Modo manual (si la cámara no funciona)
           </label>
-          <p className="text-[11px] text-muted-foreground -mt-1">
-            La alumna abre su <strong>Perfil → Mi código de acceso</strong> y le da a <strong>"Copiar código"</strong>. Te lo manda por WhatsApp y lo pegas aquí.
+          <p className="text-[11px] text-alma-ink/70 -mt-1">
+            La clienta abre su <strong>Perfil → Mi código de acceso</strong> y le da a <strong>"Copiar código"</strong>. Te lo manda por WhatsApp y lo pegas aquí.
           </p>
-          <p className="text-[11px] text-emerald-700 -mt-1">
-            💡 Alternativa rápida sin código: usa <strong>Pasar lista</strong> (en el menú lateral) — lista todas las alumnas del día y marcas con un tap.
+          <p className="text-[11px] text-alma-ink/70 -mt-1 flex items-start gap-1.5">
+            <ListChecks size={12} className="mt-0.5 shrink-0 text-alma-berry" aria-hidden="true" />
+            <span>
+              Alternativa rápida sin código: usa <strong>Pasar lista</strong> (en el menú lateral), lista todas las clientas del día y marcas con un tap.
+            </span>
           </p>
           <div className="flex gap-2">
             <Input
@@ -378,7 +381,7 @@ export const CheckinScanner = ({ open, onOpenChange }: Props) => {
 
         {/* ── Resultados ────────────────────────────────────────────────────── */}
         {results.length > 0 && (
-          <div className="max-h-52 space-y-1.5 overflow-auto border-t border-border pt-3">
+          <div className="max-h-52 space-y-1.5 overflow-auto border-t border-alma-hairline pt-3">
             {results.map((r, i) => (
               <div key={i} className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm ${styleFor(r.status)}`}>
                 {r.status === "ok" ? <CheckCircle2 size={16} className="shrink-0" />

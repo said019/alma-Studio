@@ -1,16 +1,23 @@
-import { useState, useMemo, useEffect } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import {
-  format, addDays, startOfWeek, isSameDay, parseISO,
-  isToday, addWeeks, subWeeks, differenceInMinutes,
+  format,
+  addDays,
+  startOfWeek,
+  isSameDay,
+  parseISO,
+  isToday,
+  differenceInMinutes,
 } from "date-fns";
 import { es } from "date-fns/locale";
-import { Loader2, ChevronLeft, ChevronRight, Clock, ArrowUpRight } from "lucide-react";
+import { ArrowUpRight, Plus, Minus } from "lucide-react";
 import api from "@/lib/api";
-import { BookingDialog, type ClassItem } from "@/components/BookingDialog";
+import { ALMA } from "@/components/app/tokens";
+import { STUDIO } from "@/lib/studio";
+import { useAuthStore } from "@/stores/authStore";
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+/* ─── Types ──────────────────────────────────────────────────────────────── */
 
 interface ApiClass {
   id: string;
@@ -21,7 +28,6 @@ interface ApiClass {
   class_type_name: string;
   class_type_color: string;
   instructor_name: string;
-  instructor_photo?: string;
   capacity: number;
   max_capacity?: number;
   current_bookings: number;
@@ -31,63 +37,115 @@ interface ApiClass {
 interface ScheduleClass {
   id: string;
   name: string;
-  time: string;      // ISO 'YYYY-MM-DDTHH:MM'
-  endTime: string;
-  duration: number;
+  time: string;    // ISO 'YYYY-MM-DDTHH:MM'
+  endTime: string; // 'HH:MM' o ''
   instructor: string;
-  instructorPhoto?: string | null;
   spots: number;
   maxSpots: number;
-  color: string;
 }
 
-// ─── Fallback colors ──────────────────────────────────────────────────────────
+/* ─── Helpers ────────────────────────────────────────────────────────────── */
 
-const fallbackColors: Record<string, string> = {
-  "Barre": "#A48D78",
-  "Jumping Fitness": "#A48D78",
-  "Jumping Dance":   "#CBB9A4",
-  "Jump & Tone":     "#C0A688",
-  "Strong Jump":     "#A48D78",
-  "Mindful Jump":    "#CBB9A4",
-  "Hot Pilates":     "#C0A688",
-  "Flow Pilates":    "#A48D78",
-  "Pilates Mat":     "#CBB9A4",
-};
-const DEFAULT_COLOR = "#9C8E72";
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function formatTime(iso: string) {
-  try { return format(parseISO(iso), "HH:mm"); } catch { return iso.slice(11, 16); }
+function formatHour(iso: string): string {
+  try {
+    return format(parseISO(iso), "h:mm a").toLowerCase().replace(". ", "").replace(".", "");
+  } catch {
+    return iso.slice(11, 16);
+  }
 }
 
-// ─── Component ───────────────────────────────────────────────────────────────
+function classEnd(cls: ScheduleClass): Date | null {
+  try {
+    const start = parseISO(cls.time);
+    if (cls.endTime) {
+      const end = parseISO(`${cls.time.split("T")[0]}T${cls.endTime.slice(0, 5)}`);
+      if (!Number.isNaN(end.getTime())) return end;
+    }
+    return new Date(start.getTime() + 50 * 60_000);
+  } catch {
+    return null;
+  }
+}
+
+function classDuration(cls: ScheduleClass): number {
+  try {
+    const start = parseISO(cls.time);
+    const end = classEnd(cls);
+    if (!end) return 50;
+    const mins = differenceInMinutes(end, start);
+    return mins > 0 && mins < 240 ? mins : 50;
+  } catch {
+    return 50;
+  }
+}
+
+function startOfDayLocal(d: Date): Date {
+  const c = new Date(d);
+  c.setHours(0, 0, 0, 0);
+  return c;
+}
+
+/* ─── Component ──────────────────────────────────────────────────────────── */
 
 export default function Schedule() {
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [weekStart, setWeekStart] = useState<Date>(
-    startOfWeek(new Date(), { weekStartsOn: 1 })
-  );
-  const [filter, setFilter] = useState("all");
-  const [now, setNow] = useState(new Date());
-  const [selectedClass, setSelectedClass] = useState<ClassItem | null>(null);
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const navigate = useNavigate();
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  // Reservar requiere sesión (POST /bookings lleva authMiddleware): la landing
+  // manda a crear cuenta; si ya hay sesión, directo al booking de la app.
+  const bookPath = isAuthenticated ? "/app/classes" : "/auth/register";
 
-  // Tick every 30 s for real-time badges
+  /* Semana visible: lun→sáb. En domingo (día de descanso) se muestra la
+     semana siguiente para no abrir sobre seis días deshabilitados. */
+  const weekStart = useMemo(() => {
+    const today = new Date();
+    const base = today.getDay() === 0 ? addDays(today, 1) : today;
+    return startOfWeek(base, { weekStartsOn: 1 });
+  }, []);
+  const weekDays = useMemo(
+    () => Array.from({ length: 6 }, (_, i) => addDays(weekStart, i)),
+    [weekStart]
+  );
+
+  const [selectedDate, setSelectedDate] = useState<Date>(() => {
+    const today = new Date();
+    return today.getDay() === 0 ? addDays(today, 1) : today;
+  });
+  const [openClassId, setOpenClassId] = useState<string | null>(null);
+  useEffect(() => setOpenClassId(null), [selectedDate]);
+
+  /* Reloj de baja frecuencia para marcar clases ya iniciadas o finalizadas. */
+  const [now, setNow] = useState(() => new Date());
   useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 30_000);
+    const id = setInterval(() => setNow(new Date()), 60_000);
     return () => clearInterval(id);
   }, []);
 
-  // Reset filter when day changes
-  useEffect(() => { setFilter("all"); }, [selectedDate]);
+  /* Entrada de sección: [data-reveal] + .is-visible (index.css respeta
+     prefers-reduced-motion). */
+  const sectionRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const root = sectionRef.current;
+    if (!root) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("is-visible");
+            observer.unobserve(entry.target);
+          }
+        });
+      },
+      { threshold: 0.12 }
+    );
+    root.querySelectorAll("[data-reveal]").forEach((el) => observer.observe(el));
+    return () => observer.disconnect();
+  }, []);
 
-  // ── Fetch ──────────────────────────────────────────────────────────────────
+  /* ── Fetch (mismo endpoint y queryKey de siempre) ─────────────────────── */
   const startDate = format(weekStart, "yyyy-MM-dd");
-  const endDate   = format(addDays(weekStart, 13), "yyyy-MM-dd");
+  const endDate = format(addDays(weekStart, 5), "yyyy-MM-dd");
 
-  const { data: rawClasses, isLoading } = useQuery<ApiClass[]>({
+  const { data: rawClasses, isLoading, isError, refetch } = useQuery<ApiClass[]>({
     queryKey: ["public-classes", startDate, endDate],
     queryFn: async () => {
       const { data } = await api.get(`/classes?start=${startDate}&end=${endDate}`);
@@ -97,87 +155,47 @@ export default function Schedule() {
     staleTime: 1000 * 60 * 2,
   });
 
-  // ── Transform ──────────────────────────────────────────────────────────────
+  /* ── Transform ────────────────────────────────────────────────────────── */
   const allClasses: ScheduleClass[] = useMemo(() => {
     if (!rawClasses) return [];
     return rawClasses
       .filter((c) => c.status !== "cancelled")
       .map((c) => {
-        // start_time is now a full ISO string "YYYY-MM-DDTHH:mm" from the server
-        const dateStr = (c.date || c.class_date || (c.start_time?.split("T")[0]) || "").split("T")[0];
-        // Extract just the HH:mm part from whatever format start_time comes in
+        const dateStr = (c.date || c.class_date || c.start_time?.split("T")[0] || "").split("T")[0];
         const startTimePart = c.start_time?.includes("T")
           ? c.start_time.split("T")[1].slice(0, 5)
           : (c.start_time ?? "00:00").slice(0, 5);
         const endTimePart = c.end_time?.includes("T")
           ? c.end_time.split("T")[1].slice(0, 5)
           : (c.end_time ?? "").slice(0, 5);
-        const available = (c.capacity ?? c.max_capacity ?? 0) - (c.current_bookings ?? 0);
+        const maxSpots = c.capacity ?? c.max_capacity ?? 0;
+        const available = maxSpots - (c.current_bookings ?? 0);
         return {
-          id:         c.id,
-          name:       c.class_type_name ?? "Clase",
-          time:       `${dateStr}T${startTimePart}`,
-          endTime:    endTimePart,
-          duration:   50,
+          id: c.id,
+          name: c.class_type_name ?? "Clase",
+          time: `${dateStr}T${startTimePart}`,
+          endTime: endTimePart,
           instructor: c.instructor_name ?? "Por confirmar",
-          instructorPhoto: (c as any).instructor_photo ?? null,
-          spots:      Math.max(0, available),
-          maxSpots:   c.capacity ?? (c as any).max_capacity ?? 1,
-          color:      c.class_type_color || fallbackColors[c.class_type_name] || DEFAULT_COLOR,
+          spots: Math.max(0, available),
+          maxSpots,
         };
       });
   }, [rawClasses]);
 
-  // ── Week days ──────────────────────────────────────────────────────────────
-  const weekDays = useMemo(
-    () => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)),
-    [weekStart]
-  );
-
-  // ── Day classes ────────────────────────────────────────────────────────────
   const dayClasses = useMemo(
-    () => allClasses.filter((c) => {
-      try { return isSameDay(parseISO(c.time), selectedDate); } catch { return false; }
-    }).sort((a, b) => a.time.localeCompare(b.time)),
+    () =>
+      allClasses
+        .filter((c) => {
+          try {
+            return isSameDay(parseISO(c.time), selectedDate);
+          } catch {
+            return false;
+          }
+        })
+        .sort((a, b) => a.time.localeCompare(b.time)),
     [allClasses, selectedDate]
   );
 
-  // ── Unique types for filter pills ──────────────────────────────────────────
-  const uniqueTypes = useMemo(
-    () => [...new Set(dayClasses.map((c) => c.name))],
-    [dayClasses]
-  );
-
-  const filteredClasses = useMemo(
-    () => filter === "all" ? dayClasses : dayClasses.filter((c) => c.name === filter),
-    [dayClasses, filter]
-  );
-
-  // ── Real-time status ───────────────────────────────────────────────────────
-  const getTimeStatus = (cls: ScheduleClass) => {
-    try {
-      const classStart = parseISO(cls.time);
-      if (!isToday(classStart)) return null;
-
-      const dateStr     = cls.time.split("T")[0];
-      const endDateTime = cls.endTime
-        ? parseISO(`${dateStr}T${cls.endTime.slice(0, 5)}`)
-        : new Date(classStart.getTime() + cls.duration * 60_000);
-
-      if (now >= endDateTime) return { status: "past", label: "Finalizada" };
-      if (now >= classStart) {
-        const minsLeft = differenceInMinutes(endDateTime, now);
-        return { status: "in-progress", label: `En curso · ${minsLeft} min restantes` };
-      }
-      const minsUntil = differenceInMinutes(classStart, now);
-      if (minsUntil < 60) return { status: "upcoming", label: `En ${minsUntil} min` };
-      const hours = Math.floor(minsUntil / 60);
-      const mins  = minsUntil % 60;
-      return { status: "upcoming", label: mins === 0 ? `En ${hours}h` : `En ${hours}h ${mins}m` };
-    } catch { return null; }
-  };
-
-  // ── Dots per day ───────────────────────────────────────────────────────────
   const classCountByDay = useMemo(() => {
     const map: Record<string, number> = {};
     allClasses.forEach((c) => {
@@ -187,407 +205,347 @@ export default function Schedule() {
     return map;
   }, [allClasses]);
 
-  // ── Book handler ───────────────────────────────────────────────────────────
-  const handleBook = (cls: ScheduleClass) => {
-    setSelectedClass({
-      id:         cls.id,
-      time:       formatTime(cls.time),
-      type:       cls.name,
-      instructor: cls.instructor,
-      spots:      cls.spots,
-      duration:   `${cls.duration} min`,
-      date:       parseISO(cls.time),
-      color:      cls.color,
-    });
-    setDialogOpen(true);
+  const isPastDay = (d: Date) => startOfDayLocal(d) < startOfDayLocal(now);
+
+  /* "past": ya terminó · "live": en curso · null: por venir */
+  const timeStatus = (cls: ScheduleClass): "past" | "live" | null => {
+    try {
+      const start = parseISO(cls.time);
+      const end = classEnd(cls);
+      if (end && now >= end) return "past";
+      if (now >= start) return "live";
+      return null;
+    } catch {
+      return null;
+    }
   };
 
-  // ── isPastDay ──────────────────────────────────────────────────────────────
-  const isPastDay = (d: Date) => {
-    const today = new Date(); today.setHours(0, 0, 0, 0);
-    const check = new Date(d);  check.setHours(0, 0, 0, 0);
-    return check < today;
-  };
-
-  // ─────────────────────────────────────────────────────────────────────────
+  /* ─────────────────────────────────────────────────────────────────────── */
   return (
-    <section id="horario" className="scroll-mt-16 bg-background relative overflow-hidden">
+    <section
+      ref={sectionRef}
+      id="horario"
+      className="scroll-mt-16 relative px-5 sm:px-8 lg:px-12 py-28 lg:py-40"
+      style={{ backgroundColor: ALMA.cream }}
+    >
+      <div className="mx-auto max-w-[1320px]">
 
-      {/* ── Atmospheric glows ─────────────────────────────────────────────── */}
-      <div className="pointer-events-none fixed top-0 left-1/2 -translate-x-1/2 w-[800px] h-[500px] rounded-full"
-        style={{ background: "radial-gradient(ellipse, rgba(119,132,85,0.10) 0%, transparent 70%)" }} />
-      <div className="pointer-events-none fixed bottom-0 right-0 w-[400px] h-[400px] rounded-full"
-        style={{ background: "radial-gradient(ellipse, rgba(233,116,95,0.06) 0%, transparent 70%)" }} />
-
-      <div className="relative z-10 max-w-[1200px] mx-auto px-6 lg:px-10">
-
-        {/* ── HEADER ──────────────────────────────────────────────────────── */}
-        <div className="pt-14 pb-0">
-
-          {/* Studio label */}
-          <p className="text-[11px] font-normal tracking-[0.25em] uppercase text-muted-foreground mb-8">
-            Alma · Pilates Studio
-          </p>
-
-          <div className="mb-8 grid grid-cols-1 gap-3 rounded-3xl border border-primary/15 bg-white/70 p-5 sm:grid-cols-[1fr_auto] sm:items-center">
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-primary">Horarios</p>
-              <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                Lunes a viernes: 7:00 AM, 8:00 AM, 7:00 PM y 8:00 PM.
-              </p>
-              <p className="text-sm leading-6 text-muted-foreground">
-                Sábados: 7:00 AM, 8:00 AM y 9:00 AM.
-              </p>
-            </div>
-            <span className="w-fit rounded-full bg-primary/10 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">
-              Cupos de 5 alumnas
+        {/* ── Encabezado editorial ─────────────────────────────────────── */}
+        <div data-reveal className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-12 lg:mb-16">
+          <div>
+            <span className="text-[0.66rem] font-medium uppercase tracking-[0.34em]" style={{ color: ALMA.berry }}>
+              Agenda de la semana
             </span>
-          </div>
-
-          {/* Month nav */}
-          <div className="flex items-center gap-5 mb-8">
-            <button
-              onClick={() => setWeekStart((p) => subWeeks(p, 1))}
-              className="w-10 h-10 rounded-full border border-primary/10 bg-white flex items-center justify-center text-muted-foreground hover:border-primary hover:text-primary transition-all"
+            <h2
+              className="font-display mt-4 leading-[0.94]"
+              style={{ color: ALMA.ink, fontSize: "clamp(2.4rem, 5.2vw, 4.6rem)", fontWeight: 420 }}
             >
-              <ChevronLeft size={16} />
-            </button>
-            <h2 className="flex-1 font-bebas text-[2.1rem] font-semibold tracking-tight text-foreground">
-              <span className="capitalize">{format(weekStart, "MMMM", { locale: es })}</span>{" "}
-              <span className="font-bold text-primary">{format(weekStart, "yyyy")}</span>
+              Elige tu día,
+              <span className="block font-display-italic" style={{ color: ALMA.stone, fontWeight: 400 }}>
+                aparta tu lugar.
+              </span>
             </h2>
-            <button
-              onClick={() => setWeekStart((p) => addWeeks(p, 1))}
-              className="w-10 h-10 rounded-full border border-primary/10 bg-white flex items-center justify-center text-muted-foreground hover:border-primary hover:text-primary transition-all"
-            >
-              <ChevronRight size={16} />
-            </button>
           </div>
-
-          {/* Week strip — day pills */}
-          <div className="flex gap-2 overflow-x-auto pb-1 mb-14 scrollbar-none"
-            style={{ scrollbarWidth: "none" }}>
-            {weekDays.map((day) => {
-              const past     = isPastDay(day);
-              const selected = isSameDay(day, selectedDate);
-              const todayDay = isToday(day);
-              const dayKey   = format(day, "yyyy-MM-dd");
-              const count    = classCountByDay[dayKey] ?? 0;
-              const dotCount = Math.min(count, 4);
-
-              return (
-                <button
-                  key={dayKey}
-                  disabled={past}
-                  onClick={() => setSelectedDate(day)}
-                  style={selected ? {
-                    background: "linear-gradient(135deg, var(--color-primary, #9C8E72) 0%, #5E643E 100%)",
-                    boxShadow: "0 8px 32px rgba(119,132,85,0.38), inset 0 0 0 1px rgba(255,255,255,0.1)",
-                    transform: "translateY(-3px) scale(1.04)",
-                    borderColor: "transparent",
-                  } : {}}
-                  className={[
-                    "flex flex-col items-center gap-1.5 px-5 py-3.5 rounded-[20px] min-w-[72px] select-none transition-all duration-200 border",
-                    past ? "opacity-25 cursor-not-allowed" : "cursor-pointer",
-                    selected
-                      ? "text-white"
-                      : todayDay
-                      ? "bg-white border-primary/30 text-foreground"
-                      : "bg-white/80 border-primary/10 text-foreground/80 hover:border-primary/30 hover:-translate-y-0.5",
-                  ].join(" ")}
-                >
-                  <span className={[
-                    "text-[10px] font-semibold tracking-[0.12em] uppercase transition-colors",
-                    selected ? "text-white/75" : "text-muted-foreground",
-                  ].join(" ")}>
-                    {format(day, "EEE", { locale: es })}
-                  </span>
-                  <span className={[
-                    "font-bebas text-[1.6rem] font-semibold leading-none transition-colors",
-                    !selected && todayDay ? "text-primary" : "",
-                  ].join(" ")}>
-                    {format(day, "d")}
-                  </span>
-                  {/* Dots */}
-                  <div className="flex gap-[3px] h-[8px] items-center justify-center">
-                    {Array.from({ length: dotCount }).map((_, i) => (
-                      <span
-                        key={i}
-                        className="w-1 h-1 rounded-full transition-all"
-                        style={{
-                          background: selected ? "rgba(255,255,255,0.75)"
-                            : todayDay ? "var(--color-primary, #9C8E72)"
-                            : "rgba(118,33,77,0.25)",
-                        }}
-                      />
-                    ))}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
+          <p className="max-w-[42ch] text-[0.95rem] leading-[1.7]" style={{ color: `${ALMA.ink}b8` }}>
+            El horario vivo del estudio. Grupos de 4 en Reformer y Tower, 8 en Studio: cada clase con lugares contados.
+          </p>
         </div>
 
-        {/* ── FILTERS ROW ─────────────────────────────────────────────────── */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 flex-wrap">
-          <div className="font-bebas text-[1.35rem] font-semibold text-foreground">
-            {filteredClasses.length} clase{filteredClasses.length !== 1 ? "s" : ""}{" "}
-            <span className="text-muted-foreground text-base font-light font-sans">
-              · {format(selectedDate, "EEE d 'de' MMMM", { locale: es })}
-            </span>
-          </div>
-
-          {uniqueTypes.length > 0 && (
-            <div className="flex flex-wrap gap-2">
+        {/* ── Selector de día (lun→sáb) ────────────────────────────────── */}
+        <div data-reveal className="flex flex-wrap gap-2 mb-10" role="group" aria-label="Elegir día de la semana">
+          {weekDays.map((day) => {
+            const selected = isSameDay(day, selectedDate);
+            const past = isPastDay(day);
+            const today = isToday(day);
+            const hasClasses = (classCountByDay[format(day, "yyyy-MM-dd")] ?? 0) > 0;
+            return (
               <button
-                onClick={() => setFilter("all")}
-                className={[
-                  "px-4 py-[7px] rounded-full text-xs font-medium transition-all border tracking-wide",
-                  filter === "all"
-                    ? "bg-primary border-transparent text-white shadow-[0_4px_16px_rgba(119,132,85,0.35)]"
-                    : "bg-white/80 border-primary/10 text-muted-foreground hover:border-primary/40 hover:text-primary",
-                ].join(" ")}
+                key={day.toISOString()}
+                type="button"
+                disabled={past}
+                onClick={() => setSelectedDate(day)}
+                aria-pressed={selected}
+                aria-label={format(day, "EEEE d 'de' MMMM", { locale: es })}
+                data-press={past ? undefined : ""}
+                className="inline-flex items-baseline gap-2 rounded-full border px-5 py-2.5 will-change-transform"
+                style={{
+                  backgroundColor: selected ? ALMA.ink : "transparent",
+                  borderColor: selected ? ALMA.ink : today ? ALMA.sandstone : ALMA.border,
+                  color: selected ? ALMA.cream : ALMA.ink,
+                  opacity: past ? 0.4 : 1,
+                  cursor: past ? "default" : "pointer",
+                }}
               >
-                Todas
+                <span className="text-[0.64rem] uppercase tracking-[0.22em]">
+                  {format(day, "EEE", { locale: es }).replace(".", "")}
+                </span>
+                <span className="nums font-display text-[1.05rem] leading-none">
+                  {format(day, "d")}
+                </span>
+                {hasClasses && !selected && !past && (
+                  <span
+                    aria-hidden
+                    className="self-center inline-block h-1 w-1 rounded-full"
+                    style={{ backgroundColor: ALMA.berry }}
+                  />
+                )}
               </button>
-              {uniqueTypes.map((t) => (
-                <button
-                  key={t}
-                  onClick={() => setFilter(t)}
-                  className={[
-                    "px-4 py-[7px] rounded-full text-xs font-medium transition-all border tracking-wide",
-                    filter === t
-                      ? "bg-primary border-transparent text-white shadow-[0_4px_16px_rgba(119,132,85,0.35)]"
-                      : "bg-white/80 border-primary/10 text-muted-foreground hover:border-primary/40 hover:text-primary",
-                  ].join(" ")}
-                >
-                  {t}
-                </button>
-              ))}
-            </div>
+            );
+          })}
+        </div>
+
+        {/* ── Cabecera del día ─────────────────────────────────────────── */}
+        <div data-reveal className="flex items-baseline justify-between gap-4 mb-1">
+          <p className="text-[0.72rem] uppercase tracking-[0.24em]" style={{ color: ALMA.berry }}>
+            {format(selectedDate, "EEEE d 'de' MMMM", { locale: es })}
+          </p>
+          {!isLoading && !isError && dayClasses.length > 0 && (
+            <p className="nums text-[0.72rem] uppercase tracking-[0.18em]" style={{ color: `${ALMA.ink}8c` }}>
+              {dayClasses.length} {dayClasses.length === 1 ? "clase" : "clases"}
+            </p>
           )}
         </div>
 
-        {/* ── CARDS ───────────────────────────────────────────────────────── */}
-        {isLoading ? (
-          <div className="flex items-center justify-center py-24 text-muted-foreground gap-2">
-            <Loader2 size={20} className="animate-spin" />
-            <span className="text-sm tracking-wide">Cargando clases…</span>
-          </div>
-        ) : filteredClasses.length === 0 ? (
-          <div className="text-center py-24 text-muted-foreground">
-            <p className="text-sm">No hay clases para este día.</p>
-            {filter !== "all" && (
-              <button onClick={() => setFilter("all")} className="mt-3 text-primary text-sm underline underline-offset-2">
-                Ver todas
-              </button>
-            )}
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5 pb-16">
-            {filteredClasses.map((cls, idx) => {
-              const ts           = getTimeStatus(cls);
-              const isPast       = ts?.status === "past";
-              const inProg       = ts?.status === "in-progress";
-              const upcoming     = ts?.status === "upcoming";
-              const full         = cls.spots === 0;
-              const spotsPercent = ((cls.maxSpots - cls.spots) / cls.maxSpots) * 100;
-              const accent       = isPast ? "rgba(123,91,82,0.35)" : cls.color;
-              const initials     = cls.instructor.split(" ").map((w: string) => w[0]).slice(0, 2).join("");
-
-              // Status badge config
-              const badgeCfg = (() => {
-                if (isPast)   return { label: "Finalizada",      bg: "rgba(123,91,82,0.08)", color: "rgba(123,91,82,0.75)", dot: false };
-                if (inProg)   return { label: ts!.label,         bg: `${accent}22`,            color: accent,                   dot: "pulse" };
-                if (upcoming) return { label: ts!.label,         bg: `${accent}18`,            color: accent,                   dot: true };
-                return null;
-              })();
-
-              return (
-                <div
-                  key={cls.id}
-                  style={{
-                    animationDelay: `${idx * 0.07}s`,
-                    ["--card-accent" as string]: accent,
-                    background: isPast
-                      ? "linear-gradient(135deg, rgba(241,214,206,0.70) 0%, rgba(255,247,242,0.92) 100%)"
-                      : `linear-gradient(135deg, #FFFFFF 0%, ${accent}0d 70%, rgba(255,240,228,0.74) 100%)`,
-                    borderColor: isPast ? "rgba(123,91,82,0.10)" : `${accent}28`,
-                  }}
-                  className={[
-                    "relative border rounded-3xl p-7 overflow-hidden",
-                    "transition-all duration-300 cursor-pointer group",
-                    isPast ? "" : "hover:-translate-y-1.5 hover:scale-[1.01]",
-                    isPast ? "" : "hover:shadow-[0_20px_60px_rgba(118,33,77,0.14)]",
-                    isPast ? "opacity-60 pointer-events-none" : "",
-                    "animate-[fadeSlideUp_0.4s_both]",
-                  ].join(" ")}
+        {/* ── Lista del día ────────────────────────────────────────────── */}
+        <div data-reveal>
+          {isLoading ? (
+            /* Skeleton de filas */
+            <ul className="list-none m-0 p-0" aria-hidden>
+              {Array.from({ length: 4 }).map((_, i) => (
+                <li
+                  key={i}
+                  className="py-7"
+                  style={{ borderTop: `1px solid ${ALMA.border}`, borderBottom: i === 3 ? `1px solid ${ALMA.border}` : undefined }}
                 >
-                  {/* Top accent line on hover */}
-                  <div
-                    className="absolute top-0 left-0 right-0 h-[2px] opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-                    style={{ background: `linear-gradient(90deg, transparent, ${accent}, transparent)` }}
-                  />
-
-                  {/* Background glow orb */}
-                  <div
-                    className="absolute -top-10 -right-10 w-40 h-40 rounded-full opacity-[0.06] group-hover:opacity-[0.12] transition-opacity pointer-events-none"
-                    style={{ background: accent }}
-                  />
-
-                  {/* ── Card top row ── */}
-                  <div className="flex items-start justify-between mb-5">
-                    {/* Status badge */}
-                    {badgeCfg ? (
-                      <span
-                        className="inline-flex items-center gap-1.5 px-[11px] py-[5px] rounded-full text-[11px] font-semibold tracking-wide uppercase border"
-                        style={{
-                          background: badgeCfg.bg,
-                          color: badgeCfg.color,
-                          borderColor: `${badgeCfg.color}40`,
-                        }}
-                      >
-                        {badgeCfg.dot && (
-                          <span
-                            className={["w-1.5 h-1.5 rounded-full", badgeCfg.dot === "pulse" ? "animate-pulse" : ""].join(" ")}
-                            style={{ background: badgeCfg.color }}
-                          />
+                  <div className="grid grid-cols-[56px_1fr_auto] sm:grid-cols-[88px_1fr_auto] items-center gap-x-4 sm:gap-x-6 px-1 sm:px-2">
+                    <div className="h-4 w-12 rounded-full animate-pulse" style={{ backgroundColor: ALMA.blush }} />
+                    <div className="space-y-2">
+                      <div className="h-4 w-44 max-w-full rounded-full animate-pulse" style={{ backgroundColor: ALMA.mist }} />
+                      <div className="h-3 w-28 max-w-full rounded-full animate-pulse" style={{ backgroundColor: ALMA.mist }} />
+                    </div>
+                    <div className="h-3 w-20 rounded-full animate-pulse" style={{ backgroundColor: ALMA.mist }} />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : isError ? (
+            /* Error honesto con reintentar */
+            <div
+              className="py-16 text-center"
+              style={{ borderTop: `1px solid ${ALMA.border}`, borderBottom: `1px solid ${ALMA.border}` }}
+            >
+              <p className="text-[0.98rem]" style={{ color: ALMA.ink }}>
+                No pudimos cargar el horario.
+              </p>
+              <p className="mt-1 text-[0.85rem]" style={{ color: `${ALMA.ink}99` }}>
+                Revisa tu conexión e inténtalo otra vez.
+              </p>
+              <button
+                type="button"
+                onClick={() => refetch()}
+                data-press
+                className="mt-6 inline-flex items-center gap-2 rounded-full border px-6 py-2.5 text-[0.74rem] font-medium uppercase tracking-[0.18em]"
+                style={{ borderColor: ALMA.sandstone, color: ALMA.ink, backgroundColor: "transparent", cursor: "pointer" }}
+              >
+                Reintentar
+              </button>
+            </div>
+          ) : dayClasses.length === 0 ? (
+            /* Día sin clases */
+            <div
+              className="py-16 text-center"
+              style={{ borderTop: `1px solid ${ALMA.border}`, borderBottom: `1px solid ${ALMA.border}` }}
+            >
+              <p className="font-display-italic" style={{ color: ALMA.stone, fontSize: "clamp(1.5rem, 2.6vw, 1.9rem)" }}>
+                El estudio descansa este día.
+              </p>
+              <p className="mt-3 text-[0.9rem]" style={{ color: `${ALMA.ink}99` }}>
+                Elige otro día de la semana para ver sus clases.
+              </p>
+            </div>
+          ) : (
+            /* Filas editoriales con hairlines */
+            <ul className="list-none m-0 p-0">
+              {dayClasses.map((cls, i) => {
+                const status = timeStatus(cls);
+                const inactive = status !== null;
+                const isOpen = openClassId === cls.id && !inactive;
+                const full = cls.spots === 0;
+                const hasSpotData = cls.maxSpots > 0;
+                const isLast = i === dayClasses.length - 1;
+                const metaLabel = inactive
+                  ? status === "past" ? "Finalizada" : "En curso"
+                  : full
+                    ? "Completa"
+                    : hasSpotData
+                      ? `${cls.spots} de ${cls.maxSpots} lugares`
+                      : null;
+                return (
+                  <li
+                    key={cls.id}
+                    style={{
+                      borderTop: `1px solid ${ALMA.border}`,
+                      borderBottom: isLast ? `1px solid ${ALMA.border}` : undefined,
+                    }}
+                  >
+                    <button
+                      type="button"
+                      disabled={inactive}
+                      onClick={() => setOpenClassId(isOpen ? null : cls.id)}
+                      aria-expanded={inactive ? undefined : isOpen}
+                      className="w-full grid grid-cols-[56px_1fr_auto] sm:grid-cols-[88px_1fr_auto_auto] items-center gap-x-4 sm:gap-x-6 px-1 sm:px-2 py-6 bg-transparent border-0 text-left"
+                      style={{ cursor: inactive ? "default" : "pointer", opacity: inactive ? 0.45 : 1 }}
+                    >
+                      <span className="nums font-display text-[1.05rem] sm:text-[1.25rem] leading-none" style={{ color: ALMA.ink }}>
+                        {formatHour(cls.time)}
+                      </span>
+                      <span className="min-w-0">
+                        <h3 className="font-display text-[1.25rem] sm:text-[1.5rem] leading-tight truncate" style={{ color: ALMA.ink }}>
+                          {cls.name}
+                        </h3>
+                        <p className="mt-1 text-[0.74rem] uppercase tracking-[0.18em]" style={{ color: ALMA.berry }}>
+                          {cls.instructor}
+                        </p>
+                        {metaLabel && (
+                          <p className="sm:hidden nums mt-1.5 text-[0.68rem] uppercase tracking-[0.16em]" style={{ color: `${ALMA.ink}8c` }}>
+                            {metaLabel}
+                          </p>
                         )}
-                        {badgeCfg.label}
                       </span>
-                    ) : (
-                      <span />
-                    )}
-
-                    {/* Book button */}
-                    {!isPast && (
-                      <button
-                        disabled={full}
-                        onClick={(e) => { e.stopPropagation(); !full && handleBook(cls); }}
-                        className={[
-                          "px-5 py-[9px] rounded-full text-[12px] font-semibold tracking-wide transition-all",
-                          full
-                            ? "bg-[#F0EBE1] text-muted-foreground cursor-not-allowed"
-                            : "text-white hover:scale-105",
-                        ].join(" ")}
-                        style={!full ? {
-                          background: `linear-gradient(135deg, ${accent} 0%, ${accent}cc 100%)`,
-                          boxShadow: `0 4px 20px ${accent}55`,
-                        } : {}}
-                      >
-                        {full ? "Llena" : "Reservar"}
-                      </button>
-                    )}
-                  </div>
-
-                  {/* ── Class name ── */}
-                  <h3 className="font-bebas text-[1.6rem] font-semibold leading-tight tracking-tight text-foreground mb-4">
-                    {cls.name}
-                  </h3>
-
-                  {/* ── Time row ── */}
-                  <div className="flex items-center gap-2 mb-3 text-muted-foreground text-[13px] font-medium">
-                    <Clock size={13} className="opacity-60 shrink-0" />
-                    <span className="text-foreground text-[14px] font-medium">
-                      {formatTime(cls.time)}{cls.endTime ? ` — ${cls.endTime.slice(0, 5)}` : ""}
-                    </span>
-                    <span className="ml-auto bg-[#E6DAC8] text-[#8C7A68] text-[11px] px-2 py-0.5 rounded-md">
-                      {cls.duration} min
-                    </span>
-                  </div>
-
-                  {/* ── Instructor ── */}
-                  <div className="flex items-center gap-2.5 mb-5">
-                    {cls.instructorPhoto ? (
-                      <img
-                        src={cls.instructorPhoto}
-                        alt={cls.instructor}
-                        className="w-7 h-7 rounded-full object-cover ring-[1.5px] ring-white/15 shrink-0"
-                      />
-                    ) : (
-                      <span
-                        className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold text-white ring-[1.5px] ring-white/15 shrink-0"
-                        style={{ background: `linear-gradient(135deg, ${accent}cc 0%, ${accent} 100%)` }}
-                      >
-                        {initials}
+                      <span className="hidden sm:block nums text-[0.72rem] uppercase tracking-[0.16em] text-right" style={{ color: full && !inactive ? ALMA.berry : `${ALMA.ink}8c` }}>
+                        {metaLabel}
                       </span>
-                    )}
-                    <span className="text-[13px] text-muted-foreground font-normal">{cls.instructor}</span>
-                  </div>
+                      {!inactive ? (
+                        <span
+                          aria-hidden
+                          className="grid h-9 w-9 place-items-center rounded-full transition-transform duration-300"
+                          style={{
+                            backgroundColor: isOpen ? ALMA.berry : "transparent",
+                            color: isOpen ? ALMA.cream : ALMA.berry,
+                            border: `1px solid ${ALMA.berry}`,
+                            transitionTimingFunction: "var(--ease-alma-out)",
+                          }}
+                        >
+                          {isOpen ? <Minus size={14} /> : <Plus size={14} />}
+                        </span>
+                      ) : (
+                        <span aria-hidden className="h-9 w-9" />
+                      )}
+                    </button>
 
-                  {/* ── Divider ── */}
-                  <div className="h-px bg-primary/10 mb-4" />
-
-                  {/* ── Capacity bar ── */}
-                  <div>
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-[11px] font-semibold tracking-[0.08em] uppercase text-muted-foreground">Lugares</span>
-                      <span
-                        className="text-[12px] font-semibold"
-                        style={{ color: full ? accent : "#43392F" }}
-                      >
-                        {full
-                          ? `${cls.maxSpots} / ${cls.maxSpots} — Lleno`
-                          : `${cls.spots} disponibles`}
-                      </span>
+                    {/* Detalle expandible in-place (grid-template-rows) */}
+                    <div
+                      className="grid overflow-hidden transition-[grid-template-rows] duration-500"
+                      style={{ gridTemplateRows: isOpen ? "1fr" : "0fr", transitionTimingFunction: "var(--ease-alma-out)" }}
+                    >
+                      <div className="min-h-0 overflow-hidden">
+                        <div className="grid grid-cols-[56px_1fr] sm:grid-cols-[88px_1fr] gap-x-4 sm:gap-x-6 px-1 sm:px-2">
+                          <span aria-hidden />
+                          <div className="pb-7 pr-1 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-5">
+                            <dl className="flex flex-wrap gap-x-8 gap-y-2.5 text-[0.7rem] uppercase tracking-[0.18em]" style={{ color: `${ALMA.ink}8c` }}>
+                              <div className="flex items-baseline gap-2">
+                                <dt>Inicio</dt>
+                                <dd className="nums font-display text-[0.95rem] normal-case tracking-normal" style={{ color: ALMA.ink }}>
+                                  {formatHour(cls.time)}
+                                </dd>
+                              </div>
+                              <div className="flex items-baseline gap-2">
+                                <dt>Duración</dt>
+                                <dd className="nums font-display text-[0.95rem] normal-case tracking-normal" style={{ color: ALMA.ink }}>
+                                  {classDuration(cls)} min
+                                </dd>
+                              </div>
+                              <div className="flex items-baseline gap-2">
+                                <dt>Instructora</dt>
+                                <dd className="font-display text-[0.95rem] normal-case tracking-normal" style={{ color: ALMA.ink }}>
+                                  {cls.instructor}
+                                </dd>
+                              </div>
+                              {hasSpotData && (
+                                <div className="flex items-baseline gap-2">
+                                  <dt>Lugares</dt>
+                                  <dd className="nums font-display text-[0.95rem] normal-case tracking-normal" style={{ color: ALMA.ink }}>
+                                    {full ? "Completa" : `${cls.spots} de ${cls.maxSpots}`}
+                                  </dd>
+                                </div>
+                              )}
+                            </dl>
+                            {full ? (
+                              <p className="text-[0.85rem] leading-[1.6] shrink-0" style={{ color: `${ALMA.ink}99` }}>
+                                Esta clase ya está llena. Elige otro horario.
+                              </p>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => navigate(bookPath)}
+                                data-press
+                                className="group inline-flex w-fit items-center gap-2.5 rounded-full px-6 py-3 text-[0.74rem] font-medium uppercase tracking-[0.16em] shrink-0"
+                                style={{ backgroundColor: ALMA.ink, color: ALMA.cream, border: "none", cursor: "pointer" }}
+                              >
+                                {isAuthenticated ? "Reservar esta clase" : "Crear cuenta y reservar"}
+                                <ArrowUpRight
+                                  size={13}
+                                  className="transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
+                                  style={{ transitionTimingFunction: "var(--ease-alma-out)" }}
+                                />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    <div className="h-1 rounded-full bg-[#F0EBE1] overflow-hidden">
-                      <div
-                        className="h-full rounded-full transition-all duration-700"
-                        style={{
-                          width: `${spotsPercent}%`,
-                          background: full
-                            ? `linear-gradient(90deg, ${accent}, ${accent}cc)`
-                            : spotsPercent > 60
-                            ? `linear-gradient(90deg, rgba(245,138,36,0.8), ${accent})`
-                            : `linear-gradient(90deg, ${accent}cc, ${accent})`,
-                          boxShadow: full ? `0 0 8px ${accent}88` : "none",
-                        }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
 
-        {/* ── CTA ─────────────────────────────────────────────────────────── */}
-        <div className="mb-16 rounded-3xl border border-primary/20 bg-gradient-to-br from-primary/[0.07] via-primary/[0.03] to-transparent p-10 text-center">
-          <p className="text-[0.72rem] tracking-[0.15em] uppercase text-primary font-medium mb-2">
+        {/* ── CTA principal: clase muestra ─────────────────────────────── */}
+        <div data-reveal className="mt-16 lg:mt-24 flex flex-col items-center text-center">
+          <span className="text-[0.66rem] font-medium uppercase tracking-[0.34em]" style={{ color: ALMA.berry }}>
             ¿Primera vez en Alma?
-          </p>
-          <h3 className="font-bebas text-[clamp(1.7rem,2.7vw,2.3rem)] leading-none text-foreground mb-3">
-            Prueba una clase muestra
-          </h3>
-          <p className="text-sm text-muted-foreground mb-7 max-w-sm mx-auto">
-            Reserva tu clase muestra y descubre una experiencia cercana, energetica y personalizada.
-          </p>
-          <Link
-            to="/auth/register?returnUrl=/app/book"
-            className="inline-flex items-center gap-2 bg-primary text-white px-8 py-3.5 rounded-full text-[0.82rem] font-medium tracking-wider uppercase hover:-translate-y-1 hover:shadow-[0_15px_40px_rgba(119,132,85,0.35)] transition-all"
+          </span>
+          <h3
+            className="font-display mt-4 leading-[0.96]"
+            style={{ color: ALMA.ink, fontSize: "clamp(1.9rem, 3.6vw, 3rem)", fontWeight: 420 }}
           >
-            Reservar mi primera clase
-            <ArrowUpRight size={13} />
-          </Link>
+            Empieza con una{" "}
+            <span className="font-display-italic" style={{ color: ALMA.berry, fontWeight: 400 }}>
+              clase muestra.
+            </span>
+          </h3>
+          <p className="mt-4 max-w-[48ch] text-[0.95rem] leading-[1.7]" style={{ color: `${ALMA.ink}b8` }}>
+            Tu primera visita para conocer el estudio, el equipo y a tu coach. Crea tu cuenta y aparta tu lugar en el horario que te quede.
+          </p>
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-5">
+            <button
+              type="button"
+              onClick={() => navigate(bookPath)}
+              data-press
+              className="group inline-flex items-center gap-3 rounded-full px-7 py-4 text-[0.8rem] font-medium uppercase tracking-[0.16em]"
+              style={{ backgroundColor: ALMA.ink, color: ALMA.cream, border: "none", cursor: "pointer" }}
+            >
+              Reserva tu clase muestra
+              <span
+                className="grid h-7 w-7 place-items-center rounded-full bg-white/15 transition-transform duration-300 group-hover:translate-x-1"
+                style={{ transitionTimingFunction: "var(--ease-alma-out)" }}
+              >
+                <ArrowUpRight size={13} />
+              </span>
+            </button>
+            <a
+              href={`https://wa.me/${STUDIO.whatsapp}?text=${encodeURIComponent("Hola, me gustaría reservar una clase muestra en Alma Movement.")}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[0.76rem] uppercase tracking-[0.2em] no-underline underline-offset-4 hover:underline"
+              style={{ color: ALMA.berry }}
+            >
+              o escríbenos por WhatsApp
+            </a>
+          </div>
         </div>
       </div>
-
-      {/* Booking dialog */}
-      <BookingDialog
-        classData={selectedClass}
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        onSuccess={() => {}}
-      />
-
-      {/* Keyframe for card entrance */}
-      <style>{`
-        @keyframes fadeSlideUp {
-          from { opacity: 0; transform: translateY(24px); }
-          to   { opacity: 1; transform: translateY(0);    }
-        }
-      `}</style>
     </section>
   );
 }

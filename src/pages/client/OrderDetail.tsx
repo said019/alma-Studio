@@ -1,6 +1,6 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import api from "@/lib/api";
@@ -13,6 +13,7 @@ import {
   PrimaryButton,
   GhostButton,
   SkeletonRow,
+  ErrorState,
   ALMA,
 } from "@/components/app/AppShell";
 import {
@@ -22,13 +23,17 @@ import {
   InfoBanner,
   formatMoneyMX,
 } from "@/components/app/widgets";
+import { UploadDropzone } from "@/components/app/UploadDropzone";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, FileText, Loader2, Check } from "lucide-react";
+import { FileText } from "lucide-react";
 import type { Order } from "@/types/order";
 
-const STATUS: Record<string, { label: string; tone: keyof typeof ALMA }> = {
-  pending_payment: { label: "Pago pendiente", tone: "coral" },
-  pending_verification: { label: "En verificación", tone: "orange" },
+/* Ambos estados pendientes viven en berry para cumplir AA a 0.72rem
+   (stone falla en texto pequeño): "Pago pendiente" pide acción de la
+   socia, va sólido; "En verificación" es espera, va suave. */
+const STATUS: Record<string, { label: string; tone: keyof typeof ALMA; variant?: "soft" | "solid" }> = {
+  pending_payment: { label: "Pago pendiente", tone: "berry", variant: "solid" },
+  pending_verification: { label: "En verificación", tone: "berry" },
   approved: { label: "Aprobado · membresía activa", tone: "olive" },
   rejected: { label: "Rechazado", tone: "destructive" },
   cancelled: { label: "Cancelado", tone: "destructive" },
@@ -36,16 +41,18 @@ const STATUS: Record<string, { label: string; tone: keyof typeof ALMA }> = {
 
 const OrderDetail = () => {
   const { orderId } = useParams<{ orderId: string }>();
+  const navigate = useNavigate();
   const { toast } = useToast();
   const qc = useQueryClient();
-  const fileRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["order-detail", orderId],
     queryFn: async () => (await api.get(`/orders/${orderId}`)).data,
   });
   const order: Order | null = data?.data ?? data ?? null;
+  const notFound =
+    (error as any)?.response?.status === 404 || (!isLoading && !isError && !order);
 
   const uploadMutation = useMutation({
     mutationFn: () => {
@@ -79,25 +86,34 @@ const OrderDetail = () => {
 
         {isLoading ? (
           <SkeletonRow height={300} />
-        ) : !order ? (
-          <p className="text-[0.95rem]" style={{ color: ALMA.ink, opacity: 0.55 }}>
-            No encontramos esta orden.
-          </p>
-        ) : (
+        ) : notFound ? (
+          <ErrorState
+            title="No encontramos esta orden"
+            description="Puede que el enlace ya no sea válido o que la orden se haya eliminado. Tus compras siguen en tu historial."
+            retryLabel="Volver a mis órdenes"
+            onRetry={() => navigate("/app/orders")}
+          />
+        ) : isError ? (
+          <ErrorState
+            title="No pudimos cargar tu orden"
+            description="Revisa tu conexión y vuelve a intentarlo."
+            onRetry={() => refetch()}
+          />
+        ) : order ? (
           <>
             <PageHeader
               eyebrow="Detalle"
               title={order.plan_name ?? "Compra"}
-              actions={status ? <StatusPill label={status.label} tone={status.tone} /> : null}
+              actions={status ? <StatusPill label={status.label} tone={status.tone} variant={status.variant ?? "soft"} /> : null}
             />
 
             <Section>
               <div className="rounded-3xl p-5 sm:p-7" style={{ backgroundColor: ALMA.blush }}>
                 <div className="flex flex-wrap items-baseline justify-between gap-3 pb-3" style={{ borderBottom: `1px solid ${ALMA.border}` }}>
-                  <span className="text-[0.62rem] font-medium uppercase tracking-[0.24em]" style={{ color: ALMA.berry }}>
+                  <span className="text-[0.72rem] font-medium uppercase tracking-[0.24em]" style={{ color: ALMA.berry }}>
                     Total
                   </span>
-                  <span className="font-bebas leading-none" style={{ color: ALMA.ink, fontSize: "clamp(1.85rem, 3vw, 2.6rem)" }}>
+                  <span className="font-display nums leading-none" style={{ color: ALMA.ink, fontSize: "clamp(1.85rem, 3vw, 2.6rem)" }}>
                     {amountStr}
                   </span>
                 </div>
@@ -129,35 +145,7 @@ const OrderDetail = () => {
 
             {order.status === "pending_payment" && (
               <Section title="Subir comprobante">
-                <div
-                  onClick={() => fileRef.current?.click()}
-                  className="rounded-3xl p-7 text-center cursor-pointer transition-colors"
-                  style={{
-                    backgroundColor: file ? `${ALMA.olive}10` : "transparent",
-                    border: `1px dashed ${file ? ALMA.olive : ALMA.border}`,
-                    color: ALMA.ink,
-                  }}
-                >
-                  <input
-                    type="file"
-                    accept="image/*,.pdf"
-                    ref={fileRef}
-                    className="hidden"
-                    onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-                  />
-                  <span
-                    className="grid h-12 w-12 mx-auto place-items-center rounded-full mb-3"
-                    style={{ backgroundColor: file ? ALMA.olive : ALMA.blush, color: file ? ALMA.cream : ALMA.berry }}
-                  >
-                    {file ? <Check size={20} strokeWidth={3} /> : <Upload size={18} />}
-                  </span>
-                  <p className="text-[0.92rem] font-medium" style={{ color: ALMA.ink }}>
-                    {file ? file.name : "Toca aquí o arrastra el archivo"}
-                  </p>
-                  <p className="mt-1 text-[0.78rem]" style={{ color: ALMA.ink, opacity: 0.55 }}>
-                    JPG, PNG o PDF
-                  </p>
-                </div>
+                <UploadDropzone file={file} onFileChange={setFile} />
 
                 <div className="mt-5 flex gap-3">
                   <PrimaryButton
@@ -191,14 +179,14 @@ const OrderDetail = () => {
             {order.admin_notes && (
               <Section>
                 <InfoBanner
-                  tone="orange"
+                  tone="stone"
                   title="Nota del estudio"
                   description={order.admin_notes}
                 />
               </Section>
             )}
           </>
-        )}
+        ) : null}
       </AppShell>
     </ClientAuthGuard>
   );

@@ -1,65 +1,39 @@
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import almaLogo from "@/assets/alma/alma-logo.png";
-import api from "@/lib/api";
+import { STUDIO } from "@/lib/studio";
+import LegalLayout, {
+  LegalContact,
+  LegalDynamicBody,
+  LegalH2,
+  LegalSkeleton,
+  LegalUpdated,
+  usePolicyText,
+} from "./LegalLayout";
 
 const Privacidad = () => {
-  const navigate = useNavigate();
-  const [dynamicPolicy, setDynamicPolicy] = useState("");
-
-  useEffect(() => {
-    api.get("/public/settings/policies_settings").then(({ data }) => {
-      const value = data?.data;
-      const text = typeof value?.privacy_policy === "string" ? value.privacy_policy.trim() : "";
-      setDynamicPolicy(text);
-    }).catch(() => {});
-  }, []);
+  const { text, loading } = usePolicyText("privacy_policy");
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      {/* Nav */}
-      <nav className="sticky top-0 z-50 bg-background/95 backdrop-blur-md border-b border-border px-6 lg:px-[60px] py-4 flex items-center justify-between">
-        <button onClick={() => navigate("/")} className="flex items-center bg-transparent border-none cursor-pointer">
-          <img src={almaLogo} alt="Alma Movement" className="h-14 w-auto object-contain" />
-        </button>
-        <button
-          onClick={() => navigate(-1)}
-          className="text-muted-foreground text-sm hover:text-foreground transition-colors bg-transparent border-none cursor-pointer"
-        >
-          ← Volver
-        </button>
-      </nav>
+    <LegalLayout
+      current="/legal/privacidad"
+      title={
+        <>
+          Aviso de <span className="font-display-italic">privacidad</span>
+        </>
+      }
+    >
+      {loading ? (
+        <LegalSkeleton />
+      ) : text ? (
+        <LegalDynamicBody text={text} />
+      ) : (
+        <div className="space-y-6">
+          <LegalUpdated>26 de febrero de 2026</LegalUpdated>
 
-      <main className="max-w-3xl mx-auto px-6 py-16">
-        <div className="text-[0.72rem] tracking-[0.15em] uppercase text-primary font-medium mb-4 flex items-center gap-[10px]">
-          <span className="w-[30px] h-[1px] bg-primary inline-block" />
-          Legal
-        </div>
-        <h1 className="font-bebas text-[clamp(2.5rem,5vw,4rem)] leading-[0.95] text-foreground mb-10">
-          AVISO DE PRIVACIDAD
-        </h1>
-
-        {dynamicPolicy ? (
-          <div className="prose-alma space-y-6 text-[0.92rem] text-muted-foreground leading-[1.8]">
-            <p className="text-foreground font-medium">
-              Última actualización: {new Date().toLocaleDateString("es-MX")}
-            </p>
-            <div className="rounded-2xl border border-border bg-secondary/40 p-6 whitespace-pre-wrap leading-[1.9]">
-              {dynamicPolicy}
-            </div>
-          </div>
-        ) : (
-          <div className="prose-alma space-y-6 text-[0.92rem] text-muted-foreground leading-[1.8]">
-          <p className="text-foreground font-medium">
-            Última actualización: 26 de febrero de 2026
-          </p>
-
-          <h2 className="font-syne font-bold text-lg text-foreground mt-8 mb-3">1. Responsable del tratamiento</h2>
+          <LegalH2>1. Responsable del tratamiento</LegalH2>
           <p>
-            <strong className="text-foreground">Alma Movement</strong>, a cargo de Estefanía Torres Lanzagorta, con domicilio en Plaza Arce, Calle Acueducto de Querétaro 513, Jurica Acueducto, 76230 Juriquilla, Querétaro, es responsable del tratamiento de los datos personales que recabamos de usted, en los términos de la Ley Federal de Protección de Datos Personales en Posesión de los Particulares (LFPDPPP).
+            <strong className="text-foreground">Alma Movement</strong>, a cargo de Estefanía Torres Lanzagorta, con domicilio en {STUDIO.address}, es responsable del tratamiento de los datos personales que recabamos de usted, en los términos de la Ley Federal de Protección de Datos Personales en Posesión de los Particulares (LFPDPPP).
           </p>
 
-          <h2 className="font-syne font-bold text-lg text-foreground mt-8 mb-3">2. Datos personales que recabamos</h2>
+          <LegalH2>2. Datos personales que recabamos</LegalH2>
           <p>Para las finalidades señaladas, recabamos las siguientes categorías de datos personales:</p>
           <ul className="list-disc pl-6 space-y-2">
             <li><strong className="text-foreground">Datos de identificación:</strong> nombre completo, fecha de nacimiento, género, fotografía de perfil.</li>
@@ -69,7 +43,7 @@ const Privacidad = () => {
             <li><strong className="text-foreground">Datos de uso:</strong> historial de reservaciones, asistencias, preferencias de clase.</li>
           </ul>
 
-          <h2 className="font-syne font-bold text-lg text-foreground mt-8 mb-3">3. Finalidades del tratamiento</h2>
+          <LegalH2>3. Finalidades del tratamiento</LegalH2>
           <p>Sus datos personales serán utilizados para las siguientes finalidades primarias:</p>
           <ul className="list-disc pl-6 space-y-2">
             <li>Registro y administración de su cuenta de usuario.</li>
@@ -86,14 +60,14 @@ const Privacidad = () => {
             <li>Publicación de fotografías o videos del estudio en redes sociales y materiales publicitarios.</li>
           </ul>
 
-          <h2 className="font-syne font-bold text-lg text-foreground mt-8 mb-3">4. Transferencias de datos</h2>
+          <LegalH2>4. Transferencias de datos</LegalH2>
           <p>
             No transferimos sus datos personales a terceros sin su consentimiento, salvo en los casos previstos por la LFPDPPP y su Reglamento. Sus datos pueden ser compartidos con proveedores de servicios tecnológicos (hosting, pasarelas de pago) que operan bajo estrictas medidas de confidencialidad.
           </p>
 
-          <h2 className="font-syne font-bold text-lg text-foreground mt-8 mb-3">5. Derechos ARCO</h2>
+          <LegalH2>5. Derechos ARCO</LegalH2>
           <p>
-            Usted tiene derecho a Acceder, Rectificar, Cancelar u Oponerse (derechos ARCO) al tratamiento de sus datos personales. Para ejercer estos derechos, envíe una solicitud al correo electrónico <strong className="text-primary">info@almamovement.mx</strong> indicando:
+            Usted tiene derecho a Acceder, Rectificar, Cancelar u Oponerse (derechos ARCO) al tratamiento de sus datos personales. Para ejercer estos derechos, envíe una solicitud al correo electrónico <a href="mailto:info@almamovement.mx" className="font-medium underline underline-offset-2 text-foreground">info@almamovement.mx</a> indicando:
           </p>
           <ul className="list-disc pl-6 space-y-2">
             <li>Nombre completo y datos de contacto.</li>
@@ -104,39 +78,29 @@ const Privacidad = () => {
             Responderemos su solicitud en un plazo máximo de 20 días hábiles a partir de la recepción de la misma.
           </p>
 
-          <h2 className="font-syne font-bold text-lg text-foreground mt-8 mb-3">6. Medidas de seguridad</h2>
+          <LegalH2>6. Medidas de seguridad</LegalH2>
           <p>
             Implementamos medidas de seguridad administrativas, técnicas y físicas para proteger sus datos personales contra daño, pérdida, alteración, destrucción o uso, acceso o tratamiento no autorizado. Utilizamos cifrado SSL/TLS para la transmisión de datos y almacenamiento seguro en servidores protegidos.
           </p>
 
-          <h2 className="font-syne font-bold text-lg text-foreground mt-8 mb-3">7. Uso de cookies</h2>
+          <LegalH2>7. Uso de cookies</LegalH2>
           <p>
             Nuestra plataforma usa cookies necesarias para que puedas iniciar sesión, reservar tus clases y recordar tus preferencias. Puedes configurar tu navegador para rechazarlas, aunque esto puede limitar la reserva en línea.
           </p>
 
-          <h2 className="font-syne font-bold text-lg text-foreground mt-8 mb-3">8. Cambios al aviso de privacidad</h2>
+          <LegalH2>8. Cambios al aviso de privacidad</LegalH2>
           <p>
             Nos reservamos el derecho de modificar el presente Aviso de Privacidad. Cualquier cambio será publicado en nuestra plataforma web y, en caso de cambios significativos, le notificaremos a través de su correo electrónico registrado.
           </p>
 
-          <h2 className="font-syne font-bold text-lg text-foreground mt-8 mb-3">9. Contacto</h2>
+          <LegalH2>9. Contacto</LegalH2>
           <p>
             Si tiene alguna duda o comentario sobre este Aviso de Privacidad, puede contactarnos en:
           </p>
-          <ul className="list-none space-y-1">
-            <li><strong className="text-foreground">Email:</strong> info@almamovement.mx</li>
-            <li><strong className="text-foreground">Teléfono:</strong> por confirmar</li>
-            <li><strong className="text-foreground">Dirección:</strong> Plaza Arce, Calle Acueducto de Querétaro 513, Jurica Acueducto, 76230 Juriquilla, Querétaro</li>
-          </ul>
-          </div>
-        )}
-      </main>
-
-      {/* Footer */}
-      <footer className="border-t border-border px-6 lg:px-[60px] py-6 text-center">
-        <p className="text-xs text-muted-foreground/50">© 2026 Alma Movement. Todos los derechos reservados.</p>
-      </footer>
-    </div>
+          <LegalContact />
+        </div>
+      )}
+    </LegalLayout>
   );
 };
 

@@ -7,6 +7,8 @@ import api from "@/lib/api";
 import { AuthGuard } from "@/components/admin/AuthGuard";
 import AdminLayout from "@/components/admin/AdminLayout";
 import SectionTabs from "@/components/admin/SectionTabs";
+import { useConfirm } from "@/components/admin/ConfirmDialog";
+import { EmptyState, ErrorState } from "@/components/app/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,7 +19,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
-import { MoreHorizontal, Plus, Upload } from "lucide-react";
+import { Copy, Loader2, MoreHorizontal, Plus, Users, X } from "lucide-react";
 
 const instructorSchema = z.object({
   displayName: z.string().min(1),
@@ -73,12 +75,14 @@ function getFocusFromPointerEvent(event: React.PointerEvent<HTMLElement>) {
 const InstructorsList = () => {
   const { toast } = useToast();
   const qc = useQueryClient();
+  const { confirm, dialog } = useConfirm();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Instructor | null>(null);
   const [uploadTargetId, setUploadTargetId] = useState<string | null>(null);
+  const [magicLink, setMagicLink] = useState<{ name: string; link: string } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const { data, isLoading } = useQuery<{ data: Instructor[] }>({
+  const { data, isLoading, isError, refetch } = useQuery<{ data: Instructor[] }>({
     queryKey: ["instructors"],
     queryFn: async () => (await api.get("/instructors")).data,
   });
@@ -96,7 +100,7 @@ const InstructorsList = () => {
       photoFocusX: clampFocus(d.photoFocusX),
       photoFocusY: clampFocus(d.photoFocusY),
     }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["instructors"] }); toast({ title: "Instructor creado" }); setOpen(false); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["instructors"] }); toast({ title: "Instructora creada" }); setOpen(false); },
     onError: (e: any) => toast({ title: e?.response?.data?.message ?? "Error al crear", variant: "destructive" }),
   });
 
@@ -110,23 +114,35 @@ const InstructorsList = () => {
         photoFocusY: clampFocus(rest.photoFocusY),
       });
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["instructors"] }); toast({ title: "✅ Instructor actualizado" }); setOpen(false); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["instructors"] }); toast({ title: "Instructora actualizada" }); setOpen(false); },
     onError: (e: any) => toast({ title: e?.response?.data?.message ?? "Error al actualizar", variant: "destructive" }),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/instructors/${id}`),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["instructors"] }); toast({ title: "Instructor eliminado" }); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["instructors"] }); toast({ title: "Instructora eliminada" }); },
     onError: (e: any) => toast({ title: e?.response?.data?.message ?? "Error al eliminar", variant: "destructive" }),
   });
 
+  const copyMagicLink = (link: string) => {
+    navigator.clipboard?.writeText(link).then(
+      () => toast({ title: "Magic link copiado al portapapeles" }),
+      () => toast({ title: "No se pudo copiar", description: "Copia el link manualmente desde el recuadro.", variant: "destructive" }),
+    );
+  };
+
   const magicLinkMutation = useMutation({
-    mutationFn: (id: string) => api.post(`/instructors/${id}/magic-link`),
-    onSuccess: (res: any) => {
-      if (res.data?.data?.link) {
-        navigator.clipboard.writeText(res.data.data.link);
-        toast({ title: "✅ Magic link copiado al portapapeles" });
+    mutationFn: async (ins: Instructor) => {
+      const res = await api.post(`/instructors/${ins.id}/magic-link`);
+      return { link: res.data?.data?.link as string | undefined, name: ins.displayName };
+    },
+    onSuccess: ({ link, name }) => {
+      if (!link) {
+        toast({ title: "Error al generar link", variant: "destructive" });
+        return;
       }
+      setMagicLink({ link, name });
+      copyMagicLink(link);
     },
     onError: (e: any) => toast({ title: e?.response?.data?.message ?? "Error al generar link", variant: "destructive" }),
   });
@@ -137,7 +153,7 @@ const InstructorsList = () => {
       fd.append("photo", file);
       return api.post(`/instructors/${id}/photo`, fd, { headers: { "Content-Type": "multipart/form-data" } });
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["instructors"] }); toast({ title: "✅ Foto actualizada" }); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["instructors"] }); toast({ title: "Foto actualizada" }); },
     onError: (e: any) => toast({ title: e?.response?.data?.message ?? "Error al subir foto", variant: "destructive" }),
   });
 
@@ -156,6 +172,16 @@ const InstructorsList = () => {
     form.reset({ isActive: true, photoFocusX: 50, photoFocusY: 50 });
     setEditing(null);
     setOpen(true);
+  };
+
+  const handleDelete = async (ins: Instructor) => {
+    const ok = await confirm({
+      title: `¿Eliminar a ${ins.displayName}?`,
+      description: "Su perfil se borra definitivamente (foto, bio y especialidades) y dejará de aparecer al programar clases. Esta acción no se puede deshacer.",
+      confirmLabel: "Eliminar",
+      destructive: true,
+    });
+    if (ok) deleteMutation.mutate(ins.id);
   };
 
   const focusX = clampFocus(form.watch("photoFocusX"));
@@ -178,72 +204,125 @@ const InstructorsList = () => {
             ]}
           />
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
-            <h1 className="text-2xl font-bold">Instructores / Staff</h1>
-            <Button size="sm" onClick={openCreate}><Plus size={14} className="mr-1" />Nuevo instructor</Button>
+            <h1 className="admin-title font-semibold text-alma-ink">Instructoras</h1>
+            <Button size="sm" onClick={openCreate} className="bg-alma-ink text-alma-canvas hover:bg-alma-ink-deep">
+              <Plus size={14} className="mr-1" />Nueva instructora
+            </Button>
           </div>
 
-          <div className="rounded-xl border border-border overflow-hidden">
-            <input
-              type="file"
-              accept="image/*"
-              className="hidden"
-              ref={fileRef}
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f && uploadTargetId) uploadPhotoMutation.mutate({ id: uploadTargetId, file: f });
-                e.target.value = "";
-                setUploadTargetId(null);
-              }}
+          {magicLink && (
+            <div className="mb-4 rounded-xl border border-alma-hairline bg-alma-mist p-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-alma-ink/60">
+                    Magic link · {magicLink.name}
+                  </p>
+                  <p className="mt-1 break-all text-xs text-alma-ink/80">{magicLink.link}</p>
+                  <p className="mt-1 text-[11px] text-alma-ink/55">Caduca en 24 horas. Compártelo solo con ella.</p>
+                </div>
+                <div className="flex shrink-0 items-center gap-1">
+                  <Button type="button" variant="outline" size="sm" onClick={() => copyMagicLink(magicLink.link)}>
+                    <Copy size={12} className="mr-1.5" /> Copiar
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-alma-ink/55 hover:text-alma-ink"
+                    onClick={() => setMagicLink(null)}
+                    aria-label="Ocultar magic link"
+                  >
+                    <X size={14} />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <input
+            type="file"
+            accept="image/*"
+            className="hidden"
+            ref={fileRef}
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f && uploadTargetId) uploadPhotoMutation.mutate({ id: uploadTargetId, file: f });
+              e.target.value = "";
+              setUploadTargetId(null);
+            }}
+          />
+
+          {isError ? (
+            <ErrorState
+              description="No pudimos cargar a las instructoras. Revisa tu conexión y vuelve a intentarlo."
+              onRetry={() => refetch()}
             />
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Foto</TableHead>
-                  <TableHead>Nombre</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Especialidades</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading
-                  ? Array(4).fill(0).map((_, i) => (
-                    <TableRow key={i}>{Array(6).fill(0).map((_, j) => <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>)}</TableRow>
-                  ))
-                  : instructors.map((ins) => (
-                    <TableRow key={ins.id}>
-                      <TableCell>
-                        {ins.photoUrl
-                          ? <img src={ins.photoUrl} className="w-8 h-8 rounded-full object-cover" style={{ objectPosition: `${clampFocus(ins.photoFocusX)}% ${clampFocus(ins.photoFocusY)}%` }} alt="" />
-                          : <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center text-xs font-bold">{ins.displayName?.[0]}</div>
-                        }
-                      </TableCell>
-                      <TableCell className="font-medium">{ins.displayName}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{ins.email}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{normalizeSpecialties(ins.specialties).join(", ")}</TableCell>
-                      <TableCell><Badge variant={ins.isActive ? "default" : "secondary"}>{ins.isActive ? "Activo" : "Inactivo"}</Badge></TableCell>
-                      <TableCell>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal size={14} /></Button></DropdownMenuTrigger>
-                          <DropdownMenuContent>
-                            <DropdownMenuItem onClick={() => openEdit(ins)}>Editar</DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => { setUploadTargetId(ins.id); setTimeout(() => fileRef.current?.click(), 0); }}>Subir foto</DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => magicLinkMutation.mutate(ins.id)}>Magic link</DropdownMenuItem>
-                            <DropdownMenuItem className="text-destructive" onClick={() => { if (window.confirm("¿Eliminar este instructor?")) deleteMutation.mutate(ins.id); }}>Eliminar</DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-              </TableBody>
-            </Table>
-          </div>
+          ) : !isLoading && instructors.length === 0 ? (
+            <EmptyState
+              icon={<Users size={20} strokeWidth={1.8} />}
+              title="Crea tu primera instructora"
+              description="Su perfil con foto y especialidades aparece al programar clases y en la página del estudio."
+              ctaLabel="Nueva instructora"
+              onCta={openCreate}
+            />
+          ) : (
+            <div className="rounded-xl border border-alma-hairline overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Foto</TableHead>
+                    <TableHead>Nombre</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Especialidades</TableHead>
+                    <TableHead>Estado</TableHead>
+                    <TableHead />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {isLoading
+                    ? Array(4).fill(0).map((_, i) => (
+                      <TableRow key={i}>{Array(6).fill(0).map((_, j) => <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>)}</TableRow>
+                    ))
+                    : instructors.map((ins) => (
+                      <TableRow key={ins.id}>
+                        <TableCell>
+                          {ins.photoUrl
+                            ? <img src={ins.photoUrl} className="w-8 h-8 rounded-full object-cover" style={{ objectPosition: `${clampFocus(ins.photoFocusX)}% ${clampFocus(ins.photoFocusY)}%` }} alt="" />
+                            : <div className="w-8 h-8 rounded-full bg-alma-oat flex items-center justify-center text-xs font-bold text-alma-ink">{ins.displayName?.[0]}</div>
+                          }
+                        </TableCell>
+                        <TableCell className="font-medium text-alma-ink">{ins.displayName}</TableCell>
+                        <TableCell className="text-sm text-alma-ink/60">{ins.email}</TableCell>
+                        <TableCell className="text-xs text-alma-ink/60">{normalizeSpecialties(ins.specialties).join(", ")}</TableCell>
+                        <TableCell>
+                          {ins.isActive ? (
+                            <Badge variant="outline" className="border-transparent bg-alma-oat text-alma-ink font-medium">Activa</Badge>
+                          ) : (
+                            <Badge variant="outline" className="border-alma-hairline bg-transparent text-alma-ink/55 font-medium">Inactiva</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal size={14} /></Button></DropdownMenuTrigger>
+                            <DropdownMenuContent>
+                              <DropdownMenuItem onClick={() => openEdit(ins)}>Editar</DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => { setUploadTargetId(ins.id); setTimeout(() => fileRef.current?.click(), 0); }}>Subir foto</DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => magicLinkMutation.mutate(ins)}>Magic link</DropdownMenuItem>
+                              <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(ins)}>Eliminar</DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </div>
 
         <Dialog open={open} onOpenChange={setOpen}>
-          <DialogContent className="max-w-md">
-            <DialogHeader><DialogTitle>{editing ? "Editar instructor" : "Nuevo instructor"}</DialogTitle></DialogHeader>
+          <DialogContent className="max-w-2xl max-h-[90dvh] overflow-y-auto">
+            <DialogHeader><DialogTitle>{editing ? "Editar instructora" : "Nueva instructora"}</DialogTitle></DialogHeader>
             <form onSubmit={form.handleSubmit((d) => editing
               ? updateMutation.mutate({
                 id: editing.id,
@@ -256,88 +335,98 @@ const InstructorsList = () => {
                 photoFocusY: d.photoFocusY,
               })
               : createMutation.mutate(d))} className="space-y-4">
-              <div className="space-y-1"><Label>Nombre</Label><Input {...form.register("displayName")} /></div>
-              <div className="space-y-1"><Label>Email</Label><Input type="email" {...form.register("email")} /></div>
-              <div className="space-y-1"><Label>Bio</Label><Input {...form.register("bio")} /></div>
-              <div className="space-y-1"><Label>Especialidades (separadas por coma)</Label><Input {...form.register("specialties")} /></div>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label>Enfoque horizontal</Label>
-                  <span className="text-xs text-muted-foreground">{focusX}%</span>
-                </div>
-                <Input
-                  type="range"
-                  min={0}
-                  max={100}
-                  step={1}
-                  value={focusX}
-                  onChange={(e) => form.setValue("photoFocusX", Number(e.target.value), { shouldDirty: true })}
-                />
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1"><Label>Nombre</Label><Input {...form.register("displayName")} /></div>
+                <div className="space-y-1"><Label>Email</Label><Input type="email" {...form.register("email")} /></div>
+                <div className="space-y-1"><Label>Bio</Label><Input {...form.register("bio")} /></div>
+                <div className="space-y-1"><Label>Especialidades (separadas por coma)</Label><Input {...form.register("specialties")} /></div>
               </div>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label>Enfoque vertical</Label>
-                  <span className="text-xs text-muted-foreground">{focusY}%</span>
-                </div>
-                <Input
-                  type="range"
-                  min={0}
-                  max={100}
-                  step={1}
-                  value={focusY}
-                  onChange={(e) => form.setValue("photoFocusY", Number(e.target.value), { shouldDirty: true })}
-                />
-              </div>
-              {editing?.photoUrl && (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between gap-3">
-                    <Label>Vista previa y enfoque</Label>
-                    <span className="text-[11px] text-muted-foreground">Haz clic o arrastra sobre la cara</span>
-                  </div>
-                  <button
-                    type="button"
-                    onPointerDown={applyPreviewFocus}
-                    onPointerMove={(event) => {
-                      if (event.buttons !== 1 && event.pointerType !== "touch") return;
-                      applyPreviewFocus(event);
-                    }}
-                    className="group relative mx-auto block h-[360px] w-full max-w-[300px] touch-none overflow-hidden rounded-[28px] border border-border bg-black/30 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C7A892]"
-                    aria-label="Seleccionar enfoque de la foto"
-                  >
-                    <img
-                      src={editing.photoUrl}
-                      alt={editing.displayName}
-                      className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
-                      style={{ objectPosition: `${focusX}% ${focusY}%` }}
-                    />
-                    <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent" />
-                    <div
-                      className="pointer-events-none absolute h-8 w-8 rounded-full border border-white/80 bg-white/10 shadow-[0_0_0_1px_rgba(0,0,0,0.2)] backdrop-blur-sm"
-                      style={{ left: `${focusX}%`, top: `${focusY}%`, transform: "translate(-50%, -50%)" }}
-                    >
-                      <div className="absolute left-1/2 top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white" />
+
+              <div className={editing?.photoUrl ? "grid gap-5 sm:grid-cols-[minmax(0,1fr)_300px]" : "space-y-4"}>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label>Enfoque horizontal</Label>
+                      <span className="nums text-xs text-alma-ink/60">{focusX}%</span>
                     </div>
-                    <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-between px-4 py-3 text-[11px] font-medium text-white/80">
+                    <Input
+                      type="range"
+                      min={0}
+                      max={100}
+                      step={1}
+                      value={focusX}
+                      onChange={(e) => form.setValue("photoFocusX", Number(e.target.value), { shouldDirty: true })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label>Enfoque vertical</Label>
+                      <span className="nums text-xs text-alma-ink/60">{focusY}%</span>
+                    </div>
+                    <Input
+                      type="range"
+                      min={0}
+                      max={100}
+                      step={1}
+                      value={focusY}
+                      onChange={(e) => form.setValue("photoFocusY", Number(e.target.value), { shouldDirty: true })}
+                    />
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Switch checked={form.watch("isActive")} onCheckedChange={(v) => form.setValue("isActive", v)} />
+                    <Label>Activa</Label>
+                  </div>
+                </div>
+
+                {editing?.photoUrl && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <Label>Vista previa y enfoque</Label>
+                      <span className="text-[11px] text-alma-ink/55">Haz clic o arrastra sobre la cara</span>
+                    </div>
+                    <button
+                      type="button"
+                      onPointerDown={applyPreviewFocus}
+                      onPointerMove={(event) => {
+                        if (event.buttons !== 1 && event.pointerType !== "touch") return;
+                        applyPreviewFocus(event);
+                      }}
+                      className="group relative mx-auto block h-[360px] w-full max-w-[300px] touch-none overflow-hidden rounded-[28px] border border-alma-hairline bg-alma-oat/40 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-alma-berry focus-visible:ring-offset-2"
+                      aria-label="Seleccionar enfoque de la foto"
+                    >
+                      <img
+                        src={editing.photoUrl}
+                        alt={editing.displayName}
+                        className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+                        style={{ objectPosition: `${focusX}% ${focusY}%` }}
+                      />
+                      <div
+                        className="pointer-events-none absolute h-8 w-8 rounded-full border-2 border-alma-canvas bg-alma-canvas/15 shadow-[0_0_0_1px_rgba(0,0,0,0.25)]"
+                        style={{ left: `${focusX}%`, top: `${focusY}%`, transform: "translate(-50%, -50%)" }}
+                      >
+                        <div className="absolute left-1/2 top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-alma-canvas shadow-[0_0_0_1px_rgba(0,0,0,0.25)]" />
+                      </div>
+                    </button>
+                    <div className="nums mx-auto flex w-full max-w-[300px] items-center justify-between text-[11px] font-medium text-alma-ink/60">
                       <span>X {focusX}%</span>
                       <span>Y {focusY}%</span>
                     </div>
-                  </button>
-                </div>
-              )}
-              <div className="flex items-center gap-3">
-                <Switch checked={form.watch("isActive")} onCheckedChange={(v) => form.setValue("isActive", v)} />
-                <Label>Activo</Label>
+                  </div>
+                )}
               </div>
+
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-                <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
-                  {(createMutation.isPending || updateMutation.isPending) && <span className="mr-2 animate-spin">⏳</span>}
+                <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending} className="bg-alma-ink text-alma-canvas hover:bg-alma-ink-deep">
+                  {(createMutation.isPending || updateMutation.isPending) && <Loader2 size={14} className="mr-2 animate-spin" />}
                   {editing ? "Actualizar datos" : "Crear"}
                 </Button>
               </DialogFooter>
             </form>
           </DialogContent>
         </Dialog>
+
+        {dialog}
       </AdminLayout>
     </AuthGuard>
   );

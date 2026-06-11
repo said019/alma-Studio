@@ -3,11 +3,11 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuthStore } from "@/stores/authStore";
-import { useToast } from "@/hooks/use-toast";
 import {
   AuthShell,
   AuthField,
   AuthPasswordField,
+  AuthSelect,
   AuthSubmit,
   AuthErrorBanner,
   AuthDivider,
@@ -66,7 +66,6 @@ const Register = () => {
   const { register: registerUser, isLoading, error, clearError } = useAuthStore();
   const navigate = useNavigate();
   const [params] = useSearchParams();
-  const { toast } = useToast();
   const refCode = params.get("ref");
 
   const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm<FormValues>({
@@ -98,11 +97,7 @@ const Register = () => {
       } as any);
       navigate("/auth/onboarding");
     } catch {
-      toast({
-        title: "No pudimos crear tu cuenta",
-        description: error ?? "Inténtalo de nuevo en un momento.",
-        variant: "destructive",
-      });
+      // El error del store se muestra en el AuthErrorBanner, único canal de error.
     }
   };
 
@@ -133,7 +128,7 @@ const Register = () => {
           <span className="grid h-6 w-6 place-items-center rounded-full" style={{ backgroundColor: ALMA.berry, color: ALMA.cream }}>
             <Check size={11} strokeWidth={3} />
           </span>
-          Código de referido <strong className="ml-1 font-bebas tracking-wide">{refCode}</strong>
+          Código de referido <strong className="ml-1 nums font-medium tracking-wide">{refCode}</strong>
         </div>
       )}
 
@@ -160,40 +155,17 @@ const Register = () => {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-          <div className="flex flex-col gap-1.5">
-            <label
-              htmlFor="f-genero"
-              className="text-[0.64rem] font-medium uppercase tracking-[0.22em]"
-              style={{ color: ALMA.ink, opacity: 0.62 }}
-            >
-              Sexo
-            </label>
-            <select
-              id="f-genero"
-              {...register("gender")}
-              defaultValue=""
-              className="w-full rounded-2xl px-4 py-3.5 text-[0.95rem] outline-none transition-all duration-200 focus-visible:ring-2 appearance-none bg-no-repeat"
-              style={{
-                backgroundColor: ALMA.cream,
-                color: ALMA.ink,
-                border: `1px solid ${errors.gender ? ALMA.destructive : ALMA.border}`,
-                boxShadow: errors.gender ? `0 0 0 2px ${ALMA.destructive}1a` : undefined,
-                backgroundImage: `url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L6 6L11 1' stroke='%2376214D' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
-                backgroundPosition: "right 1rem center",
-                paddingRight: "2.6rem",
-              }}
-            >
-              <option value="" disabled>Selecciona</option>
-              <option value="female">Femenino</option>
-              <option value="male">Masculino</option>
-              <option value="other">Prefiero no decir</option>
-            </select>
-            {errors.gender && (
-              <p className="text-[0.78rem] mt-0.5" style={{ color: ALMA.destructive }}>
-                {errors.gender.message}
-              </p>
-            )}
-          </div>
+          <AuthSelect
+            label="Sexo"
+            defaultValue=""
+            error={errors.gender?.message}
+            {...register("gender")}
+          >
+            <option value="" disabled>Selecciona</option>
+            <option value="female">Femenino</option>
+            <option value="male">Masculino</option>
+            <option value="other">Prefiero no decir</option>
+          </AuthSelect>
 
           <AuthField
             label="Fecha de nacimiento"
@@ -232,7 +204,7 @@ const Register = () => {
           placeholder="Repite tu contraseña"
           autoComplete="new-password"
           error={errors.confirmPassword?.message}
-          hint={passwordsMatch ? "Coincide" : undefined}
+          success={passwordsMatch ? "Coincide" : undefined}
           {...register("confirmPassword")}
         />
 

@@ -7,22 +7,37 @@ import api from "@/lib/api";
 import { AuthGuard } from "@/components/admin/AuthGuard";
 import AdminLayout from "@/components/admin/AdminLayout";
 import SectionTabs from "@/components/admin/SectionTabs";
+import { useConfirm } from "@/components/admin/ConfirmDialog";
+import { EmptyState, ErrorState } from "@/components/app/AppShell";
+import { formatDate, formatMXN } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
-import { MoreHorizontal, Plus } from "lucide-react";
+import { MoreHorizontal, Plus, TicketPercent } from "lucide-react";
 
 const nullableInt = z.preprocess(
   (v) => (v === "" || v === undefined || v === null ? null : Number(v)),
   z.number().int().positive().nullable(),
 );
+
+// Taxonomía única (la misma que valida el server: all/studio/reformer_tower/mixto).
+const CODE_CATEGORIES = ["all", "studio", "reformer_tower", "mixto"] as const;
+type CodeCategory = (typeof CODE_CATEGORIES)[number];
+
+const CATEGORY_LABELS: Record<CodeCategory, string> = {
+  all: "General (all)",
+  studio: "Studio",
+  reformer_tower: "Reformer/Tower",
+  mixto: "Mixto",
+};
 
 const codeSchema = z.object({
   code: z.string().trim().min(1, "Código requerido"),
@@ -31,7 +46,7 @@ const codeSchema = z.object({
   minOrderAmount: z.coerce.number().min(0).default(0),
   maxUses: nullableInt,
   planId: z.string().optional(),
-  classCategory: z.enum(["all", "barre", "pilates", "mixto"]).optional(),
+  classCategory: z.enum(CODE_CATEGORIES).optional(),
   channel: z.enum(["all", "membership", "pos", "event"]).default("all"),
   expiresAt: z.string().optional(),
   isActive: z.boolean().default(true),
@@ -49,6 +64,11 @@ function normalizeType(type: unknown): "percent" | "fixed" {
   return value === "fixed" ? "fixed" : "percent";
 }
 
+function normalizeCategory(raw: unknown): CodeCategory | undefined {
+  const value = String(raw ?? "").toLowerCase();
+  return (CODE_CATEGORIES as readonly string[]).includes(value) ? (value as CodeCategory) : undefined;
+}
+
 function normalizeCode(row: any): DiscountCode {
   return {
     id: row.id,
@@ -58,7 +78,7 @@ function normalizeCode(row: any): DiscountCode {
     minOrderAmount: Number(row.minOrderAmount ?? row.min_order_amount ?? 0),
     maxUses: row.maxUses ?? row.max_uses ?? null,
     planId: row.planId ?? row.plan_id ?? undefined,
-    classCategory: row.classCategory ?? row.class_category ?? undefined,
+    classCategory: normalizeCategory(row.classCategory ?? row.class_category),
     channel: (row.channel ?? "all") as "all" | "membership" | "pos" | "event",
     planName: row.planName ?? row.plan_name ?? null,
     expiresAt: row.expiresAt ?? row.expires_at ?? "",
@@ -67,13 +87,21 @@ function normalizeCode(row: any): DiscountCode {
   };
 }
 
+const CHANNEL_LABELS: Record<string, string> = {
+  membership: "Membresías",
+  pos: "POS",
+  event: "Eventos",
+  all: "Todos",
+};
+
 const DiscountCodes = () => {
   const { toast } = useToast();
   const qc = useQueryClient();
+  const { confirm, dialog } = useConfirm();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<DiscountCode | null>(null);
 
-  const { data, isLoading } = useQuery<{ data: any[] }>({
+  const { data, isLoading, isError, refetch } = useQuery<{ data: any[] }>({
     queryKey: ["discount-codes"],
     queryFn: async () => (await api.get("/discount-codes")).data,
   });
@@ -147,6 +175,16 @@ const DiscountCodes = () => {
     onError: (e: any) => toast({ title: e?.response?.data?.message ?? "Error al eliminar código", variant: "destructive" }),
   });
 
+  const requestDelete = async (c: DiscountCode) => {
+    const ok = await confirm({
+      title: `¿Eliminar el código ${c.code}?`,
+      description: "Deja de funcionar de inmediato para compras nuevas. Las compras donde ya se aplicó no cambian.",
+      confirmLabel: "Eliminar",
+      destructive: true,
+    });
+    if (ok) deleteMutation.mutate(c.id);
+  };
+
   const openEdit = (c: DiscountCode) => {
     form.reset({
       code: c.code,
@@ -186,6 +224,7 @@ const DiscountCodes = () => {
   return (
     <AuthGuard>
       <AdminLayout>
+        {dialog}
         <div className="admin-page max-w-5xl">
           <SectionTabs
             tabs={[
@@ -195,60 +234,77 @@ const DiscountCodes = () => {
             ]}
           />
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
-            <h1 className="text-2xl font-bold">Códigos de Descuento</h1>
+            <h1 className="admin-title font-semibold text-alma-ink">Códigos de descuento</h1>
             <Button size="sm" onClick={openCreate}><Plus size={14} className="mr-1" />Nuevo código</Button>
           </div>
 
-          <div className="rounded-xl border border-border overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Código</TableHead>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead>Descuento</TableHead>
-                  <TableHead>Canal</TableHead>
-                  <TableHead>Aplica a</TableHead>
-                  <TableHead>Usos</TableHead>
-                  <TableHead>Vence</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading
-                  ? null
-                  : codes.map((c) => (
-                  <TableRow key={c.id}>
-                    <TableCell className="font-mono font-bold">{c.code}</TableCell>
-                    <TableCell>{c.discountType === "percent" ? "%" : "MXN"}</TableCell>
-                    <TableCell>{c.discountType === "percent" ? `${c.discountValue}%` : `$${c.discountValue}`}</TableCell>
-                    <TableCell>
-                      {c.channel === "membership" ? "Membresías" : c.channel === "pos" ? "POS" : c.channel === "event" ? "Eventos" : "Todos"}
-                    </TableCell>
-                    <TableCell>
-                      {c.planName
-                        ? c.planName
-                        : c.classCategory
-                          ? `Categoría ${c.classCategory}`
-                          : "Todos los planes"}
-                    </TableCell>
-                    <TableCell>{c.usesCount}/{c.maxUses ?? "∞"}</TableCell>
-                    <TableCell className="text-sm">{c.expiresAt ? new Date(c.expiresAt).toLocaleString("es-MX") : "—"}</TableCell>
-                    <TableCell><Badge variant={c.isActive ? "default" : "secondary"}>{c.isActive ? "Activo" : "Inactivo"}</Badge></TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal size={14} /></Button></DropdownMenuTrigger>
-                        <DropdownMenuContent>
-                          <DropdownMenuItem onClick={() => openEdit(c)}>Editar</DropdownMenuItem>
-                          <DropdownMenuItem className="text-destructive" onClick={() => { if (window.confirm("¿Eliminar este código de descuento?")) deleteMutation.mutate(c.id); }}>Eliminar</DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
+          {isError ? (
+            <ErrorState
+              description="No pudimos cargar los códigos de descuento. Revisa tu conexión y vuelve a intentarlo."
+              onRetry={() => refetch()}
+            />
+          ) : !isLoading && codes.length === 0 ? (
+            <div className="rounded-xl border border-alma-hairline bg-alma-mist px-6">
+              <EmptyState
+                icon={<TicketPercent size={20} strokeWidth={1.8} />}
+                title="Aún no hay códigos de descuento"
+                description="Son cupones que las clientas escriben al pagar: aplican un porcentaje o un monto fijo. Puedes limitarlos por plan, categoría, canal, número de usos o fecha."
+                ctaLabel="Crear el primer código"
+                onCta={openCreate}
+              />
+            </div>
+          ) : (
+            <div className="rounded-xl border border-alma-hairline bg-alma-mist overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Código</TableHead>
+                    <TableHead>Descuento</TableHead>
+                    <TableHead>Canal</TableHead>
+                    <TableHead>Aplica a</TableHead>
+                    <TableHead>Usos</TableHead>
+                    <TableHead>Vence</TableHead>
+                    <TableHead>Estado</TableHead>
+                    <TableHead />
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                </TableHeader>
+                <TableBody>
+                  {isLoading
+                    ? Array(4).fill(0).map((_, i) => (
+                      <TableRow key={i}>{Array(8).fill(0).map((_, j) => <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>)}</TableRow>
+                    ))
+                    : codes.map((c) => (
+                      <TableRow key={c.id}>
+                        <TableCell className="font-mono font-bold text-alma-ink">{c.code}</TableCell>
+                        <TableCell className="nums text-alma-ink">
+                          {c.discountType === "percent" ? `${c.discountValue}%` : formatMXN(c.discountValue)}
+                        </TableCell>
+                        <TableCell className="text-sm text-alma-ink/70">{CHANNEL_LABELS[c.channel] ?? "Todos"}</TableCell>
+                        <TableCell className="text-sm text-alma-ink/70">
+                          {c.planName
+                            ? c.planName
+                            : c.classCategory
+                              ? `Categoría ${CATEGORY_LABELS[c.classCategory]}`
+                              : "Todos los planes"}
+                        </TableCell>
+                        <TableCell className="nums text-alma-ink/70">{c.usesCount}/{c.maxUses ?? "∞"}</TableCell>
+                        <TableCell className="nums text-sm text-alma-ink/70">{c.expiresAt ? formatDate(c.expiresAt) : "—"}</TableCell>
+                        <TableCell><Badge variant={c.isActive ? "default" : "secondary"}>{c.isActive ? "Activo" : "Inactivo"}</Badge></TableCell>
+                        <TableCell>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal size={14} /></Button></DropdownMenuTrigger>
+                            <DropdownMenuContent>
+                              <DropdownMenuItem onClick={() => openEdit(c)}>Editar</DropdownMenuItem>
+                              <DropdownMenuItem className="text-destructive" onClick={() => requestDelete(c)}>Eliminar</DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </div>
 
         <Dialog
@@ -258,8 +314,10 @@ const DiscountCodes = () => {
             if (!next) setEditing(null);
           }}
         >
-          <DialogContent className="max-w-md">
-            <DialogHeader><DialogTitle>{editing ? "Editar código" : "Nuevo código"}</DialogTitle></DialogHeader>
+          <DialogContent className="max-w-md border-alma-hairline bg-alma-canvas">
+            <DialogHeader>
+              <DialogTitle className="font-display text-alma-ink">{editing ? "Editar código" : "Nuevo código"}</DialogTitle>
+            </DialogHeader>
             <form
               noValidate
               onSubmit={form.handleSubmit((d) => editing
@@ -279,11 +337,11 @@ const DiscountCodes = () => {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-1"><Label>Valor</Label><Input type="number" {...form.register("discountValue")} /></div>
+                <div className="space-y-1"><Label>Valor</Label><Input type="number" className="nums" {...form.register("discountValue")} /></div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1"><Label>Compra mínima</Label><Input type="number" {...form.register("minOrderAmount")} /></div>
-                <div className="space-y-1"><Label>Máx. usos (vacío=∞)</Label><Input type="number" {...form.register("maxUses")} /></div>
+                <div className="space-y-1"><Label>Compra mínima</Label><Input type="number" className="nums" {...form.register("minOrderAmount")} /></div>
+                <div className="space-y-1"><Label>Máx. usos (vacío = ∞)</Label><Input type="number" className="nums" {...form.register("maxUses")} /></div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
@@ -300,14 +358,14 @@ const DiscountCodes = () => {
                 </div>
                 <div className="space-y-1">
                   <Label>Categoría de clase</Label>
-                  <Select value={form.watch("classCategory") ?? "none"} onValueChange={(v) => form.setValue("classCategory", v === "none" ? undefined : (v as CodeFormData["classCategory"]))}>
+                  <Select value={form.watch("classCategory") ?? "none"} onValueChange={(v) => form.setValue("classCategory", v === "none" ? undefined : (v as CodeCategory))}>
                     <SelectTrigger><SelectValue placeholder="Todas" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">Todas</SelectItem>
-                      <SelectItem value="all">General</SelectItem>
-                      <SelectItem value="barre">Barre</SelectItem>
-                      <SelectItem value="pilates">Pilates</SelectItem>
+                      <SelectItem value="studio">Studio</SelectItem>
+                      <SelectItem value="reformer_tower">Reformer/Tower</SelectItem>
                       <SelectItem value="mixto">Mixto</SelectItem>
+                      <SelectItem value="all">General (all)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -324,7 +382,7 @@ const DiscountCodes = () => {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1"><Label>Fecha de expiración</Label><Input type="datetime-local" {...form.register("expiresAt")} /></div>
+              <div className="space-y-1"><Label>Fecha de expiración</Label><Input type="datetime-local" className="nums" {...form.register("expiresAt")} /></div>
               <div className="flex items-center gap-3"><Switch checked={form.watch("isActive")} onCheckedChange={(v) => form.setValue("isActive", v)} /><Label>Activo</Label></div>
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>

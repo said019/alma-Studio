@@ -9,16 +9,20 @@ import AdminLayout from "@/components/admin/AdminLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { MoreHorizontal, Plus, Search, Trash2, Minus } from "lucide-react";
+import { useConfirm } from "@/components/admin/ConfirmDialog";
+import { ErrorState, EmptyState } from "@/components/app/AppShell";
+import { formatMXN } from "@/lib/format";
+import { MoreHorizontal, Plus, Search, Trash2, Minus, PackageOpen, ShoppingBag } from "lucide-react";
 import { useDebounce } from "@/hooks/use-debounce";
+import { cn } from "@/lib/utils";
 
 const productSchema = z.object({
   name: z.string().min(1),
@@ -33,6 +37,12 @@ interface Product extends ProductFormData { id: string }
 
 interface CartItem { product: Product; qty: number }
 
+const CATEGORY_LABEL: Record<string, string> = {
+  suplementos: "Suplementos",
+  ropa: "Ropa",
+  accesorios: "Accesorios",
+};
+
 function normalizeProduct(row: any): Product {
   return {
     id: String(row?.id ?? ""),
@@ -45,16 +55,17 @@ function normalizeProduct(row: any): Product {
   };
 }
 
-// ── Products CRUD ────────────────────────────────────────
+// ── Catálogo de productos (CRUD) ─────────────────────────
 const ProductsPage = () => {
   const { toast } = useToast();
   const qc = useQueryClient();
+  const { confirm, dialog } = useConfirm();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 300);
 
-  const { data } = useQuery<{ data: Product[] }>({
+  const { data, isLoading, isError, refetch } = useQuery<{ data: Product[] }>({
     queryKey: ["products", debouncedSearch],
     queryFn: async () => (await api.get(`/products?search=${debouncedSearch}`)).data,
   });
@@ -66,40 +77,93 @@ const ProductsPage = () => {
   const updateMutation = useMutation({ mutationFn: ({ id, ...d }: Product) => api.put(`/products/${id}`, d), onSuccess: () => { qc.invalidateQueries({ queryKey: ["products"] }); toast({ title: "Producto actualizado" }); setOpen(false); } });
   const deleteMutation = useMutation({ mutationFn: (id: string) => api.delete(`/products/${id}`), onSuccess: () => { qc.invalidateQueries({ queryKey: ["products"] }); toast({ title: "Producto eliminado" }); } });
 
+  const openNew = () => { form.reset({ isActive: true, category: "suplementos" }); setEditing(null); setOpen(true); };
+
+  const handleDelete = async (p: Product) => {
+    const ok = await confirm({
+      title: `¿Eliminar "${p.name}"?`,
+      description: "Se elimina del catálogo y deja de aparecer en la terminal de venta.",
+      confirmLabel: "Eliminar",
+      destructive: true,
+    });
+    if (ok) deleteMutation.mutate(p.id);
+  };
+
   return (
     <div>
+      {dialog}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
         <div className="relative max-w-xs">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <Input className="pl-8" placeholder="Buscar producto..." value={search} onChange={(e) => setSearch(e.target.value)} />
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-alma-ink/55" />
+          <Input className="pl-8" placeholder="Buscar producto…" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
-        <Button size="sm" onClick={() => { form.reset({ isActive: true, category: "suplementos" }); setEditing(null); setOpen(true); }}>
+        <Button size="sm" className="bg-alma-ink-deep text-alma-canvas hover:bg-alma-ink" onClick={openNew}>
           <Plus size={14} className="mr-1" />Nuevo producto
         </Button>
       </div>
-      <Table>
-        <TableHeader><TableRow><TableHead>Nombre</TableHead><TableHead>Categoría</TableHead><TableHead>Precio</TableHead><TableHead>Stock</TableHead><TableHead>Estado</TableHead><TableHead /></TableRow></TableHeader>
-        <TableBody>
-          {products.map((p) => (
-            <TableRow key={p.id}>
-              <TableCell className="font-medium">{p.name}</TableCell>
-              <TableCell className="text-sm text-muted-foreground">{p.category}</TableCell>
-              <TableCell>${p.price}</TableCell>
-              <TableCell>{p.stock}</TableCell>
-              <TableCell><Badge variant={p.isActive ? "default" : "secondary"}>{p.isActive ? "Activo" : "Inactivo"}</Badge></TableCell>
-              <TableCell>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal size={14} /></Button></DropdownMenuTrigger>
-                  <DropdownMenuContent>
-                    <DropdownMenuItem onClick={() => { form.reset(normalizeProduct(p)); setEditing(p); setOpen(true); }}>Editar</DropdownMenuItem>
-                    <DropdownMenuItem className="text-destructive" onClick={() => { if (window.confirm("¿Eliminar este producto?")) deleteMutation.mutate(p.id); }}>Eliminar</DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </TableCell>
-            </TableRow>
+
+      {isLoading && (
+        <div className="space-y-2">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-12 w-full rounded-xl" />
           ))}
-        </TableBody>
-      </Table>
+        </div>
+      )}
+
+      {isError && !isLoading && (
+        <ErrorState
+          title="No pudimos cargar los productos"
+          description="Revisa tu conexión y vuelve a intentarlo."
+          onRetry={() => refetch()}
+        />
+      )}
+
+      {!isLoading && !isError && products.length === 0 && (
+        <EmptyState
+          icon={<PackageOpen size={20} strokeWidth={1.8} />}
+          title={search ? "Sin resultados" : "Aún no hay productos"}
+          description={search ? `No encontramos productos para "${search}".` : "Crea tu primer producto para venderlo en la terminal."}
+          ctaLabel={search ? undefined : "Nuevo producto"}
+          onCta={search ? undefined : openNew}
+        />
+      )}
+
+      {!isLoading && !isError && products.length > 0 && (
+        <div className="rounded-xl border border-alma-hairline overflow-hidden bg-alma-canvas">
+          <Table>
+            <TableHeader><TableRow><TableHead>Nombre</TableHead><TableHead>Categoría</TableHead><TableHead className="text-right">Precio</TableHead><TableHead className="text-right">Stock</TableHead><TableHead>Estado</TableHead><TableHead /></TableRow></TableHeader>
+            <TableBody>
+              {products.map((p) => (
+                <TableRow key={p.id}>
+                  <TableCell className="font-medium text-alma-ink">{p.name}</TableCell>
+                  <TableCell className="text-sm text-alma-ink/55">{CATEGORY_LABEL[p.category] ?? p.category}</TableCell>
+                  <TableCell className="text-right text-alma-ink nums">{formatMXN(p.price)}</TableCell>
+                  <TableCell className="text-right text-alma-ink nums">{p.stock}</TableCell>
+                  <TableCell>
+                    <span className={cn(
+                      "inline-flex items-center px-2.5 py-0.5 rounded-full border text-[11px] font-semibold",
+                      p.isActive
+                        ? "bg-alma-oat/60 text-alma-ink border-alma-sandstone/50"
+                        : "bg-alma-mist text-alma-ink/55 border-alma-hairline",
+                    )}>
+                      {p.isActive ? "Activo" : "Inactivo"}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal size={14} /></Button></DropdownMenuTrigger>
+                      <DropdownMenuContent>
+                        <DropdownMenuItem onClick={() => { form.reset(normalizeProduct(p)); setEditing(p); setOpen(true); }}>Editar</DropdownMenuItem>
+                        <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(p)}>Eliminar</DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-md">
@@ -107,8 +171,8 @@ const ProductsPage = () => {
           <form onSubmit={form.handleSubmit((d) => editing ? updateMutation.mutate({ ...d, id: editing.id }) : createMutation.mutate(d))} className="space-y-4">
             <div className="space-y-1"><Label>Nombre</Label><Input {...form.register("name")} /></div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1"><Label>Precio</Label><Input type="number" {...form.register("price")} /></div>
-              <div className="space-y-1"><Label>Stock</Label><Input type="number" {...form.register("stock")} /></div>
+              <div className="space-y-1"><Label>Precio</Label><Input type="number" className="nums" {...form.register("price")} /></div>
+              <div className="space-y-1"><Label>Stock</Label><Input type="number" className="nums" {...form.register("stock")} /></div>
             </div>
             <div className="space-y-1">
               <Label>Categoría</Label>
@@ -125,7 +189,7 @@ const ProductsPage = () => {
             <div className="flex items-center gap-3"><Switch checked={form.watch("isActive")} onCheckedChange={(v) => form.setValue("isActive", v)} /><Label>Activo</Label></div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-              <Button type="submit">{editing ? "Actualizar" : "Crear"}</Button>
+              <Button type="submit" className="bg-alma-ink-deep text-alma-canvas hover:bg-alma-ink">{editing ? "Actualizar" : "Crear"}</Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -134,7 +198,7 @@ const ProductsPage = () => {
   );
 };
 
-// ── POS Terminal ─────────────────────────────────────────
+// ── Terminal de venta ────────────────────────────────────
 const POSTerminal = () => {
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -144,7 +208,7 @@ const POSTerminal = () => {
   const [discountCode, setDiscountCode] = useState("");
   const debouncedSearch = useDebounce(search, 300);
 
-  const { data } = useQuery<{ data: Product[] }>({
+  const { data, isLoading, isError, refetch } = useQuery<{ data: Product[] }>({
     queryKey: ["products", debouncedSearch],
     queryFn: async () => (await api.get(`/products?search=${debouncedSearch}&active=true`)).data,
   });
@@ -182,49 +246,82 @@ const POSTerminal = () => {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      {/* Products */}
+      {/* Productos */}
       <div>
         <div className="relative mb-3">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <Input className="pl-8" placeholder="Buscar producto..." value={search} onChange={(e) => setSearch(e.target.value)} />
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-alma-ink/55" />
+          <Input className="pl-8" placeholder="Buscar producto…" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          {products.map((p) => (
-            <div
-              key={p.id}
-              onClick={() => addToCart(p)}
-              className="p-3 rounded-xl border border-border hover:bg-muted cursor-pointer"
-            >
-              <p className="font-medium text-sm">{p.name}</p>
-              <p className="text-xs text-muted-foreground">{p.category}</p>
-              <p className="font-bold mt-1">${p.price}</p>
-              <p className="text-xs text-muted-foreground">Stock: {p.stock}</p>
-            </div>
-          ))}
-        </div>
+
+        {isLoading && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} className="h-24 w-full rounded-xl" />
+            ))}
+          </div>
+        )}
+
+        {isError && !isLoading && (
+          <ErrorState
+            title="No pudimos cargar los productos"
+            description="Revisa tu conexión y vuelve a intentarlo."
+            onRetry={() => refetch()}
+          />
+        )}
+
+        {!isLoading && !isError && products.length === 0 && (
+          <EmptyState
+            icon={<PackageOpen size={20} strokeWidth={1.8} />}
+            title="Sin productos a la venta"
+            description={search ? `No encontramos productos para "${search}".` : "Agrega productos activos en la pestaña Productos."}
+          />
+        )}
+
+        {!isLoading && !isError && products.length > 0 && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {products.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => addToCart(p)}
+                className="p-3 rounded-xl border border-alma-hairline bg-alma-mist hover:bg-alma-oat/40 hover:border-alma-sandstone transition-colors text-left"
+              >
+                <p className="font-medium text-sm text-alma-ink">{p.name}</p>
+                <p className="text-xs text-alma-ink/55">{CATEGORY_LABEL[p.category] ?? p.category}</p>
+                <p className="font-semibold text-alma-ink nums mt-1">{formatMXN(p.price)}</p>
+                <p className="text-xs text-alma-ink/55 nums">Stock: {p.stock}</p>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Cart */}
-      <div className="bg-secondary rounded-xl p-4 space-y-3">
-        <h3 className="font-semibold">Carrito</h3>
-        {cart.length === 0 ? <p className="text-sm text-muted-foreground">Agrega productos...</p> : null}
+      {/* Carrito */}
+      <div className="bg-alma-mist border border-alma-hairline rounded-xl p-4 space-y-3 h-fit">
+        <h3 className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-alma-ink/70">Carrito</h3>
+        {cart.length === 0 && (
+          <div className="flex flex-col items-center gap-2 py-8 text-alma-ink/55">
+            <ShoppingBag size={18} strokeWidth={1.8} />
+            <p className="text-sm">Toca un producto para agregarlo</p>
+          </div>
+        )}
         {cart.map((item) => (
-          <div key={item.product.id} className="flex items-center justify-between text-sm">
+          <div key={item.product.id} className="flex items-center justify-between text-sm text-alma-ink">
             <span className="flex-1 truncate">{item.product.name}</span>
             <div className="flex items-center gap-1">
-              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => adjustQty(item.product.id, -1)}><Minus size={10} /></Button>
-              <span className="w-5 text-center">{item.qty}</span>
-              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => adjustQty(item.product.id, 1)}><Plus size={10} /></Button>
-              <span className="w-20 text-right font-medium">${item.product.price * item.qty}</span>
-              <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={() => remove(item.product.id)}><Trash2 size={10} /></Button>
+              <Button variant="ghost" size="icon" className="h-6 w-6" aria-label="Quitar uno" onClick={() => adjustQty(item.product.id, -1)}><Minus size={10} /></Button>
+              <span className="w-5 text-center nums">{item.qty}</span>
+              <Button variant="ghost" size="icon" className="h-6 w-6" aria-label="Agregar uno" onClick={() => adjustQty(item.product.id, 1)}><Plus size={10} /></Button>
+              <span className="w-20 text-right font-medium nums">{formatMXN(item.product.price * item.qty)}</span>
+              <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" aria-label="Eliminar del carrito" onClick={() => remove(item.product.id)}><Trash2 size={10} /></Button>
             </div>
           </div>
         ))}
         {cart.length > 0 && (
           <>
-            <div className="border-t border-border pt-3 flex justify-between font-bold">
+            <div className="border-t border-alma-hairline pt-3 flex justify-between font-semibold text-alma-ink">
               <span>Total</span>
-              <span>${total} MXN</span>
+              <span className="nums">{formatMXN(total)}</span>
             </div>
             <div className="space-y-1">
               <Label>Método de pago</Label>
@@ -245,8 +342,8 @@ const POSTerminal = () => {
                 placeholder="Ej. ALMA10"
               />
             </div>
-            <Button className="w-full" onClick={() => checkoutMutation.mutate()} disabled={checkoutMutation.isPending}>
-              Confirmar venta
+            <Button className="w-full bg-alma-ink-deep text-alma-canvas hover:bg-alma-ink font-semibold" onClick={() => checkoutMutation.mutate()} disabled={checkoutMutation.isPending}>
+              {checkoutMutation.isPending ? "Procesando…" : "Confirmar venta"}
             </Button>
           </>
         )}
@@ -255,16 +352,19 @@ const POSTerminal = () => {
   );
 };
 
-// ── Main POS Page ─────────────────────────────────────────
+const tabTriggerClass =
+  "rounded-xl px-4 py-2 text-[13px] font-semibold text-alma-ink/70 data-[state=active]:bg-alma-oat data-[state=active]:text-alma-ink data-[state=active]:shadow-none data-[state=active]:ring-1 data-[state=active]:ring-inset data-[state=active]:ring-alma-sandstone";
+
+// ── Página principal POS ──────────────────────────────────
 const POSPage = () => (
   <AuthGuard>
     <AdminLayout>
       <div className="admin-page max-w-5xl">
-        <h1 className="text-2xl font-bold mb-6">Punto de Venta</h1>
+        <h1 className="admin-title text-alma-ink mb-6">Punto de venta</h1>
         <Tabs defaultValue="pos">
-          <TabsList>
-            <TabsTrigger value="pos">Terminal POS</TabsTrigger>
-            <TabsTrigger value="products">Productos</TabsTrigger>
+          <TabsList className="h-auto rounded-2xl border border-alma-hairline bg-alma-mist p-1">
+            <TabsTrigger value="pos" className={tabTriggerClass}>Terminal</TabsTrigger>
+            <TabsTrigger value="products" className={tabTriggerClass}>Productos</TabsTrigger>
           </TabsList>
           <TabsContent value="pos" className="mt-4"><POSTerminal /></TabsContent>
           <TabsContent value="products" className="mt-4"><ProductsPage /></TabsContent>

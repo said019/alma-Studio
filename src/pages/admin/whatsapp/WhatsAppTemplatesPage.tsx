@@ -1,17 +1,21 @@
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { AuthGuard } from "@/components/admin/AuthGuard";
 import AdminLayout from "@/components/admin/AdminLayout";
 import SectionTabs from "@/components/admin/SectionTabs";
+import { useConfirm } from "@/components/admin/ConfirmDialog";
+import { EmptyState, ErrorState } from "@/components/app/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
-import { MessageSquare, Eye, RotateCcw, Save, Loader2, Sparkles, Send, BellOff, Bell } from "lucide-react";
+import { MessageSquare, Eye, RotateCcw, Save, Loader2, Send, BellOff, Bell, ChevronDown, MoreHorizontal, X } from "lucide-react";
 
 interface Template { subject: string; body: string; enabled?: boolean }
 interface ApiResponse {
@@ -37,12 +41,12 @@ const CATEGORIES: { id: string; label: string; keys: string[] }[] = [
 const SAMPLE_VARS: Record<string, string | number> = {
   firstName: "María",
   name: "María González",
-  class: "Barre",
+  class: "Reformer",
   date: "viernes 9 de mayo",
   time: "07:00",
   startDate: "1 mayo",
   endDate: "31 mayo",
-  plan: "Barre — 4 Clases por semana",
+  plan: "Reformer 4 clases por semana",
   expiresAt: "31 mayo",
   reason: "comprobante ilegible",
   link: "https://alma-movement.app/r/xyz",
@@ -78,6 +82,7 @@ const TemplateCard = ({
   toast: ReturnType<typeof useToast>["toast"];
 }) => {
   const enabled = template.enabled !== false;
+  const { confirm, promptText, dialog } = useConfirm();
   const [open, setOpen] = useState(false);
   const [subject, setSubject] = useState(template.subject || "");
   const [body, setBody] = useState(template.body || "");
@@ -121,10 +126,13 @@ const TemplateCard = ({
   };
 
   const handleTestSend = async () => {
-    const phone = window.prompt(
-      `Manda esta plantilla como WhatsApp de prueba.\n\nTeléfono (con o sin +52, solo números):`,
-      "",
-    );
+    const phone = await promptText({
+      title: "Enviar WhatsApp de prueba",
+      description: "Escribe el teléfono que recibirá esta plantilla. Con código de país, solo números. Ej: 5214441234567.",
+      placeholder: "5214441234567",
+      confirmLabel: "Enviar prueba",
+      required: true,
+    });
     if (!phone) return;
     setSendingTest(true);
     try {
@@ -132,7 +140,7 @@ const TemplateCard = ({
         templateKey,
         phone,
       });
-      toast({ title: "✓ Enviado", description: `WA de prueba mandado a ${phone}` });
+      toast({ title: "Prueba enviada", description: `WhatsApp de prueba enviado a ${phone}` });
     } catch (e: any) {
       toast({
         title: "No se envió",
@@ -144,8 +152,27 @@ const TemplateCard = ({
     }
   };
 
-  const handleToggle = async () => {
+  const handleResetClick = async () => {
+    const ok = await confirm({
+      title: "¿Restaurar al texto default?",
+      description: `Tu versión editada de "${templateKey}" se reemplaza por el texto original de Alma y no se puede recuperar.`,
+      confirmLabel: "Restaurar",
+      destructive: true,
+    });
+    if (ok) onReset(templateKey);
+  };
+
+  const handleToggleClick = async () => {
     const next = !enabled;
+    if (!next) {
+      const ok = await confirm({
+        title: "¿Desactivar este aviso?",
+        description: `El WhatsApp "${templateKey}" dejará de enviarse automáticamente a las clientas. Puedes reactivarlo cuando quieras.`,
+        confirmLabel: "Desactivar",
+        destructive: true,
+      });
+      if (!ok) return;
+    }
     setToggling(true);
     try {
       await onToggleEnabled(templateKey, next);
@@ -163,34 +190,44 @@ const TemplateCard = ({
   };
 
   return (
-    <div className={`rounded-2xl border border-white/[0.07] bg-white/[0.02] overflow-hidden ${!enabled ? "opacity-60" : ""}`}>
+    <div className={`rounded-xl border border-alma-hairline bg-alma-mist overflow-hidden ${!enabled ? "opacity-60" : ""}`}>
+      {dialog}
       <button
         onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center justify-between p-4 text-left hover:bg-white/[0.03] transition-colors"
+        className="w-full flex items-center justify-between gap-2 p-4 text-left transition-colors hover:bg-alma-oat/30"
+        aria-expanded={open}
       >
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <code className="text-[11px] px-1.5 py-0.5 rounded bg-secondary font-mono">{templateKey}</code>
-            {isModified && <Badge variant="default" className="text-[10px] h-4">editado</Badge>}
+            <code className="text-[11px] px-1.5 py-0.5 rounded bg-alma-oat/60 text-alma-berry font-mono">{templateKey}</code>
+            {isModified && (
+              <Badge variant="outline" className="border-transparent bg-alma-oat text-alma-ink text-[10px] h-4">
+                editado
+              </Badge>
+            )}
             {!enabled && (
               <Badge variant="outline" className="text-[10px] h-4 border-destructive/40 text-destructive">
                 desactivado
               </Badge>
             )}
           </div>
-          <p className="text-sm font-medium mt-1 truncate">{template.subject}</p>
-          <p className="text-xs text-muted-foreground mt-0.5 truncate">{template.body.slice(0, 90)}…</p>
+          <p className="text-sm font-medium text-alma-ink mt-1 truncate">{template.subject}</p>
+          <p className="text-xs text-alma-ink/55 mt-0.5 truncate">{template.body.slice(0, 90)}…</p>
         </div>
-        <span className="text-muted-foreground text-xs ml-2">{open ? "▼" : "▶"}</span>
+        <ChevronDown
+          size={15}
+          className={`shrink-0 text-alma-ink/55 transition-transform duration-200 ${open ? "" : "-rotate-90"}`}
+          aria-hidden="true"
+        />
       </button>
       {open && (
-        <div className="border-t border-white/[0.04] p-4 space-y-4 bg-white/[0.01]">
+        <div className="border-t border-alma-hairline p-4 space-y-4">
           <div className="space-y-1.5">
             <Label className="text-xs">Subject (asunto interno)</Label>
             <Input
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
-              className="bg-white/[0.04] border-white/[0.08]"
+              className="bg-alma-canvas"
             />
           </div>
           <div className="space-y-1.5">
@@ -199,17 +236,17 @@ const TemplateCard = ({
               value={body}
               onChange={(e) => setBody(e.target.value)}
               rows={4}
-              className="bg-white/[0.04] border-white/[0.08] resize-none font-mono text-sm"
+              className="bg-alma-canvas resize-none font-mono text-sm"
             />
             {variables.length > 0 && (
               <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                <span className="text-[11px] text-muted-foreground">Variables:</span>
+                <span className="text-[11px] text-alma-ink/55">Variables:</span>
                 {variables.map((v) => (
                   <button
                     key={v}
                     type="button"
                     onClick={() => insertVariable(v)}
-                    className="rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[11px] hover:bg-white/10 font-mono"
+                    className="rounded border border-alma-hairline bg-alma-canvas px-1.5 py-0.5 text-[11px] font-mono text-alma-ink/80 transition-colors hover:bg-alma-oat/60"
                   >
                     {`{${v}}`}
                   </button>
@@ -219,20 +256,29 @@ const TemplateCard = ({
           </div>
 
           {preview && (
-            <div className="rounded-xl border border-[#8A6E60]/30 bg-[#8A6E60]/5 p-3">
-              <p className="text-[10px] uppercase tracking-widest text-[#8A6E60] mb-1.5">Preview con datos de muestra</p>
-              <p className="text-sm font-medium">{preview.subject}</p>
-              <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">{preview.body}</p>
+            <div className="rounded-xl border border-alma-sandstone/60 bg-alma-oat/30 p-3">
+              <p className="text-[10px] uppercase tracking-widest text-alma-berry mb-1.5">Preview con datos de muestra</p>
+              <p className="text-sm font-medium text-alma-ink">{preview.subject}</p>
+              <p className="text-sm text-alma-ink/70 mt-1 whitespace-pre-wrap">{preview.body}</p>
             </div>
           )}
 
-          <div className="flex flex-wrap gap-2 pt-1">
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            <Button
+              onClick={handleSave}
+              disabled={!dirty || saving}
+              size="sm"
+              className="bg-alma-ink text-alma-canvas hover:bg-alma-ink-deep"
+            >
+              {saving ? <Loader2 size={13} className="mr-1.5 animate-spin" /> : <Save size={13} className="mr-1.5" />}
+              Guardar
+            </Button>
             <Button
               onClick={handlePreview}
               disabled={previewing}
-              variant="outline"
+              variant="ghost"
               size="sm"
-              className="border-white/15 bg-white/[0.04]"
+              className="text-alma-ink/70 hover:text-alma-ink"
             >
               {previewing ? <Loader2 size={13} className="mr-1.5 animate-spin" /> : <Eye size={13} className="mr-1.5" />}
               Preview
@@ -240,56 +286,42 @@ const TemplateCard = ({
             <Button
               onClick={handleTestSend}
               disabled={sendingTest || dirty}
-              variant="outline"
+              variant="ghost"
               size="sm"
-              className="border-[#8A7C66]/40 bg-[#8A7C66]/5 text-[#8A7C66]"
-              title={dirty ? "Guarda primero los cambios antes de enviar prueba" : "Mandar WA de prueba a un teléfono"}
+              className="text-alma-ink/70 hover:text-alma-ink"
+              title={dirty ? "Guarda primero los cambios antes de enviar prueba" : "Mandar WhatsApp de prueba a un teléfono"}
             >
               {sendingTest ? <Loader2 size={13} className="mr-1.5 animate-spin" /> : <Send size={13} className="mr-1.5" />}
               Enviar prueba
             </Button>
-            <Button
-              onClick={handleSave}
-              disabled={!dirty || saving}
-              size="sm"
-              className="bg-gradient-to-r from-[#8A6E60] to-[#C7A892] text-white"
-            >
-              {saving ? <Loader2 size={13} className="mr-1.5 animate-spin" /> : <Save size={13} className="mr-1.5" />}
-              Guardar
-            </Button>
-            {isModified && (
-              <Button
-                onClick={() => {
-                  if (window.confirm(`¿Restaurar "${templateKey}" al texto Alma default?`)) onReset(templateKey);
-                }}
-                variant="outline"
-                size="sm"
-                className="border-white/15 bg-white/[0.04]"
-              >
-                <RotateCcw size={13} className="mr-1.5" />
-                Restaurar default
-              </Button>
-            )}
-            <Button
-              onClick={() => {
-                if (enabled
-                  ? window.confirm(`Desactivar el aviso "${templateKey}" — ya no se enviará automáticamente. ¿Continuar?`)
-                  : true
-                ) handleToggle();
-              }}
-              disabled={toggling}
-              variant="outline"
-              size="sm"
-              className={enabled
-                ? "border-destructive/30 bg-destructive/5 text-destructive hover:bg-destructive/10"
-                : "border-emerald-500/30 bg-emerald-500/5 text-emerald-700 hover:bg-emerald-500/10"}
-              title={enabled ? "Detener el envío automático de este aviso" : "Volver a enviar este aviso"}
-            >
-              {toggling ? <Loader2 size={13} className="mr-1.5 animate-spin" />
-                : enabled ? <BellOff size={13} className="mr-1.5" />
-                : <Bell size={13} className="mr-1.5" />}
-              {enabled ? "Desactivar aviso" : "Activar aviso"}
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-alma-ink/55 hover:text-alma-ink"
+                  disabled={toggling}
+                  aria-label="Más acciones del template"
+                >
+                  {toggling ? <Loader2 size={15} className="animate-spin" /> : <MoreHorizontal size={15} />}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {isModified && (
+                  <DropdownMenuItem onClick={handleResetClick}>
+                    <RotateCcw size={13} className="mr-2" />
+                    Restaurar default
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuItem
+                  onClick={handleToggleClick}
+                  className={enabled ? "text-destructive focus:text-destructive" : ""}
+                >
+                  {enabled ? <BellOff size={13} className="mr-2" /> : <Bell size={13} className="mr-2" />}
+                  {enabled ? "Desactivar aviso" : "Activar aviso"}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       )}
@@ -300,8 +332,9 @@ const TemplateCard = ({
 const WhatsAppTemplatesPage = () => {
   const { toast } = useToast();
   const qc = useQueryClient();
+  const { confirm, dialog } = useConfirm();
 
-  const { data, isLoading } = useQuery<ApiResponse>({
+  const { data, isLoading, isError, refetch } = useQuery<ApiResponse>({
     queryKey: ["whatsapp-templates"],
     queryFn: async () => (await api.get("/admin/whatsapp-templates")).data,
   });
@@ -324,7 +357,7 @@ const WhatsAppTemplatesPage = () => {
   const variables = data?.data?.variables ?? {};
 
   // ── Admin phones (a quién se le manda 'admin_new_booking' y similares) ───
-  const { data: notifSettings, refetch: refetchSettings } = useQuery<{ data: { admin_phones?: string[] } }>({
+  const { data: notifSettings, refetch: refetchSettings, isError: phonesError } = useQuery<{ data: { admin_phones?: string[] } }>({
     queryKey: ["notification-settings"],
     queryFn: async () => (await api.get("/admin/notification-settings")).data,
   });
@@ -346,13 +379,18 @@ const WhatsAppTemplatesPage = () => {
     try {
       await updatePhonesMutation.mutateAsync([...adminPhones, v]);
       setPhoneInput("");
-      toast({ title: "Teléfono agregado", description: `Ahora recibirá los avisos administrativos.` });
+      toast({ title: "Teléfono agregado", description: "Ahora recibirá los avisos administrativos." });
     } catch {
       toast({ title: "Error al guardar", variant: "destructive" });
     }
   };
   const removeAdminPhone = async (p: string) => {
-    if (!window.confirm(`Quitar ${p} de los destinatarios de avisos administrativos?`)) return;
+    const ok = await confirm({
+      title: `¿Quitar ${p}?`,
+      description: "Ese teléfono dejará de recibir los avisos administrativos por WhatsApp.",
+      confirmLabel: "Quitar",
+    });
+    if (!ok) return;
     try {
       await updatePhonesMutation.mutateAsync(adminPhones.filter((x) => x !== p));
       toast({ title: "Teléfono quitado" });
@@ -386,6 +424,16 @@ const WhatsAppTemplatesPage = () => {
     await updateMutation.mutateAsync({ ...templates, [key]: { ...cur, enabled: next } });
   };
 
+  const handleResetAll = async () => {
+    const ok = await confirm({
+      title: "¿Restaurar todos los templates?",
+      description: "Todos los templates vuelven al texto original de Alma y se pierde el copy editado. Esta acción no se puede deshacer.",
+      confirmLabel: "Restaurar todo",
+      destructive: true,
+    });
+    if (ok) resetMutation.mutate();
+  };
+
   // Agrupar templates no listados explícitamente bajo "Otros"
   const allKeys = Object.keys(templates);
   const categorized = new Set(CATEGORIES.flatMap((c) => c.keys));
@@ -398,6 +446,7 @@ const WhatsAppTemplatesPage = () => {
     <AuthGuard>
       <AdminLayout>
         <div className="admin-page max-w-4xl">
+          {dialog}
           <SectionTabs
             tabs={[
               { label: "Ajustes", to: "/admin/settings" },
@@ -405,40 +454,32 @@ const WhatsAppTemplatesPage = () => {
               { label: "Templates WA", to: "/admin/whatsapp-templates" },
             ]}
           />
-          <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-5 mb-6">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <MessageSquare size={18} className="text-[#C7A892]" />
-                  <h1 className="text-xl font-bold text-white">Templates WhatsApp</h1>
-                </div>
-                <p className="mt-1 text-sm text-white/45">
-                  Edita el copy de las {allKeys.length} notificaciones automáticas. Los cambios aplican al instante.
-                </p>
-              </div>
-              <Button
-                onClick={() => {
-                  if (window.confirm("Esto restaurará TODOS los templates a los textos Alma default. ¿Continuar?")) {
-                    resetMutation.mutate();
-                  }
-                }}
-                disabled={resetMutation.isPending}
-                variant="outline"
-                className="border-white/15 bg-white/[0.04] text-white/80"
-              >
-                <Sparkles size={14} className="mr-1.5" />
-                Restaurar todos a default
-              </Button>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-6">
+            <div className="min-w-0">
+              <h1 className="admin-title font-semibold text-alma-ink">Templates de WhatsApp</h1>
+              <p className="mt-1 text-sm text-alma-ink/70">
+                Edita el copy de las{allKeys.length > 0 ? <> <span className="nums">{allKeys.length}</span></> : null} notificaciones automáticas. Los cambios aplican al instante.
+              </p>
             </div>
+            <Button
+              onClick={handleResetAll}
+              disabled={resetMutation.isPending || isLoading || isError}
+              variant="outline"
+              size="sm"
+              className="shrink-0"
+            >
+              {resetMutation.isPending ? <Loader2 size={14} className="mr-1.5 animate-spin" /> : <RotateCcw size={14} className="mr-1.5" />}
+              Restaurar todo a default
+            </Button>
           </div>
 
           {/* ── Destinatarios de avisos administrativos ───────────────── */}
-          <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-5 mb-6">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-white/60 mb-1">
+          <div className="rounded-xl border border-alma-hairline bg-alma-mist p-5 mb-6">
+            <p className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-alma-ink/60 mb-1">
               Avisos a la dueña / staff
-            </h2>
-            <p className="text-xs text-white/45 mb-3">
-              Teléfonos que reciben los WhatsApps administrativos (ej. <code>admin_new_booking</code>). Agrega tu número y el de quien quieras que reciba estas alertas. Formato: <code>+524441234567</code>.
+            </p>
+            <p className="text-xs text-alma-ink/70 mb-3">
+              Teléfonos que reciben los WhatsApps administrativos (ej. <code className="font-mono">admin_new_booking</code>). Agrega tu número y el de quien quieras que reciba estas alertas. Formato: <code className="font-mono nums">+524441234567</code>.
             </p>
             <div className="flex gap-2">
               <Input
@@ -446,33 +487,38 @@ const WhatsAppTemplatesPage = () => {
                 onChange={(e) => setPhoneInput(e.target.value)}
                 placeholder="+524441234567"
                 onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addAdminPhone(); } }}
-                className="bg-white/[0.04] border-white/[0.08]"
+                className="bg-alma-canvas nums"
               />
               <Button
                 onClick={addAdminPhone}
                 disabled={!phoneInput.trim() || updatePhonesMutation.isPending}
                 size="sm"
-                className="bg-gradient-to-r from-[#8A6E60] to-[#C7A892] text-white"
+                className="bg-alma-ink text-alma-canvas hover:bg-alma-ink-deep"
               >
                 Agregar
               </Button>
             </div>
-            {adminPhones.length === 0 ? (
-              <p className="mt-3 text-xs text-white/40">
-                Sin teléfonos configurados. Mientras tanto, los avisos van a usuarios con role admin que tengan teléfono.
+            {phonesError ? (
+              <p className="mt-3 text-xs text-destructive">
+                No pudimos cargar los teléfonos.{" "}
+                <button type="button" className="underline underline-offset-2" onClick={() => refetchSettings()}>Reintentar</button>
+              </p>
+            ) : adminPhones.length === 0 ? (
+              <p className="mt-3 text-xs text-alma-ink/55">
+                Sin teléfonos configurados. Mientras tanto, los avisos van a usuarias con rol admin que tengan teléfono.
               </p>
             ) : (
               <div className="mt-3 flex flex-wrap gap-2">
                 {adminPhones.map((p) => (
-                  <span key={p} className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.06] border border-white/10 px-2.5 py-1 text-xs">
-                    <code className="font-mono">{p}</code>
+                  <span key={p} className="inline-flex items-center gap-1.5 rounded-full border border-alma-hairline bg-alma-canvas px-2.5 py-1 text-xs text-alma-ink">
+                    <code className="font-mono nums">{p}</code>
                     <button
                       type="button"
                       onClick={() => removeAdminPhone(p)}
-                      className="text-white/40 hover:text-destructive transition-colors"
-                      title="Quitar"
+                      className="text-alma-ink/45 transition-colors hover:text-destructive"
+                      aria-label={`Quitar ${p}`}
                     >
-                      ✕
+                      <X size={12} />
                     </button>
                   </span>
                 ))}
@@ -480,8 +526,26 @@ const WhatsAppTemplatesPage = () => {
             )}
           </div>
 
-          {isLoading ? (
-            <p className="text-sm text-muted-foreground">Cargando templates…</p>
+          {isError ? (
+            <ErrorState
+              description="No pudimos cargar los templates de WhatsApp. Revisa tu conexión y vuelve a intentarlo."
+              onRetry={() => refetch()}
+            />
+          ) : isLoading ? (
+            <div className="space-y-2">
+              <Skeleton className="h-9 w-full max-w-md rounded-md" />
+              {Array.from({ length: 4 }).map((_, i) => (
+                <Skeleton key={i} className="h-20 w-full rounded-xl" />
+              ))}
+            </div>
+          ) : allKeys.length === 0 ? (
+            <EmptyState
+              icon={<MessageSquare size={20} strokeWidth={1.8} />}
+              title="Sin templates configurados"
+              description="El servidor aún no devuelve templates de WhatsApp. Verifica la configuración de Evolution y vuelve a cargar."
+              ctaLabel="Volver a cargar"
+              onCta={() => refetch()}
+            />
           ) : (
             <Tabs defaultValue={allCategories[0].id}>
               <TabsList className="flex flex-wrap h-auto">
@@ -490,9 +554,9 @@ const WhatsAppTemplatesPage = () => {
                   return (
                     <TabsTrigger key={cat.id} value={cat.id} className="text-xs">
                       {cat.label}
-                      <span className="ml-1.5 text-[10px] text-muted-foreground">{cat.keys.length}</span>
+                      <span className="ml-1.5 text-[10px] text-alma-ink/50 nums">{cat.keys.length}</span>
                       {editedCount > 0 && (
-                        <span className="ml-1 inline-block h-1.5 w-1.5 rounded-full bg-[#C7A892]" />
+                        <span className="ml-1 inline-block h-1.5 w-1.5 rounded-full bg-alma-berry" />
                       )}
                     </TabsTrigger>
                   );

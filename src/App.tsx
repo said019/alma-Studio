@@ -125,8 +125,13 @@ const App = () => (
           <Route path="/admin/clients" element={<ClientsList />} />
           <Route path="/admin/clients/:id" element={<ClientDetail />} />
           <Route path="/admin/classes" element={<ClassesCalendar />} />
-          <Route path="/admin/classes/types" element={<ClassTypesList />} />
-          <Route path="/admin/classes/generate" element={<GenerateClasses />} />
+          {/* Rutas planas para que SectionTabs no marque dos tabs activas
+              (detecta activo por prefijo de pathname). Las rutas anidadas
+              viejas redirigen para no romper enlaces guardados. */}
+          <Route path="/admin/class-types" element={<ClassTypesList />} />
+          <Route path="/admin/class-generator" element={<GenerateClasses />} />
+          <Route path="/admin/classes/types" element={<Navigate to="/admin/class-types" replace />} />
+          <Route path="/admin/classes/generate" element={<Navigate to="/admin/class-generator" replace />} />
           <Route path="/admin/schedules" element={<Navigate to="/admin/classes" replace />} />
           <Route path="/admin/bookings" element={<BookingsList />} />
           <Route path="/admin/bookings/waitlist" element={<Waitlist />} />

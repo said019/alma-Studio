@@ -10,28 +10,32 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { MoreHorizontal, Plus, Star } from "lucide-react";
+import { useConfirm } from "@/components/admin/ConfirmDialog";
+import { ErrorState, EmptyState } from "@/components/app/AppShell";
+import { formatDateTime } from "@/lib/format";
+import { MessageSquare, MoreHorizontal, Pencil, Plus, Star, Tag, X } from "lucide-react";
 
-const tagSchema = z.object({ name: z.string().min(1), color: z.string().default("#8B5CF6") });
+const tagSchema = z.object({ name: z.string().min(1), color: z.string().default("#6E5A46") });
 type TagFormData = z.infer<typeof tagSchema>;
 interface ReviewTag extends TagFormData { id: string }
 
 const ReviewTagsManager = () => {
   const { toast } = useToast();
   const qc = useQueryClient();
+  const { confirm, dialog } = useConfirm();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<ReviewTag | null>(null);
 
-  const { data } = useQuery<{ data: ReviewTag[] }>({ queryKey: ["review-tags"], queryFn: async () => (await api.get("/review-tags")).data });
+  const { data, isError, refetch } = useQuery<{ data: ReviewTag[] }>({ queryKey: ["review-tags"], queryFn: async () => (await api.get("/review-tags")).data });
   const tags = Array.isArray(data?.data) ? data.data : [];
 
-  const form = useForm<TagFormData>({ resolver: zodResolver(tagSchema), defaultValues: { color: "#8B5CF6" } });
+  const form = useForm<TagFormData>({ resolver: zodResolver(tagSchema), defaultValues: { color: "#6E5A46" } });
 
   const createMutation = useMutation({ mutationFn: (d: TagFormData) => api.post("/review-tags", d), onSuccess: () => { qc.invalidateQueries({ queryKey: ["review-tags"] }); toast({ title: "Tag creado" }); setOpen(false); } });
   const updateMutation = useMutation({ mutationFn: ({ id, ...d }: ReviewTag) => api.put(`/review-tags/${id}`, d), onSuccess: () => { qc.invalidateQueries({ queryKey: ["review-tags"] }); toast({ title: "Tag actualizado" }); setOpen(false); } });
@@ -40,18 +44,51 @@ const ReviewTagsManager = () => {
   return (
     <div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
-        <h2 className="text-lg font-semibold">Tags de reseñas</h2>
-        <Button size="sm" onClick={() => { form.reset({ color: "#8B5CF6" }); setEditing(null); setOpen(true); }}><Plus size={14} className="mr-1" />Nuevo tag</Button>
+        <h2 className="text-lg font-semibold text-alma-ink">Tags de reseñas</h2>
+        <Button size="sm" onClick={() => { form.reset({ color: "#6E5A46" }); setEditing(null); setOpen(true); }}><Plus size={14} className="mr-1" />Nuevo tag</Button>
       </div>
-      <div className="flex flex-wrap gap-2 mb-4">
-        {tags.map((t) => (
-          <div key={t.id} className="flex items-center gap-1">
-            <Badge style={{ backgroundColor: `${t.color}22`, color: t.color, borderColor: `${t.color}44` }} variant="outline">{t.name}</Badge>
-            <Button variant="ghost" size="icon" className="h-5 w-5 text-xs" onClick={() => { form.reset(t); setEditing(t); setOpen(true); }}>✎</Button>
-            <Button variant="ghost" size="icon" className="h-5 w-5 text-destructive text-xs" onClick={() => { if (window.confirm("¿Eliminar este tag?")) deleteMutation.mutate(t.id); }}>✕</Button>
-          </div>
-        ))}
-      </div>
+      {isError ? (
+        <ErrorState
+          title="No pudimos cargar los tags"
+          onRetry={() => refetch()}
+        />
+      ) : tags.length === 0 ? (
+        <EmptyState
+          icon={<Tag size={20} />}
+          title="Aún no hay tags"
+          description="Sirven para clasificar reseñas (limpieza, instructoras, equipo) y detectar patrones."
+          ctaLabel="Nuevo tag"
+          onCta={() => { form.reset({ color: "#6E5A46" }); setEditing(null); setOpen(true); }}
+        />
+      ) : (
+        <div className="flex flex-wrap gap-2 mb-4">
+          {tags.map((t) => (
+            <div key={t.id} className="flex items-center gap-1">
+              <Badge style={{ backgroundColor: `${t.color}22`, color: t.color, borderColor: `${t.color}44` }} variant="outline">{t.name}</Badge>
+              <Button variant="ghost" size="icon" className="h-5 w-5" aria-label={`Editar tag ${t.name}`} onClick={() => { form.reset(t); setEditing(t); setOpen(true); }}>
+                <Pencil size={11} />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-5 w-5 text-destructive"
+                aria-label={`Eliminar tag ${t.name}`}
+                onClick={async () => {
+                  const ok = await confirm({
+                    title: `¿Eliminar el tag "${t.name}"?`,
+                    description: "Se quita de todas las reseñas que lo usan. Las reseñas no se borran.",
+                    confirmLabel: "Eliminar",
+                    destructive: true,
+                  });
+                  if (ok) deleteMutation.mutate(t.id);
+                }}
+              >
+                <X size={11} />
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-xs">
@@ -66,6 +103,7 @@ const ReviewTagsManager = () => {
           </form>
         </DialogContent>
       </Dialog>
+      {dialog}
     </div>
   );
 };
@@ -87,10 +125,19 @@ interface AdminReview {
   created_at?: string;
 }
 
+/* Stat compacto sobre hairline superior (mismo lenguaje que Reportes) */
+const StripStat = ({ label, value }: { label: string; value: React.ReactNode }) => (
+  <div className="border-t border-alma-hairline pb-1 pt-2.5">
+    <p className="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-alma-ink/60">{label}</p>
+    <p className="font-display nums mt-1.5 leading-none text-alma-ink" style={{ fontSize: "1.5rem" }}>{value}</p>
+  </div>
+);
+
 const AdminReviewsDashboard = () => {
   const { toast } = useToast();
   const qc = useQueryClient();
-  const { data: reviewsData, isLoading } = useQuery({
+  const { confirm, dialog } = useConfirm();
+  const { data: reviewsData, isLoading, isError, refetch } = useQuery({
     queryKey: ["admin-reviews"],
     queryFn: async () => (await api.get("/admin/reviews")).data,
   });
@@ -129,7 +176,12 @@ const AdminReviewsDashboard = () => {
   }, [reviews]);
 
   const renderStars = (n: number) => Array(5).fill(0).map((_, i) => (
-    <Star key={i} size={12} fill={i < n ? "currentColor" : "none"} className={i < n ? "text-yellow-400" : "text-muted-foreground"} />
+    <Star
+      key={i}
+      size={12}
+      fill={i < n ? "currentColor" : "none"}
+      className={i < n ? "text-alma-berry" : "text-alma-ink/25"}
+    />
   ));
 
   const renderClassLabel = (r: AdminReview) => {
@@ -145,13 +197,23 @@ const AdminReviewsDashboard = () => {
     <AuthGuard>
       <AdminLayout>
         <div className="admin-page max-w-5xl">
-          <h1 className="text-2xl font-bold mb-6">Reseñas</h1>
+          <h1 className="admin-title font-display leading-none text-alma-ink mb-6">Reseñas</h1>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-            <Card><CardHeader><CardTitle className="text-sm text-muted-foreground">Total reseñas</CardTitle></CardHeader><CardContent><p className="text-2xl font-bold">{stats.total}</p></CardContent></Card>
-            <Card><CardHeader><CardTitle className="text-sm text-muted-foreground">Promedio</CardTitle></CardHeader><CardContent><p className="text-2xl font-bold">{stats.average} ⭐</p></CardContent></Card>
-            <Card><CardHeader><CardTitle className="text-sm text-muted-foreground">Pendientes</CardTitle></CardHeader><CardContent><p className="text-2xl font-bold">{stats.pending}</p></CardContent></Card>
-          </div>
+          {!isError && (
+            <div className="mb-8 grid max-w-lg grid-cols-3 gap-x-6">
+              <StripStat label="Total" value={stats.total} />
+              <StripStat
+                label="Promedio"
+                value={
+                  <span className="inline-flex items-center gap-1">
+                    {stats.average}
+                    <Star size={14} className="text-alma-berry" fill="currentColor" strokeWidth={0} />
+                  </span>
+                }
+              />
+              <StripStat label="Pendientes" value={stats.pending} />
+            </div>
+          )}
 
           <Tabs defaultValue="list">
             <TabsList>
@@ -159,85 +221,102 @@ const AdminReviewsDashboard = () => {
               <TabsTrigger value="tags">Tags</TabsTrigger>
             </TabsList>
             <TabsContent value="list" className="mt-4">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Cliente</TableHead>
-                    <TableHead>Clase</TableHead>
-                    <TableHead>Instructor</TableHead>
-                    <TableHead>Rating</TableHead>
-                    <TableHead>Estatus</TableHead>
-                    <TableHead>Comentario</TableHead>
-                    <TableHead>Fecha</TableHead>
-                    <TableHead className="w-[56px]" />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {!isLoading && reviews.length === 0 && (
+              {isError ? (
+                <ErrorState
+                  title="No pudimos cargar las reseñas"
+                  onRetry={() => refetch()}
+                />
+              ) : isLoading ? (
+                <div className="space-y-2">
+                  {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-12 w-full" />)}
+                </div>
+              ) : reviews.length === 0 ? (
+                <EmptyState
+                  icon={<MessageSquare size={20} />}
+                  title="Aún no hay reseñas"
+                  description="Cuando las alumnas califiquen sus clases, aquí las apruebas antes de publicarlas."
+                />
+              ) : (
+                <Table>
+                  <TableHeader>
                     <TableRow>
-                      <TableCell colSpan={8} className="text-sm text-muted-foreground text-center py-8">
-                        No hay reseñas para mostrar.
-                      </TableCell>
+                      <TableHead>Clienta</TableHead>
+                      <TableHead>Clase</TableHead>
+                      <TableHead>Instructora</TableHead>
+                      <TableHead>Rating</TableHead>
+                      <TableHead>Estatus</TableHead>
+                      <TableHead>Comentario</TableHead>
+                      <TableHead>Fecha</TableHead>
+                      <TableHead className="w-[56px]" />
                     </TableRow>
-                  )}
-                  {reviews.map((r) => {
-                    const numericRating = Number(r.rating ?? r.overall_rating ?? 0);
-                    const safeRating = Number.isFinite(numericRating) && numericRating > 0
-                      ? Math.max(1, Math.min(5, Math.round(numericRating)))
-                      : null;
+                  </TableHeader>
+                  <TableBody>
+                    {reviews.map((r) => {
+                      const numericRating = Number(r.rating ?? r.overall_rating ?? 0);
+                      const safeRating = Number.isFinite(numericRating) && numericRating > 0
+                        ? Math.max(1, Math.min(5, Math.round(numericRating)))
+                        : null;
 
-                    return (
-                      <TableRow key={r.id}>
-                        <TableCell>{r.user_name || r.email || r.user_id || "—"}</TableCell>
-                        <TableCell>{renderClassLabel(r)}</TableCell>
-                        <TableCell>{r.instructor_name || r.instructor_id || "—"}</TableCell>
-                        <TableCell>
-                          {safeRating ? <div className="flex">{renderStars(safeRating)}</div> : "—"}
-                        </TableCell>
-                        <TableCell>
-                          {r.is_approved ? (
-                            <Badge variant="outline" className="border-emerald-300 bg-emerald-50 text-emerald-700">Aprobada</Badge>
-                          ) : (
-                            <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-700">Pendiente</Badge>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-sm max-w-xs truncate">{r.comment || "—"}</TableCell>
-                        <TableCell className="text-sm">
-                          {r.created_at ? new Date(r.created_at).toLocaleString("es-MX") : "—"}
-                        </TableCell>
-                        <TableCell>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8">
-                                <MoreHorizontal size={16} />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              {!r.is_approved && (
-                                <DropdownMenuItem onClick={() => approveMutation.mutate(r.id)}>
-                                  Aprobar
+                      return (
+                        <TableRow key={r.id}>
+                          <TableCell>{r.user_name || r.email || r.user_id || "—"}</TableCell>
+                          <TableCell className="nums">{renderClassLabel(r)}</TableCell>
+                          <TableCell>{r.instructor_name || r.instructor_id || "—"}</TableCell>
+                          <TableCell>
+                            {safeRating ? <div className="flex">{renderStars(safeRating)}</div> : "—"}
+                          </TableCell>
+                          <TableCell>
+                            {r.is_approved ? (
+                              <Badge variant="outline" className="border-alma-olive/40 bg-alma-olive/10 text-alma-olive">Aprobada</Badge>
+                            ) : (
+                              <Badge variant="outline" className="border-alma-sandstone bg-alma-oat/60 text-alma-berry">Pendiente</Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-sm max-w-xs truncate">{r.comment || "—"}</TableCell>
+                          <TableCell className="nums text-sm">
+                            {r.created_at ? formatDateTime(r.created_at) : "—"}
+                          </TableCell>
+                          <TableCell>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8">
+                                  <MoreHorizontal size={16} />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                {!r.is_approved && (
+                                  <DropdownMenuItem onClick={() => approveMutation.mutate(r.id)}>
+                                    Aprobar
+                                  </DropdownMenuItem>
+                                )}
+                                <DropdownMenuItem
+                                  className="text-destructive focus:text-destructive"
+                                  onClick={async () => {
+                                    const ok = await confirm({
+                                      title: "¿Eliminar esta reseña?",
+                                      description: "Se borra de forma permanente y deja de contar para el promedio del studio.",
+                                      confirmLabel: "Eliminar",
+                                      destructive: true,
+                                    });
+                                    if (ok) deleteMutation.mutate(r.id);
+                                  }}
+                                >
+                                  Eliminar
                                 </DropdownMenuItem>
-                              )}
-                              <DropdownMenuItem
-                                className="text-destructive focus:text-destructive"
-                                onClick={() => {
-                                  if (window.confirm("¿Eliminar esta reseña?")) deleteMutation.mutate(r.id);
-                                }}
-                              >
-                                Eliminar
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              )}
             </TabsContent>
             <TabsContent value="tags" className="mt-4"><ReviewTagsManager /></TabsContent>
           </Tabs>
         </div>
+        {dialog}
       </AdminLayout>
     </AuthGuard>
   );

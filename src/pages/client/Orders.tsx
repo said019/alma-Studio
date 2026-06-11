@@ -11,7 +11,7 @@ import {
   ListGroup,
   ListRow,
   EmptyState,
-  PrimaryButton,
+  ErrorState,
   SkeletonRow,
   ALMA,
 } from "@/components/app/AppShell";
@@ -19,16 +19,19 @@ import { StatusPill, formatMoneyMX } from "@/components/app/widgets";
 import { Receipt } from "lucide-react";
 import type { Order } from "@/types/order";
 
-const STATUS: Record<string, { label: string; tone: keyof typeof ALMA }> = {
-  pending_payment: { label: "Pago pendiente", tone: "coral" },
-  pending_verification: { label: "En verificación", tone: "orange" },
+/* Ambos estados pendientes viven en berry para cumplir AA a 0.72rem
+   (stone falla en texto pequeño): "Pago pendiente" pide acción de la
+   socia, va sólido; "En verificación" es espera, va suave. */
+const STATUS: Record<string, { label: string; tone: keyof typeof ALMA; variant?: "soft" | "solid" }> = {
+  pending_payment: { label: "Pago pendiente", tone: "berry", variant: "solid" },
+  pending_verification: { label: "En verificación", tone: "berry" },
   approved: { label: "Aprobado", tone: "olive" },
   rejected: { label: "Rechazado", tone: "destructive" },
   cancelled: { label: "Cancelado", tone: "destructive" },
 };
 
 const Orders = () => {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["my-orders"],
     queryFn: async () => (await api.get("/orders")).data,
   });
@@ -46,6 +49,12 @@ const Orders = () => {
         <Section>
           {isLoading ? (
             <div className="space-y-2">{[1, 2, 3].map((i) => <SkeletonRow key={i} height={72} />)}</div>
+          ) : isError ? (
+            <ErrorState
+              title="No pudimos cargar tus órdenes"
+              description="Revisa tu conexión y vuelve a intentarlo."
+              onRetry={() => refetch()}
+            />
           ) : orders.length === 0 ? (
             <EmptyState
               icon={<Receipt size={20} />}
@@ -72,7 +81,7 @@ const Orders = () => {
                         ${formatMoneyMX(order.total_amount ?? order.amount)} {order.currency ?? "MXN"}
                       </>
                     }
-                    trailing={<StatusPill label={status.label} tone={status.tone} />}
+                    trailing={<StatusPill label={status.label} tone={status.tone} variant={status.variant ?? "soft"} />}
                   />
                 );
               })}

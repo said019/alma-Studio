@@ -15,6 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { formatMXN } from "@/lib/format";
 import { Loader2, Search, CheckCircle2, UserPlus, X } from "lucide-react";
 import { useDebounce } from "@/hooks/use-debounce";
 
@@ -93,7 +94,7 @@ export const VisitAssignDialog = ({ classId, open, onOpenChange, onSuccess }: Pr
   const [host, setHost] = useState<HostOption | null>(null);
   const [hostSearch, setHostSearch] = useState("");
   const debouncedHostSearch = useDebounce(hostSearch, 250);
-  const { data: hostsData, isFetching: searchingHosts } = useQuery<{ data: HostOption[] }>({
+  const { data: hostsData, isFetching: searchingHosts, isError: hostsError, refetch: refetchHosts } = useQuery<{ data: HostOption[] }>({
     queryKey: ["visit-host-search", debouncedHostSearch],
     enabled: open && !host && debouncedHostSearch.trim().length >= 2,
     queryFn: async () =>
@@ -107,7 +108,7 @@ export const VisitAssignDialog = ({ classId, open, onOpenChange, onSuccess }: Pr
   }));
 
   // Carga planes is_visit_pack
-  const { data: plansData } = useQuery<{ data: any[] }>({
+  const { data: plansData, isError: plansError, refetch: refetchPlans } = useQuery<{ data: any[] }>({
     queryKey: ["visit-plans"],
     queryFn: async () => (await api.get("/plans")).data,
     enabled: open,
@@ -193,7 +194,7 @@ export const VisitAssignDialog = ({ classId, open, onOpenChange, onSuccess }: Pr
     onSuccess: (data: any) => {
       const chargedHost = data?.data?.chargedHostUserId;
       toast({
-        title: "✓ Visitante asignada",
+        title: "Visitante asignada",
         description: chargedHost
           ? `Reserva creada. Crédito descontado del pack de visitas de ${host?.displayName ?? "la anfitriona"}.`
           : data?.data?.soldOrder
@@ -257,54 +258,54 @@ export const VisitAssignDialog = ({ classId, open, onOpenChange, onSuccess }: Pr
               </Button>
             </div>
             {searched && (
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-[11px] text-alma-ink/55">
                 {foundGuest
-                  ? `Visitante existente — su cuestionario está pre-cargado.`
-                  : `Nueva visitante — llena el cuestionario abajo.`}
+                  ? "Visitante existente, su cuestionario está precargado."
+                  : "Nueva visitante, llena el cuestionario abajo."}
               </p>
             )}
           </div>
 
           {/* Pack activo */}
           {activeMembership && (
-            <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-3 text-sm">
-              <p className="flex items-center gap-1.5 text-emerald-700 font-medium">
+            <div className="rounded-xl border border-alma-olive/30 bg-alma-olive/5 p-3 text-sm">
+              <p className="flex items-center gap-1.5 text-alma-olive font-medium">
                 <CheckCircle2 size={14} /> Pack activo
               </p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {activeMembership.plan_name} — {activeMembership.classes_remaining ?? "—"} clase{activeMembership.classes_remaining === 1 ? "" : "s"} restante{activeMembership.classes_remaining === 1 ? "" : "s"}
+              <p className="nums text-xs text-alma-ink/70 mt-0.5">
+                {activeMembership.plan_name} · {activeMembership.classes_remaining ?? "—"} clase{activeMembership.classes_remaining === 1 ? "" : "s"} restante{activeMembership.classes_remaining === 1 ? "" : "s"}
               </p>
-              <p className="text-[11px] text-muted-foreground mt-0.5">
+              <p className="text-[11px] text-alma-ink/55 mt-0.5">
                 Se descuenta 1 al confirmar.
               </p>
             </div>
           )}
 
           {/* Anfitriona (socia que la invita) — el crédito se descuenta de SU pack de visitas */}
-          <div className="rounded-xl border border-border p-3 space-y-2">
+          <div className="rounded-xl border border-alma-hairline p-3 space-y-2">
             <div className="flex items-center justify-between">
-              <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              <Label className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-alma-ink/60">
                 Trajo (opcional)
               </Label>
               {host && (
                 <button
                   type="button"
                   onClick={() => { setHost(null); setHostSearch(""); }}
-                  className="text-[11px] text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+                  className="text-[11px] text-alma-ink/55 hover:text-alma-ink inline-flex items-center gap-1"
                 >
                   <X size={11} /> quitar
                 </button>
               )}
             </div>
             {host ? (
-              <div className="rounded-lg bg-[#8A6E60]/5 border border-[#8A6E60]/20 px-3 py-2 text-sm">
-                <p className="font-medium">{host.displayName}</p>
+              <div className="rounded-lg bg-alma-oat/40 border border-alma-sandstone/50 px-3 py-2 text-sm">
+                <p className="font-medium text-alma-ink">{host.displayName}</p>
                 {(host.email || host.phone) && (
-                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                  <p className="text-[11px] text-alma-ink/60 mt-0.5">
                     {[host.email, host.phone].filter(Boolean).join(" · ")}
                   </p>
                 )}
-                <p className="text-[11px] text-[#8A6E60] mt-1">
+                <p className="text-[11px] text-alma-berry mt-1">
                   El crédito se descuenta del pack de visitas de {host.displayName.split(" ")[0]}.
                 </p>
               </div>
@@ -316,24 +317,31 @@ export const VisitAssignDialog = ({ classId, open, onOpenChange, onSuccess }: Pr
                   placeholder="Buscar socia por nombre o teléfono…"
                 />
                 {hostSearch.trim().length >= 2 && (
-                  <div className="max-h-44 overflow-y-auto rounded-lg border border-border bg-card">
+                  <div className="max-h-44 overflow-y-auto rounded-lg border border-alma-hairline bg-alma-canvas">
                     {searchingHosts ? (
-                      <p className="px-3 py-2 text-xs text-muted-foreground inline-flex items-center gap-1.5">
+                      <p className="px-3 py-2 text-xs text-alma-ink/55 inline-flex items-center gap-1.5">
                         <Loader2 size={11} className="animate-spin" /> Buscando…
                       </p>
+                    ) : hostsError ? (
+                      <p className="px-3 py-2 text-xs text-destructive">
+                        No se pudo buscar.{" "}
+                        <button type="button" className="underline underline-offset-2" onClick={() => refetchHosts()}>
+                          Reintentar
+                        </button>
+                      </p>
                     ) : hostOptions.length === 0 ? (
-                      <p className="px-3 py-2 text-xs text-muted-foreground">Sin resultados</p>
+                      <p className="px-3 py-2 text-xs text-alma-ink/55">Sin resultados</p>
                     ) : (
                       hostOptions.map((u) => (
                         <button
                           key={u.id}
                           type="button"
                           onClick={() => { setHost(u); setHostSearch(""); }}
-                          className="block w-full text-left px-3 py-2 hover:bg-muted/60 border-b border-border last:border-b-0"
+                          className="block w-full text-left px-3 py-2 hover:bg-alma-mist border-b border-alma-hairline last:border-b-0"
                         >
-                          <p className="text-sm font-medium">{u.displayName}</p>
+                          <p className="text-sm font-medium text-alma-ink">{u.displayName}</p>
                           {(u.email || u.phone) && (
-                            <p className="text-[11px] text-muted-foreground">
+                            <p className="text-[11px] text-alma-ink/55">
                               {[u.email, u.phone].filter(Boolean).join(" · ")}
                             </p>
                           )}
@@ -342,7 +350,7 @@ export const VisitAssignDialog = ({ classId, open, onOpenChange, onSuccess }: Pr
                     )}
                   </div>
                 )}
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-[11px] text-alma-ink/55">
                   Si llenas esto, el crédito se descuenta del pack de visitas de la socia, no de la invitada.
                 </p>
               </>
@@ -360,8 +368,8 @@ export const VisitAssignDialog = ({ classId, open, onOpenChange, onSuccess }: Pr
           </div>
 
           {/* Cuestionario */}
-          <div className="rounded-xl border border-border p-3 space-y-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Cuestionario inicial</p>
+          <div className="rounded-xl border border-alma-hairline bg-alma-mist p-3 space-y-3">
+            <p className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-alma-ink/60">Cuestionario inicial</p>
 
             <div className="flex items-center justify-between gap-3">
               <Label className="text-sm">¿Tiene alguna lesión o condición física?</Label>
@@ -377,11 +385,11 @@ export const VisitAssignDialog = ({ classId, open, onOpenChange, onSuccess }: Pr
             )}
 
             <div className="flex items-center justify-between gap-3">
-              <Label className="text-sm">¿Practicó barre antes?</Label>
+              <Label className="text-sm">¿Ha practicado pilates antes?</Label>
               <Switch checked={practicedBefore} onCheckedChange={setPracticedBefore} />
             </div>
 
-            <div className="flex items-start justify-between gap-3 border-t border-border pt-3">
+            <div className="flex items-start justify-between gap-3 border-t border-alma-hairline pt-3">
               <Label className="text-xs">
                 Confirmo que la visitante leyó y aceptó los términos y riesgos de la clase.
               </Label>
@@ -393,8 +401,8 @@ export const VisitAssignDialog = ({ classId, open, onOpenChange, onSuccess }: Pr
               Si la anfitriona NO tiene créditos en su pack, el backend usará
               esto como fallback. */}
           {!activeMembership && !host && (
-            <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-3 space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">
+            <div className="rounded-xl border border-alma-sandstone/60 bg-alma-oat/30 p-3 space-y-2">
+              <p className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-alma-berry">
                 Venta de pack en este momento
               </p>
               <div className="space-y-1">
@@ -406,16 +414,23 @@ export const VisitAssignDialog = ({ classId, open, onOpenChange, onSuccess }: Pr
                   <SelectContent>
                     {visitPlans.map((p) => (
                       <SelectItem key={p.id} value={p.id}>
-                        {p.name} — {p.classLimit ?? "?"} clases · ${p.price.toLocaleString("es-MX")}
+                        <span className="nums">{p.name} · {p.classLimit ?? "?"} clases · {formatMXN(p.price)}</span>
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                {visitPlans.length === 0 && (
+                {plansError ? (
+                  <p className="text-[11px] text-destructive">
+                    No se pudieron cargar los planes.{" "}
+                    <button type="button" className="underline underline-offset-2" onClick={() => refetchPlans()}>
+                      Reintentar
+                    </button>
+                  </p>
+                ) : visitPlans.length === 0 ? (
                   <p className="text-[11px] text-destructive">
                     Marca al menos un plan como "Paquete de visitas" en <strong>Planes</strong>.
                   </p>
-                )}
+                ) : null}
               </div>
               <div className="space-y-1">
                 <Label className="text-sm">Método de pago</Label>
@@ -439,6 +454,7 @@ export const VisitAssignDialog = ({ classId, open, onOpenChange, onSuccess }: Pr
           <Button
             onClick={() => submitMutation.mutate()}
             disabled={!canSubmit || submitMutation.isPending}
+            className="bg-alma-ink text-alma-canvas hover:bg-alma-ink-deep"
           >
             {submitMutation.isPending ? <><Loader2 size={14} className="animate-spin mr-2" />Asignando…</> : "Confirmar"}
           </Button>

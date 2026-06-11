@@ -4,7 +4,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Link } from "react-router-dom";
 import api from "@/lib/api";
-import { useToast } from "@/hooks/use-toast";
 import { CheckCircle2, MailCheck } from "lucide-react";
 import {
   AuthShell,
@@ -23,7 +22,6 @@ const ForgotPassword = () => {
   const [submittedEmail, setSubmittedEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [globalError, setGlobalError] = useState<string | null>(null);
-  const { toast } = useToast();
 
   const { register, handleSubmit, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -39,7 +37,6 @@ const ForgotPassword = () => {
     } catch (err: any) {
       const msg = err?.response?.data?.message ?? "Inténtalo de nuevo.";
       setGlobalError(msg);
-      toast({ title: "No pudimos enviar el correo", description: msg, variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -55,21 +52,21 @@ const ForgotPassword = () => {
       brandHeadlineItalic="a entrar."
       brandSubline="Pasa con frecuencia. Olvidar la contraseña es lo más normal del mundo."
       formEyebrow="Recuperar contraseña"
-      formHeadline={sent ? "Listo." : "Te enviamos"}
-      formHeadlineItalic={sent ? "Revisa tu correo." : "un enlace."}
+      formHeadline={sent ? "Listo," : "Dinos tu correo,"}
+      formHeadlineItalic={sent ? "revisa tu correo." : "te enviamos un enlace."}
       formIntro={
         sent
           ? undefined
-          : "Escribe tu correo. Si está registrado, te llega un enlace para crear una nueva contraseña."
+          : "Si tu correo está registrado, te llega un enlace para crear una contraseña nueva."
       }
     >
       {sent ? (
         <div className="flex flex-col gap-6">
           <div
             className="flex items-start gap-4 rounded-2xl px-5 py-5"
-            style={{ backgroundColor: ALMA.blush, border: `1px solid ${ALMA.coral}33` }}
+            style={{ backgroundColor: ALMA.blush, border: `1px solid ${ALMA.sandstone}4d` }}
           >
-            <span className="grid h-10 w-10 place-items-center rounded-full shrink-0" style={{ backgroundColor: ALMA.coral, color: ALMA.cream }}>
+            <span className="grid h-10 w-10 place-items-center rounded-full shrink-0" style={{ backgroundColor: ALMA.berry, color: ALMA.cream }}>
               <MailCheck size={18} />
             </span>
             <div>
@@ -95,8 +92,8 @@ const ForgotPassword = () => {
                 style={{ borderTop: i === 0 ? undefined : `1px solid ${ALMA.border}` }}
               >
                 <span
-                  className="font-bebas text-[0.95rem] leading-none"
-                  style={{ color: ALMA.coral }}
+                  className="font-display nums text-[0.95rem] leading-none"
+                  style={{ color: ALMA.berry }}
                 >
                   0{i + 1}
                 </span>
@@ -111,15 +108,13 @@ const ForgotPassword = () => {
             <button
               type="button"
               onClick={() => setSent(false)}
-              className="inline-flex items-center justify-center gap-2 rounded-full px-6 py-3 text-[0.78rem] font-medium uppercase tracking-[0.18em] transition-colors"
-              style={{ border: `1px solid ${ALMA.border}`, color: ALMA.ink }}
+              className="inline-flex items-center justify-center gap-2 rounded-full border border-alma-hairline px-6 py-3.5 text-[0.78rem] font-medium uppercase tracking-[0.18em] text-alma-ink transition-colors duration-200 hover:border-alma-sandstone hover:bg-alma-mist focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-alma-berry focus-visible:ring-offset-2"
             >
               Cambiar correo
             </button>
             <Link
               to="/auth/login"
-              className="inline-flex items-center justify-center gap-2 rounded-full px-6 py-3 text-[0.78rem] font-medium uppercase tracking-[0.18em] no-underline"
-              style={{ backgroundColor: ALMA.berry, color: ALMA.cream }}
+              className="inline-flex items-center justify-center gap-2 rounded-full bg-alma-ink px-6 py-3.5 text-[0.78rem] font-medium uppercase tracking-[0.18em] text-alma-canvas no-underline transition-transform duration-200 hover:-translate-y-0.5 hover:bg-alma-ink-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-alma-berry focus-visible:ring-offset-2"
             >
               <CheckCircle2 size={14} />
               Volver a iniciar sesión

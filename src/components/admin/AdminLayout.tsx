@@ -16,7 +16,6 @@ const NAV_GROUPS = [
   {
     label: "Principal",
     collapsible: false,
-    accentColor: "#8A6E60",
     items: [
       { path: "/admin/dashboard", label: "Inicio", icon: LayoutDashboard },
       { path: "/admin/notifications", label: "Bandeja", icon: Bell },
@@ -27,7 +26,6 @@ const NAV_GROUPS = [
   {
     label: "Gestión",
     collapsible: true,
-    accentColor: "#C7A892",
     items: [
       { path: "/admin/payments", label: "Cobros", icon: DollarSign },
       { path: "/admin/memberships", label: "Membresías", icon: CreditCard },
@@ -39,7 +37,6 @@ const NAV_GROUPS = [
   {
     label: "Sistema",
     collapsible: false,
-    accentColor: "#8A6E60",
     items: [
       { path: "/admin/reports", label: "Crecimiento", icon: BarChart2 },
       { path: "/admin/settings", label: "Configuración", icon: Settings },
@@ -106,11 +103,11 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
   const unreadCount = unreadData?.data?.unread_count ?? 0;
 
   return (
-    <div className="alma-admin flex min-h-screen bg-[#E9E6DF] text-[#4A3333]">
+    <div className="alma-admin flex min-h-screen bg-alma-canvas text-alma-ink">
       {mobileOpen && (
         <button
           aria-label="Cerrar menú"
-          className="fixed inset-0 z-40 bg-[#4A3333]/40 backdrop-blur-sm lg:hidden"
+          className="fixed inset-0 z-40 bg-alma-ink/40 lg:hidden"
           onClick={() => setMobileOpen(false)}
         />
       )}
@@ -118,8 +115,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
       <aside
         className={cn(
           "fixed inset-y-0 left-0 z-50 flex flex-col transition-transform duration-300 shrink-0",
-          "border-r border-[#D8CFC1]",
-          "bg-gradient-to-b from-[#E4D2C3] via-[#E9E6DF] to-[#E9E6DF]",
+          "border-r border-alma-hairline bg-alma-mist",
           "w-[88vw] max-w-[300px] -translate-x-full lg:translate-x-0 lg:static",
           mobileOpen && "translate-x-0",
           collapsed ? "lg:w-[72px]" : "lg:w-[240px]",
@@ -127,26 +123,19 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
       >
         <div
           className={cn(
-            "flex items-center border-b border-[#D8CFC1] shrink-0",
+            "flex items-center border-b border-alma-hairline shrink-0",
             isCompact ? "justify-center px-3 py-5" : "justify-between px-5 py-5",
           )}
         >
           {!isCompact && (
-            <div className="flex flex-col">
-              <img
-                src="/wallet-logo@2x.png"
-                alt="Alma Movement"
-                className="h-9 w-auto object-contain"
-              />
-              <span className="mt-1 text-[9px] font-medium uppercase tracking-[0.32em] text-[#8A6E60]/60">
-                Pilates Studio
-              </span>
-            </div>
+            <span className="font-display text-2xl leading-none text-alma-ink">
+              Alma
+            </span>
           )}
 
           <button
             onClick={() => setMobileOpen(false)}
-            className="flex lg:hidden items-center justify-center w-8 h-8 rounded-lg text-[#4A3333]/55 hover:text-[#8A6E60] hover:bg-[#8A6E60]/8"
+            className="flex lg:hidden items-center justify-center w-8 h-8 rounded-lg text-alma-ink/55 hover:text-alma-ink hover:bg-alma-oat/40"
             aria-label="Cerrar menú"
           >
             <X size={16} />
@@ -155,8 +144,8 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
           <button
             onClick={() => setCollapsed((v) => !v)}
             className={cn(
-              "hidden lg:flex items-center justify-center w-7 h-7 rounded-lg transition-all",
-              "text-[#C7A892]/70 hover:text-[#C7A892] hover:bg-[#C7A892]/10",
+              "hidden lg:flex items-center justify-center w-7 h-7 rounded-lg transition-colors",
+              "text-alma-ink/45 hover:text-alma-ink hover:bg-alma-oat/40",
             )}
             aria-label="Contraer menú"
           >
@@ -178,22 +167,23 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
                       className="w-full flex items-center justify-between px-5 py-1.5 group"
                     >
                       <span
-                        className="text-[10px] font-semibold tracking-widest uppercase transition-colors"
-                        style={{ color: isGroupActive ? group.accentColor : `${group.accentColor}50` }}
+                        className={cn(
+                          "text-[0.72rem] font-semibold uppercase tracking-[0.14em] transition-colors",
+                          isGroupActive ? "text-alma-ink/70" : "text-alma-ink/45",
+                        )}
                       >
                         {group.label}
                       </span>
                       <ChevronDown
                         size={11}
-                        className={cn("transition-all duration-200", isOpen ? "rotate-0" : "-rotate-90")}
-                        style={{ color: `${group.accentColor}50` }}
+                        className={cn(
+                          "text-alma-ink/40 transition-transform duration-200",
+                          isOpen ? "rotate-0" : "-rotate-90",
+                        )}
                       />
                     </button>
                   ) : (
-                    <p
-                      className="px-5 py-1.5 text-[10px] font-semibold tracking-widest uppercase"
-                      style={{ color: `${group.accentColor}50` }}
-                    >
+                    <p className="px-5 py-1.5 text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-alma-ink/45">
                       {group.label}
                     </p>
                   )
@@ -201,7 +191,6 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
 
                 {(isCompact || isOpen) && group.items.map(({ path, label, icon: Icon }) => {
                   const active = location.pathname === path || location.pathname.startsWith(path + "/");
-                  const accent = group.accentColor;
                   return (
                     <Link
                       key={path}
@@ -209,30 +198,18 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
                       data-press
                       title={isCompact ? label : undefined}
                       className={cn(
-                        "flex items-center gap-3 mx-2 my-0.5 rounded-xl transition-all duration-200 no-underline group",
+                        "flex items-center gap-3 mx-2 my-0.5 rounded-xl transition-colors duration-200 no-underline",
                         isCompact ? "px-0 justify-center py-2.5" : "px-3 py-2.5",
                         active
-                          ? "font-semibold"
-                          : "text-[#4A3333]/65 hover:text-[#4A3333] hover:bg-[#8A6E60]/6 border border-transparent",
+                          ? "bg-alma-oat font-semibold text-alma-ink ring-1 ring-inset ring-alma-sandstone/50"
+                          : "text-alma-ink/70 hover:text-alma-ink hover:bg-alma-oat/40",
                       )}
-                      style={active ? {
-                        background: `linear-gradient(to right, ${accent}1f, ${accent}0a)`,
-                        border: `1px solid ${accent}40`,
-                        color: accent,
-                      } : {}}
                     >
                       <span className="relative shrink-0 inline-flex">
-                        <Icon
-                          size={15}
-                          className="transition-colors"
-                          style={{ color: active ? accent : "#4A3333" }}
-                        />
+                        <Icon size={15} />
                         {/* Badge: unread count para 'Bandeja' nav item */}
                         {path === "/admin/notifications" && unreadCount > 0 && (
-                          <span
-                            className="absolute -top-1.5 -right-2 grid place-items-center rounded-full text-[8px] font-bold leading-none px-1 min-w-[14px] h-[14px]"
-                            style={{ backgroundColor: "#8A6E60", color: "#E9E6DF" }}
-                          >
+                          <span className="nums absolute -top-2 -right-2.5 grid h-4 min-w-[16px] place-items-center rounded-full bg-alma-ink-deep px-1 text-[0.7rem] font-semibold leading-none text-alma-canvas">
                             {unreadCount > 9 ? "9+" : unreadCount}
                           </span>
                         )}
@@ -240,29 +217,23 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
                       {!isCompact && (
                         <span className="text-[13px] leading-none truncate">{label}</span>
                       )}
-                      {active && !isCompact && (
-                        <span
-                          className="ml-auto w-1.5 h-1.5 rounded-full"
-                          style={{ backgroundColor: accent, boxShadow: `0 0 6px ${accent}40` }}
-                        />
-                      )}
                     </Link>
                   );
                 })}
 
-                {isCompact && <div className="mx-3 my-1 h-px bg-[#D8CFC1]/60" />}
+                {isCompact && <div className="mx-3 my-1 h-px bg-alma-hairline" />}
               </div>
             );
           })}
         </nav>
 
-        <div className="border-t border-[#D8CFC1] pb-3 pt-2 shrink-0">
+        <div className="border-t border-alma-hairline pb-3 pt-2 shrink-0">
           <Link
             to="/"
             title={isCompact ? "Ver sitio" : undefined}
             className={cn(
-              "flex items-center gap-3 mx-2 rounded-xl px-3 py-2 no-underline transition-all",
-              "text-[#4A3333]/55 hover:text-[#C7A892] hover:bg-[#C7A892]/8 border border-transparent",
+              "flex items-center gap-3 mx-2 rounded-xl px-3 py-2 no-underline transition-colors",
+              "text-alma-ink/60 hover:text-alma-ink hover:bg-alma-oat/40",
               isCompact && "justify-center px-0",
             )}
           >
@@ -273,8 +244,8 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
             onClick={handleLogout}
             title={isCompact ? "Salir" : undefined}
             className={cn(
-              "flex items-center gap-3 mx-2 rounded-xl px-3 py-2 w-[calc(100%-16px)] transition-all",
-              "text-[#4A3333]/55 hover:text-[#B23A48] hover:bg-[#B23A48]/8 border border-transparent",
+              "flex items-center gap-3 mx-2 rounded-xl px-3 py-2 w-[calc(100%-16px)] transition-colors",
+              "text-alma-ink/60 hover:text-destructive hover:bg-destructive/10",
               isCompact && "justify-center px-0",
             )}
           >
@@ -285,46 +256,39 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0 lg:ml-0">
-        <header className="shrink-0 h-14 flex items-center justify-between px-3 sm:px-4 lg:px-6 border-b border-[#D8CFC1] bg-[#E9E6DF]/90 backdrop-blur-sm sticky top-0 z-30">
+        <header className="shrink-0 h-14 flex items-center justify-between px-3 sm:px-4 lg:px-6 border-b border-alma-hairline bg-alma-canvas sticky top-0 z-30">
           <div className="flex items-center gap-2 min-w-0">
             <button
-              className="lg:hidden inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#4A3333]/60 hover:text-[#8A6E60] hover:bg-[#8A6E60]/8"
+              className="lg:hidden inline-flex h-8 w-8 items-center justify-center rounded-lg text-alma-ink/60 hover:text-alma-ink hover:bg-alma-oat/40"
               onClick={() => setMobileOpen(true)}
               aria-label="Abrir menú"
             >
               <Menu size={16} />
             </button>
-            <span className="text-[#4A3333]/45 text-[11px] sm:text-xs font-medium tracking-wider uppercase">Admin</span>
+            <span className="text-alma-ink/50 text-[0.72rem] font-medium tracking-[0.12em] uppercase">Admin</span>
             {currentItem && (
               <>
-                <ChevronRight size={12} className="text-[#4A3333]/35 shrink-0" />
-                <span className="text-[#4A3333] text-xs sm:text-sm font-semibold truncate">{currentItem.label}</span>
+                <ChevronRight size={12} className="text-alma-ink/35 shrink-0" />
+                <span className="text-alma-ink text-xs sm:text-sm font-semibold truncate">{currentItem.label}</span>
               </>
             )}
           </div>
-          <div className="flex items-center gap-2 sm:gap-3">
-            <span className="hidden sm:flex items-center gap-1.5 text-[11px] text-[#8A7C66] font-medium">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#8A7C66] shadow-[0_0_6px_rgba(119,132,85,0.4)] animate-pulse" />
-              En línea
-            </span>
-            <div className="w-px h-4 bg-[#D8CFC1] hidden sm:block" />
-            <div className="flex items-center gap-2 min-w-0">
-              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#8A6E60] to-[#C7A892] flex items-center justify-center text-[11px] font-bold text-[#E9E6DF] shadow-[0_0_10px_rgba(118,33,77,0.25)]">
-                {user?.displayName?.[0]?.toUpperCase() ?? user?.display_name?.[0]?.toUpperCase() ?? user?.email?.[0]?.toUpperCase() ?? "A"}
-              </div>
-              {!isCompact && (
-                <span className="text-xs text-[#4A3333]/65 hidden md:block truncate max-w-[180px]">
-                  {user?.displayName ?? user?.display_name ?? user?.email ?? "Admin"}
-                </span>
-              )}
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-7 h-7 rounded-full bg-alma-oat flex items-center justify-center text-[11px] font-semibold text-alma-ink">
+              {user?.displayName?.[0]?.toUpperCase() ?? user?.display_name?.[0]?.toUpperCase() ?? user?.email?.[0]?.toUpperCase() ?? "A"}
             </div>
+            {!isCompact && (
+              <span className="text-xs text-alma-ink/70 hidden md:block truncate max-w-[180px]">
+                {user?.displayName ?? user?.display_name ?? user?.email ?? "Admin"}
+              </span>
+            )}
           </div>
         </header>
 
-        <main className="admin-mobile-main flex-1 overflow-auto pb-[88px] lg:pb-0 bg-[#E9E6DF]">{children}</main>
+        <main className="admin-mobile-main flex-1 overflow-auto pb-[88px] lg:pb-0 bg-alma-canvas">{children}</main>
 
         {isMobile && (
-          <nav className="fixed inset-x-2 bottom-2 z-40 rounded-2xl border border-[#D8CFC1] bg-[#E9E6DF]/95 p-1 pb-safe backdrop-blur-xl shadow-lg lg:hidden">
+          <nav className="fixed inset-x-2 bottom-2 z-40 rounded-2xl border border-alma-hairline bg-alma-canvas p-1 pb-safe shadow-sm lg:hidden">
             <ul className="grid grid-cols-5 gap-1">
               {MOBILE_QUICK_NAV.map((item) => {
                 const active = location.pathname === item.path || location.pathname.startsWith(item.path + "/");
@@ -336,8 +300,8 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
                       className={cn(
                         "flex h-12 min-h-[44px] flex-col items-center justify-center rounded-xl text-[11px] font-semibold transition-colors",
                         active
-                          ? "bg-gradient-to-r from-[#8A6E60] to-[#C7A892] text-[#E9E6DF] shadow-[0_0_14px_rgba(118,33,77,0.20)]"
-                          : "text-[#4A3333]/60 hover:bg-[#8A6E60]/6 hover:text-[#8A6E60]",
+                          ? "bg-alma-oat text-alma-ink ring-1 ring-inset ring-alma-sandstone/50"
+                          : "text-alma-ink/70 hover:bg-alma-oat/40 hover:text-alma-ink",
                       )}
                       aria-current={active ? "page" : undefined}
                     >

@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
-import { FileSignature } from "lucide-react";
+import { FileSignature, Printer } from "lucide-react";
 import api from "@/lib/api";
 import { ClientAuthGuard } from "@/components/layout/ClientAuthGuard";
 import {
@@ -9,7 +9,9 @@ import {
   PageHeader,
   Section,
   EmptyState,
+  ErrorState,
   SkeletonRow,
+  GhostButton,
   ALMA,
 } from "@/components/app/AppShell";
 import { BackLink, DataRow } from "@/components/app/widgets";
@@ -25,7 +27,7 @@ interface WaiverRow {
 }
 
 const Responsiva = () => {
-  const { data, isLoading } = useQuery<{ data: WaiverRow | null }>({
+  const { data, isLoading, isError, refetch } = useQuery<{ data: WaiverRow | null }>({
     queryKey: ["my-waiver"],
     queryFn: async () => (await api.get("/me/waiver")).data,
   });
@@ -44,10 +46,24 @@ const Responsiva = () => {
           eyebrow="Documentos"
           title="Mi responsiva."
           subtitle="Responsiva y consentimiento informado firmado con Alma Movement."
+          actions={
+            waiver ? (
+              <GhostButton onClick={() => window.print()}>
+                <Printer size={14} />
+                Imprimir
+              </GhostButton>
+            ) : undefined
+          }
         />
 
         {isLoading ? (
           <SkeletonRow height={200} />
+        ) : isError ? (
+          <ErrorState
+            title="No pudimos cargar tu responsiva"
+            description="Revisa tu conexión y vuelve a intentarlo."
+            onRetry={() => refetch()}
+          />
         ) : !waiver ? (
           <EmptyState
             icon={<FileSignature size={22} />}
@@ -57,64 +73,47 @@ const Responsiva = () => {
         ) : (
           <>
             {/* Summary card */}
-            <div
-              className="rounded-3xl p-5 sm:p-7"
-              style={{ backgroundColor: ALMA.blush }}
-            >
+            <div className="rounded-3xl p-5 sm:p-7" style={{ backgroundColor: ALMA.blush }}>
               <p
-                className="font-bebas"
-                style={{
-                  color: ALMA.berry,
-                  fontSize: "0.68rem",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.28em",
-                  margin: "0 0 6px",
-                }}
+                className="text-[0.72rem] font-medium uppercase tracking-[0.24em] mb-1.5"
+                style={{ color: ALMA.berry }}
               >
                 Firmada
               </p>
               <p
-                className="font-bebas"
-                style={{ color: ALMA.inkDeep, fontSize: "1.45rem", margin: "0 0 12px", lineHeight: 1 }}
+                className="font-display text-[1.45rem] leading-none mb-3"
+                style={{ color: ALMA.inkDeep }}
               >
                 {RESPONSIVA_TITLE}
               </p>
 
               <DataRow label="Nombre" value={waiver.full_name} />
               {waiver.email && <DataRow label="Correo" value={waiver.email} />}
-              {waiver.phone && <DataRow label="Teléfono" value={waiver.phone} />}
+              {waiver.phone && <DataRow label="Teléfono" value={<span className="nums">{waiver.phone}</span>} />}
               <DataRow
                 label="Uso de imagen"
                 value={
                   <span
-                    style={{
-                      color: waiver.image_consent ? ALMA.berry : ALMA.ink,
-                      fontWeight: 500,
-                    }}
+                    className="font-medium"
+                    style={{ color: waiver.image_consent ? ALMA.berry : ALMA.ink }}
                   >
                     {waiver.image_consent ? "Sí autorizado" : "No autorizado"}
                   </span>
                 }
               />
-              {signedDate && <DataRow label="Firmada el" value={signedDate} />}
+              {signedDate && <DataRow label="Firmada el" value={<span className="nums">{signedDate}</span>} />}
             </div>
 
             {/* Signature */}
             <Section title="Tu firma">
               <div
-                className="rounded-2xl overflow-hidden"
-                style={{
-                  border: `1px solid ${ALMA.border}`,
-                  backgroundColor: "#ffffff",
-                  padding: 16,
-                  display: "inline-block",
-                  maxWidth: "100%",
-                }}
+                className="inline-block max-w-full rounded-2xl p-4"
+                style={{ backgroundColor: ALMA.cream, border: `1px solid ${ALMA.border}` }}
               >
                 <img
                   src={waiver.signature_data}
                   alt="Tu firma"
-                  style={{ display: "block", maxWidth: "100%", height: "auto", maxHeight: 140 }}
+                  className="block h-auto max-w-full max-h-[140px]"
                 />
               </div>
             </Section>
@@ -124,38 +123,27 @@ const Responsiva = () => {
               {RESPONSIVA_SECTIONS.map((section) => (
                 <div
                   key={section.n}
-                  style={{
-                    borderTop: `1px solid ${ALMA.border}`,
-                    paddingTop: "1.1rem",
-                    paddingBottom: "1rem",
-                  }}
+                  className="pt-4 pb-4"
+                  style={{ borderTop: `1px solid ${ALMA.border}` }}
                 >
                   <h3
-                    className="font-bebas"
-                    style={{
-                      color: ALMA.ink,
-                      fontSize: "1.05rem",
-                      margin: "0 0 0.35rem",
-                      letterSpacing: "0.03em",
-                    }}
+                    className="font-display text-[1.05rem] leading-snug mb-1.5"
+                    style={{ color: ALMA.ink }}
                   >
-                    <span style={{ color: ALMA.berry, marginRight: 6 }}>{section.n}.</span>
+                    <span className="nums mr-1.5" style={{ color: ALMA.berry }}>
+                      {section.n}.
+                    </span>
                     {section.title}
                   </h3>
                   <p
-                    style={{
-                      color: ALMA.ink,
-                      opacity: 0.75,
-                      fontSize: "0.875rem",
-                      lineHeight: 1.65,
-                      margin: 0,
-                    }}
+                    className="m-0 text-[0.875rem] leading-[1.65]"
+                    style={{ color: ALMA.ink, opacity: 0.75 }}
                   >
                     {section.body}
                   </p>
                 </div>
               ))}
-              <div style={{ borderTop: `1px solid ${ALMA.border}`, paddingTop: "0.8rem" }} />
+              <div className="pt-3" style={{ borderTop: `1px solid ${ALMA.border}` }} />
             </Section>
           </>
         )}

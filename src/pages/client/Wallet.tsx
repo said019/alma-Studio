@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
 import api from "@/lib/api";
 import { ClientAuthGuard } from "@/components/layout/ClientAuthGuard";
@@ -8,42 +7,48 @@ import {
   AppShell,
   PageHeader,
   Section,
-  Stat,
-  Tag,
-  GhostButton,
+  ListGroup,
+  ListRow,
   PrimaryButton,
   SkeletonRow,
+  ErrorState,
   ALMA,
 } from "@/components/app/AppShell";
 import { InfoBanner } from "@/components/app/widgets";
 import { useToast } from "@/hooks/use-toast";
 import {
-  Download,
-  ExternalLink,
   Gift,
   History,
   RefreshCw,
   CalendarDays,
   ScanQrCode,
-  Sparkles,
   Copy,
   Check,
 } from "lucide-react";
 
-const GoogleIcon = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-    <path d="M12.5 6.9c1.32 0 2.21.57 2.72 1.05l1.99-1.94C15.85 4.79 14.35 4 12.5 4c-3.07 0-5.64 2.05-6.52 4.82l2.32 1.8C9.03 8.57 10.6 6.9 12.5 6.9z" fill="#CBB9A4" />
-    <path d="M18.77 12.16c0-.53-.08-1.04-.2-1.52H12.5v2.87h3.52c-.15.8-.61 1.48-1.3 1.94l2.01 1.56c1.2-1.1 1.88-2.73 1.88-4.85h.16z" fill="#A48D78" />
-    <path d="M8.3 13.38A4.6 4.6 0 018.06 12c0-.48.09-.94.24-1.38l-2.32-1.8A7.52 7.52 0 005 12c0 1.2.29 2.34.8 3.34l2.5-1.96z" fill="#C0A688" />
-    <path d="M12.5 20c1.84 0 3.38-.61 4.51-1.65l-2.01-1.56c-.63.4-1.43.64-2.5.64-1.9 0-3.47-1.27-4.06-3h-2.5l-.03.1A7.99 7.99 0 0012.5 20z" fill="#9C8E72" />
+/* Logos oficiales sin recolorear: la "G" de Google con sus colores
+   oficiales y la manzana de Apple en blanco, ambos sobre el badge
+   negro oficial de cada wallet. */
+const GoogleLogo = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
+    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
+    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
   </svg>
 );
 
-const AppleIcon = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-    <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z" fill="#A48D78" />
+const AppleLogo = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z" fill="#FFFFFF" />
   </svg>
 );
+
+/* Badge oficial de wallet: pill negro, texto blanco. Los hex son del
+   lockup oficial de Google/Apple, no de la paleta Alma. */
+const walletBadgeClass =
+  "flex min-h-[52px] w-full items-center justify-center gap-2.5 rounded-full px-5 no-underline transition-transform hover:-translate-y-px cursor-pointer border-0";
+const walletBadgeStyle = { backgroundColor: "#000000", color: "#FFFFFF" } as const;
 
 type Membership = {
   plan_name?: string | null;
@@ -73,6 +78,9 @@ const formatShortDate = (value?: string | null) => {
   return d.toLocaleDateString("es-MX", { day: "numeric", month: "short" });
 };
 
+/* Hairline interna del pase drenched */
+const PASS_HAIRLINE = "1px solid rgba(250,249,246,0.14)";
+
 const Wallet = () => {
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -80,7 +88,7 @@ const Wallet = () => {
   const [gwRetrying, setGwRetrying] = useState(false);
   const [codeCopied, setCodeCopied] = useState(false);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["wallet-pass"],
     queryFn: async () => (await api.get("/wallet/pass")).data,
   });
@@ -95,7 +103,7 @@ const Wallet = () => {
         total: 0,
         remaining: 0,
         used: 0,
-        planName: "Sin paquete",
+        planName: "Sin paquete activo",
       };
     }
     const isUnlimited = m.class_limit === null || Number(m.class_limit) >= 9999;
@@ -133,6 +141,23 @@ const Wallet = () => {
     }
   };
 
+  const handleCopyCode = async () => {
+    const code = wallet?.qr_code;
+    if (!code) return;
+    try {
+      await navigator.clipboard.writeText(code);
+      if (navigator.vibrate) navigator.vibrate(40);
+      setCodeCopied(true);
+      setTimeout(() => setCodeCopied(false), 1800);
+    } catch {
+      toast({
+        title: "No se pudo copiar el código.",
+        description: "Intenta de nuevo o muestra el QR en recepción.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleAppleWalletDownload = async () => {
     setAppleLoading(true);
     try {
@@ -162,6 +187,12 @@ const Wallet = () => {
     }
   };
 
+  const passStats = [
+    { label: "Por usar", value: metrics.isUnlimited ? "∞" : String(metrics.remaining) },
+    { label: "Vence", value: formatShortDate(wallet?.membership?.end_date) },
+    { label: "Puntos", value: (wallet?.points ?? 0).toLocaleString("es-MX") },
+  ];
+
   return (
     <ClientAuthGuard requiredRoles={["client"]}>
       <AppShell hideGreeting>
@@ -173,220 +204,157 @@ const Wallet = () => {
         />
 
         {isLoading ? (
-          <SkeletonRow height={520} />
+          <Section>
+            <SkeletonRow height={420} />
+          </Section>
+        ) : isError ? (
+          <Section>
+            <ErrorState
+              title="Tu pase no cargó"
+              description="No pudimos traer tu pase del estudio. Revisa tu conexión y vuelve a intentarlo."
+              onRetry={() => refetch()}
+            />
+          </Section>
         ) : (
           <Section>
-            {/* ── Double-Bezel pass card ── */}
-            <div
-              className="relative rounded-[2.4rem] p-1.5 sm:p-2 transition-transform duration-700 ease-[cubic-bezier(0.32,0.72,0,1)]"
+            {/* ── El pase: una sola pieza drenched ── */}
+            <article
+              className="overflow-hidden rounded-[1.75rem]"
               style={{
-                backgroundColor: ALMA.cream,
-                border: `1px solid ${ALMA.border}`,
-                boxShadow:
-                  "0 30px 80px -40px rgba(118,33,77,0.35), inset 0 1px 0 rgba(255,255,255,0.5)",
+                backgroundColor: ALMA.inkDeep,
+                color: ALMA.cream,
+                boxShadow: "0 18px 48px -12px rgba(36,27,26,0.18)",
               }}
             >
-              <div
-                className="relative overflow-hidden"
-                style={{
-                  borderRadius: "calc(2.4rem - 0.375rem)",
-                  backgroundColor: ALMA.berry,
-                  color: ALMA.cream,
-                  boxShadow:
-                    "inset 0 1px 0 rgba(255,247,242,0.16), inset 0 -40px 80px -40px rgba(46,32,28,0.35)",
-                }}
-              >
-                {/* Decorative wordmark watermark (PNG con transparencia) */}
-                <img
-                  src="/wallet-logo@3x.png"
-                  alt=""
-                  aria-hidden="true"
-                  className="pointer-events-none absolute -right-8 -bottom-6 h-[120px] w-auto object-contain opacity-[0.08] select-none"
-                  style={{ filter: "brightness(0) invert(1)" }}
-                />
-
-                {/* ── Header row ── */}
-                <header className="relative flex items-start justify-between gap-4 px-6 sm:px-8 pt-6 sm:pt-7">
-                  <div className="min-w-0">
-                    {/* Wordmark Alma (PNG con transparencia → el filtro lo deja
-                        blanco limpio sobre el fondo vino). */}
-                    <img
-                      src="/wallet-logo@3x.png"
-                      alt="Alma"
-                      className="h-5 sm:h-6 w-auto object-contain mb-2"
-                      style={{ filter: "brightness(0) invert(1)", opacity: 0.92 }}
-                    />
-                    <h2
-                      className="font-bebas leading-none truncate"
-                      style={{ color: ALMA.cream, fontSize: "clamp(1.4rem, 2.4vw, 1.85rem)", letterSpacing: "0.01em" }}
-                    >
-                      {metrics.planName}
-                    </h2>
-                  </div>
+              {/* Wordmark + estado */}
+              <header className="flex items-start justify-between gap-4 px-6 pb-5 pt-6 sm:px-7">
+                <div className="min-w-0">
+                  <p className="font-display text-[1.4rem] leading-none" style={{ color: ALMA.cream }}>
+                    Alma <span className="font-display-italic">Movement</span>
+                  </p>
+                  <p
+                    className="mt-2 text-[0.72rem] uppercase tracking-[0.22em]"
+                    style={{ color: ALMA.cream, opacity: 0.6 }}
+                  >
+                    Pase del estudio
+                  </p>
+                </div>
+                <span
+                  className="inline-flex shrink-0 items-center gap-1.5 pt-1 text-[0.72rem] font-medium uppercase tracking-[0.18em]"
+                  style={{ color: ALMA.cream, opacity: metrics.hasMembership ? 0.92 : 0.6 }}
+                >
                   <span
-                    className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[0.6rem] font-medium uppercase tracking-[0.22em] shrink-0"
-                    style={{
-                      backgroundColor: metrics.hasMembership ? `${ALMA.olive}30` : `${ALMA.coral}40`,
-                      color: ALMA.cream,
-                      border: `1px solid ${ALMA.cream}1f`,
-                    }}
-                  >
-                    <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ backgroundColor: ALMA.cream }} />
-                    {metrics.hasMembership ? "Activo" : "Sin paquete"}
-                  </span>
-                </header>
+                    className="inline-block h-1.5 w-1.5 rounded-full"
+                    style={{ backgroundColor: metrics.hasMembership ? ALMA.olive : "rgba(250,249,246,0.4)" }}
+                  />
+                  {metrics.hasMembership ? "Activo" : "Sin paquete"}
+                </span>
+              </header>
 
-                {/* ── Card body: membership stats ── */}
-                <div className="relative px-6 sm:px-8 py-7 sm:py-9">
-                  {/* Stats: 3 cols hairline */}
+              {/* Titular y plan */}
+              <div className="px-6 py-5 sm:px-7" style={{ borderTop: PASS_HAIRLINE }}>
+                <p className="text-[0.72rem] uppercase tracking-[0.22em]" style={{ color: ALMA.cream, opacity: 0.55 }}>
+                  Titular
+                </p>
+                <p
+                  className="font-display mt-1.5 leading-tight"
+                  style={{ color: ALMA.cream, fontSize: "clamp(1.35rem, 4.5vw, 1.6rem)" }}
+                >
+                  {wallet?.user_name || "Tu pase"}
+                </p>
+                <p className="mt-1 text-[0.84rem]" style={{ color: ALMA.cream, opacity: 0.7 }}>
+                  {metrics.planName}
+                </p>
+              </div>
+
+              {/* Datos del pase: número + label, hairlines internas */}
+              <div className="grid grid-cols-3 px-6 sm:px-7" style={{ borderTop: PASS_HAIRLINE }}>
+                {passStats.map((s, i) => (
                   <div
-                    className="grid grid-cols-3 gap-0 rounded-2xl overflow-hidden"
-                    style={{ backgroundColor: `${ALMA.cream}0d`, border: `1px solid ${ALMA.cream}14` }}
+                    key={s.label}
+                    className="min-w-0 py-4"
+                    style={i > 0 ? { borderLeft: PASS_HAIRLINE, paddingLeft: "1rem" } : undefined}
                   >
-                    {[
-                      { label: "Por usar", value: metrics.isUnlimited ? "∞" : metrics.remaining },
-                      { label: "Vence", value: formatShortDate(wallet?.membership?.end_date) },
-                      { label: "Puntos", value: (wallet?.points ?? 0).toLocaleString("es-MX") },
-                    ].map((s, i, arr) => (
-                      <div
-                        key={s.label}
-                        className="px-4 py-3"
-                        style={i < arr.length - 1 ? { borderRight: `1px solid ${ALMA.cream}14` } : undefined}
-                      >
-                        <p className="text-[0.58rem] uppercase tracking-[0.2em]" style={{ color: ALMA.cream, opacity: 0.65 }}>
-                          {s.label}
-                        </p>
-                        <p
-                          className="font-bebas leading-none mt-1 tabular-nums truncate"
-                          style={{ color: ALMA.cream, fontSize: "clamp(1.05rem, 1.6vw, 1.35rem)" }}
-                        >
-                          {s.value}
-                        </p>
-                      </div>
-                    ))}
+                    <p className="text-[0.72rem] uppercase tracking-[0.18em]" style={{ color: ALMA.cream, opacity: 0.55 }}>
+                      {s.label}
+                    </p>
+                    <p
+                      className="nums font-display mt-1.5 truncate leading-none"
+                      style={{ color: ALMA.cream, fontSize: "1.3rem" }}
+                    >
+                      {s.value}
+                    </p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Próxima clase como dato del pase, sin caja anidada */}
+              {wallet?.next_booking && (
+                <div className="px-6 py-4 sm:px-7" style={{ borderTop: PASS_HAIRLINE }}>
+                  <p className="text-[0.72rem] uppercase tracking-[0.22em]" style={{ color: ALMA.cream, opacity: 0.55 }}>
+                    Próxima clase
+                  </p>
+                  <p className="mt-1 truncate text-[0.92rem]" style={{ color: ALMA.cream }}>
+                    {wallet.next_booking.class_name || "Clase"}
+                    <span className="nums" style={{ opacity: 0.7 }}>
+                      {" "}· {formatShortDate(wallet.next_booking.date)}, {String(wallet.next_booking.start_time || "").slice(0, 5)}
+                    </span>
+                  </p>
+                </div>
+              )}
+
+              {/* QR integrado sobre superficie cream (segundo y último nivel) */}
+              {wallet?.qr_code && (
+                <div
+                  className="flex items-center gap-5 px-6 py-5 sm:px-7"
+                  style={{ backgroundColor: ALMA.cream, color: ALMA.ink }}
+                >
+                  <QRCodeSVG
+                    value={wallet.qr_code}
+                    size={96}
+                    bgColor={ALMA.cream}
+                    fgColor={ALMA.inkDeep}
+                    className="shrink-0"
+                  />
+                  <div className="min-w-0">
+                    <p
+                      className="flex items-center gap-1.5 text-[0.72rem] font-medium uppercase tracking-[0.2em]"
+                      style={{ color: ALMA.berry }}
+                    >
+                      <ScanQrCode size={13} />
+                      Check-in en recepción
+                    </p>
+                    <p className="mt-1.5 text-[0.82rem] leading-[1.5]" style={{ color: ALMA.ink, opacity: 0.65 }}>
+                      Muéstralo al llegar. Si te lo piden por chat, cópialo y mándalo.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleCopyCode}
+                      className="mt-3 inline-flex min-h-[44px] cursor-pointer items-center gap-2 rounded-full border-0 px-4 text-[0.74rem] font-medium uppercase tracking-[0.16em] transition-colors"
+                      style={
+                        codeCopied
+                          ? { backgroundColor: ALMA.olive, color: ALMA.cream }
+                          : { backgroundColor: ALMA.ink, color: ALMA.cream }
+                      }
+                    >
+                      {codeCopied
+                        ? <><Check size={13} /> Copiado</>
+                        : <><Copy size={13} /> Copiar código</>}
+                    </button>
                   </div>
                 </div>
-
-                {/* ── QR strip (inner double-bezel) ── */}
-                {wallet?.qr_code && (
-                  <div className="relative px-4 sm:px-6 pb-6">
-                    <div
-                      className="rounded-2xl p-1.5"
-                      style={{
-                        backgroundColor: `${ALMA.cream}18`,
-                        border: `1px solid ${ALMA.cream}26`,
-                        boxShadow: "inset 0 1px 0 rgba(255,247,242,0.18)",
-                      }}
-                    >
-                      <div
-                        className="rounded-xl px-5 py-4 flex items-center gap-5"
-                        style={{
-                          backgroundColor: ALMA.cream,
-                          color: ALMA.ink,
-                        }}
-                      >
-                        <div
-                          className="grid place-items-center rounded-xl p-2 shrink-0"
-                          style={{ backgroundColor: ALMA.cream, border: `1px solid ${ALMA.border}` }}
-                        >
-                          <QRCodeSVG value={wallet.qr_code} size={92} bgColor={ALMA.cream} fgColor={ALMA.ink} />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-[0.62rem] font-medium uppercase tracking-[0.24em] flex items-center gap-1.5" style={{ color: ALMA.berry }}>
-                            <ScanQrCode size={12} />
-                            Check-in en recepción
-                          </p>
-                          <p className="font-bebas leading-tight mt-1.5 truncate" style={{ color: ALMA.ink, fontSize: "clamp(1.15rem, 2vw, 1.4rem)" }}>
-                            {wallet?.user_name || "Tu pase"}
-                          </p>
-                          <p className="text-[0.78rem] mt-1" style={{ color: ALMA.ink, opacity: 0.6 }}>
-                            Presenta este código al llegar. Si te lo piden por chat, copia y manda:
-                          </p>
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              const code = wallet?.qr_code || "";
-                              if (!code) return;
-                              try {
-                                await navigator.clipboard.writeText(code);
-                              } catch {
-                                window.prompt("Copia este código y mándalo por WhatsApp:", code);
-                              }
-                              if (navigator.vibrate) navigator.vibrate(40);
-                              setCodeCopied(true);
-                              setTimeout(() => setCodeCopied(false), 1800);
-                            }}
-                            className="mt-2 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[0.72rem] font-semibold transition-colors"
-                            style={
-                              codeCopied
-                                ? { backgroundColor: "#16a34a", color: "white" }
-                                : { backgroundColor: ALMA.berry, color: ALMA.cream }
-                            }
-                          >
-                            {codeCopied
-                              ? <><Check size={12} /> Copiado</>
-                              : <><Copy size={12} /> Copiar código</>}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Next class banner inside drench */}
-                {wallet?.next_booking && (
-                  <div className="relative px-6 sm:px-8 pb-6 sm:pb-7">
-                    <div
-                      className="rounded-2xl px-4 py-3 flex items-center gap-3"
-                      style={{
-                        backgroundColor: `${ALMA.olive}1a`,
-                        border: `1px solid ${ALMA.olive}55`,
-                        color: ALMA.cream,
-                      }}
-                    >
-                      <span
-                        className="grid h-9 w-9 place-items-center rounded-full shrink-0"
-                        style={{ backgroundColor: ALMA.olive, color: ALMA.cream }}
-                      >
-                        <CalendarDays size={15} />
-                      </span>
-                      <div className="min-w-0">
-                        <p className="text-[0.6rem] uppercase tracking-[0.22em]" style={{ color: ALMA.cream, opacity: 0.78 }}>
-                          Próxima clase
-                        </p>
-                        <p className="font-bebas leading-tight truncate mt-0.5" style={{ color: ALMA.cream, fontSize: "1.1rem" }}>
-                          {wallet.next_booking.class_name || "Clase"}
-                          <span className="ml-2 text-[0.78rem] font-alilato font-normal italic opacity-85">
-                            {formatShortDate(wallet.next_booking.date)} ·{" "}
-                            {String(wallet.next_booking.start_time || "").slice(0, 5)}
-                          </span>
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Pass legend */}
-            <p
-              className="mt-4 text-center text-[0.66rem] uppercase tracking-[0.24em] flex items-center justify-center gap-2"
-              style={{ color: ALMA.ink, opacity: 0.55 }}
-            >
-              <Sparkles size={11} />
-              Tu pase del estudio
-              <Sparkles size={11} />
-            </p>
+              )}
+            </article>
           </Section>
         )}
 
-        {/* Add to phone */}
+        {/* Agregar al teléfono: badges oficiales */}
         <Section title="Agregar a tu teléfono">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {gwLoading || gwRetrying ? (
               <div
-                className="flex items-center justify-center gap-3 rounded-2xl py-3.5"
-                style={{ backgroundColor: ALMA.blush, color: ALMA.ink, opacity: 0.65 }}
+                className="flex min-h-[52px] items-center justify-center gap-3 rounded-full"
+                style={{ backgroundColor: ALMA.mist, color: ALMA.ink, opacity: 0.65 }}
               >
                 <RefreshCw size={15} className="animate-spin" />
                 <span className="text-[0.84rem]">Cargando Google Wallet…</span>
@@ -396,20 +364,18 @@ const Wallet = () => {
                 href={googleSaveUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center justify-center gap-3 rounded-2xl py-3.5 no-underline transition-colors"
-                style={{ backgroundColor: ALMA.cream, border: `1px solid ${ALMA.border}`, color: ALMA.ink }}
+                className={walletBadgeClass}
+                style={walletBadgeStyle}
               >
-                <GoogleIcon />
-                <span className="text-[0.84rem] font-medium">Agregar a Google Wallet</span>
-                <ExternalLink size={13} style={{ color: ALMA.berry, opacity: 0.7 }} />
+                <GoogleLogo />
+                <span className="text-[0.86rem] font-medium">Agregar a Google Wallet</span>
               </a>
             ) : (
               <button
                 onClick={handleGoogleRetry}
-                className="flex items-center justify-center gap-3 rounded-2xl py-3.5 cursor-pointer transition-colors bg-transparent"
-                style={{ border: `1px dashed ${ALMA.border}`, color: ALMA.ink, opacity: 0.7 }}
+                className="flex min-h-[52px] cursor-pointer items-center justify-center gap-3 rounded-full bg-transparent transition-colors"
+                style={{ border: `1px dashed ${ALMA.sandstone}`, color: ALMA.ink, opacity: 0.75 }}
               >
-                <GoogleIcon />
                 <span className="text-[0.84rem]">Reintentar Google Wallet</span>
                 <RefreshCw size={13} />
               </button>
@@ -418,52 +384,45 @@ const Wallet = () => {
             <button
               onClick={handleAppleWalletDownload}
               disabled={appleLoading}
-              className="flex items-center justify-center gap-3 rounded-2xl py-3.5 cursor-pointer transition-colors bg-transparent disabled:opacity-60"
-              style={{ backgroundColor: ALMA.cream, border: `1px solid ${ALMA.border}`, color: ALMA.ink }}
+              className={walletBadgeClass + " disabled:opacity-60"}
+              style={walletBadgeStyle}
             >
-              <AppleIcon />
-              <span className="text-[0.84rem] font-medium">
+              <AppleLogo />
+              <span className="text-[0.86rem] font-medium">
                 {appleLoading ? "Preparando…" : "Agregar a Apple Wallet"}
               </span>
-              {!appleLoading && <Download size={13} style={{ color: ALMA.berry, opacity: 0.7 }} />}
             </button>
           </div>
         </Section>
 
-        {/* Quick actions */}
-        <Section>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <Link
+        {/* Accesos: lista editorial, no pills */}
+        <Section title="Tus puntos y reservas">
+          <ListGroup>
+            <ListRow
               to="/app/wallet/history"
-              className="flex items-center justify-center gap-2 rounded-2xl py-3.5 no-underline transition-colors"
-              style={{ backgroundColor: ALMA.blush, color: ALMA.berry }}
-            >
-              <History size={15} />
-              <span className="text-[0.78rem] font-medium uppercase tracking-[0.18em]">Historial</span>
-            </Link>
-            <Link
+              icon={<History size={17} strokeWidth={1.7} />}
+              title="Historial de puntos"
+              description="Movimiento a movimiento"
+            />
+            <ListRow
               to="/app/wallet/rewards"
-              className="flex items-center justify-center gap-2 rounded-2xl py-3.5 no-underline transition-colors"
-              style={{ backgroundColor: ALMA.berry, color: ALMA.cream }}
-            >
-              <Gift size={15} />
-              <span className="text-[0.78rem] font-medium uppercase tracking-[0.18em]">Canjear puntos</span>
-            </Link>
-            <Link
+              icon={<Gift size={17} strokeWidth={1.7} />}
+              title="Canjear puntos"
+              description="Las recompensas del estudio"
+            />
+            <ListRow
               to="/app/classes"
-              className="flex items-center justify-center gap-2 rounded-2xl py-3.5 no-underline transition-colors"
-              style={{ backgroundColor: `${ALMA.orange}1a`, color: ALMA.orange }}
-            >
-              <CalendarDays size={15} />
-              <span className="text-[0.78rem] font-medium uppercase tracking-[0.18em]">Reservar clase</span>
-            </Link>
-          </div>
+              icon={<CalendarDays size={17} strokeWidth={1.7} />}
+              title="Reservar clase"
+              description="Encuentra tu próximo horario"
+            />
+          </ListGroup>
         </Section>
 
-        {!metrics.hasMembership && (
+        {!isLoading && !isError && !metrics.hasMembership && (
           <Section>
             <InfoBanner
-              tone="coral"
+              tone="stone"
               title="Aún no activas un paquete."
               description="Compra uno y tu pase se activa automáticamente."
               action={<PrimaryButton size="sm" to="/app/checkout">Ver paquetes</PrimaryButton>}

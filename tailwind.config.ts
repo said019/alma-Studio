@@ -47,15 +47,19 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        /* ── Alma Movement brand palette ── */
+        /* ── Alma Movement: paleta canónica (brand kit greige + espresso).
+           Debe coincidir con src/components/app/tokens.ts e index.css. ── */
         alma: {
-          purple:      "#2E201C",
-          magenta:     "#76214D",
-          violet:      "#778455",
-          lime:        "#F58A24",
-          cream:       "#FFF7F2",
-          lilac:       "#E9745F",
-          pinklight:   "#FCE6E1",
+          canvas:      "#FAF9F6",
+          mist:        "#F4F1EA",
+          oat:         "#E6DAC8",
+          sandstone:   "#CBB9A4",
+          stone:       "#A48D78",
+          berry:       "#6E5A46",
+          ink:         "#43392F",
+          "ink-deep":  "#241B1A",
+          hairline:    "#E0D5C6",
+          olive:       "#5F6B4A",
         },
       },
       borderRadius: {
@@ -64,13 +68,15 @@ export default {
         sm: "calc(var(--radius) - 4px)",
       },
       fontFamily: {
-        /* ── Official brand fonts ── */
-        gulfs:   ['"Bricolage Grotesque"', '"Jost"', 'sans-serif'],
+        /* ── Tipografías canónicas ── */
+        sans:    ['"Jost"', 'system-ui', 'sans-serif'],
+        display: ['"Fraunces"', 'Georgia', 'serif'],
         alilato: ['"Alilato"', '"Jost"', 'sans-serif'],
-        /* ── Backwards-compat aliases ── */
-        bebas:   ['"Bricolage Grotesque"', '"Jost"', 'sans-serif'],
-        syne:    ['"Alilato"', '"Jost"', 'sans-serif'],
-        dm:      ['"Alilato"', '"Jost"', 'sans-serif'],
+        /* ── Aliases legacy (todas resuelven a las canónicas) ── */
+        gulfs:   ['"Fraunces"', 'Georgia', 'serif'],
+        bebas:   ['"Fraunces"', 'Georgia', 'serif'],
+        syne:    ['"Jost"', 'system-ui', 'sans-serif'],
+        dm:      ['"Jost"', 'system-ui', 'sans-serif'],
       },
       keyframes: {
         "accordion-down": {

@@ -4,15 +4,17 @@ import api from "@/lib/api";
 import { AuthGuard } from "@/components/admin/AuthGuard";
 import AdminLayout from "@/components/admin/AdminLayout";
 import SectionTabs from "@/components/admin/SectionTabs";
+import { ErrorState } from "@/components/app/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Search, UserPlus, Edit, Phone, Mail, ShieldCheck, AlertTriangle } from "lucide-react";
+import { Plus, Search, UserPlus, Edit, Phone, Mail, ShieldCheck, ShieldAlert, AlertTriangle, Loader2 } from "lucide-react";
 import { useDebounce } from "@/hooks/use-debounce";
 
 interface ActivePack {
@@ -45,7 +47,7 @@ const VisitsList = () => {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Guest | null>(null);
 
-  const { data, isLoading } = useQuery<{ data: Guest[] }>({
+  const { data, isLoading, isError, refetch } = useQuery<{ data: Guest[] }>({
     queryKey: ["guest-profiles", debounced],
     queryFn: async () => (await api.get(`/admin/guest-profiles${debounced ? `?search=${encodeURIComponent(debounced)}` : ""}`)).data,
   });
@@ -120,29 +122,29 @@ const VisitsList = () => {
         <div className="admin-page max-w-5xl">
           <SectionTabs
             tabs={[
-              { label: "Clientes", to: "/admin/clients" },
+              { label: "Clientas", to: "/admin/clients" },
               { label: "Visitas", to: "/admin/visitas" },
             ]}
           />
           <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h1 className="text-2xl font-bold text-white">Invitadas / Visitas</h1>
-              <p className="mt-1 text-sm text-white/45">
+              <h1 className="admin-title font-semibold text-alma-ink">Invitadas / Visitas</h1>
+              <p className="mt-1 text-sm text-alma-ink/55">
                 Registro de acompañantes y sus cuestionarios iniciales. El cuestionario se reusa la próxima vez que vengan.
               </p>
             </div>
             <Button
               onClick={() => { resetForm(); setFormOpen(true); }}
-              className="bg-gradient-to-r from-[#C7A892] to-[#8A6E60] text-white"
+              className="bg-alma-ink text-alma-canvas hover:bg-alma-ink-deep"
             >
               <Plus size={14} className="mr-1.5" /> Nueva invitada
             </Button>
           </div>
 
           <div className="relative mb-4">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/35" />
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-alma-ink/40" />
             <Input
-              className="pl-8 bg-white/[0.04] border-white/[0.08]"
+              className="pl-8"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Buscar por nombre o teléfono"
@@ -150,12 +152,21 @@ const VisitsList = () => {
           </div>
 
           {isLoading ? (
-            <p className="text-sm text-muted-foreground">Cargando…</p>
+            <div className="space-y-2">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <Skeleton key={i} className="h-24 w-full rounded-2xl" />
+              ))}
+            </div>
+          ) : isError ? (
+            <ErrorState
+              description="No pudimos cargar a las invitadas. Revisa tu conexión y vuelve a intentarlo."
+              onRetry={() => refetch()}
+            />
           ) : guests.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-white/10 p-8 text-center">
-              <UserPlus size={32} className="mx-auto text-white/30 mb-3" />
-              <p className="text-sm text-white/60">Aún no hay invitadas registradas.</p>
-              <p className="mt-1 text-xs text-white/40">
+            <div className="rounded-2xl border border-dashed border-alma-sandstone/70 p-8 text-center">
+              <UserPlus size={32} className="mx-auto text-alma-stone mb-3" />
+              <p className="text-sm text-alma-ink/70">Aún no hay invitadas registradas.</p>
+              <p className="mt-1 text-xs text-alma-ink/55">
                 Se registran automáticamente al asignarlas a una clase, o aquí con <strong>"Nueva invitada"</strong>.
               </p>
             </div>
@@ -164,48 +175,62 @@ const VisitsList = () => {
               {guests.map((g) => (
                 <div
                   key={g.id}
-                  className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-4 flex flex-wrap items-start justify-between gap-3"
+                  className="rounded-2xl border border-alma-hairline bg-alma-mist p-4"
                 >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="font-medium text-white">{g.display_name}</p>
-                      {g.active_pack && (
-                        <Badge variant="outline" className="border-emerald-500/40 text-emerald-400 text-[10px]">
-                          {g.active_pack.classes_remaining ?? "—"} clase{g.active_pack.classes_remaining === 1 ? "" : "s"} · {g.active_pack.plan_name}
-                        </Badge>
-                      )}
-                      {!g.active_pack && (
-                        <Badge variant="outline" className="border-white/10 text-white/40 text-[10px]">
-                          Sin pack activo
-                        </Badge>
-                      )}
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-medium text-alma-ink">{g.display_name}</p>
+                        {g.active_pack ? (
+                          <Badge variant="outline" className="nums border-transparent bg-alma-oat text-alma-ink text-[10px] font-medium">
+                            {g.active_pack.classes_remaining ?? "—"} clase{g.active_pack.classes_remaining === 1 ? "" : "s"} · {g.active_pack.plan_name}
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="border-alma-hairline bg-transparent text-alma-ink/55 text-[10px] font-medium">
+                            Sin pack activo
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-alma-ink/60">
+                        {g.phone && <span className="nums flex items-center gap-1"><Phone size={11} /> {g.phone}</span>}
+                        {g.email && <span className="flex items-center gap-1"><Mail size={11} /> {g.email}</span>}
+                        {g.host_name && <span>Trajo: <strong className="text-alma-ink/80">{g.host_name}</strong></span>}
+                      </div>
+                      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
+                        {g.practiced_barre_before === true && (
+                          <span className="rounded-full border border-alma-hairline bg-alma-canvas px-2 py-0.5 text-alma-ink/60">
+                            Con experiencia previa
+                          </span>
+                        )}
+                        {g.accepted_waiver_at ? (
+                          <span className="inline-flex items-center gap-1 text-alma-olive">
+                            <ShieldCheck size={12} /> Waiver firmado
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-alma-berry">
+                            <ShieldAlert size={12} /> Waiver pendiente
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-white/55">
-                      {g.phone && <span className="flex items-center gap-1"><Phone size={11} /> {g.phone}</span>}
-                      {g.email && <span className="flex items-center gap-1"><Mail size={11} /> {g.email}</span>}
-                      {g.host_name && <span>Trajo: <strong className="text-white/75">{g.host_name}</strong></span>}
-                    </div>
-                    <div className="mt-1.5 flex flex-wrap gap-1.5 text-[10px]">
-                      {g.has_injury === true && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 px-2 py-0.5">
-                          <AlertTriangle size={9} /> Lesión: {g.injury_details || "—"}
-                        </span>
-                      )}
-                      {g.practiced_barre_before === true && (
-                        <span className="rounded-full bg-white/5 border border-white/10 text-white/60 px-2 py-0.5">
-                          Ya practicó barre
-                        </span>
-                      )}
-                      {g.accepted_waiver_at && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-2 py-0.5">
-                          <ShieldCheck size={9} /> Waiver aceptado
-                        </span>
-                      )}
-                    </div>
+                    <Button variant="outline" size="sm" onClick={() => openEdit(g)}>
+                      <Edit size={12} className="mr-1.5" /> Editar
+                    </Button>
                   </div>
-                  <Button variant="outline" size="sm" onClick={() => openEdit(g)} className="border-white/15">
-                    <Edit size={12} className="mr-1.5" /> Editar
-                  </Button>
+
+                  {g.has_injury === true && (
+                    <div className="mt-3 flex items-start gap-2.5 rounded-xl border border-destructive/25 bg-destructive/5 px-3 py-2.5">
+                      <AlertTriangle size={14} className="mt-0.5 shrink-0 text-destructive" />
+                      <div className="min-w-0">
+                        <p className="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-destructive">
+                          Lesión o condición física
+                        </p>
+                        <p className="mt-0.5 whitespace-pre-wrap break-words text-xs leading-relaxed text-alma-ink/80">
+                          {g.injury_details || "Sin detalles registrados. Confirma con ella antes de la clase."}
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -232,8 +257,8 @@ const VisitsList = () => {
                 <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="ej. ana@correo.com" />
               </div>
 
-              <div className="rounded-xl border border-border bg-muted/30 p-3 space-y-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Cuestionario</p>
+              <div className="rounded-xl border border-alma-hairline bg-alma-mist p-3 space-y-3">
+                <p className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-alma-ink/60">Cuestionario</p>
                 <div className="flex items-center justify-between gap-2">
                   <Label className="text-sm">¿Tiene lesión o condición física?</Label>
                   <Switch checked={hasInjury} onCheckedChange={setHasInjury} />
@@ -242,10 +267,10 @@ const VisitsList = () => {
                   <Textarea rows={2} value={injuryDetails} onChange={(e) => setInjuryDetails(e.target.value)} placeholder="Detalles relevantes" />
                 )}
                 <div className="flex items-center justify-between gap-2">
-                  <Label className="text-sm">¿Practicó barre antes?</Label>
+                  <Label className="text-sm">¿Ha practicado pilates antes?</Label>
                   <Switch checked={practicedBefore} onCheckedChange={setPracticedBefore} />
                 </div>
-                <div className="flex items-start justify-between gap-2 border-t border-border pt-2.5">
+                <div className="flex items-start justify-between gap-2 border-t border-alma-hairline pt-2.5">
                   <Label className="text-xs leading-relaxed">
                     Confirma que la invitada leyó y aceptó los términos y riesgos de la clase.
                   </Label>
@@ -260,9 +285,11 @@ const VisitsList = () => {
               <Button
                 onClick={() => saveMutation.mutate()}
                 disabled={!canSubmit || saveMutation.isPending}
-                className="bg-gradient-to-r from-[#C7A892] to-[#8A6E60] text-white"
+                className="bg-alma-ink text-alma-canvas hover:bg-alma-ink-deep"
               >
-                {saveMutation.isPending ? "Guardando…" : (editing ? "Guardar cambios" : "Registrar")}
+                {saveMutation.isPending ? (
+                  <><Loader2 size={14} className="mr-2 animate-spin" /> Guardando…</>
+                ) : (editing ? "Guardar cambios" : "Registrar")}
               </Button>
             </DialogFooter>
           </DialogContent>
