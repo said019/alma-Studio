@@ -932,6 +932,10 @@ async function ensureSchema() {
     `);
     await pool.query(`ALTER TABLE instructors ADD COLUMN IF NOT EXISTS photo_focus_x SMALLINT DEFAULT 50`).catch(() => {});
     await pool.query(`ALTER TABLE instructors ADD COLUMN IF NOT EXISTS photo_focus_y SMALLINT DEFAULT 50`).catch(() => {});
+    // Esquemas heredados (schema_complete.sql) dejaron instructors.user_id como
+    // NOT NULL; el alta de coaches desde admin no envía user_id. Lo relajamos
+    // para que POST /api/instructors funcione en cualquier base.
+    await pool.query(`ALTER TABLE instructors ALTER COLUMN user_id DROP NOT NULL`).catch(() => {});
     // ── Reviews table ──────────────────────────────────────────────────────
     await pool.query(`
       CREATE TABLE IF NOT EXISTS reviews (
