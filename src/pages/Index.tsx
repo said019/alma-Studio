@@ -672,14 +672,11 @@ const CoachesSection = ({ instructors }: { instructors: { id: string; displayNam
             >
               <div className={(isSolo ? "lg:col-span-6 " : "") + "relative grid place-items-center overflow-hidden rounded-[24px] " + (isSolo ? "aspect-[5/4] lg:aspect-[16/11]" : "aspect-[4/5]")} style={{ backgroundColor: ALMA.blush }}>
                 <img src={almaMark} alt="" aria-hidden="true" className="pointer-events-none absolute -left-16 -bottom-16 w-[78%] max-w-[330px] opacity-[0.13]" />
-                <span className="relative flex flex-col items-center text-center">
-                  <span
-                    className="grid place-items-center rounded-full font-bebas leading-none"
-                    style={{ width: isSolo ? 168 : 120, height: isSolo ? 168 : 120, backgroundColor: ALMA.cream, color: ALMA.berry, fontSize: isSolo ? "3.8rem" : "2.9rem" }}
-                  >
-                    {initialsOf(inst.label)}
-                  </span>
-                  <span className="mt-4 text-[0.6rem] uppercase tracking-[0.24em]" style={{ color: ALMA.berry }}>{inst.sub}</span>
+                <span
+                  className="relative grid place-items-center rounded-full font-bebas leading-none"
+                  style={{ width: isSolo ? 176 : 124, height: isSolo ? 176 : 124, backgroundColor: ALMA.cream, color: ALMA.berry, fontSize: isSolo ? "4rem" : "3rem" }}
+                >
+                  {initialsOf(inst.label)}
                 </span>
               </div>
               <div className={isSolo ? "lg:col-span-6" : "mt-5"}>
