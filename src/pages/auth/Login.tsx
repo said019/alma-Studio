@@ -14,7 +14,6 @@ import {
   AuthDivider,
   AuthSecondaryLink,
 } from "@/components/auth/AuthShell";
-import almaAuthLogin from "@/assets/alma/alma-auth-login.jpg";
 
 const schema = z.object({
   email: z.string().email("Email inválido"),
@@ -73,8 +72,6 @@ const Login = () => {
     <>
       <InstallAppPrompt />
       <AuthShell
-        brandPhoto={almaAuthLogin}
-        brandPhotoAlt="Una clase de Pilates en Alma Movement"
         brandTint="berry"
         brandEyebrow="Bienvenida de vuelta"
         brandHeadline={<>Pasa,</>}

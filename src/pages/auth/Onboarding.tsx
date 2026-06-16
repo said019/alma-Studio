@@ -11,7 +11,6 @@ import {
   ALMA,
 } from "@/components/auth/AuthShell";
 import type { User } from "@/types/auth";
-import almaBarre from "@/assets/alma/alma-barre-line.jpg";
 
 type YesNo = "yes" | "no" | null;
 
@@ -120,8 +119,6 @@ const Onboarding = () => {
 
   return (
     <AuthShell
-      brandPhoto={almaBarre}
-      brandPhotoAlt="Una clase de Pilates en Alma Movement"
       brandTint="berry"
       brandEyebrow="Casi listas"
       brandHeadline={<>Antes de tu</>}

@@ -17,7 +17,6 @@ import {
   ALMA,
 } from "@/components/auth/AuthShell";
 import { Check } from "lucide-react";
-import almaRegister from "@/assets/alma/alma-class-energy.jpg";
 
 const todayISO = new Date().toISOString().slice(0, 10);
 
@@ -103,8 +102,6 @@ const Register = () => {
 
   return (
     <AuthShell
-      brandPhoto={almaRegister}
-      brandPhotoAlt="Energía de una clase grupal en Alma"
       brandTint="berry"
       brandEyebrow="Nueva en Alma"
       brandHeadline={<>Te recibimos</>}

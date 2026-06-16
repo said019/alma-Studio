@@ -13,7 +13,6 @@ import {
   AuthPasswordRules,
   ALMA,
 } from "@/components/auth/AuthShell";
-import almaReset from "@/assets/alma/alma-detail-ankle-weights.jpg";
 
 const schema = z.object({
   password: z
@@ -66,8 +65,6 @@ const ResetPassword = () => {
 
   return (
     <AuthShell
-      brandPhoto={almaReset}
-      brandPhotoAlt="Detalle de tobilleras en una clase de Alma Movement"
       brandTint="coral"
       brandEyebrow="Nueva contraseña"
       brandHeadline={<>Casi listo,</>}

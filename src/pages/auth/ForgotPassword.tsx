@@ -12,7 +12,6 @@ import {
   AuthErrorBanner,
   ALMA,
 } from "@/components/auth/AuthShell";
-import almaForgot from "@/assets/alma/alma-barre-line.jpg";
 
 const schema = z.object({ email: z.string().email("Email inválido") });
 type FormValues = { email: string };
@@ -44,8 +43,6 @@ const ForgotPassword = () => {
 
   return (
     <AuthShell
-      brandPhoto={almaForgot}
-      brandPhotoAlt="Detalle del estudio Alma Movement"
       brandTint="coral"
       brandEyebrow="Recuperar acceso"
       brandHeadline={<>Te ayudamos</>}

@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 
 import { ALMA } from "@/components/app/tokens";
+import almaMark from "@/assets/alma/alma-mark.png";
 export { ALMA };
 
 /* ═══════════════════════════════════════════════════════════
@@ -102,10 +103,9 @@ export const AppShell = ({ children, hideGreeting = false }: AppShellProps) => {
       >
         <Link to="/" className="flex items-center no-underline mb-10">
           <img
-            src="/wallet-logo@2x.png"
+            src={almaMark}
             alt="Alma Movement"
-            className="h-10 w-auto object-contain"
-            style={{ filter: "drop-shadow(0 1px 1px rgba(46,32,28,0.06))" }}
+            className="h-12 w-auto object-contain"
           />
         </Link>
 
@@ -201,7 +201,7 @@ export const AppShell = ({ children, hideGreeting = false }: AppShellProps) => {
           }}
         >
           <Link to="/app" className="flex items-center no-underline">
-            <img src="/wallet-logo@2x.png" alt="Alma Movement" className="h-8 w-auto object-contain" />
+            <img src={almaMark} alt="Alma Movement" className="h-10 w-auto object-contain" />
           </Link>
           <div className="flex items-center gap-2">
             <Link

@@ -9,20 +9,13 @@ import {
 import { Link } from "react-router-dom";
 import { Eye, EyeOff, Loader2, ArrowRight, Check, AlertCircle, ChevronDown } from "lucide-react";
 import { ALMA } from "@/components/app/tokens";
+import almaMarkLight from "@/assets/alma/alma-mark-light.png";
 
 /* Paleta canónica re-exportada: las páginas de auth y ChangePassword
    importan ALMA desde aquí. Única fuente de verdad: app/tokens. */
 export { ALMA };
 
 type Tint = "berry" | "coral" | "olive";
-
-/* Wash decorativo sobre la foto del panel de marca. Solo greige grande,
-   nunca semántico: coral → sandstone, el resto → stone. */
-const TINT_WASH: Record<Tint, string> = {
-  berry: ALMA.stone,
-  coral: ALMA.sandstone,
-  olive: ALMA.stone,
-};
 
 /* ── Micro-sistema de campos: label uppercase ≥0.72rem en berry (AA),
    input cream con hairline y focus ring de marca. ── */
@@ -77,8 +70,8 @@ const FieldFeedback = ({ errorId, error, success, hint }: FieldFeedbackProps) =>
 };
 
 export type AuthShellProps = {
-  brandPhoto: string;
-  brandPhotoAlt: string;
+  brandPhoto?: string;
+  brandPhotoAlt?: string;
   brandTint?: Tint;
   brandEyebrow: string;
   brandHeadline: ReactNode;
@@ -117,42 +110,23 @@ export const AuthShell = ({
   children,
   footer,
 }: AuthShellProps) => {
-  const wash = TINT_WASH[brandTint];
-
   return (
     <div className="min-h-screen w-full grid grid-cols-1 lg:grid-cols-2" style={{ backgroundColor: ALMA.cream, color: ALMA.ink }}>
-      {/* ── BRAND PANEL ── */}
+      {/* ── BRAND PANEL — drench oscuro + logo, sin foto ── */}
       <aside
         className="relative overflow-hidden lg:min-h-screen"
-        style={{ minHeight: "30vh" }}
+        style={{ minHeight: "30vh", backgroundColor: ALMA.inkDeep }}
       >
-        <img
-          src={brandPhoto}
-          alt={brandPhotoAlt}
-          className="alma-photo absolute inset-0 h-full w-full object-cover"
-          loading="eager"
-        />
-        {/* Wash de marca: opacidad baja para que la foto se sienta */}
-        <div aria-hidden className="absolute inset-0" style={{ backgroundColor: wash, opacity: 0.32 }} />
-        {/* Scrim vertical: solo legibilidad del texto */}
-        <div
-          aria-hidden
-          className="absolute inset-0"
-          style={{
-            background: `linear-gradient(180deg, ${ALMA.inkDeep}59 0%, ${ALMA.inkDeep}00 38%, ${ALMA.inkDeep}80 100%)`,
-          }}
-        />
+        <img src={almaMarkLight} alt="" aria-hidden className="pointer-events-none absolute -right-24 -bottom-24 w-[78%] max-w-[480px] opacity-[0.08]" />
+        <div aria-hidden className="absolute inset-0" style={{ background: `radial-gradient(110% 80% at 0% 0%, ${ALMA.berry}59 0%, transparent 55%)` }} />
 
         <div className="relative z-10 flex h-full min-h-[30vh] lg:min-h-screen flex-col justify-between p-6 sm:p-9 lg:p-12">
           <Link
             to="/"
-            className="inline-flex w-fit items-baseline rounded-md no-underline transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-alma-canvas"
+            className="inline-flex w-fit items-center rounded-md no-underline transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-alma-canvas"
             aria-label="Inicio Alma Movement"
-            style={{ color: ALMA.cream }}
           >
-            <span className="font-display text-[1.55rem] sm:text-[1.7rem] leading-none">
-              Alma.
-            </span>
+            <img src={almaMarkLight} alt="Alma Movement" className="h-16 sm:h-20 w-auto object-contain" />
           </Link>
 
           <div className="max-w-[440px]">
@@ -212,7 +186,7 @@ export const AuthShell = ({
           </div>
 
           <div className="hidden lg:flex items-center justify-between text-[0.72rem] uppercase tracking-[0.22em]" style={{ color: ALMA.cream, opacity: 0.55 }}>
-            <span>Alma Movement</span>
+            <span>Move with intention</span>
             <span>Juriquilla, Querétaro, MX</span>
           </div>
         </div>
