@@ -664,7 +664,7 @@ const CoachesSection = ({ instructors }: { instructors: { id: string; displayNam
           </p>
         </div>
 
-        <div className={"reveal opacity-0 translate-y-8 transition-all duration-700 grid gap-8 " + (isSolo ? "grid-cols-1 lg:grid-cols-12" : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3")}>
+        <div className={"reveal opacity-0 translate-y-8 transition-all duration-700 grid gap-8 items-start " + (isSolo ? "grid-cols-1 lg:grid-cols-12" : items.length === 2 ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3")}>
           {items.map((inst) => (
             <article
               key={inst.key}
@@ -685,7 +685,7 @@ const CoachesSection = ({ instructors }: { instructors: { id: string; displayNam
                   {inst.coachTitle}
                 </h3>
                 {inst.bio && (
-                  <p className={"text-[0.95rem] leading-[1.75] max-w-[60ch] " + (isSolo ? "mt-5" : "mt-3")} style={{ color: ALMA.ink }}>
+                  <p className={"text-[0.95rem] leading-[1.75] max-w-[60ch] whitespace-pre-line " + (isSolo ? "mt-5" : "mt-3")} style={{ color: ALMA.ink }}>
                     {inst.bio}
                   </p>
                 )}
