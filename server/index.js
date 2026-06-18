@@ -2826,16 +2826,8 @@ app.get("/api/plans", async (req, res) => {
 // GET /api/memberships/my
 app.get("/api/memberships/my", authMiddleware, async (req, res) => {
   try {
-    // Ensure optional columns exist (idempotent, safe to run on every request)
-    await pool.query(`ALTER TABLE memberships ADD COLUMN IF NOT EXISTS plan_name_override VARCHAR(255)`).catch(() => { });
-    await pool.query(`ALTER TABLE memberships ADD COLUMN IF NOT EXISTS class_limit_override INTEGER`).catch(() => { });
-    await pool.query(`ALTER TABLE memberships ADD COLUMN IF NOT EXISTS cancellations_used INTEGER NOT NULL DEFAULT 0`).catch(() => { });
-    await pool.query(`ALTER TABLE memberships ADD COLUMN IF NOT EXISTS order_id UUID`).catch(() => { });
-    await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS class_category VARCHAR(20) DEFAULT 'all'`).catch(() => { });
-    await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS class_limit INTEGER`).catch(() => { });
-    await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS duration_days INTEGER NOT NULL DEFAULT 30`).catch(() => { });
-    await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS features JSONB DEFAULT '[]'::jsonb`).catch(() => { });
-
+    // Las columnas opcionales ya las garantiza ensureSchema al arrancar; no se
+    // migran por-request (antes corrían 8 ALTER TABLE en cada petición).
     const r = await pool.query(
       `SELECT m.id, m.user_id, m.plan_id, m.status, m.start_date, m.end_date,
               m.classes_remaining, m.payment_method, m.created_at, m.updated_at,
@@ -3563,6 +3555,10 @@ app.post("/api/reviews", authMiddleware, async (req, res) => {
     );
     if (bRes.rows.length === 0) return res.status(404).json({ message: "Reserva no encontrada" });
     const booking = bRes.rows[0];
+    // Solo se puede reseñar una clase efectivamente asistida (check-in).
+    if (booking.status !== "checked_in") {
+      return res.status(403).json({ message: "Solo puedes reseñar una clase a la que asististe." });
+    }
 
     // Check if already reviewed
     const existing = await pool.query("SELECT id FROM reviews WHERE booking_id = $1", [bookingId]);
@@ -3672,7 +3668,7 @@ app.get("/api/orders", authMiddleware, async (req, res) => {
     const r = await pool.query(
       `SELECT o.*, p.name AS plan_name, p.duration_days
        FROM orders o
-       JOIN plans p ON o.plan_id = p.id
+       LEFT JOIN plans p ON o.plan_id = p.id
        WHERE o.user_id = $1
        ORDER BY o.created_at DESC`,
       [req.userId]
@@ -3691,7 +3687,7 @@ app.get("/api/orders/:id", authMiddleware, async (req, res) => {
       `SELECT o.*, p.name AS plan_name, p.duration_days, p.features,
               pp.file_url AS proof_url, pp.status AS proof_status, pp.uploaded_at AS proof_uploaded_at
        FROM orders o
-       JOIN plans p ON o.plan_id = p.id
+       LEFT JOIN plans p ON o.plan_id = p.id
        LEFT JOIN payment_proofs pp ON pp.order_id = o.id
        WHERE o.id = $1 AND o.user_id = $2`,
       [req.params.id, req.userId]
@@ -10602,10 +10598,10 @@ app.get("/api/reports/instructors", adminMiddleware, async (req, res) => {
 // GET /api/reviews (public, approved only; admin sees all via /api/admin/reviews)
 app.get("/api/reviews", async (req, res) => {
   try {
-    const { limit = 50, approved } = req.query;
-    let q = `SELECT rv.*, u.display_name AS user_name FROM reviews rv LEFT JOIN users u ON rv.user_id=u.id WHERE 1=1`;
+    const { limit = 50 } = req.query;
+    // Público: SOLO reseñas aprobadas. El admin ve todas vía /api/admin/reviews.
+    let q = `SELECT rv.*, u.display_name AS user_name FROM reviews rv LEFT JOIN users u ON rv.user_id=u.id WHERE rv.is_approved=true`;
     const params = [];
-    if (approved !== "false") { q += ` AND rv.is_approved=true`; }
     params.push(parseInt(limit)); q += ` ORDER BY rv.created_at DESC LIMIT $${params.length}`;
     const r = await pool.query(q, params);
     return res.json({ data: r.rows });
@@ -11843,10 +11839,34 @@ app.post("/api/users", adminMiddleware, async (req, res) => {
 // DELETE /api/users/:id
 app.delete("/api/users/:id", adminMiddleware, async (req, res) => {
   try {
-    await pool.query("DELETE FROM users WHERE id = $1", [req.params.id]);
+    const id = req.params.id;
+    if (id === req.userId) {
+      return res.status(400).json({ message: "No puedes eliminar tu propia cuenta." });
+    }
+    // No borrar clientas con historial vivo: membresías activas o reservas próximas.
+    const deps = await pool.query(
+      `SELECT
+         (SELECT COUNT(*) FROM memberships
+            WHERE user_id = $1 AND status IN ('active','pending_activation','pending_payment')) AS memberships,
+         (SELECT COUNT(*) FROM bookings b JOIN classes c ON b.class_id = c.id
+            WHERE b.user_id = $1 AND b.status IN ('confirmed','checked_in')
+              AND c.date >= (NOW() AT TIME ZONE 'America/Mexico_City')::date) AS upcoming`,
+      [id]
+    );
+    const d = deps.rows[0] || {};
+    if (Number(d.memberships) > 0 || Number(d.upcoming) > 0) {
+      return res.status(409).json({
+        message: "No se puede eliminar: la clienta tiene membresías activas o reservas próximas. Cancélalas primero.",
+      });
+    }
+    const del = await pool.query("DELETE FROM users WHERE id = $1 RETURNING id", [id]);
+    if (!del.rows.length) return res.status(404).json({ message: "Usuario no encontrado" });
     return res.json({ message: "Usuario eliminado" });
   } catch (err) {
     console.error("DELETE /api/users/:id error:", err);
+    if (err?.code === "23503") {
+      return res.status(409).json({ message: "No se puede eliminar: la clienta tiene historial asociado (reservas o pagos). Considera desactivarla en su lugar." });
+    }
     return res.status(500).json({ message: "Error interno" });
   }
 });
@@ -12873,6 +12893,12 @@ app.post("/api/admin/checkin/scan", adminMiddleware, async (req, res) => {
         );
       }
     } catch (_) { /* no romper el check-in */ }
+
+    // Igual que el check-in manual del roster: dispara motivación, milestones y
+    // sincronización del pase de wallet (antes el check-in por QR no lo hacía).
+    notifyClassAttended(userId, { className: bk.class_name }).catch((e) => {
+      console.warn("[checkin/scan] notifyClassAttended async error:", e?.message);
+    });
 
     return res.json({
       status: "ok", name, className: bk.class_name, time: timeStr,
