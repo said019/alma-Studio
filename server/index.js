@@ -3820,7 +3820,30 @@ app.post("/api/orders/:id/proof", authMiddleware, upload.any(), async (req, res)
     if (uploadedFile) {
       mimeType = uploadedFile.mimetype;
       fileName = uploadedFile.originalname;
-      fileUrl = `data:${mimeType};base64,${uploadedFile.buffer.toString("base64")}`;
+      // Sube el comprobante a Google Drive si está configurado (evita inflar la BD
+      // con base64 y mantener ligeras las listas). Si no, cae a base64 (dev).
+      const driveConfigured = Boolean(
+        process.env.GOOGLE_DRIVE_FOLDER_ID && process.env.GOOGLE_CLIENT_ID &&
+        process.env.GOOGLE_CLIENT_SECRET && process.env.GOOGLE_REFRESH_TOKEN
+      );
+      if (driveConfigured) {
+        try {
+          const token = await getGoogleDriveAccessToken();
+          const up = await uploadBufferToDrive(
+            uploadedFile.buffer,
+            `comprobante_${req.params.id}_${Date.now()}_${fileName}`,
+            mimeType,
+            token
+          );
+          await makeGoogleDriveFilePublic(up.id, token);
+          fileUrl = `/api/drive/image/${up.id}`;
+        } catch (e) {
+          console.warn("[proof] Drive upload falló, fallback base64:", e?.message);
+          fileUrl = `data:${mimeType};base64,${uploadedFile.buffer.toString("base64")}`;
+        }
+      } else {
+        fileUrl = `data:${mimeType};base64,${uploadedFile.buffer.toString("base64")}`;
+      }
     } else if (req.body.fileUrl) {
       fileUrl = req.body.fileUrl;
       fileName = req.body.fileName || "comprobante";
@@ -7948,89 +7971,9 @@ app.delete("/api/admin/schedule-slots/:id", adminMiddleware, async (req, res) =>
   }
 });
 
-// ─── Routes: /api/admin/plans (CRUD) ────────────────────────────────────────
-
-// POST /api/admin/plans
-app.post("/api/admin/plans", adminMiddleware, async (req, res) => {
-  const {
-    name, description, price, currency, duration_days, class_limit, class_category,
-    features, is_active, sort_order, is_non_transferable, is_non_repeatable, repeat_key,
-  } = req.body;
-  if (!name?.trim() || price === undefined) return res.status(400).json({ message: "name y price requeridos" });
-  try {
-    const validCats = ["studio", "reformer_tower", "mixto", "all"];
-    const cat = validCats.includes(class_category) ? class_category : "all";
-    const nonTransferable = parseBooleanFlag(is_non_transferable);
-    const nonRepeatable = parseBooleanFlag(is_non_repeatable);
-    const safeRepeatKey = nonRepeatable ? String(repeat_key ?? "").trim() || null : null;
-    const r = await pool.query(
-      `INSERT INTO plans
-        (name, description, price, currency, duration_days, class_limit, class_category, features, is_active, sort_order, is_non_transferable, is_non_repeatable, repeat_key)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
-      [name.trim(), description || null, price, currency || "MXN",
-      duration_days || 30, class_limit || null,
-      cat, JSON.stringify(features || []), is_active ?? true, sort_order ?? 0, nonTransferable, nonRepeatable, safeRepeatKey]
-    );
-    return res.status(201).json({ data: r.rows[0] });
-  } catch (err) {
-    console.error("POST admin/plans error:", err);
-    return res.status(500).json({ message: "Error interno" });
-  }
-});
-
-// PUT /api/admin/plans/:id
-app.put("/api/admin/plans/:id", adminMiddleware, async (req, res) => {
-  const {
-    name, description, price, currency, duration_days, class_limit, class_category,
-    features, is_active, sort_order, is_non_transferable, is_non_repeatable, repeat_key,
-  } = req.body;
-  try {
-    const validCats = ["studio", "reformer_tower", "mixto", "all"];
-    const cat = validCats.includes(class_category) ? class_category : null;
-    const nonTransferable = parseBooleanFlag(is_non_transferable);
-    const nonRepeatable = parseBooleanFlag(is_non_repeatable);
-    const safeRepeatKey = nonRepeatable ? String(repeat_key ?? "").trim() || null : null;
-    const r = await pool.query(
-      `UPDATE plans SET
-         name          = COALESCE($1, name),
-         description   = COALESCE($2, description),
-         price         = COALESCE($3, price),
-         currency      = COALESCE($4, currency),
-         duration_days = COALESCE($5, duration_days),
-         class_limit   = $6,
-         class_category= COALESCE($7, class_category),
-         features      = COALESCE($8, features),
-         is_active     = COALESCE($9, is_active),
-         sort_order    = COALESCE($10, sort_order),
-         is_non_transferable = COALESCE($11, is_non_transferable),
-         is_non_repeatable   = COALESCE($12, is_non_repeatable),
-         repeat_key          = CASE WHEN COALESCE($12, is_non_repeatable) = true THEN $13 ELSE NULL END,
-         updated_at    = NOW()
-       WHERE id = $14 RETURNING *`,
-      [name || null, description || null, price ?? null, currency || null,
-      duration_days || null, class_limit ?? null,
-      cat, features ? JSON.stringify(features) : null,
-      is_active ?? null, sort_order ?? null, nonTransferable, nonRepeatable, safeRepeatKey,
-      req.params.id]
-    );
-    if (r.rows.length === 0) return res.status(404).json({ message: "No encontrado" });
-    return res.json({ data: r.rows[0] });
-  } catch (err) {
-    console.error("PUT admin/plans error:", err);
-    return res.status(500).json({ message: "Error interno" });
-  }
-});
-
-// DELETE /api/admin/plans/:id
-app.delete("/api/admin/plans/:id", adminMiddleware, async (req, res) => {
-  try {
-    await pool.query("UPDATE plans SET is_active = false WHERE id = $1", [req.params.id]);
-    return res.json({ message: "Plan desactivado" });
-  } catch (err) {
-    console.error("DELETE admin/plans error:", err);
-    return res.status(500).json({ message: "Error interno" });
-  }
-});
+// CRUD de planes consolidado en /api/plans (POST/PUT/DELETE), que es lo que usa
+// el frontend. Se eliminaron los duplicados /api/admin/plans: estaban incompletos
+// (no manejaban opening_price/morning_only/is_visit_pack) y eran código muerto.
 
 // ─── Routes: /api/admin/schedule (schedule_templates) ───────────────────────
 
@@ -13644,21 +13587,8 @@ app.delete("/api/products/:id", adminMiddleware, async (req, res) => {
   }
 });
 
-// POST /api/pos/sale — POS transaction
-app.post("/api/pos/sale", adminMiddleware, async (req, res) => {
-  try {
-    const { userId, items, paymentMethod = "efectivo", discountCode } = req.body;
-    const result = await processPosSale({ userId, items, paymentMethod, discountCode });
-    if (result.error) {
-      return res.status(result.error.status).json({ message: result.error.message });
-    }
-    return res.status(201).json({ data: result.data });
-  } catch (err) {
-    console.error("POST /pos/sale error:", err);
-    const status = Number.isInteger(err?.status) ? err.status : 500;
-    return res.status(status).json({ message: err?.message || "Error interno" });
-  }
-});
+// (POST /api/pos/sale eliminado: era duplicado exacto de /api/pos/checkout
+//  —el que usa el POS—; ambos llamaban a processPosSale.)
 
 // ─── Loyalty admin ───────────────────────────────────────────────────────────
 
@@ -13907,49 +13837,8 @@ app.post("/api/instructors/:id/magic-link", adminMiddleware, async (req, res) =>
 });
 
 
-// GET /api/admin/reports?startDate=&endDate=
-app.get("/api/admin/reports", adminMiddleware, async (req, res) => {
-  try {
-    const { startDate, endDate } = req.query;
-    const start = startDate || new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
-    const end = endDate || new Date().toISOString().slice(0, 10);
-
-    const [revenue, newClients, bookings, topPlans] = await Promise.all([
-      pool.query(
-        "SELECT COALESCE(SUM(total_amount),0) AS total, COUNT(*) AS count FROM orders WHERE status='approved' AND created_at BETWEEN $1 AND $2",
-        [start, end]
-      ),
-      pool.query(
-        "SELECT COUNT(*) FROM users WHERE role='client' AND created_at BETWEEN $1 AND $2",
-        [start, end]
-      ),
-      pool.query(
-        "SELECT COUNT(*) AS total, COUNT(CASE WHEN status='checked_in' THEN 1 END) AS attended FROM bookings WHERE created_at BETWEEN $1 AND $2",
-        [start, end]
-      ),
-      pool.query(
-        `SELECT p.name, COUNT(m.id) AS sales, SUM(o.total_amount) AS revenue
-         FROM memberships m
-         JOIN plans p ON m.plan_id = p.id
-         LEFT JOIN orders o ON o.plan_id = p.id AND o.status = 'approved'
-         WHERE m.created_at BETWEEN $1 AND $2
-         GROUP BY p.name ORDER BY sales DESC LIMIT 5`,
-        [start, end]
-      ),
-    ]);
-
-    return res.json({
-      period: { start, end },
-      revenue: { total: parseFloat(revenue.rows[0].total), count: parseInt(revenue.rows[0].count) },
-      newClients: parseInt(newClients.rows[0].count),
-      bookings: { total: parseInt(bookings.rows[0].total), attended: parseInt(bookings.rows[0].attended) },
-      topPlans: topPlans.rows,
-    });
-  } catch (err) {
-    console.error("GET /admin/reports error:", err);
-    return res.status(500).json({ message: "Error interno" });
-  }
-});
+// (GET /api/admin/reports eliminado: reporte legacy no usado por el frontend,
+//  que consume /api/reports/* —overview, revenue, classes, retention, etc.)
 
 // ─── Classes admin ──────────────────────────────────────────────────────────
 
