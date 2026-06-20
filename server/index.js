@@ -3736,6 +3736,75 @@ app.get("/api/orders/:id", authMiddleware, async (req, res) => {
   }
 });
 
+// ── Activate a Stripe-paid order (called from webhook, never from HTTP) ────
+async function finalizeStripeOrder(client, orderId) {
+  const orderRes = await client.query("SELECT * FROM orders WHERE id = $1 FOR UPDATE", [orderId]);
+  if (!orderRes.rows.length) throw new Error(`Order ${orderId} not found`);
+  const order = orderRes.rows[0];
+
+  if (order.status === "approved") return; // already activated — idempotent
+
+  await client.query(
+    "UPDATE orders SET status = 'approved', verified_at = NOW() WHERE id = $1",
+    [orderId]
+  );
+
+  if (!order.plan_id || !order.user_id) return;
+
+  const planRes = await client.query("SELECT * FROM plans WHERE id = $1", [order.plan_id]);
+  if (!planRes.rows.length) return;
+  const plan = planRes.rows[0];
+
+  // Carry-over: cancel active memberships and transfer remaining credits
+  let carryOver = 0;
+  const activeMemberships = await client.query(
+    `SELECT id, classes_remaining FROM memberships
+      WHERE user_id = $1 AND status = 'active' AND classes_remaining > 0`,
+    [order.user_id]
+  );
+  if (activeMemberships.rows.length > 0) {
+    for (const m of activeMemberships.rows) {
+      carryOver += Number(m.classes_remaining) || 0;
+    }
+    const oldIds = activeMemberships.rows.map((m) => m.id);
+    await client.query(
+      `UPDATE memberships
+          SET status = 'cancelled',
+              cancellation_reason = 'Renovación: créditos transferidos a nueva membresía',
+              cancelled_at = NOW(),
+              end_date = NOW()
+        WHERE id = ANY($1::uuid[])`,
+      [oldIds]
+    );
+  }
+
+  const newCredits = (plan.class_limit ?? 0) + carryOver;
+  const end = new Date();
+  end.setDate(end.getDate() + (plan.duration_days || 30));
+
+  const existing = await client.query(
+    `SELECT id FROM memberships WHERE order_id = $1 AND COALESCE(is_addon, false) = false`,
+    [orderId]
+  );
+  if (existing.rows.length > 0) {
+    await client.query(
+      `UPDATE memberships SET status = 'active', classes_remaining = $1 WHERE id = $2`,
+      [newCredits, existing.rows[0].id]
+    );
+  } else {
+    await client.query(
+      `INSERT INTO memberships
+          (user_id, plan_id, status, payment_method, start_date, end_date, classes_remaining, order_id)
+         VALUES ($1, $2, 'active', 'card', NOW(), $3, $4, $5)`,
+      [order.user_id, order.plan_id, end.toISOString(), newCredits, orderId]
+    );
+  }
+
+  if (order.discount_code_id) {
+    await incrementDiscountUsage(order.discount_code_id, client);
+  }
+}
+
 // ── Generate short order number: OPH-YYMM-XXXX ──
 async function generateOrderNumber(client) {
   const now = new Date();
@@ -3746,6 +3815,127 @@ async function generateOrderNumber(client) {
   );
   const seq = (res.rows[0]?.cnt ?? 0) + 1;
   return `${prefix}-${String(seq).padStart(4, "0")}`;
+}
+
+// ── POST /api/stripe/webhook ───────────────────────────────────────────────
+app.post(
+  "/api/stripe/webhook",
+  express.raw({ type: "application/json" }),
+  async (req, res) => {
+    const sig = req.headers["stripe-signature"];
+    let event;
+    try {
+      event = verifyWebhookSignature(req.body, sig);
+    } catch (err) {
+      console.error("[Stripe Webhook] Signature verification failed:", err.message);
+      return res.status(400).json({ message: "Invalid signature" });
+    }
+
+    const eventId = event.id;
+
+    // Dedup: ignore already-processed events (PRIMARY KEY violation = duplicate)
+    try {
+      await pool.query(
+        "INSERT INTO stripe_webhook_events (event_id) VALUES ($1)",
+        [eventId]
+      );
+    } catch (_dupErr) {
+      return res.status(200).json({ received: true, duplicate: true });
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      await handleStripeEvent(client, event);
+      await client.query("COMMIT");
+      return res.status(200).json({ received: true });
+    } catch (err) {
+      await client.query("ROLLBACK").catch(() => {});
+      // Delete dedup row so Stripe retries this event
+      await pool.query("DELETE FROM stripe_webhook_events WHERE event_id = $1", [eventId]).catch(() => {});
+      console.error("[Stripe Webhook] Handler error for", eventId, ":", err.message);
+      return res.status(500).json({ message: "Webhook handler error" });
+    } finally {
+      client.release();
+    }
+  }
+);
+
+// ── Stripe event dispatcher ────────────────────────────────────────────────
+async function handleStripeEvent(client, event) {
+  switch (event.type) {
+    case "checkout.session.completed": {
+      const session = event.data.object;
+      const orderId = session.metadata?.order_id;
+      if (!orderId) {
+        console.warn("[Stripe] checkout.session.completed missing order_id in metadata");
+        return;
+      }
+      // Update Stripe fields on the order regardless of payment_status
+      await client.query(
+        `UPDATE orders SET
+            stripe_session_id        = $1,
+            stripe_payment_intent_id = $2,
+            stripe_payment_status    = $3,
+            payment_provider         = 'stripe'
+          WHERE id = $4`,
+        [session.id, session.payment_intent ?? null, session.payment_status, orderId]
+      );
+      // Only activate when fully paid (card). OXXO arrives as 'unpaid' here —
+      // activation waits for payment_intent.succeeded below.
+      if (session.payment_status === "paid") {
+        await finalizeStripeOrder(client, orderId);
+      }
+      break;
+    }
+
+    case "checkout.session.expired": {
+      const session = event.data.object;
+      const orderId = session.metadata?.order_id;
+      if (!orderId) return;
+      await client.query(
+        `UPDATE orders SET status = 'expired', stripe_session_id = $1
+          WHERE id = $2 AND status = 'pending_payment'`,
+        [session.id, orderId]
+      );
+      break;
+    }
+
+    case "payment_intent.succeeded": {
+      // Handles OXXO: session.completed arrives 'unpaid', this fires when cash collected
+      const pi = event.data.object;
+      const orderId = pi.metadata?.order_id;
+      if (!orderId) return;
+      await client.query(
+        `UPDATE orders SET stripe_payment_intent_id = $1, stripe_payment_status = 'paid'
+          WHERE id = $2`,
+        [pi.id, orderId]
+      );
+      await finalizeStripeOrder(client, orderId);
+      break;
+    }
+
+    case "payment_intent.payment_failed": {
+      const pi = event.data.object;
+      const orderId = pi.metadata?.order_id;
+      if (!orderId) return;
+      await client.query(
+        `UPDATE orders SET stripe_payment_status = 'failed', stripe_payment_intent_id = $1
+          WHERE id = $2`,
+        [pi.id, orderId]
+      );
+      break;
+    }
+
+    case "charge.refunded":
+    case "charge.dispute.created":
+      console.log(`[Stripe] ${event.type}: ${event.data.object.id} — review in Stripe Dashboard`);
+      break;
+
+    default:
+      // Unhandled event types — Stripe sends many, silence is intentional
+      break;
+  }
 }
 
 // POST /api/orders
