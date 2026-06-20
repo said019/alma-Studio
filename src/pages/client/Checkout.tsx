@@ -34,7 +34,7 @@ import {
 } from "lucide-react";
 
 type Step = "select" | "method" | "bank" | "cash" | "upload" | "done";
-type PaymentMethod = "transfer" | "cash";
+type PaymentMethod = "transfer" | "cash" | "card";
 
 const flag = (value: unknown): boolean => {
   if (typeof value === "boolean") return value;
@@ -253,6 +253,11 @@ const Checkout = () => {
       const data = res.data?.data ?? res.data;
       setOrderId(data.orderId ?? data.id);
       setOrderNumber(data.orderNumber ?? data.order_number ?? null);
+      // Card: redirect browser to Stripe Hosted Checkout
+      if (paymentMethod === "card" && data.checkout_url) {
+        window.location.href = data.checkout_url;
+        return;
+      }
       setBankDetails(data.bankDetails ?? data.bank_details);
       setStep(paymentMethod === "transfer" ? "bank" : "cash");
     },
@@ -461,6 +466,7 @@ const Checkout = () => {
             <Section title="¿Cómo quieres pagar?">
               <div role="radiogroup" aria-label="Método de pago" style={{ borderBottom: `1px solid ${ALMA.border}` }}>
                 {[
+                  { id: "card" as const, label: "Tarjeta", sub: "Visa, Mastercard — pago seguro con Stripe", icon: CreditCard },
                   { id: "transfer" as const, label: "Transferencia", sub: "Banorte, subes tu comprobante", icon: Building2 },
                   { id: "cash" as const, label: "Efectivo", sub: "Pagas en recepción del estudio", icon: Banknote },
                 ].map((opt) => {
