@@ -1567,6 +1567,23 @@ async function ensureSchema() {
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_event_passes_status ON event_passes(status)`).catch(() => { });
     await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_event_passes_registration_unique ON event_passes(registration_id) WHERE registration_id IS NOT NULL`).catch(() => { });
 
+    // ── Stripe ──────────────────────────────────────────────────────────────
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT`).catch(() => { });
+    await pool.query(`
+      ALTER TABLE orders
+        ADD COLUMN IF NOT EXISTS stripe_session_id        TEXT,
+        ADD COLUMN IF NOT EXISTS stripe_checkout_url      TEXT,
+        ADD COLUMN IF NOT EXISTS stripe_payment_intent_id TEXT,
+        ADD COLUMN IF NOT EXISTS stripe_payment_status    TEXT,
+        ADD COLUMN IF NOT EXISTS payment_provider         TEXT DEFAULT 'internal'
+    `).catch(() => { });
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS stripe_webhook_events (
+        event_id     TEXT PRIMARY KEY,
+        processed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `).catch(() => { });
+
     console.log("✅ Schema ensured");
   } catch (err) {
     console.error("Schema migration warning:", err.message);
