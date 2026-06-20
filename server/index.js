@@ -4014,12 +4014,48 @@ app.post("/api/orders", authMiddleware, async (req, res) => {
     await client.query("COMMIT");
 
     const order = orderRes.rows[0];
+
+    // ── Card: create Stripe Checkout Session ──────────────────────────────
+    if (paymentMethod === "card") {
+      if (!process.env.STRIPE_SECRET_KEY) {
+        return res.status(503).json({ message: "Pagos con tarjeta no disponibles en este momento" });
+      }
+      try {
+        const customerId = await createOrGetStripeCustomer(pool, req.userId);
+        const session = await createCheckoutSession(pool, {
+          order,
+          plan,
+          totalAmount: total,
+          customerId,
+        });
+        await pool.query(
+          `UPDATE orders SET
+              stripe_session_id   = $1,
+              stripe_checkout_url = $2,
+              payment_provider    = 'stripe'
+            WHERE id = $3`,
+          [session.id, session.url, order.id]
+        );
+        return res.status(201).json({
+          data: {
+            ...order,
+            plan_name: plan.name,
+            checkout_url: session.url,
+          },
+        });
+      } catch (stripeErr) {
+        console.error("[Stripe] createCheckoutSession error:", stripeErr.message);
+        return res.status(502).json({ message: "Error al crear sesión de pago. Intenta de nuevo." });
+      }
+    }
+
+    // ── Transfer / cash ───────────────────────────────────────────────────
     return res.status(201).json({
       data: {
         ...order,
         plan_name: plan.name,
         bank_details: { ...bankInfo, amount: total, currency: "MXN" },
-      }
+      },
     });
   } catch (err) {
     try { await client.query("ROLLBACK"); } catch (_) { }
