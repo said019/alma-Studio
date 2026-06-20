@@ -27,6 +27,12 @@ import { ALMA_CLASS_TYPES, ALMA_SCHEDULE_SLOTS, ALMA_SCHEDULE_DAYS, ALMA_PLANS, 
 import { resolveEffectivePrice } from "./lib/pricing.js";
 import { isMembershipCategoryCompatible as ruleCategoryCompatible, normalizeClassCategory as ruleNormalizeCategory, isWithinMorningWindow, categoryLabel } from "./lib/bookingRules.js";
 import { isWithinCancelWindow, penaltyDueAt } from "./lib/faltas.js";
+import {
+  validateStripeConfig,
+  createOrGetStripeCustomer,
+  createCheckoutSession,
+  verifyWebhookSignature,
+} from "./lib/stripe.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -1587,6 +1593,17 @@ async function ensureSchema() {
     console.log("✅ Schema ensured");
   } catch (err) {
     console.error("Schema migration warning:", err.message);
+  }
+
+  // ── Stripe config (only if key is set; allows running without Stripe in dev) ──
+  if (process.env.STRIPE_SECRET_KEY) {
+    try {
+      validateStripeConfig();
+      console.log("[Stripe] Config validated OK");
+    } catch (stripeConfigErr) {
+      console.error("[Stripe] Config error:", stripeConfigErr.message);
+      process.exit(1);
+    }
   }
 
   // ── Seed demo classes for the next 4 weeks (only if classes table is empty) ──
