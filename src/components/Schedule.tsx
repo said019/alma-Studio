@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import {
   format,
   addDays,
+  addWeeks,
   startOfWeek,
   isSameDay,
   parseISO,
@@ -11,7 +12,7 @@ import {
   differenceInMinutes,
 } from "date-fns";
 import { es } from "date-fns/locale";
-import { ArrowUpRight, Plus, Minus } from "lucide-react";
+import { ArrowUpRight, Plus, Minus, ChevronLeft, ChevronRight } from "lucide-react";
 import api from "@/lib/api";
 import { ALMA } from "@/components/app/tokens";
 import { STUDIO } from "@/lib/studio";
@@ -94,13 +95,20 @@ export default function Schedule() {
   // manda a crear cuenta; si ya hay sesión, directo al booking de la app.
   const bookPath = isAuthenticated ? "/app/classes" : "/auth/register";
 
-  /* Semana visible: lun→sáb. En domingo (día de descanso) se muestra la
-     semana siguiente para no abrir sobre seis días deshabilitados. */
-  const weekStart = useMemo(() => {
+  /* Semana visible: lun→sáb. weekOffset 0 = semana actual, 1 = siguiente, etc. */
+  const [weekOffset, setWeekOffset] = useState(0);
+
+  const baseWeekStart = useMemo(() => {
     const today = new Date();
     const base = today.getDay() === 0 ? addDays(today, 1) : today;
     return startOfWeek(base, { weekStartsOn: 1 });
   }, []);
+
+  const weekStart = useMemo(
+    () => addWeeks(baseWeekStart, weekOffset),
+    [baseWeekStart, weekOffset]
+  );
+
   const weekDays = useMemo(
     () => Array.from({ length: 6 }, (_, i) => addDays(weekStart, i)),
     [weekStart]
@@ -112,6 +120,11 @@ export default function Schedule() {
   });
   const [openClassId, setOpenClassId] = useState<string | null>(null);
   useEffect(() => setOpenClassId(null), [selectedDate]);
+
+  // When week changes, move selected date to first available day of new week
+  useEffect(() => {
+    setSelectedDate(weekDays[0]);
+  }, [weekOffset]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* Reloj de baja frecuencia para marcar clases ya iniciadas o finalizadas. */
   const [now, setNow] = useState(() => new Date());
@@ -205,7 +218,7 @@ export default function Schedule() {
     return map;
   }, [allClasses]);
 
-  const isPastDay = (d: Date) => startOfDayLocal(d) < startOfDayLocal(now);
+  const isPastDay = (d: Date) => weekOffset === 0 && startOfDayLocal(d) < startOfDayLocal(now);
 
   /* "past": ya terminó · "live": en curso · null: por venir */
   const timeStatus = (cls: ScheduleClass): "past" | "live" | null => {
@@ -251,8 +264,40 @@ export default function Schedule() {
           </p>
         </div>
 
-        {/* ── Selector de día (lun→sáb) ────────────────────────────────── */}
-        <div data-reveal className="flex flex-wrap gap-2 mb-10" role="group" aria-label="Elegir día de la semana">
+        {/* ── Selector de día (lun→sáb) con navegación de semana ─────── */}
+        <div data-reveal className="mb-10">
+          <div className="flex items-center justify-between gap-4 mb-4">
+            <span className="text-[0.72rem] uppercase tracking-[0.22em]" style={{ color: ALMA.berry }}>
+              {format(weekDays[0], "d MMM", { locale: es })} – {format(weekDays[5], "d MMM yyyy", { locale: es })}
+            </span>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                disabled={weekOffset <= 0}
+                onClick={() => setWeekOffset((w) => w - 1)}
+                aria-label="Semana anterior"
+                className="grid h-9 w-9 place-items-center rounded-full border transition-colors"
+                style={{
+                  borderColor: weekOffset <= 0 ? `${ALMA.border}` : ALMA.berry,
+                  color: weekOffset <= 0 ? `${ALMA.ink}44` : ALMA.berry,
+                  backgroundColor: "transparent",
+                  cursor: weekOffset <= 0 ? "default" : "pointer",
+                }}
+              >
+                <ChevronLeft size={15} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setWeekOffset((w) => w + 1)}
+                aria-label="Semana siguiente"
+                className="grid h-9 w-9 place-items-center rounded-full border transition-colors hover:bg-[color:var(--blush)]"
+                style={{ borderColor: ALMA.berry, color: ALMA.berry, backgroundColor: "transparent", cursor: "pointer" }}
+              >
+                <ChevronRight size={15} />
+              </button>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2" role="group" aria-label="Elegir día de la semana">
           {weekDays.map((day) => {
             const selected = isSameDay(day, selectedDate);
             const past = isPastDay(day);
@@ -292,6 +337,7 @@ export default function Schedule() {
               </button>
             );
           })}
+          </div>
         </div>
 
         {/* ── Cabecera del día ─────────────────────────────────────────── */}

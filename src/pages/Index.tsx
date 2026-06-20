@@ -31,6 +31,9 @@ const IconFacebook = ({ size = 16 }: { size?: number }) => (
 );
 import almaMark from "@/assets/alma/alma-mark.png";
 import almaMarkLight from "@/assets/alma/alma-mark-light.png";
+import classPhoto01 from "@/assets/alma/alma-class-photo-01.jpg";
+import classPhoto02 from "@/assets/alma/alma-class-photo-02.jpg";
+import classPhoto03 from "@/assets/alma/alma-class-photo-03.jpg";
 import { ALMA } from "@/components/app/tokens";
 import { STUDIO } from "@/lib/studio";
 import { formatMXN } from "@/lib/format";
@@ -391,6 +394,24 @@ const Index = () => {
           <p className="nums border-t pt-4 text-[0.74rem] uppercase tracking-[0.22em]" style={{ borderColor: ALMA.border, color: ALMA.berry }}>
             Grupos de 4 en equipo · 8 en studio · 50 minutos
           </p>
+        </div>
+      </section>
+
+      {/* ═════════ GALERÍA (foto strip) ═════════ */}
+      <section aria-hidden="true" className="relative overflow-hidden">
+        <div className="grid grid-cols-3 h-[28vw] min-h-[180px] max-h-[340px]">
+          {[classPhoto01, classPhoto02, classPhoto03].map((src, i) => (
+            <div key={i} className="relative overflow-hidden">
+              <img
+                src={src}
+                alt=""
+                loading="lazy"
+                decoding="async"
+                className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 hover:scale-105"
+              />
+              <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, transparent 55%, rgba(67,57,47,0.22))" }} />
+            </div>
+          ))}
         </div>
       </section>
 

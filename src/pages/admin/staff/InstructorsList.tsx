@@ -23,7 +23,7 @@ import { Copy, Loader2, MoreHorizontal, Plus, Users, X } from "lucide-react";
 
 const instructorSchema = z.object({
   displayName: z.string().min(1),
-  email: z.string().email(),
+  email: z.preprocess((v) => (v === "" || v == null ? undefined : v), z.string().email().optional()),
   bio: z.string().optional(),
   specialties: z.string().optional(),
   isActive: z.boolean().default(true),
@@ -105,7 +105,7 @@ const InstructorsList = () => {
   });
 
   const updateMutation = useMutation({
-    mutationFn: (payload: { id: string; displayName: string; email: string; bio?: string; specialties?: string; isActive: boolean; photoFocusX: number; photoFocusY: number }) => {
+    mutationFn: (payload: { id: string; displayName: string; email?: string; bio?: string; specialties?: string; isActive: boolean; photoFocusX: number; photoFocusY: number }) => {
       const { id, specialties, ...rest } = payload;
       return api.put(`/instructors/${id}`, {
         ...rest,
@@ -292,7 +292,7 @@ const InstructorsList = () => {
                           }
                         </TableCell>
                         <TableCell className="font-medium text-alma-ink">{ins.displayName}</TableCell>
-                        <TableCell className="text-sm text-alma-ink/60">{ins.email}</TableCell>
+                        <TableCell className="text-sm text-alma-ink/60">{ins.email ?? <span className="opacity-40">—</span>}</TableCell>
                         <TableCell className="text-xs text-alma-ink/60">{normalizeSpecialties(ins.specialties).join(", ")}</TableCell>
                         <TableCell>
                           {ins.isActive ? (
@@ -337,7 +337,7 @@ const InstructorsList = () => {
               : createMutation.mutate(d))} className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-1"><Label>Nombre</Label><Input {...form.register("displayName")} /></div>
-                <div className="space-y-1"><Label>Email</Label><Input type="email" {...form.register("email")} /></div>
+                <div className="space-y-1"><Label>Email <span className="text-alma-ink/40 font-normal">(opcional)</span></Label><Input type="email" {...form.register("email")} /></div>
                 <div className="space-y-1"><Label>Bio</Label><Input {...form.register("bio")} /></div>
                 <div className="space-y-1"><Label>Especialidades (separadas por coma)</Label><Input {...form.register("specialties")} /></div>
               </div>
