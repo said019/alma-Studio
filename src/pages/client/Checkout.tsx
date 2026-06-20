@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { ClientAuthGuard } from "@/components/layout/ClientAuthGuard";
@@ -33,7 +34,7 @@ import {
   ArrowLeft,
 } from "lucide-react";
 
-type Step = "select" | "method" | "bank" | "cash" | "upload" | "done";
+type Step = "select" | "method" | "bank" | "cash" | "upload" | "done" | "stripe-success" | "stripe-cancelled";
 type PaymentMethod = "transfer" | "cash" | "card";
 
 const flag = (value: unknown): boolean => {
@@ -186,6 +187,19 @@ const Checkout = () => {
   const [orderNumber, setOrderNumber] = useState<string | null>(null);
   const [bankDetails, setBankDetails] = useState<any>(null);
   const [file, setFile] = useState<File | null>(null);
+
+  const [searchParams] = useSearchParams();
+  const checkoutReturn = searchParams.get("checkout"); // "success" | "cancelled" | null
+
+  useEffect(() => {
+    if (checkoutReturn === "success") {
+      setStep("stripe-success");
+      qc.invalidateQueries({ queryKey: ["my-orders"] });
+    } else if (checkoutReturn === "cancelled") {
+      setStep("stripe-cancelled");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [checkoutReturn]);
 
   const {
     data: plansData,
@@ -642,6 +656,61 @@ const Checkout = () => {
               <PrimaryButton to="/app/orders" className="w-full">
                 Ver mis órdenes
               </PrimaryButton>
+            </StickyCta>
+          </Section>
+        )}
+
+        {/* ── Stripe return: success ── */}
+        {step === "stripe-success" && (
+          <Section>
+            <div className="rounded-3xl p-7 sm:p-10 text-center" style={{ backgroundColor: ALMA.blush }}>
+              <span
+                className="grid h-14 w-14 mx-auto place-items-center rounded-2xl mb-4"
+                style={{ backgroundColor: ALMA.olive, color: ALMA.cream }}
+              >
+                <CheckCircle2 size={22} />
+              </span>
+              <h3 className="font-display leading-tight" style={{ color: ALMA.ink, fontSize: "clamp(1.7rem, 2.8vw, 2.3rem)" }}>
+                Pago recibido
+              </h3>
+              <p className="mt-3 text-[0.92rem] leading-[1.6] max-w-[44ch] mx-auto" style={{ color: ALMA.ink, opacity: 0.7 }}>
+                Tu pago fue procesado. Activamos tu paquete en segundos — revisa tus órdenes para confirmar.
+              </p>
+            </div>
+            <StickyCta>
+              <PrimaryButton to="/app/orders" className="w-full">
+                Ver mis órdenes
+              </PrimaryButton>
+            </StickyCta>
+          </Section>
+        )}
+
+        {/* ── Stripe return: cancelled ── */}
+        {step === "stripe-cancelled" && (
+          <Section>
+            <div className="rounded-3xl p-7 sm:p-10 text-center" style={{ backgroundColor: ALMA.blush }}>
+              <span
+                className="grid h-14 w-14 mx-auto place-items-center rounded-2xl mb-4"
+                style={{ backgroundColor: ALMA.sandstone, color: ALMA.cream }}
+              >
+                <ArrowLeft size={22} />
+              </span>
+              <h3 className="font-display leading-tight" style={{ color: ALMA.ink, fontSize: "clamp(1.7rem, 2.8vw, 2.3rem)" }}>
+                Pago cancelado
+              </h3>
+              <p className="mt-3 text-[0.92rem] leading-[1.6] max-w-[44ch] mx-auto" style={{ color: ALMA.ink, opacity: 0.7 }}>
+                Cancelaste el pago. Tu orden quedó pendiente — puedes intentarlo de nuevo cuando quieras.
+              </p>
+            </div>
+            <StickyCta>
+              <div className="flex gap-3">
+                <PrimaryButton onClick={() => setStep("select")} className="flex-1">
+                  Intentar de nuevo
+                </PrimaryButton>
+                <PrimaryButton to="/app/orders" className="flex-1">
+                  Ver órdenes
+                </PrimaryButton>
+              </div>
             </StickyCta>
           </Section>
         )}
