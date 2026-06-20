@@ -1822,10 +1822,12 @@ app.use(createSimpleRateLimiter({
 // Skip JSON body parsing for binary upload-chunk endpoint
 app.use((req, res, next) => {
   if (req.path.startsWith("/api/drive/upload-chunk/")) return next();
+  if (req.path === "/api/stripe/webhook") return next();
   express.json({ limit: "20mb" })(req, res, next);
 });
 app.use((req, res, next) => {
   if (req.path.startsWith("/api/drive/upload-chunk/")) return next();
+  if (req.path === "/api/stripe/webhook") return next();
   express.urlencoded({ extended: true, limit: "20mb" })(req, res, next);
 });
 
