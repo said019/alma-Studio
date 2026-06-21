@@ -5381,7 +5381,7 @@ function buildGoogleWalletSaveUrl({ userId, userName, points, qrCode, membership
     // (sin OAuth), así que limpia el branding viejo aunque la clase persistida
     // en Google no se pueda actualizar todavía. ?v fuerza re-fetch del CDN.
     heroImage: {
-      sourceUri: { uri: `${SITE_URL}/wallet-hero-alma.png?v=warm1` },
+      sourceUri: { uri: `${SITE_URL}/wallet-hero-alma.png?v=warm2` },
       contentDescription: { defaultValue: { language: "es", value: "Alma Movement" } },
     },
     barcode: {
@@ -6772,10 +6772,27 @@ function buildAlmaStripSvg(ringState, scale = 1, opts = {}) {
     cb(375 - ins, 123 - ins, 375 - ins - arm, 123 - ins), cb(375 - ins, 123 - ins, 375 - ins, 123 - ins - arm),
   ].join("");
 
+  // Guilloché (engine-turn) sutil: dos familias de ondas finas tipo billete/sello.
+  const wave = (step, amp, cycles, phase, opBase, opFade) => {
+    let out = "", i = 0;
+    for (let y = step; y < 123; y += step) {
+      const pts = [];
+      for (let x = 0; x <= 375; x += 7.8) {
+        const yy = y + amp * Math.sin((x / 375) * cycles * 2 * Math.PI + phase + y * 0.18);
+        pts.push(`${x.toFixed(1)} ${yy.toFixed(1)}`);
+      }
+      const op = Math.max(0.04, opBase - i * opFade);
+      out += `<path d="M${pts.join("L")}" fill="none" stroke="#E6DAC8" stroke-width="0.5" stroke-opacity="${op.toFixed(3)}" stroke-linecap="round" />`;
+      i++;
+    }
+    return out;
+  };
+  const guilloche = wave(7, 1.5, 6, 0, 0.13, 0.003) + wave(9, 1.2, 4.5, Math.PI / 2, 0.09, 0.002);
+
   // Emblema central: el logo real; si faltara el asset, anillo vector de respaldo.
   const lsize = 96, lx = 187.5 - lsize / 2, ly = 61.5 - lsize / 2;
   const emblem = mark
-    ? `<image href="${mark}" x="${lx}" y="${ly}" width="${lsize}" height="${lsize}" opacity="0.95" preserveAspectRatio="xMidYMid meet" />`
+    ? `<image href="${mark}" x="${lx}" y="${ly}" width="${lsize}" height="${lsize}" opacity="0.96" preserveAspectRatio="xMidYMid meet" />`
     : `<circle cx="187.5" cy="61.5" r="13" fill="none" stroke="${fg}" stroke-opacity="0.85" stroke-width="1" /><circle cx="187.5" cy="61.5" r="2" fill="${fg}" />`;
 
   return `<?xml version="1.0" encoding="UTF-8"?>
@@ -6785,8 +6802,15 @@ function buildAlmaStripSvg(ringState, scale = 1, opts = {}) {
       <stop offset="0%"   stop-color="#AC9682" />
       <stop offset="100%" stop-color="#9A8166" />
     </linearGradient>
+    <radialGradient id="seal" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0%"   stop-color="#F4F1EA" stop-opacity="0.18" />
+      <stop offset="60%"  stop-color="#E6DAC8" stop-opacity="0.05" />
+      <stop offset="100%" stop-color="#A48D78" stop-opacity="0" />
+    </radialGradient>
   </defs>
   <rect width="375" height="123" fill="url(#bg)" />
+  ${guilloche}
+  <rect width="375" height="123" fill="url(#seal)" />
   ${corners}
   ${emblem}
 </svg>`;
