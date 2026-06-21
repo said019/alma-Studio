@@ -5403,6 +5403,13 @@ function buildGoogleWalletSaveUrl({ userId, userName, points, qrCode, membership
     accountName: userName,
     // Drenched espresso for all pass types — brand "firma" moment
     hexBackgroundColor: "#241B1A",
+    // Hero a nivel OBJETO: sobreescribe el hero de la clase. Se firma local
+    // (sin OAuth), así que limpia el branding viejo aunque la clase persistida
+    // en Google no se pueda actualizar todavía. ?v fuerza re-fetch del CDN.
+    heroImage: {
+      sourceUri: { uri: `${SITE_URL}/wallet-hero-black.png?v=alma2` },
+      contentDescription: { defaultValue: { language: "es", value: "Alma Movement" } },
+    },
     barcode: {
       type: "QR_CODE",
       value: qrCode,
