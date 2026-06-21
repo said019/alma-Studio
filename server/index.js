@@ -11354,23 +11354,46 @@ function normalisePhone(raw) {
   return phone;
 }
 
-const EVOLUTION_SEND_DELAY_MS = Number(process.env.EVOLUTION_SEND_DELAY_MS || 1200);
+const EVOLUTION_SEND_DELAY_MS = Number(process.env.EVOLUTION_SEND_DELAY_MS || 2500);
 let evolutionSendQueue = Promise.resolve();
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+async function sendTypingIndicator(number, durationMs) {
+  try {
+    await evolutionApi.post(`/chat/sendPresence/${EVOLUTION_INSTANCE}`, {
+      number,
+      options: { presence: "composing", delay: durationMs },
+    });
+    await sleep(durationMs + 300);
+  } catch (_) {
+    // typing indicator failure is non-fatal — continue with send
+  }
+}
+
 async function sendWhatsAppNow(number, text) {
-  const payload = { number, text };
-  return evolutionApi.post(`/message/sendText/${EVOLUTION_INSTANCE}`, payload);
+  const typingMs = Math.min(Math.max(Math.round(text.length * 55), 1500), 4500);
+  await sendTypingIndicator(number, typingMs);
+  let lastErr;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      return await evolutionApi.post(`/message/sendText/${EVOLUTION_INSTANCE}`, { number, text });
+    } catch (err) {
+      lastErr = err;
+      const errMsg = err?.response?.data?.message ?? err?.message ?? "unknown";
+      console.error(`[WA] send attempt ${attempt}/3 to ${number} failed: ${errMsg}`);
+      if (attempt < 3) await sleep(attempt * 5000);
+    }
+  }
+  throw lastErr;
 }
 
 function queueWhatsAppSend(number, text) {
   const run = evolutionSendQueue.then(async () => {
-    const jitter = Math.floor(Math.random() * 250);
+    const jitter = Math.floor(Math.random() * 1500);
     return sendWhatsAppNow(number, text).finally(async () => {
-      await sleep(Math.max(300, EVOLUTION_SEND_DELAY_MS + jitter));
+      await sleep(Math.max(1000, EVOLUTION_SEND_DELAY_MS + jitter));
     });
   });
-  // Keep queue alive even if one send fails
   evolutionSendQueue = run.catch(() => {});
   return run;
 }
