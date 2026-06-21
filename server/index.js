@@ -15371,6 +15371,7 @@ async function runClassReminderCron() {
       ).catch((e) => console.error("[Cron] class_reminder WA:", e?.message));
 
       // 2. APNS wallet push — updates the pass on the lockscreen
+      // Fire-and-forget: triggerWalletPassSync schedules async push internally and logs its own errors
       triggerWalletPassSync(row.user_id, reason);
 
       // 3. Log to wallet_notification_logs for dedup (apple_sent=0 since
@@ -15380,7 +15381,7 @@ async function runClassReminderCron() {
         `INSERT INTO wallet_notification_logs (user_id, reason, status, detail)
          VALUES ($1, $2, 'ok', '{"source":"class_reminder_cron"}'::jsonb)`,
         [row.user_id, reason],
-      ).catch(() => {});
+      ).catch((e) => console.error("[Cron] class_reminder log:", e?.message));
 
       // Small delay to respect Evolution API rate limits
       await new Promise((r) => setTimeout(r, 400));
