@@ -200,15 +200,15 @@ const InstructorsList = () => {
         <div className="admin-page max-w-5xl">
           <SectionTabs
             tabs={[
-              { label: "Ajustes", to: "/admin/settings" },
-              { label: "Instructoras", to: "/admin/staff" },
-              { label: "Templates WA", to: "/admin/whatsapp-templates" },
+              { label: "Clientas", to: "/admin/clients" },
+              { label: "Visitas", to: "/admin/visitas" },
+              { label: "Coaches", to: "/admin/staff" },
             ]}
           />
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
-            <h1 className="admin-title font-semibold text-alma-ink">Instructoras</h1>
+            <h1 className="admin-title font-semibold text-alma-ink">Coaches</h1>
             <Button size="sm" onClick={openCreate} className="bg-alma-ink text-alma-canvas hover:bg-alma-ink-deep">
-              <Plus size={14} className="mr-1" />Nueva instructora
+              <Plus size={14} className="mr-1" />Nueva coach
             </Button>
           </div>
 

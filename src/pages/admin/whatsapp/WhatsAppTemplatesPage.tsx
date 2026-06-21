@@ -450,7 +450,6 @@ const WhatsAppTemplatesPage = () => {
           <SectionTabs
             tabs={[
               { label: "Ajustes", to: "/admin/settings" },
-              { label: "Instructoras", to: "/admin/staff" },
               { label: "Templates WA", to: "/admin/whatsapp-templates" },
             ]}
           />

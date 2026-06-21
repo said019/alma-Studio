@@ -208,6 +208,7 @@ const ClientsList = () => {
             tabs={[
               { label: "Clientas", to: "/admin/clients" },
               { label: "Visitas", to: "/admin/visitas" },
+              { label: "Coaches", to: "/admin/staff" },
             ]}
           />
           {/* Header */}
