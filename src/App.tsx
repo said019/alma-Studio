@@ -63,6 +63,7 @@ import SettingsPage from "./pages/admin/settings/SettingsPage";
 import Privacidad from "./pages/legal/Privacidad";
 import Terminos from "./pages/legal/Terminos";
 import Cancelacion from "./pages/legal/Cancelacion";
+import UpdateBanner from "./components/UpdateBanner";
 
 const queryClient = new QueryClient();
 
@@ -80,6 +81,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AppInit />
+        <UpdateBanner />
         <Routes>
           {/* Public landing */}
           <Route path="/" element={<Index />} />

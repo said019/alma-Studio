@@ -4177,8 +4177,12 @@ app.post("/api/orders", authMiddleware, async (req, res) => {
           },
         });
       } catch (stripeErr) {
-        console.error("[Stripe] createCheckoutSession error:", stripeErr.message);
-        return res.status(502).json({ message: "Error al crear sesión de pago. Intenta de nuevo." });
+        // Log con type/code para diagnosticar en Railway (api version, key, etc.)
+        console.error("[Stripe] createCheckoutSession error:", stripeErr?.message, "| type:", stripeErr?.type, "| code:", stripeErr?.code);
+        return res.status(502).json({
+          message: "Error al crear sesión de pago. Intenta de nuevo.",
+          detail: stripeErr?.message ?? null,
+        });
       }
     }
 
@@ -6749,96 +6753,57 @@ function buildAlmaStripSvg(ringState, scale = 1, opts = {}) {
   const W = Math.round(375 * scale);
   const H = Math.round(123 * scale);
   const c = (n) => Math.round(n * scale);
-
-  const mode = opts.mode || "default";
-  const planName = String(opts.planName || "").trim();
-  const classesLabel = String(opts.classesLabel || "").trim();
   const centerX = c(187.5);
+  const centerY = Math.round(H / 2);
 
-  // Contextual secondary line
-  let subLabel;
-  if (mode === "welcome") subLabel = "Tu primera clase te espera";
-  else if (mode === "expired") subLabel = "Renueva para seguir";
-  else if (planName && classesLabel) subLabel = `${planName}  ·  ${classesLabel}`;
-  else if (planName) subLabel = planName;
-  else if (classesLabel) subLabel = classesLabel;
-  else subLabel = "Pilates · Barre · Reformer";
+  // SOLO formas vectoriales y gradientes — CERO texto y CERO glifos especiales.
+  // El servidor (sharp/resvg) no tiene las fuentes de iOS, así que cualquier
+  // <text> aquí salía como cuadros "tofu" (□). El nombre de marca vive en el
+  // logo del pase y el plan/estado en los campos nativos; el strip es solo el
+  // momento "drenched espresso" de la marca. Render idéntico en todos lados.
+  const bg   = ALMA_PASS_PALETTE.inkDeep;   // #241B1A
+  const line = ALMA_PASS_PALETTE.sandstone; // #CBB9A4
+  const dot  = ALMA_PASS_PALETTE.stone;     // #A48D78
 
-  // Drenched espresso background with subtle warm vignette (the brand "firma")
-  const bg    = ALMA_PASS_PALETTE.inkDeep;   // #241B1A
-  const fg    = ALMA_PASS_PALETTE.canvas;    // #FAF9F6
-  const rule  = ALMA_PASS_PALETTE.sandstone; // #CBB9A4
-  const sub   = ALMA_PASS_PALETTE.stone;     // #A48D78
-
-  // Warm vignette in top-right (espresso deepens at bottom-left)
-  const vigGrad = `
-    <radialGradient id="vig" cx="90%" cy="10%" r="70%">
-      <stop offset="0%"   stop-color="#3a2820" stop-opacity="0.0" />
-      <stop offset="100%" stop-color="#130d0c" stop-opacity="0.55" />
+  // Vignette cálida: luz arriba-derecha, espresso profundo abajo-izquierda.
+  const vig = `
+    <radialGradient id="vig" cx="84%" cy="14%" r="90%">
+      <stop offset="0%"   stop-color="#3a2820" stop-opacity="0" />
+      <stop offset="100%" stop-color="#120c0b" stop-opacity="0.6" />
     </radialGradient>`;
 
-  // Decorative horizontal rule: two fine lines flanking center gap
-  const ruleY   = c(62);
-  const ruleGap = c(72);  // total gap around center text break
-  const ruleX1  = c(28);
-  const ruleX2  = centerX - Math.round(ruleGap / 2);
-  const ruleX3  = centerX + Math.round(ruleGap / 2);
-  const ruleX4  = W - c(28);
-  const ruleStroke = `stroke="${rule}" stroke-opacity="0.35" stroke-width="${c(0.75)}"`;
+  // Ondas concéntricas sutiles (movimiento consciente) ancladas arriba-derecha.
+  const rippleCx = Math.round(W * 0.84);
+  const rippleCy = c(4);
+  const ripples = [c(54), c(88), c(124)]
+    .map((r) => `<circle cx="${rippleCx}" cy="${rippleCy}" r="${r}" fill="none" stroke="${line}" stroke-opacity="0.07" stroke-width="${c(1)}" />`)
+    .join("");
 
-  // Three small dots flanking the center monogram area
-  const dotY   = ruleY;
-  const dotR   = c(1.2);
-  const dotFill = `fill="${rule}" fill-opacity="0.45"`;
-  const dotLeft1  = ruleX2 - c(7);
-  const dotLeft2  = ruleX2 - c(13);
-  const dotRight1 = ruleX3 + c(7);
-  const dotRight2 = ruleX3 + c(13);
-
-  const titleY = c(50);
-  const subY   = c(83);
-  const markY  = c(67);   // small mark / monogram between rules
+  // Regla central fina con hueco para el emblema, y dos puntos a cada lado.
+  const ruleY = centerY;
+  const gap = c(30);
+  const ruleStroke = `stroke="${line}" stroke-opacity="0.3" stroke-width="${c(0.75)}"`;
+  const dotFill = `fill="${dot}" fill-opacity="0.55"`;
+  const dotR = c(1.3);
+  const ringR = c(12.5); // emblema: anillo fino + punto central (la "intención")
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
-  <defs>${vigGrad}</defs>
-
-  <!-- Drenched espresso background -->
+  <defs>${vig}</defs>
   <rect width="${W}" height="${H}" fill="${bg}" />
+  ${ripples}
   <rect width="${W}" height="${H}" fill="url(#vig)" />
 
-  <!-- "ALMA MOVEMENT" display headline -->
-  <text x="${centerX}" y="${titleY}" text-anchor="middle"
-        font-family="-apple-system, 'Helvetica Neue', serif"
-        font-size="${c(16.5)}" font-weight="300"
-        letter-spacing="${c(5.5)}"
-        fill="${fg}" fill-opacity="0.92">ALMA MOVEMENT</text>
+  <line x1="${c(30)}" y1="${ruleY}" x2="${centerX - gap}" y2="${ruleY}" ${ruleStroke} />
+  <line x1="${centerX + gap}" y1="${ruleY}" x2="${W - c(30)}" y2="${ruleY}" ${ruleStroke} />
 
-  <!-- Decorative rule left segment -->
-  <line x1="${ruleX1}" y1="${ruleY}" x2="${ruleX2}" y2="${ruleY}" ${ruleStroke} />
-  <!-- Dots left -->
-  <circle cx="${dotLeft2}" cy="${dotY}" r="${dotR}" ${dotFill} />
-  <circle cx="${dotLeft1}" cy="${dotY}" r="${dotR}" ${dotFill} />
+  <circle cx="${centerX - gap - c(8)}"  cy="${ruleY}" r="${dotR}" ${dotFill} />
+  <circle cx="${centerX - gap - c(14)}" cy="${ruleY}" r="${dotR}" ${dotFill} />
+  <circle cx="${centerX + gap + c(8)}"  cy="${ruleY}" r="${dotR}" ${dotFill} />
+  <circle cx="${centerX + gap + c(14)}" cy="${ruleY}" r="${dotR}" ${dotFill} />
 
-  <!-- Center monogram "A" in stone -->
-  <text x="${centerX}" y="${markY}" text-anchor="middle"
-        font-family="-apple-system, 'Helvetica Neue', serif"
-        font-size="${c(10)}" font-weight="200"
-        letter-spacing="${c(2)}"
-        fill="${sub}" fill-opacity="0.80">✦</text>
-
-  <!-- Dots right -->
-  <circle cx="${dotRight1}" cy="${dotY}" r="${dotR}" ${dotFill} />
-  <circle cx="${dotRight2}" cy="${dotY}" r="${dotR}" ${dotFill} />
-  <!-- Decorative rule right segment -->
-  <line x1="${ruleX3}" y1="${ruleY}" x2="${ruleX4}" y2="${ruleY}" ${ruleStroke} />
-
-  <!-- Contextual secondary label -->
-  <text x="${centerX}" y="${subY}" text-anchor="middle"
-        font-family="-apple-system, 'Helvetica Neue', sans-serif"
-        font-size="${c(9.5)}" font-weight="500"
-        letter-spacing="${c(1.4)}"
-        fill="${sub}" fill-opacity="0.78">${escapeXml(subLabel.toUpperCase())}</text>
+  <circle cx="${centerX}" cy="${centerY}" r="${ringR}" fill="none" stroke="${line}" stroke-opacity="0.7" stroke-width="${c(1)}" />
+  <circle cx="${centerX}" cy="${centerY}" r="${c(2)}" fill="${dot}" fill-opacity="0.9" />
 </svg>`;
 }
 
@@ -15443,6 +15408,19 @@ app.get("/api/health", async (_req, res) => {
     return;
   }
   res.status(200).json({ ...out, latencyMs: Date.now() - startedAt });
+});
+
+// ─── Versión de la app (para el aviso "nueva versión disponible") ────────────
+// Cambia en cada deploy: Railway expone el SHA del commit; si no, cae al
+// timestamp de arranque (cada redeploy reinicia el proceso → valor nuevo).
+const APP_VERSION =
+  process.env.RAILWAY_GIT_COMMIT_SHA ||
+  process.env.RAILWAY_DEPLOYMENT_ID ||
+  process.env.GIT_COMMIT_SHA ||
+  String(Date.now());
+app.get("/api/version", (_req, res) => {
+  res.set("Cache-Control", "no-store");
+  res.json({ version: APP_VERSION });
 });
 
 // ─── Serve React SPA (static) ────────────────────────────────────────────────

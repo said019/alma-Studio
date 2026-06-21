@@ -244,7 +244,7 @@ export const AppShell = ({ children, hideGreeting = false }: AppShellProps) => {
         )}
 
         <main
-          className="flex-1 px-5 sm:px-7 lg:px-12 pt-4 lg:pt-6 pb-28 lg:pb-16"
+          className="flex-1 px-5 sm:px-7 lg:px-12 pt-4 lg:pt-6 pb-[calc(7rem+env(safe-area-inset-bottom))] lg:pb-16"
         >
           {children}
         </main>

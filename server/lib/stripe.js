@@ -1,6 +1,9 @@
 import Stripe from "stripe";
 
-const STRIPE_API_VERSION = "2026-04-22.dahlia";
+// La versión de API se toma SOLO de entorno. Si no se define, dejamos que el
+// SDK use la versión por defecto de la cuenta (compatible con el SDK instalado).
+// NO fijar una versión más nueva que el SDK: rompe todas las llamadas.
+const STRIPE_API_VERSION = process.env.STRIPE_API_VERSION || null;
 
 // ── Singleton ──────────────────────────────────────────────────────────────
 let _stripe = null;
@@ -8,7 +11,7 @@ let _stripe = null;
 export function getStripe() {
   if (_stripe) return _stripe;
   const key = process.env.STRIPE_SECRET_KEY ?? "";
-  _stripe = new Stripe(key, { apiVersion: STRIPE_API_VERSION });
+  _stripe = new Stripe(key, STRIPE_API_VERSION ? { apiVersion: STRIPE_API_VERSION } : {});
   return _stripe;
 }
 
