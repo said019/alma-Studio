@@ -8,37 +8,39 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import {
   LayoutDashboard, Package, CreditCard, Users, CalendarDays,
   BookOpen, DollarSign,
-  ShoppingCart, BarChart2, Bell,
+  ShoppingCart, BarChart2, Bell, MessageCircle,
   Settings, ChevronLeft, ChevronRight, ChevronDown, LogOut, Globe, Menu, X,
 } from "lucide-react";
+import almaMark from "@/assets/alma/alma-mark.png";
 
 const NAV_GROUPS = [
   {
-    label: "Principal",
+    label: "",
     collapsible: false,
     items: [
       { path: "/admin/dashboard", label: "Inicio", icon: LayoutDashboard },
-      { path: "/admin/notifications", label: "Bandeja", icon: Bell },
       { path: "/admin/bookings", label: "Reservas", icon: BookOpen },
       { path: "/admin/classes", label: "Clases", icon: CalendarDays },
+      { path: "/admin/payments", label: "Cobros", icon: DollarSign },
+      { path: "/admin/clients", label: "Personas", icon: Users },
     ],
   },
   {
-    label: "Gestión",
+    label: "Más",
     collapsible: true,
     items: [
-      { path: "/admin/payments", label: "Cobros", icon: DollarSign },
+      { path: "/admin/notifications", label: "Bandeja", icon: Bell },
       { path: "/admin/memberships", label: "Membresías", icon: CreditCard },
       { path: "/admin/plans", label: "Planes", icon: Package },
-      { path: "/admin/clients", label: "Personas", icon: Users },
       { path: "/admin/pos", label: "Tienda", icon: ShoppingCart },
+      { path: "/admin/reports", label: "Reportes", icon: BarChart2 },
     ],
   },
   {
     label: "Sistema",
     collapsible: false,
     items: [
-      { path: "/admin/reports", label: "Crecimiento", icon: BarChart2 },
+      { path: "/admin/settings?tab=whatsapp", label: "WhatsApp", icon: MessageCircle },
       { path: "/admin/settings", label: "Configuración", icon: Settings },
     ],
   },
@@ -61,7 +63,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
-    Gestión: true,
+    Más: false,
   });
 
   const location = useLocation();
@@ -83,13 +85,12 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
   };
 
   const allItems = NAV_GROUPS.flatMap((g) => g.items);
-  const currentItem = allItems.find(
-    (i) => location.pathname === i.path || location.pathname.startsWith(i.path + "/"),
-  );
-
-  const activeGroup = NAV_GROUPS.find((g) =>
-    g.items.some((i) => location.pathname === i.path || location.pathname.startsWith(i.path + "/")),
-  );
+  const matchPath = (itemPath: string) => {
+    const basePath = itemPath.split("?")[0];
+    return location.pathname === basePath || location.pathname.startsWith(basePath + "/");
+  };
+  const currentItem = allItems.find((i) => matchPath(i.path));
+  const activeGroup = NAV_GROUPS.find((g) => g.items.some((i) => matchPath(i.path)));
 
   const isCompact = collapsed && !mobileOpen;
 
@@ -128,9 +129,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
           )}
         >
           {!isCompact && (
-            <span className="font-display text-2xl leading-none text-alma-ink">
-              Alma
-            </span>
+            <img src={almaMark} alt="Alma Movement" className="h-12 w-auto object-contain" />
           )}
 
           <button
@@ -160,7 +159,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
 
             return (
               <div key={group.label} className="mb-1">
-                {!isCompact && (
+                {!isCompact && group.label && (
                   group.collapsible ? (
                     <button
                       onClick={() => toggleGroup(group.label)}
@@ -190,7 +189,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
                 )}
 
                 {(isCompact || isOpen) && group.items.map(({ path, label, icon: Icon }) => {
-                  const active = location.pathname === path || location.pathname.startsWith(path + "/");
+                  const active = matchPath(path);
                   return (
                     <Link
                       key={path}

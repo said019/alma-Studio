@@ -882,7 +882,9 @@ const VenueMediaSettings = () => {
   );
 };
 
-const SettingsPage = () => (
+const SettingsPage = () => {
+  const defaultTab = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "").get("tab") ?? "general";
+  return (
   <AuthGuard>
     <AdminLayout>
       <div className="admin-page max-w-3xl">
@@ -894,7 +896,7 @@ const SettingsPage = () => (
           ]}
         />
         <h1 className="admin-title font-semibold text-alma-ink mb-6">Configuración</h1>
-        <Tabs defaultValue="general">
+        <Tabs defaultValue={defaultTab}>
           <TabsList className="flex-wrap h-auto gap-1 mb-6">
             <TabsTrigger value="general">General</TabsTrigger>
             <TabsTrigger value="payments">Pagos</TabsTrigger>
@@ -960,6 +962,7 @@ const SettingsPage = () => (
       </div>
     </AdminLayout>
   </AuthGuard>
-);
+  );
+};
 
 export default SettingsPage;
