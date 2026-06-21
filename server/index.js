@@ -15321,6 +15321,75 @@ async function runMembershipExpiredCron() {
   }
 }
 
+/**
+ * Runs every 10 minutes.
+ * Finds bookings whose class starts in ~2 hours (105–135 min from now, UTC)
+ * and sends a WhatsApp pre-class reminder + triggers APNS wallet push.
+ * Deduplicates via wallet_notification_logs (reason = 'class_reminder_<bookingId>').
+ */
+async function runClassReminderCron() {
+  try {
+    const res = await pool.query(`
+      SELECT
+        b.id           AS booking_id,
+        b.user_id,
+        ct.name        AS class_name,
+        c.start_time,
+        i.display_name AS instructor_name
+      FROM bookings b
+      JOIN classes    c  ON c.id  = b.class_id
+      JOIN class_types ct ON ct.id = c.class_type_id
+      JOIN instructors i  ON i.id  = c.instructor_id
+      WHERE b.status = 'confirmed'
+        AND (c.date + c.start_time) AT TIME ZONE 'America/Mexico_City'
+              BETWEEN NOW() AT TIME ZONE 'America/Mexico_City' + INTERVAL '105 minutes'
+                  AND NOW() AT TIME ZONE 'America/Mexico_City' + INTERVAL '135 minutes'
+    `);
+
+    if (res.rows.length === 0) return;
+    console.log(`[Cron] Class reminder — ${res.rows.length} upcoming bookings`);
+
+    for (const row of res.rows) {
+      const timeStr = row.start_time ? String(row.start_time).slice(0, 5) : "";
+      const className = row.class_name || "tu clase";
+      const reason = `class_reminder_${row.booking_id}`;
+
+      // Dedup guard: skip if already sent
+      const already = await pool.query(
+        `SELECT 1 FROM wallet_notification_logs WHERE user_id=$1 AND reason=$2 LIMIT 1`,
+        [row.user_id, reason],
+      );
+      if (already.rows.length > 0) continue; // already sent, skip
+
+      // 1. WhatsApp via notifyByTemplate (handles opt-out, phone lookup)
+      await notifyByTemplate(
+        row.user_id,
+        "class_reminder",
+        { class: className, time: timeStr },
+        ({ firstName }) =>
+          `${firstName}, te vemos en ${className} a las ${timeStr}. Llega 10 minutos antes.`,
+      ).catch((e) => console.error("[Cron] class_reminder WA:", e?.message));
+
+      // 2. APNS wallet push — updates the pass on the lockscreen
+      triggerWalletPassSync(row.user_id, reason);
+
+      // 3. Log to wallet_notification_logs for dedup (apple_sent=0 since
+      //    triggerWalletPassSync is async; the actual push count is logged
+      //    inside notifyWalletPassesUpdatedForUser separately)
+      await pool.query(
+        `INSERT INTO wallet_notification_logs (user_id, reason, status, detail)
+         VALUES ($1, $2, 'ok', '{"source":"class_reminder_cron"}'::jsonb)`,
+        [row.user_id, reason],
+      ).catch(() => {});
+
+      // Small delay to respect Evolution API rate limits
+      await new Promise((r) => setTimeout(r, 400));
+    }
+  } catch (err) {
+    console.error("[Cron] Class reminder error:", err.message);
+  }
+}
+
 function scheduleEmailCrons() {
   // Check every hour if it's time to run
   setInterval(async () => {
@@ -15351,6 +15420,13 @@ function scheduleEmailCrons() {
       runMembershipExpiredCron();
     }
   }, 60 * 60 * 1000); // every 1 hour
+
+  // Pre-class reminder: every 10 minutes, find classes starting in ~2 hours
+  setInterval(async () => {
+    await runClassReminderCron().catch((e) =>
+      console.error("[Cron] class_reminder interval error:", e?.message),
+    );
+  }, 10 * 60 * 1000); // every 10 minutes
 }
 
 // ─── Start ───────────────────────────────────────────────────────────────────
