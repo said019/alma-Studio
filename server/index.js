@@ -7543,7 +7543,9 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
     files["icon@2x.png"] = icon2xBuffer || iconBuffer;
     files["icon@3x.png"] = icon3xBuffer || icon2xBuffer || iconBuffer;
   }
-  if (logoBuffer) {
+  // El logo va GRANDE y centrado en la banda; en membresías omitimos el logo de
+  // la esquina (su cuadro claro rompía la estética). Eventos sí lo conservan.
+  if (logoBuffer && hasEventPass) {
     files["logo.png"] = logoBuffer;
     files["logo@2x.png"] = logo2xBuffer || logoBuffer;
     files["logo@3x.png"] = logo3xBuffer || logo2xBuffer || logoBuffer;

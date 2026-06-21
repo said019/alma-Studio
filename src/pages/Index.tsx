@@ -213,7 +213,9 @@ const Index = () => {
     );
     document.querySelectorAll(".reveal").forEach((el) => observer.observe(el));
     return () => observer.disconnect();
-  }, []);
+    // Re-observa cuando carga contenido async (coaches): si no, sus elementos
+    // .reveal montan después del observer y se quedan invisibles (opacity-0).
+  }, [instructors]);
 
   const scrollTo = (id: string) => {
     setNavOpen(false);
