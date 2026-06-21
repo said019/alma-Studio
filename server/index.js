@@ -4948,14 +4948,22 @@ async function ensureGoogleWalletClass() {
       },
       heroImage: {
         sourceUri: { uri: `${SITE_URL}/wallet-hero-black.png` },
-        contentDescription: { defaultValue: { language: "es", value: "Alma Movement" } },
+        contentDescription: { defaultValue: { language: "es", value: "Alma Movement — Pilates Studio" } },
       },
-      hexBackgroundColor: GW_HEX_BG,
+      // Drenched espresso background — the brand "firma" for wallet moments
+      hexBackgroundColor: "#241B1A",
       reviewStatus: "UNDER_REVIEW",
       countryCode: "MX",
       multipleDevicesAndHoldersAllowedStatus: "MULTIPLE_HOLDERS",
-      localizedIssuerName: { defaultValue: { language: "es", value: GW_ISSUER_NAME } },
-      localizedProgramName: { defaultValue: { language: "es", value: GW_PROGRAM_NAME } },
+      localizedIssuerName: {
+        defaultValue: { language: "es", value: GW_ISSUER_NAME },
+      },
+      localizedProgramName: {
+        defaultValue: { language: "es", value: GW_PROGRAM_NAME },
+        translatedValues: [
+          { language: "es", value: "Alma Club — Pilates · Barre · Reformer/Tower" },
+        ],
+      },
     };
     // Try to GET the class first
     try {
@@ -5233,14 +5241,15 @@ function buildGoogleWalletSaveUrl({ userId, userName, points, qrCode, membership
     state: "ACTIVE",
     accountId: userId,
     accountName: userName,
-    hexBackgroundColor: hasEventPass ? GW_HEX_BG_EVENT : GW_HEX_BG,
+    // Drenched espresso for all pass types — brand "firma" moment
+    hexBackgroundColor: "#241B1A",
     barcode: {
       type: "QR_CODE",
       value: qrCode,
     },
     loyaltyPoints: {
       balance: { int: points },
-      label: "PUNTOS",
+      label: "ALMA CLUB",
     },
     header: {
       defaultValue: { language: "es", value: passHeader },
