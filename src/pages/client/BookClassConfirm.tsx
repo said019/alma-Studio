@@ -95,6 +95,7 @@ const BookClassConfirm = () => {
   const defaultName =
     user?.displayName ?? user?.display_name ?? user?.full_name ?? "";
   const defaultEmail = user?.email ?? "";
+  const defaultPhone = (user as any)?.phone ?? "";
 
   const hairlines = {
     borderTop: `1px solid ${ALMA.border}`,
@@ -112,6 +113,7 @@ const BookClassConfirm = () => {
         }}
         defaultName={defaultName}
         defaultEmail={defaultEmail}
+        defaultPhone={defaultPhone}
       />
       <AppShell hideGreeting>
         <BackLink to="/app/classes" label="Volver al calendario" />

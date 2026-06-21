@@ -29,6 +29,7 @@ interface ApiClass {
   class_type_name: string;
   class_type_color: string;
   instructor_name: string;
+  instructor_photo?: string | null;
   capacity: number;
   max_capacity?: number;
   current_bookings: number;
@@ -41,6 +42,7 @@ interface ScheduleClass {
   time: string;    // ISO 'YYYY-MM-DDTHH:MM'
   endTime: string; // 'HH:MM' o ''
   instructor: string;
+  instructorPhoto?: string | null;
   spots: number;
   maxSpots: number;
 }
@@ -189,6 +191,7 @@ export default function Schedule() {
           time: `${dateStr}T${startTimePart}`,
           endTime: endTimePart,
           instructor: c.instructor_name ?? "Por confirmar",
+          instructorPhoto: c.instructor_photo ?? null,
           spots: Math.max(0, available),
           maxSpots,
         };
@@ -449,7 +452,15 @@ export default function Schedule() {
                         <h3 className="font-display text-[1.25rem] sm:text-[1.5rem] leading-tight truncate" style={{ color: ALMA.ink }}>
                           {cls.name}
                         </h3>
-                        <p className="mt-1 text-[0.74rem] uppercase tracking-[0.18em]" style={{ color: ALMA.berry }}>
+                        <p className="mt-1 flex items-center gap-1.5 text-[0.74rem] uppercase tracking-[0.18em]" style={{ color: ALMA.berry }}>
+                          {cls.instructorPhoto && (
+                            <img
+                              src={cls.instructorPhoto}
+                              alt=""
+                              className="h-5 w-5 shrink-0 rounded-full object-cover"
+                              style={{ border: "1px solid #E0D5C6" }}
+                            />
+                          )}
                           {cls.instructor}
                         </p>
                         {metaLabel && (

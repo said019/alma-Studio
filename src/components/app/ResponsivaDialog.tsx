@@ -13,6 +13,7 @@ interface ResponsivaDialogProps {
   onSigned: () => void;
   defaultName?: string;
   defaultEmail?: string;
+  defaultPhone?: string;
 }
 
 const fieldStyle: React.CSSProperties = {
@@ -44,11 +45,12 @@ export const ResponsivaDialog = ({
   onSigned,
   defaultName = "",
   defaultEmail = "",
+  defaultPhone = "",
 }: ResponsivaDialogProps) => {
   const { toast } = useToast();
 
   const [fullName, setFullName] = useState(defaultName);
-  const [phone, setPhone] = useState("");
+  const [phone, setPhone] = useState(defaultPhone);
   const [email, setEmail] = useState(defaultEmail);
   const [imageConsent, setImageConsent] = useState<boolean | null>(null);
   const [signatureData, setSignatureData] = useState<string | null>(null);
@@ -61,6 +63,9 @@ export const ResponsivaDialog = ({
   useEffect(() => {
     if (defaultEmail && !email) setEmail(defaultEmail);
   }, [defaultEmail]);
+  useEffect(() => {
+    if (defaultPhone && !phone) setPhone(defaultPhone);
+  }, [defaultPhone]);
 
   const canSubmit =
     fullName.trim().length >= 2 &&

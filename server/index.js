@@ -8163,6 +8163,78 @@ app.get("/api/admin/users/:userId/waiver", adminMiddleware, async (req, res) => 
   }
 });
 
+// GET /api/admin/users/:userId/waiver/pdf — responsiva firmada como PDF descargable
+const RESPONSIVA_PDF_SECTIONS = [
+  { n: "1", title: "Aceptación de riesgo", body: "Participo de forma voluntaria en las clases, entrenamientos y actividades de Alma Movement (Pilates Reformer, Tower, Mat, Barre y Sculpt), entendiendo que la práctica de ejercicio físico implica riesgos inherentes, incluyendo lesiones musculares, articulares o caídas. Asumo la responsabilidad por cualquier lesión, accidente o daño físico que pudiera ocurrir durante o después de las clases, y libero de toda responsabilidad a Alma Movement, sus coaches, personal y representantes por cualquier incidente derivado de mi participación." },
+  { n: "2", title: "Condición física y lesiones", body: "Declaro encontrarme en condiciones físicas adecuadas para realizar actividad física. Es mi responsabilidad informar previamente a las coaches o al personal sobre cualquier lesión, molestia, condición médica, embarazo u otra situación que pueda afectar mi práctica. Alma Movement no se hace responsable por lesiones agravadas por falta de comunicación de mi parte." },
+  { n: "3", title: "Normas del estudio", body: "Para la seguridad, higiene y experiencia de todas, acepto: uso obligatorio de calcetines antiderrapantes en todas las clases; llegar 10 minutos antes; respetar el horario de inicio (no se permite el acceso una vez iniciada la clase); mantener el celular en silencio; no ingresar bajo efectos de alcohol o sustancias que alteren el estado físico; y detenerme y avisar de inmediato a la coach en caso de dolor, mareo o malestar." },
+  { n: "4", title: "Uso de imagen", body: "Autorizo a Alma Movement a utilizar fotografías o videos tomados durante las clases para fines promocionales, redes sociales y material de comunicación, sin derecho a compensación económica. Esta autorización es opcional y la indico abajo." },
+  { n: "5", title: "Firma de conformidad", body: "Declaro haber leído y comprendido completamente este documento. Al firmar, acepto los términos aquí descritos y libero de toda responsabilidad a Alma Movement por cualquier lesión o daño derivado de mi participación." },
+];
+
+app.get("/api/admin/users/:userId/waiver/pdf", adminMiddleware, async (req, res) => {
+  try {
+    const wr = await pool.query(
+      "SELECT w.*, u.display_name FROM waivers w JOIN users u ON u.id = w.user_id WHERE w.user_id = $1 LIMIT 1",
+      [req.params.userId]
+    );
+    const w = wr.rows[0];
+    if (!w) return res.status(404).json({ message: "Sin responsiva firmada" });
+
+    const { default: PDFDocument } = await import("pdfkit");
+    const doc = new PDFDocument({ size: "A4", margin: 50 });
+    const INK = "#241B1A", STONE = "#8A7968", BODY = "#43392F";
+    const signedAt = w.signed_at ? new Date(w.signed_at) : null;
+    const fmtDate = signedAt ? signedAt.toLocaleString("es-MX", { dateStyle: "long", timeStyle: "short" }) : "—";
+    const safeName = String(w.full_name || w.display_name || "alumna").replace(/[^a-zA-Z0-9]+/g, "_");
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `inline; filename="responsiva_${safeName}.pdf"`);
+    doc.pipe(res);
+
+    doc.fillColor(INK).font("Helvetica-Bold").fontSize(16).text("Alma Movement");
+    doc.fillColor(STONE).font("Helvetica").fontSize(11).text("Responsiva y Consentimiento Informado");
+    doc.moveDown(0.4);
+    doc.strokeColor("#E0D5C6").lineWidth(1).moveTo(50, doc.y).lineTo(545, doc.y).stroke();
+    doc.moveDown(0.8);
+
+    doc.fillColor(INK).font("Helvetica-Bold").fontSize(11).text("Datos del firmante");
+    doc.moveDown(0.3).font("Helvetica").fontSize(10).fillColor(BODY);
+    doc.text(`Nombre: ${w.full_name || w.display_name || "—"}`);
+    doc.text(`Teléfono: ${w.phone || "—"}`);
+    doc.text(`Correo: ${w.email || "—"}`);
+    doc.text(`Uso de imagen (Sección 4): ${w.image_consent ? "Sí autorizo" : "No autorizo"}`);
+    doc.text(`Firmado: ${fmtDate}`);
+    doc.text(`Versión del documento: ${w.waiver_version || "v1"}`);
+    doc.moveDown(0.8);
+
+    doc.fillColor(INK).font("Helvetica-Bold").fontSize(11).text("Términos aceptados");
+    doc.moveDown(0.3);
+    for (const s of RESPONSIVA_PDF_SECTIONS) {
+      doc.font("Helvetica-Bold").fontSize(10).fillColor(INK).text(`${s.n}. ${s.title}`);
+      doc.font("Helvetica").fontSize(9).fillColor(BODY).text(s.body, { align: "justify" });
+      doc.moveDown(0.5);
+    }
+
+    doc.moveDown(0.4).font("Helvetica-Bold").fontSize(10).fillColor(INK).text("Firma");
+    doc.moveDown(0.3);
+    if (typeof w.signature_data === "string" && w.signature_data.startsWith("data:image")) {
+      try {
+        const buf = Buffer.from(w.signature_data.split(",")[1], "base64");
+        doc.image(buf, { fit: [220, 90] });
+      } catch (_) {
+        doc.font("Helvetica").fontSize(9).fillColor(STONE).text("(firma no disponible)");
+      }
+    }
+    doc.moveDown(0.4).font("Helvetica").fontSize(8).fillColor(STONE).text(`${w.full_name || ""} · ${fmtDate}`);
+
+    doc.end();
+  } catch (err) {
+    console.error("waiver pdf error:", err?.message);
+    if (!res.headersSent) res.status(500).json({ message: "Error al generar PDF" });
+  }
+});
+
 // ─── Routes: /api/users ─────────────────────────────────────────────────────
 
 // PUT /api/users/:id

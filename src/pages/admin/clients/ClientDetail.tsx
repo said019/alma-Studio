@@ -661,7 +661,26 @@ const ClientDetail = () => {
                       <div className="rounded-xl border border-alma-hairline bg-alma-mist p-5">
                         <div className="mb-3 flex items-center justify-between gap-3">
                           <h3 className="text-base font-semibold text-alma-ink">Responsiva y consentimiento informado</h3>
-                          <Badge className="border-transparent bg-alma-olive/15 text-alma-olive hover:bg-alma-olive/15">Firmada</Badge>
+                          <div className="flex items-center gap-2">
+                            <Badge className="border-transparent bg-alma-olive/15 text-alma-olive hover:bg-alma-olive/15">Firmada</Badge>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="border-alma-sandstone/70 bg-transparent text-alma-ink hover:bg-alma-canvas"
+                              onClick={async () => {
+                                try {
+                                  const res = await api.get(`/admin/users/${id}/waiver/pdf`, { responseType: "blob" });
+                                  const url = URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }));
+                                  window.open(url, "_blank");
+                                  setTimeout(() => URL.revokeObjectURL(url), 60000);
+                                } catch {
+                                  toast({ title: "No se pudo generar el PDF", variant: "destructive" });
+                                }
+                              }}
+                            >
+                              Descargar PDF
+                            </Button>
+                          </div>
                         </div>
                         <dl className="grid grid-cols-1 gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
                           {[
