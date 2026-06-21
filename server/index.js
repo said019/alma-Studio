@@ -6756,43 +6756,39 @@ function buildAlmaStripSvg(ringState, scale = 1, opts = {}) {
   const centerX = c(187.5);
   const centerY = Math.round(H / 2);
 
-  // SOLO formas vectoriales y gradientes — CERO texto y CERO glifos especiales.
-  // El servidor (sharp/resvg) no tiene las fuentes de iOS, así que cualquier
-  // <text> aquí salía como cuadros "tofu" (□). El nombre de marca vive en el
-  // logo del pase y el plan/estado en los campos nativos; el strip es solo el
-  // momento "drenched espresso" de la marca. Render idéntico en todos lados.
-  const bg   = ALMA_PASS_PALETTE.inkDeep;   // #241B1A
-  const line = ALMA_PASS_PALETTE.sandstone; // #CBB9A4
-  const dot  = ALMA_PASS_PALETTE.stone;     // #A48D78
+  // SOLO formas vectoriales — CERO texto/glifos (el servidor sharp/resvg no tiene
+  // las fuentes de iOS y el texto salía como cuadros "tofu"). Tarjeta CÁLIDA en
+  // la paleta oficial Alma: fondo Desert Rock con líneas/emblema Feather White.
+  // El nombre vive en el logo del pase; el plan/estado, en los campos nativos.
+  const fg = "#FAF9F6"; // Feather White — líneas y emblema sobre el cálido
 
-  // Vignette cálida: luz arriba-derecha, espresso profundo abajo-izquierda.
-  const vig = `
-    <radialGradient id="vig" cx="84%" cy="14%" r="90%">
-      <stop offset="0%"   stop-color="#3a2820" stop-opacity="0" />
-      <stop offset="100%" stop-color="#120c0b" stop-opacity="0.6" />
-    </radialGradient>`;
+  // Fondo cálido con sutil sheen: gradiente Desert Rock (claro arriba → profundo abajo).
+  const bgGrad = `
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#AC9682" />
+      <stop offset="100%" stop-color="#9A8166" />
+    </linearGradient>`;
 
   // Ondas concéntricas sutiles (movimiento consciente) ancladas arriba-derecha.
   const rippleCx = Math.round(W * 0.84);
   const rippleCy = c(4);
   const ripples = [c(54), c(88), c(124)]
-    .map((r) => `<circle cx="${rippleCx}" cy="${rippleCy}" r="${r}" fill="none" stroke="${line}" stroke-opacity="0.07" stroke-width="${c(1)}" />`)
+    .map((r) => `<circle cx="${rippleCx}" cy="${rippleCy}" r="${r}" fill="none" stroke="${fg}" stroke-opacity="0.12" stroke-width="${c(1)}" />`)
     .join("");
 
   // Regla central fina con hueco para el emblema, y dos puntos a cada lado.
   const ruleY = centerY;
   const gap = c(30);
-  const ruleStroke = `stroke="${line}" stroke-opacity="0.3" stroke-width="${c(0.75)}"`;
-  const dotFill = `fill="${dot}" fill-opacity="0.55"`;
+  const ruleStroke = `stroke="${fg}" stroke-opacity="0.45" stroke-width="${c(0.75)}"`;
+  const dotFill = `fill="${fg}" fill-opacity="0.7"`;
   const dotR = c(1.3);
   const ringR = c(12.5); // emblema: anillo fino + punto central (la "intención")
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
-  <defs>${vig}</defs>
-  <rect width="${W}" height="${H}" fill="${bg}" />
+  <defs>${bgGrad}</defs>
+  <rect width="${W}" height="${H}" fill="url(#bg)" />
   ${ripples}
-  <rect width="${W}" height="${H}" fill="url(#vig)" />
 
   <line x1="${c(30)}" y1="${ruleY}" x2="${centerX - gap}" y2="${ruleY}" ${ruleStroke} />
   <line x1="${centerX + gap}" y1="${ruleY}" x2="${W - c(30)}" y2="${ruleY}" ${ruleStroke} />
@@ -6802,8 +6798,8 @@ function buildAlmaStripSvg(ringState, scale = 1, opts = {}) {
   <circle cx="${centerX + gap + c(8)}"  cy="${ruleY}" r="${dotR}" ${dotFill} />
   <circle cx="${centerX + gap + c(14)}" cy="${ruleY}" r="${dotR}" ${dotFill} />
 
-  <circle cx="${centerX}" cy="${centerY}" r="${ringR}" fill="none" stroke="${line}" stroke-opacity="0.7" stroke-width="${c(1)}" />
-  <circle cx="${centerX}" cy="${centerY}" r="${c(2)}" fill="${dot}" fill-opacity="0.9" />
+  <circle cx="${centerX}" cy="${centerY}" r="${ringR}" fill="none" stroke="${fg}" stroke-opacity="0.9" stroke-width="${c(1)}" />
+  <circle cx="${centerX}" cy="${centerY}" r="${c(2)}" fill="${fg}" fill-opacity="0.95" />
 </svg>`;
 }
 
@@ -6929,9 +6925,10 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
   const nonTransferable = hasMembership && parseBooleanFlag(membership.is_non_transferable);
   const nonRepeatable = hasMembership && parseBooleanFlag(membership.is_non_repeatable);
   // Drenched espresso card — brand "firma" for wallet
-  const passAccent = "rgb(164, 141, 120)";  // stone — warm accent on espresso
-  const passForeground = "rgb(250, 249, 246)";  // canvas — legible on espresso
-  const passBackground = "rgb(36, 27, 26)";     // ink-deep — drenched espresso
+  // Tarjeta cálida — 100% paleta oficial Alma (sin espresso añadido).
+  const passBackground = "rgb(164, 141, 120)";  // Desert Rock #A48D78 — fondo cálido
+  const passForeground = "rgb(250, 249, 246)";  // Feather White #FAF9F6 — valores (alto contraste)
+  const passAccent = "rgb(230, 218, 200)";      // Creamed Oat #E6DAC8 — labels
   const classLimit = hasMembership ? Number(membership.class_limit ?? 0) : 0;
   const classesRemaining = hasMembership
     ? Math.max(0, Number(membership.classes_remaining ?? classLimit ?? 0))
