@@ -6561,13 +6561,15 @@ function isAppleWebPassAvailable() {
 // restantes centrados sobre el fondo crema de la marca. Ya no dibuja anillos.
 
 const ALMA_PASS_PALETTE = {
-  cream: "#FFF7F2",
-  ink: "#2E201C",
-  berry: "#76214D",
-  olive: "#778455",
-  orange: "#F58A24",
-  blush: "#FCE6E1",
-  border: "rgba(46,32,28,0.10)",
+  // Canónico DESIGN.md — greige + espresso
+  canvas:    "#FAF9F6",  // texto claro sobre espresso
+  inkDeep:   "#241B1A",  // fondo drenched (el momento firma)
+  ink:       "#43392F",  // texto sobre fondo claro
+  oat:       "#E6DAC8",  // reglas decorativas
+  sandstone: "#CBB9A4",  // bordes, elementos terciarios
+  stone:     "#A48D78",  // acento decorativo
+  berry:     "#6E5A46",  // texto secundario (AA)
+  hairline:  "#E0D5C6",  // divisores
 };
 
 function escapeXml(value) {
@@ -6583,57 +6585,95 @@ function buildAlmaStripSvg(ringState, scale = 1, opts = {}) {
   const H = Math.round(123 * scale);
   const c = (n) => Math.round(n * scale);
 
-  // Mode detection drives the secondary line copy:
-  //   welcome → sin membresía, invita a reservar la primera clase
-  //   expired → membresía vencida, invita a renovar
-  //   default → muestra plan + clases restantes / Ilimitado
   const mode = opts.mode || "default";
-
-  // Plan name + clases restantes pasados por opts (cuando hay membresía).
   const planName = String(opts.planName || "").trim();
   const classesLabel = String(opts.classesLabel || "").trim();
-
   const centerX = c(187.5);
 
-  // Línea secundaria contextual.
+  // Contextual secondary line
   let subLabel;
-  if (mode === "welcome") subLabel = "Reserva tu primera clase";
+  if (mode === "welcome") subLabel = "Tu primera clase te espera";
   else if (mode === "expired") subLabel = "Renueva para seguir";
-  else if (planName && classesLabel) subLabel = `${planName} · ${classesLabel}`;
+  else if (planName && classesLabel) subLabel = `${planName}  ·  ${classesLabel}`;
   else if (planName) subLabel = planName;
   else if (classesLabel) subLabel = classesLabel;
-  else subLabel = "Tu estudio de Pilates";
+  else subLabel = "Pilates · Barre · Reformer";
 
-  // Soft blush wash in upper-right corner (consistente con la marca).
-  const washGrad = `
-    <radialGradient id="wash" cx="86%" cy="14%" r="80%">
-      <stop offset="0%" stop-color="${ALMA_PASS_PALETTE.blush}" stop-opacity="0.55" />
-      <stop offset="60%" stop-color="${ALMA_PASS_PALETTE.blush}" stop-opacity="0.10" />
-      <stop offset="100%" stop-color="${ALMA_PASS_PALETTE.cream}" stop-opacity="0" />
+  // Drenched espresso background with subtle warm vignette (the brand "firma")
+  const bg    = ALMA_PASS_PALETTE.inkDeep;   // #241B1A
+  const fg    = ALMA_PASS_PALETTE.canvas;    // #FAF9F6
+  const rule  = ALMA_PASS_PALETTE.sandstone; // #CBB9A4
+  const sub   = ALMA_PASS_PALETTE.stone;     // #A48D78
+
+  // Warm vignette in top-right (espresso deepens at bottom-left)
+  const vigGrad = `
+    <radialGradient id="vig" cx="90%" cy="10%" r="70%">
+      <stop offset="0%"   stop-color="#3a2820" stop-opacity="0.0" />
+      <stop offset="100%" stop-color="#130d0c" stop-opacity="0.55" />
     </radialGradient>`;
 
-  const titleY = c(56);
-  const ruleY = c(70);
-  const subY = c(92);
+  // Decorative horizontal rule: two fine lines flanking center gap
+  const ruleY   = c(62);
+  const ruleGap = c(72);  // total gap around center text break
+  const ruleX1  = c(28);
+  const ruleX2  = centerX - c(ruleGap / 2);
+  const ruleX3  = centerX + c(ruleGap / 2);
+  const ruleX4  = W - c(28);
+  const ruleStroke = `stroke="${rule}" stroke-opacity="0.35" stroke-width="${c(0.75)}"`;
+
+  // Three small dots flanking the center monogram area
+  const dotY   = ruleY;
+  const dotR   = c(1.2);
+  const dotFill = `fill="${rule}" fill-opacity="0.45"`;
+  const dotLeft1  = centerX - c(ruleGap / 2) - c(7);
+  const dotLeft2  = centerX - c(ruleGap / 2) - c(13);
+  const dotRight1 = centerX + c(ruleGap / 2) + c(7);
+  const dotRight2 = centerX + c(ruleGap / 2) + c(13);
+
+  const titleY = c(50);
+  const subY   = c(83);
+  const markY  = c(67);   // small mark / monogram between rules
 
   return `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
-     width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
-  <defs>${washGrad}</defs>
-  <rect width="${W}" height="${H}" fill="${ALMA_PASS_PALETTE.cream}" />
-  <rect width="${W}" height="${H}" fill="url(#wash)" />
+<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+  <defs>${vigGrad}</defs>
+
+  <!-- Drenched espresso background -->
+  <rect width="${W}" height="${H}" fill="${bg}" />
+  <rect width="${W}" height="${H}" fill="url(#vig)" />
+
+  <!-- "ALMA MOVEMENT" display headline -->
   <text x="${centerX}" y="${titleY}" text-anchor="middle"
-        font-family="-apple-system, system-ui, 'Helvetica Neue', sans-serif"
-        font-size="${c(20)}" font-weight="700"
-        letter-spacing="${c(3.2)}"
-        fill="${ALMA_PASS_PALETTE.berry}">ALMA MOVEMENT</text>
-  <line x1="${centerX - c(36)}" y1="${ruleY}" x2="${centerX + c(36)}" y2="${ruleY}"
-        stroke="${ALMA_PASS_PALETTE.ink}" stroke-opacity="0.12" stroke-width="${c(1)}" />
+        font-family="-apple-system, 'Helvetica Neue', serif"
+        font-size="${c(16.5)}" font-weight="300"
+        letter-spacing="${c(5.5)}"
+        fill="${fg}" fill-opacity="0.92">ALMA MOVEMENT</text>
+
+  <!-- Decorative rule left segment -->
+  <line x1="${ruleX1}" y1="${ruleY}" x2="${ruleX2}" y2="${ruleY}" ${ruleStroke} />
+  <!-- Dots left -->
+  <circle cx="${dotLeft2}" cy="${dotY}" r="${dotR}" ${dotFill} />
+  <circle cx="${dotLeft1}" cy="${dotY}" r="${dotR}" ${dotFill} />
+
+  <!-- Center monogram "A" in stone -->
+  <text x="${centerX}" y="${markY}" text-anchor="middle"
+        font-family="-apple-system, 'Helvetica Neue', serif"
+        font-size="${c(10)}" font-weight="200"
+        letter-spacing="${c(2)}"
+        fill="${sub}" fill-opacity="0.80">✦</text>
+
+  <!-- Dots right -->
+  <circle cx="${dotRight1}" cy="${dotY}" r="${dotR}" ${dotFill} />
+  <circle cx="${dotRight2}" cy="${dotY}" r="${dotR}" ${dotFill} />
+  <!-- Decorative rule right segment -->
+  <line x1="${ruleX3}" y1="${ruleY}" x2="${ruleX4}" y2="${ruleY}" ${ruleStroke} />
+
+  <!-- Contextual secondary label -->
   <text x="${centerX}" y="${subY}" text-anchor="middle"
-        font-family="-apple-system, system-ui, 'Helvetica Neue', sans-serif"
-        font-size="${c(11)}" font-weight="600"
-        letter-spacing="${c(0.6)}"
-        fill="${ALMA_PASS_PALETTE.ink}" fill-opacity="0.65">${escapeXml(subLabel)}</text>
+        font-family="-apple-system, 'Helvetica Neue', sans-serif"
+        font-size="${c(9.5)}" font-weight="500"
+        letter-spacing="${c(1.4)}"
+        fill="${sub}" fill-opacity="0.78">${escapeXml(subLabel.toUpperCase())}</text>
 </svg>`;
 }
 
@@ -6760,11 +6800,12 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
   const isTrialSingleSession = hasMembership && String(membership.repeat_key || "").startsWith("trial_single_session");
   const nonTransferable = hasMembership && parseBooleanFlag(membership.is_non_transferable);
   const nonRepeatable = hasMembership && parseBooleanFlag(membership.is_non_repeatable);
+  // Drenched espresso card — brand "firma" for wallet
   const passAccent = hasEventPass
-    ? "rgb(245, 138, 36)"
-    : "rgb(118, 33, 77)";
-  const passForeground = "rgb(46, 32, 28)";
-  const passBackground = "rgb(255, 247, 242)";
+    ? "rgb(164, 141, 120)"   // stone — warm accent on dark
+    : "rgb(164, 141, 120)";  // stone
+  const passForeground = "rgb(250, 249, 246)";  // canvas — legible on espresso
+  const passBackground = "rgb(36, 27, 26)";     // ink-deep — drenched espresso
   const classLimit = hasMembership ? Number(membership.class_limit ?? 0) : 0;
   const classesRemaining = hasMembership
     ? Math.max(0, Number(membership.classes_remaining ?? classLimit ?? 0))
