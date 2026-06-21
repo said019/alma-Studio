@@ -46,6 +46,7 @@ type ScheduleClass = {
   end_time?: string | null;
   class_type_name?: string | null;
   instructor_name?: string | null;
+  instructor_photo?: string | null;
   current_bookings?: number | null;
   max_capacity?: number | null;
   capacity?: number | null;
@@ -59,6 +60,7 @@ type DecoratedClass = {
   endLabel: string | null;
   name: string;
   instructor: string;
+  instructorPhoto: string | null;
   classCat: ClassCat;
   capacity: number;
   booked: number;
@@ -93,6 +95,7 @@ function decorateClass(cls: ScheduleClass): DecoratedClass {
     endLabel: end ? format(end, "HH:mm") : null,
     name,
     instructor: cls.instructor_name ?? "Por confirmar",
+    instructorPhoto: cls.instructor_photo ?? null,
     classCat,
     capacity,
     booked,
@@ -535,8 +538,11 @@ const ClassRow = ({ cls, state, onPick }: ClassRowProps) => {
         <p className="text-[0.94rem] font-medium leading-tight truncate" style={{ color: ALMA.ink }}>
           {cls.name}
         </p>
-        <p className="mt-0.5 text-[0.78rem] truncate" style={{ color: ALMA.ink, opacity: 0.65 }}>
-          {cls.instructor}
+        <p className="mt-0.5 flex items-center gap-1.5 text-[0.78rem]" style={{ color: ALMA.ink, opacity: 0.65 }}>
+          {cls.instructorPhoto && (
+            <img src={cls.instructorPhoto} alt="" className="shrink-0 rounded-full object-cover" style={{ width: 18, height: 18, border: "1px solid #E0D5C6" }} />
+          )}
+          <span className="truncate">{cls.instructor}</span>
         </p>
         <div className="mt-1.5">
           <Tag>{CAT_LABEL[cls.classCat]}</Tag>
@@ -588,8 +594,11 @@ const ClassCell = ({ cls, state, onPick }: ClassRowProps) => {
         <p className="mt-1 text-[0.82rem] font-medium leading-snug" style={{ color: ALMA.ink }}>
           {cls.name}
         </p>
-        <p className="mt-0.5 text-[0.72rem] truncate" style={{ color: ALMA.ink, opacity: 0.65 }}>
-          {cls.instructor}
+        <p className="mt-0.5 flex items-center gap-1.5 text-[0.72rem]" style={{ color: ALMA.ink, opacity: 0.65 }}>
+          {cls.instructorPhoto && (
+            <img src={cls.instructorPhoto} alt="" className="shrink-0 rounded-full object-cover" style={{ width: 16, height: 16, border: "1px solid #E0D5C6" }} />
+          )}
+          <span className="truncate">{cls.instructor}</span>
         </p>
         <p className="mt-1 text-[0.72rem] uppercase tracking-[0.12em]" style={{ color: ALMA.berry }}>
           {CAT_LABEL[cls.classCat]}
