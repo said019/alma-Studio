@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -6,6 +6,7 @@ import { useNavigate } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { useAuthStore } from "@/stores/authStore";
+import { Camera } from "lucide-react";
 import { ClientAuthGuard } from "@/components/layout/ClientAuthGuard";
 import {
   AppShell,
@@ -37,6 +38,7 @@ const ProfileEdit = () => {
   const { user, updateUser } = useAuthStore();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   const { register, handleSubmit, reset, formState: { errors, isDirty } } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -67,6 +69,20 @@ const ProfileEdit = () => {
     onError: () => toast({ title: "No se guardaron los cambios", variant: "destructive" }),
   });
 
+  const avatarMutation = useMutation({
+    mutationFn: (file: File) => {
+      const fd = new FormData();
+      fd.append("photo", file);
+      return api.post(`/me/photo`, fd, { headers: { "Content-Type": "multipart/form-data" } });
+    },
+    onSuccess: (res) => {
+      const photoUrl = res?.data?.data?.photoUrl;
+      if (photoUrl && user) updateUser({ ...user, photoUrl });
+      toast({ title: "Foto de perfil actualizada" });
+    },
+    onError: (e: any) => toast({ title: e?.response?.data?.message ?? "No se pudo subir la foto", variant: "destructive" }),
+  });
+
   const onSubmit = (data: FormValues) => {
     mutation.mutate({
       displayName: data.displayName,
@@ -89,6 +105,50 @@ const ProfileEdit = () => {
           titleAccent="al día."
           subtitle="Esto nos ayuda a recibirte mejor y a comunicarnos contigo cuando lo necesitemos."
         />
+
+        {/* ── Avatar uploader ── */}
+        <div className="flex flex-col items-center gap-3 py-4">
+          <div className="relative h-20 w-20">
+            {user?.photoUrl ? (
+              <img
+                src={user.photoUrl}
+                alt={user.displayName ?? "Tu foto"}
+                className="h-full w-full rounded-full object-cover border border-alma-hairline"
+              />
+            ) : (
+              <span className="grid h-full w-full place-items-center rounded-full bg-alma-oat font-display text-2xl text-alma-ink">
+                {String(user?.displayName ?? "").trim().split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]).join("").toUpperCase() || "—"}
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => avatarInputRef.current?.click()}
+              disabled={avatarMutation.isPending}
+              className="absolute -bottom-1 -right-1 grid h-7 w-7 place-items-center rounded-full bg-alma-ink text-alma-canvas shadow-sm hover:bg-alma-ink-deep disabled:opacity-60"
+              aria-label="Cambiar foto de perfil"
+            >
+              <Camera size={14} />
+            </button>
+            <input
+              ref={avatarInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) avatarMutation.mutate(f); e.target.value = ""; }}
+            />
+          </div>
+          <div className="text-center">
+            <button
+              type="button"
+              onClick={() => avatarInputRef.current?.click()}
+              disabled={avatarMutation.isPending}
+              className="text-sm font-medium text-alma-ink underline underline-offset-2 hover:text-alma-ink/70 disabled:opacity-60"
+            >
+              {avatarMutation.isPending ? "Subiendo…" : "Cambiar foto"}
+            </button>
+            <p className="mt-0.5 text-xs text-alma-ink/55">Se usa para identificarte en el estudio.</p>
+          </div>
+        </div>
 
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-6">
           <Section title="Personal">

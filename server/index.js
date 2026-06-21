@@ -514,6 +514,36 @@ async function uploadFileToDriveResumable(filePath, fileName, mimeType, accessTo
   throw new Error("Resumable upload ended without a final 200/201 response");
 }
 
+// Normaliza una foto de perfil: corrige orientación EXIF, acota a 1280px
+// (sin agrandar), recomprime a JPEG de buena calidad y limpia metadatos.
+// Devuelve { buffer, mimeType, ext } listos para subir al almacenamiento.
+async function processProfilePhoto(inputBuffer) {
+  const out = await sharp(inputBuffer)
+    .rotate()
+    .resize(1280, 1280, { fit: "inside", withoutEnlargement: true })
+    .jpeg({ quality: 90, mozjpeg: true })
+    .toBuffer();
+  return { buffer: out, mimeType: "image/jpeg", ext: "jpg" };
+}
+
+// Sube una foto de perfil ya procesada al almacenamiento y la hace pública.
+// Devuelve la URL servida por el proxy (/api/drive/image/<id>) o null si el
+// almacenamiento no está configurado (en cuyo caso el caller decide fallback).
+async function storeProfilePhoto(processed, label) {
+  const isDriveConfigured = Boolean(
+    process.env.GOOGLE_DRIVE_FOLDER_ID && process.env.GOOGLE_CLIENT_ID &&
+    process.env.GOOGLE_CLIENT_SECRET && process.env.GOOGLE_REFRESH_TOKEN
+  );
+  if (!isDriveConfigured) {
+    return `data:${processed.mimeType};base64,${processed.buffer.toString("base64")}`;
+  }
+  const token = await getGoogleDriveAccessToken();
+  const fileName = `perfil_${label}_${Date.now()}.${processed.ext}`;
+  const up = await uploadBufferToDrive(processed.buffer, fileName, processed.mimeType, token);
+  if (!up?.id) throw new Error("upload falló");
+  await makeGoogleDriveFilePublic(up.id, token);
+  return `/api/drive/image/${up.id}`;
+}
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -809,6 +839,9 @@ async function ensureSchema() {
     await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS is_visit_pack BOOLEAN DEFAULT false`).catch(() => { });
     await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS opening_price DECIMAL(10,2)`).catch(() => { });
     await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS morning_only BOOLEAN DEFAULT false`).catch(() => { });
+    // Paquetes MIXTOS: créditos dedicados a cada área (NULL = el plan no es mixto).
+    await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS studio_credits INTEGER`).catch(() => { });
+    await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS rt_credits INTEGER`).catch(() => { });
     // Tabla de perfiles de invitada/acompañante (no socia). El cuestionario
     // inicial vive aquí y se reusa al volver con el mismo teléfono.
     await pool.query(`
@@ -856,22 +889,22 @@ async function ensureSchema() {
              description=$2, price=$3, opening_price=$4, currency='MXN',
              duration_days=$5, class_limit=$6, class_category=$7, morning_only=$8,
              is_non_repeatable=$9, repeat_key=$10, is_non_transferable=false,
-             is_active=true, sort_order=$11, updated_at=NOW()
+             is_active=true, sort_order=$11, studio_credits=$12, rt_credits=$13, updated_at=NOW()
            WHERE name=$1`,
           [p.name, p.description, p.price, p.opening_price, p.duration_days,
            p.class_limit, p.class_category, p.morning_only, p.is_non_repeatable,
-           p.repeat_key, p.sort_order]
+           p.repeat_key, p.sort_order, p.studio_credits ?? null, p.rt_credits ?? null]
         );
         if (upd.rowCount === 0) {
           await pool.query(
             `INSERT INTO plans
                (name, description, price, opening_price, currency, duration_days, class_limit,
                 class_category, morning_only, is_non_repeatable, repeat_key, is_non_transferable,
-                is_active, sort_order)
-             VALUES ($1,$2,$3,$4,'MXN',$5,$6,$7,$8,$9,$10,false,true,$11)`,
+                is_active, sort_order, studio_credits, rt_credits)
+             VALUES ($1,$2,$3,$4,'MXN',$5,$6,$7,$8,$9,$10,false,true,$11,$12,$13)`,
             [p.name, p.description, p.price, p.opening_price, p.duration_days,
              p.class_limit, p.class_category, p.morning_only, p.is_non_repeatable,
-             p.repeat_key, p.sort_order]
+             p.repeat_key, p.sort_order, p.studio_credits ?? null, p.rt_credits ?? null]
           );
         }
       }
@@ -1202,6 +1235,49 @@ async function ensureSchema() {
         RAISE NOTICE '[dedup bookings] % reserva(s) duplicada(s) eliminada(s)', v_removed;
       END $$;
     `).catch((e) => console.warn("[dedup bookings]", e.message));
+
+    // ── Paquetes MIXTOS: créditos por área (studio_remaining / rt_remaining) ──
+    // Invariante: para una membresía mixta, classes_remaining (total) SIEMPRE
+    // es igual a studio_remaining + rt_remaining. NULL en planes no-mixto.
+    await pool.query(`ALTER TABLE memberships ADD COLUMN IF NOT EXISTS studio_remaining INTEGER`).catch(() => { });
+    await pool.query(`ALTER TABLE memberships ADD COLUMN IF NOT EXISTS rt_remaining INTEGER`).catch(() => { });
+    // Trigger: al CREAR una membresía mixta reparte el total por el ratio del
+    // plan (studio_credits : rt_credits). Cubre todos los endpoints de alta.
+    await pool.query(`
+      CREATE OR REPLACE FUNCTION alma_set_mixto_buckets() RETURNS trigger AS $$
+      DECLARE pcat text; sc int; rc int; tot int; s int;
+      BEGIN
+        SELECT class_category, studio_credits, rt_credits
+          INTO pcat, sc, rc FROM plans WHERE id = NEW.plan_id;
+        IF pcat = 'mixto' AND COALESCE(sc,0) + COALESCE(rc,0) > 0
+           AND NEW.studio_remaining IS NULL AND NEW.rt_remaining IS NULL THEN
+          tot := COALESCE(NEW.classes_remaining, sc + rc);
+          s := FLOOR(tot::numeric * sc / (sc + rc));
+          NEW.studio_remaining := s;
+          NEW.rt_remaining := tot - s;
+        END IF;
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+    `).catch((e) => console.error("mixto buckets fn error:", e.message));
+    await pool.query(`
+      DROP TRIGGER IF EXISTS alma_set_mixto_buckets_trg ON memberships;
+      CREATE TRIGGER alma_set_mixto_buckets_trg
+        BEFORE INSERT ON memberships
+        FOR EACH ROW EXECUTE FUNCTION alma_set_mixto_buckets();
+    `).catch((e) => console.error("mixto buckets trg error:", e.message));
+    // Backfill idempotente de membresías mixtas ya existentes (corre DESPUÉS de
+    // todas las reconciliaciones de crédito previas).
+    await pool.query(`
+      UPDATE memberships m
+         SET studio_remaining = FLOOR(COALESCE(m.classes_remaining,0)::numeric * p.studio_credits / NULLIF(p.studio_credits + p.rt_credits,0)),
+             rt_remaining     = COALESCE(m.classes_remaining,0) - FLOOR(COALESCE(m.classes_remaining,0)::numeric * p.studio_credits / NULLIF(p.studio_credits + p.rt_credits,0))
+        FROM plans p
+       WHERE m.plan_id = p.id
+         AND p.class_category = 'mixto'
+         AND m.studio_remaining IS NULL
+         AND m.rt_remaining IS NULL
+    `).catch((e) => console.error("mixto buckets backfill error:", e.message));
 
     await pool.query(`
       UPDATE classes c
@@ -1887,6 +1963,8 @@ async function selectMembershipForClass({ userId, classCategory, client = null }
     `SELECT m.id,
             m.user_id,
             m.classes_remaining,
+            m.studio_remaining,
+            m.rt_remaining,
             m.end_date,
             m.created_at,
             COALESCE(p.class_category, 'all') AS class_category,
@@ -1905,6 +1983,11 @@ async function selectMembershipForClass({ userId, classCategory, client = null }
           OR m.classes_remaining >= 9999
           OR m.classes_remaining > 0
         )
+        AND (
+          COALESCE(p.class_category, 'all') <> 'mixto'
+          OR ($2 = 'studio' AND COALESCE(m.studio_remaining, 0) > 0)
+          OR ($2 = 'reformer_tower' AND COALESCE(m.rt_remaining, 0) > 0)
+        )
       ORDER BY
         CASE
           WHEN COALESCE(p.class_category, 'all') = $2 THEN 0
@@ -1920,6 +2003,60 @@ async function selectMembershipForClass({ userId, classCategory, client = null }
     [userId, clsCat]
   );
   return r.rows[0] ?? null;
+}
+
+// ─── Créditos de membresía con soporte de paquetes MIXTOS ──────────────────
+// El total (classes_remaining) y —para mixto— el bucket de la categoría de la
+// clase se mueven SIEMPRE juntos, manteniendo la invariante
+// classes_remaining === studio_remaining + rt_remaining. La categoría se
+// resuelve desde la clase reservada (classId). En planes no-mixto los buckets
+// son NULL y solo cambia el total (comportamiento idéntico al anterior).
+async function consumeMembershipCredit(client, membershipId, classId) {
+  await client.query(
+    `UPDATE memberships m
+        SET classes_remaining = GREATEST(m.classes_remaining - 1, 0),
+            studio_remaining = CASE WHEN m.studio_remaining IS NOT NULL AND cls.cat = 'studio'
+                                    THEN GREATEST(m.studio_remaining - 1, 0) ELSE m.studio_remaining END,
+            rt_remaining     = CASE WHEN m.rt_remaining IS NOT NULL AND cls.cat = 'reformer_tower'
+                                    THEN GREATEST(m.rt_remaining - 1, 0) ELSE m.rt_remaining END,
+            updated_at = NOW()
+       FROM (SELECT ct.category AS cat
+               FROM classes c JOIN class_types ct ON ct.id = c.class_type_id
+              WHERE c.id = $2) cls
+      WHERE m.id = $1`,
+    [membershipId, classId]
+  );
+}
+
+async function restoreMembershipCredit(client, membershipId, classId) {
+  await client.query(
+    `UPDATE memberships m
+        SET classes_remaining = m.classes_remaining + 1,
+            studio_remaining = CASE WHEN m.studio_remaining IS NOT NULL AND cls.cat = 'studio'
+                                    THEN m.studio_remaining + 1 ELSE m.studio_remaining END,
+            rt_remaining     = CASE WHEN m.rt_remaining IS NOT NULL AND cls.cat = 'reformer_tower'
+                                    THEN m.rt_remaining + 1 ELSE m.rt_remaining END,
+            updated_at = NOW()
+       FROM (SELECT ct.category AS cat
+               FROM classes c JOIN class_types ct ON ct.id = c.class_type_id
+              WHERE c.id = $2) cls
+      WHERE m.id = $1 AND m.classes_remaining IS NOT NULL AND m.classes_remaining < 9999`,
+    [membershipId, classId]
+  );
+}
+
+// Re-deriva los buckets mixtos desde el total actual. Para ediciones de total
+// SIN categoría (alta manual, renovación idempotente, ajuste de admin). No-op
+// en planes no-mixto.
+async function resyncMixtoBuckets(client, membershipId) {
+  await client.query(
+    `UPDATE memberships m
+        SET studio_remaining = FLOOR(COALESCE(m.classes_remaining,0)::numeric * p.studio_credits / NULLIF(p.studio_credits + p.rt_credits,0)),
+            rt_remaining     = COALESCE(m.classes_remaining,0) - FLOOR(COALESCE(m.classes_remaining,0)::numeric * p.studio_credits / NULLIF(p.studio_credits + p.rt_credits,0))
+       FROM plans p
+      WHERE m.id = $1 AND p.id = m.plan_id AND p.class_category = 'mixto'`,
+    [membershipId]
+  );
 }
 
 async function findApplicableDiscountCode({
@@ -3407,10 +3544,8 @@ app.delete("/api/bookings/:id", authMiddleware, async (req, res) => {
       });
     }
 
-    // ── Check 2-hour advance notice window ─────────────────────────────────
-    // Classes are in Mexico City time; use the DB's start_time timestamp directly
-    // booking.date comes from the classes table (type DATE) and start_time is TIMESTAMPTZ
-    // We read the class start as Mexico City local time to compare correctly
+    // ── Ventana de aviso para devolución de crédito (política Alma: 12 h) ──
+    // Las clases están en hora de Ciudad de México; comparamos contra el inicio real.
     const classStartRes = await pool.query(
       `SELECT (c.date + c.start_time::time) AT TIME ZONE 'America/Mexico_City' AS class_start_utc
        FROM classes c WHERE c.id = $1`,
@@ -3422,8 +3557,15 @@ app.delete("/api/bookings/:id", authMiddleware, async (req, res) => {
     const now = new Date();
     const minutesUntilClass = classStartUTC
       ? (classStartUTC.getTime() - now.getTime()) / 60_000
-      : 999; // if we can't determine, assume on-time
-    const isLate = minutesUntilClass < 120; // less than 2 hours
+      : 999; // si no se puede determinar, se asume a tiempo
+    // Una sola ventana (default 12 h, configurable) decide falta Y pérdida de crédito.
+    let cancelWindowHours = 12;
+    try {
+      const _lc = await getLoyaltyConfig();
+      const w = Number(_lc.faltas_cancel_window_hours);
+      if (Number.isFinite(w) && w > 0) cancelWindowHours = w;
+    } catch (e) { console.warn("[cancel] loyalty config:", e.message); }
+    const isLate = isWithinCancelWindow(minutesUntilClass, cancelWindowHours); // dentro de la ventana = tardía
 
     // Cancel the booking
     await pool.query(
@@ -3431,15 +3573,11 @@ app.delete("/api/bookings/:id", authMiddleware, async (req, res) => {
       [req.params.id]
     );
 
-    // ── Falta por cancelación dentro de la ventana (config, default 12h) ───
-    // Se registra UNA sola vez aquí (la reserva ya está cancelada), antes de la
-    // ramificación late/on-time, para no duplicar. La ventana de 12h es
-    // independiente de la regla de crédito de 2h. Excluye invitadas (guest).
+    // ── Falta por cancelación tardía (MISMA ventana de 12h que la pérdida de
+    //    crédito). Se registra UNA sola vez aquí. Excluye invitadas (guest).
     try {
-      const _lc = await getLoyaltyConfig();
-      const cfgWin = _lc.faltas_cancel_window_hours;
-      if (req.userId && !booking.guest_profile_id && isWithinCancelWindow(minutesUntilClass, cfgWin)) {
-        await recordFalta({ userId: req.userId, reason: "cancelación dentro de 12h" });
+      if (req.userId && !booking.guest_profile_id && isLate) {
+        await recordFalta({ userId: req.userId, reason: `cancelación dentro de ${cancelWindowHours}h` });
       }
     } catch (e) { console.warn("[faltas] late-cancel:", e.message); }
 
@@ -3495,7 +3633,7 @@ app.delete("/api/bookings/:id", authMiddleware, async (req, res) => {
           }
           triggerWalletPassSync(req.userId, "booking_cancelled_late");
           return res.json({
-            message: "Reserva cancelada. Por ser con menos de 2 horas de anticipación, la clase NO se devuelve a tu paquete.",
+            message: `Reserva cancelada. Por cancelar con menos de ${cancelWindowHours} horas de anticipación, la clase cuenta como utilizada y NO se devuelve a tu paquete.`,
             creditRestored: false,
           });
         }
@@ -8430,6 +8568,38 @@ app.get("/api/users/:id", adminMiddleware, async (req, res) => {
   } catch (err) { return res.status(500).json({ message: "Error interno" }); }
 });
 
+// POST /api/me/photo — cliente sube su propia foto de perfil
+app.post("/api/me/photo", authMiddleware, upload.single("photo"), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ message: "No se envió archivo" });
+    const processed = await processProfilePhoto(req.file.buffer);
+    const photoUrl = await storeProfilePhoto(processed, req.userId);
+    await pool.query("UPDATE users SET photo_url = $1, updated_at = NOW() WHERE id = $2", [photoUrl, req.userId]);
+    triggerWalletPassSync(req.userId, "profile_photo_updated");
+    return res.json({ data: { photoUrl } });
+  } catch (err) {
+    console.error("POST /me/photo error:", err?.message);
+    return res.status(500).json({ message: "Error al subir la foto" });
+  }
+});
+
+// POST /api/users/:id/photo — recepción/admin sube o reemplaza la foto de un cliente
+app.post("/api/users/:id/photo", adminMiddleware, upload.single("photo"), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ message: "No se envió archivo" });
+    const exists = await pool.query("SELECT id FROM users WHERE id = $1", [req.params.id]);
+    if (!exists.rows.length) return res.status(404).json({ message: "Usuario no encontrado" });
+    const processed = await processProfilePhoto(req.file.buffer);
+    const photoUrl = await storeProfilePhoto(processed, req.params.id);
+    await pool.query("UPDATE users SET photo_url = $1, updated_at = NOW() WHERE id = $2", [photoUrl, req.params.id]);
+    triggerWalletPassSync(req.params.id, "profile_photo_updated");
+    return res.json({ data: { photoUrl } });
+  } catch (err) {
+    console.error("POST /users/:id/photo error:", err?.message);
+    return res.status(500).json({ message: "Error al subir la foto" });
+  }
+});
+
 // GET /api/class-types — public alias for admin/class-types
 app.get("/api/class-types", async (req, res) => {
   try {
@@ -12000,6 +12170,48 @@ app.get("/api/drive/image/:fileId", async (req, res) => {
   }
 });
 
+// GET /api/drive/video/:fileId — proxy de video con soporte de Range (seeking)
+app.get("/api/drive/video/:fileId", async (req, res) => {
+  try {
+    const { fileId } = req.params;
+    if (!fileId || fileId.length < 10) return res.status(400).end();
+    const accessToken = await getGoogleDriveAccessToken();
+    const metaResp = await axios.get(
+      `https://www.googleapis.com/drive/v3/files/${fileId}?fields=mimeType,name,size`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    const { mimeType, name, size } = metaResp.data;
+    const range = req.headers.range;
+    const driveHeaders = { Authorization: `Bearer ${accessToken}` };
+    if (range) driveHeaders.Range = range;
+    const driveResp = await axios.get(
+      `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
+      { headers: driveHeaders, responseType: "stream", validateStatus: (s) => s === 200 || s === 206 }
+    );
+    const baseHeaders = {
+      "Content-Type": mimeType || "video/mp4",
+      "Accept-Ranges": "bytes",
+      "Cache-Control": "public, max-age=604800",
+      "Content-Disposition": `inline; filename="${name || "video.mp4"}"`,
+    };
+    if (driveResp.status === 206) {
+      // Drive devolvió contenido parcial: respondemos 206 SIEMPRE (aunque por
+      // alguna razón falte Content-Range), reenviando los headers de rango que
+      // sí vengan. Caer a 200 con Content-Length completo truncaría el stream.
+      const extra = {};
+      if (driveResp.headers["content-range"]) extra["Content-Range"] = driveResp.headers["content-range"];
+      if (driveResp.headers["content-length"]) extra["Content-Length"] = driveResp.headers["content-length"];
+      res.status(206).set({ ...baseHeaders, ...extra });
+    } else {
+      res.status(200).set({ ...baseHeaders, ...(size ? { "Content-Length": size } : {}) });
+    }
+    driveResp.data.pipe(res);
+  } catch (err) {
+    console.error("Drive video proxy error:", err?.response?.status || err?.message);
+    if (!res.headersSent) res.status(500).json({ message: "Error al obtener video" });
+  }
+});
+
 // GET /api/admin/stats
 // GET /api/admin/birthdays?month=N (1-12, default current month)
 // Returns clients with date_of_birth in the requested month, sorted by day.
@@ -15262,6 +15474,22 @@ app.get("*", (req, res) => {
   res.setHeader("Pragma", "no-cache");
   res.setHeader("Expires", "0");
   res.sendFile(path.join(distDir, "index.html"));
+});
+
+// ─── Global error handler ────────────────────────────────────────────────────
+// Multer lanza errores ANTES del try/catch del handler (p.ej. archivo > 10 MB).
+// Sin esto, Express respondería un 500 HTML y el front no podría leer el motivo.
+// Devolvemos JSON limpio para que el toast muestre un mensaje claro.
+app.use((err, _req, res, next) => {
+  if (res.headersSent) return next(err);
+  if (err?.code === "LIMIT_FILE_SIZE") {
+    return res.status(413).json({ message: "El archivo supera el límite de 10 MB" });
+  }
+  if (err?.code && String(err.code).startsWith("LIMIT_")) {
+    return res.status(400).json({ message: "Archivo no válido para subir" });
+  }
+  console.error("[express error]", err?.message || err);
+  return res.status(500).json({ message: "Error interno" });
 });
 
 // ─── Email Cron Jobs ─────────────────────────────────────────────────────────

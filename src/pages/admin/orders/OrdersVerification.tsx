@@ -15,8 +15,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { ErrorState, EmptyState } from "@/components/app/AppShell";
 import { formatMXN, formatDate } from "@/lib/format";
-import { X, ZoomIn, CheckCircle2, Inbox, ImageOff, FileText } from "lucide-react";
+import { ZoomIn, CheckCircle2, Inbox, ImageOff, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Lightbox } from "@/components/app/Lightbox";
 
 const STATUS_LABEL: Record<string, string> = {
   pending_payment: "Esperando pago",
@@ -73,28 +74,6 @@ function useIsDesktop() {
   }, []);
   return isDesktop;
 }
-
-// ── Lightbox ─────────────────────────────────────────────
-const Lightbox = ({ src, onClose }: { src: string; onClose: () => void }) => (
-  <div
-    className="fixed inset-0 z-[200] bg-alma-ink-deep/95 flex items-center justify-center p-4"
-    onClick={onClose}
-  >
-    <button
-      aria-label="Cerrar"
-      className="absolute top-4 right-4 text-alma-canvas/80 hover:text-alma-canvas bg-alma-ink/60 rounded-full p-2"
-      onClick={onClose}
-    >
-      <X size={20} />
-    </button>
-    <img
-      src={src}
-      alt="Comprobante"
-      className="max-w-full max-h-full rounded-xl object-contain shadow-2xl"
-      onClick={(e) => e.stopPropagation()}
-    />
-  </div>
-);
 
 // ── Comprobante (siempre visible en el detalle) ──────────
 const ProofViewer = ({ order, onZoom }: { order: Order; onZoom: (src: string) => void }) => {
@@ -346,7 +325,7 @@ const OrdersBoard = ({ sources, emptyTitle, emptyDescription, emptyIcon }: Order
 
   return (
     <>
-      {lightboxSrc && <Lightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />}
+      {lightboxSrc && <Lightbox src={lightboxSrc} alt="Comprobante" onClose={() => setLightboxSrc(null)} />}
 
       <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start lg:gap-5">
         {/* Lista */}

@@ -1,4 +1,4 @@
-import { useState, type ComponentType, type ReactNode } from "react";
+import { useState, useRef, type ComponentType, type ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
@@ -19,9 +19,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import {
-  ArrowLeft, CalendarDays, ChevronLeft, ChevronRight, CreditCard,
+  ArrowLeft, CalendarDays, Camera, ChevronLeft, ChevronRight, CreditCard,
   MessageCircle, Pencil, Phone, Receipt, RefreshCw, type LucideProps,
 } from "lucide-react";
+import { ZoomableImage } from "@/components/app/Lightbox";
 
 // Formatea fecha de nacimiento sin que el timezone corra un día: toma solo
 // la parte YYYY-MM-DD y la muestra en es-MX (ej. "19 abr 2000").
@@ -157,6 +158,18 @@ const ClientDetail = () => {
   const [memPage, setMemPage] = useState(0);
   const [bookPage, setBookPage] = useState(0);
   const [payPage, setPayPage] = useState(0);
+
+  // Foto de perfil
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const photoMutation = useMutation({
+    mutationFn: (file: File) => {
+      const fd = new FormData();
+      fd.append("photo", file);
+      return api.post(`/users/${id}/photo`, fd, { headers: { "Content-Type": "multipart/form-data" } });
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["client", id] }); toast({ title: "Foto actualizada" }); },
+    onError: (e: any) => toast({ title: e?.response?.data?.message ?? "Error al subir la foto", variant: "destructive" }),
+  });
 
   const { data: user, isLoading, isError: userError, refetch: refetchUser } = useQuery({
     queryKey: ["client", id],
@@ -297,9 +310,22 @@ const ClientDetail = () => {
               ) : (
                 <div className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div className="flex items-start gap-4">
-                    <span className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-alma-oat font-display text-lg text-alma-ink">
-                      {initialsOf(u?.displayName)}
-                    </span>
+                    <div className="relative shrink-0">
+                      {u?.photoUrl ? (
+                        <ZoomableImage src={u.photoUrl} alt={u.displayName ?? "Cliente"} overlayLabel="Ver" className="h-14 w-14 overflow-hidden rounded-full" />
+                      ) : (
+                        <span className="grid h-14 w-14 place-items-center rounded-full bg-alma-oat font-display text-lg text-alma-ink">
+                          {initialsOf(u?.displayName)}
+                        </span>
+                      )}
+                      <button type="button" onClick={() => photoInputRef.current?.click()}
+                        className="absolute -bottom-1 -right-1 grid h-6 w-6 place-items-center rounded-full bg-alma-ink text-alma-canvas shadow-sm hover:bg-alma-ink-deep"
+                        aria-label="Cambiar foto">
+                        <Camera size={12} />
+                      </button>
+                      <input ref={photoInputRef} type="file" accept="image/*" className="hidden"
+                        onChange={(e) => { const f = e.target.files?.[0]; if (f) photoMutation.mutate(f); e.target.value = ""; }} />
+                    </div>
                     <div>
                       <h1 className="admin-title font-display text-alma-ink">{u?.displayName}</h1>
                       <p className="mt-0.5 text-sm text-alma-ink/55">
