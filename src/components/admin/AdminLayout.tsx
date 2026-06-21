@@ -11,7 +11,7 @@ import {
   ShoppingCart, BarChart2, Bell, MessageCircle, Award, Percent,
   Settings, ChevronLeft, ChevronRight, ChevronDown, LogOut, Globe, Menu, X,
 } from "lucide-react";
-import almaMark from "@/assets/alma/alma-mark.png";
+import almaMark from "@/assets/alma/alma-mark-ink.png";
 
 const NAV_GROUPS = [
   {
