@@ -2185,9 +2185,8 @@ async function processPosSale({ userId, items, paymentMethod = "efectivo", disco
     }
 
     if (userId && total > 0) {
-      const cfgRes = await client.query("SELECT value FROM settings WHERE key='loyalty_config' LIMIT 1");
-      const cfg = cfgRes.rows.length ? cfgRes.rows[0].value : {};
-      const pts = Math.floor(total * (cfg.points_per_peso ?? 1));
+      const cfg = await getLoyaltyConfig(client);
+      const pts = Math.floor(total * cfg.points_per_peso);
       if (cfg.enabled !== false && pts > 0) {
         await client.query(
           "INSERT INTO loyalty_transactions (user_id, type, points, description) VALUES ($1, 'earn', $2, $3)",
@@ -2217,19 +2216,15 @@ async function processPosSale({ userId, items, paymentMethod = "efectivo", disco
 async function recordFalta({ userId, reason, client = null }) {
   if (!userId) return { faltasCount: 0, penaltyApplied: false };
   const q = client ?? pool;
-  let cfg = {};
-  try {
-    const cfgRes = await q.query("SELECT value FROM settings WHERE key='loyalty_config' LIMIT 1");
-    cfg = cfgRes.rows.length ? cfgRes.rows[0].value : {};
-  } catch { cfg = {}; }
-  if (cfg?.faltas_enabled === false) return { faltasCount: 0, penaltyApplied: false };
+  const cfg = await getLoyaltyConfig(q);
+  if (cfg.faltas_enabled === false) return { faltasCount: 0, penaltyApplied: false };
   const upd = await q.query(
     "UPDATE users SET faltas_count = COALESCE(faltas_count,0) + 1 WHERE id = $1 RETURNING faltas_count",
     [userId]
   );
   const faltasCount = Number(upd.rows[0]?.faltas_count ?? 0);
-  const threshold = Number(cfg?.faltas_threshold ?? 5);
-  const penaltyPoints = Number(cfg?.faltas_penalty_points ?? 50);
+  const threshold = Number(cfg.faltas_threshold);
+  const penaltyPoints = Number(cfg.faltas_penalty_points);
   let penaltyApplied = false;
   if (penaltyDueAt(faltasCount, threshold) && penaltyPoints > 0) {
     await q.query(
@@ -2258,9 +2253,8 @@ async function awardBirthdayBonusIfEligible(userId, client = null) {
     birth.getUTCMonth() === today.getUTCMonth();
   if (!isBirthdayToday) return null;
 
-  const cfgRes = await q.query("SELECT value FROM settings WHERE key='loyalty_config' LIMIT 1");
-  const cfg = cfgRes.rows.length ? cfgRes.rows[0].value : {};
-  const points = Number(cfg.birthday_bonus ?? 0);
+  const cfg = await getLoyaltyConfig(q);
+  const points = Number(cfg.birthday_bonus);
   if (cfg.enabled === false || points <= 0) return null;
 
   const year = today.getUTCFullYear();
@@ -2554,9 +2548,8 @@ app.post("/api/auth/register", async (req, res) => {
     }
     // Award welcome bonus loyalty points (best-effort).
     try {
-      const cfgRes = await pool.query("SELECT value FROM settings WHERE key='loyalty_config' LIMIT 1");
-      const cfg = cfgRes.rows.length ? cfgRes.rows[0].value : {};
-      const pts = cfg.welcome_bonus ?? 50;
+      const cfg = await getLoyaltyConfig();
+      const pts = cfg.welcome_bonus;
       if (cfg.enabled !== false && pts > 0) {
         await pool.query(
           "INSERT INTO loyalty_transactions (user_id, type, points, description) VALUES ($1, 'earn', $2, 'Bono de bienvenida')",
@@ -3443,11 +3436,8 @@ app.delete("/api/bookings/:id", authMiddleware, async (req, res) => {
     // ramificación late/on-time, para no duplicar. La ventana de 12h es
     // independiente de la regla de crédito de 2h. Excluye invitadas (guest).
     try {
-      let cfgWin = 12;
-      try {
-        const cfgRes = await pool.query("SELECT value FROM settings WHERE key='loyalty_config' LIMIT 1");
-        cfgWin = (cfgRes.rows.length ? cfgRes.rows[0].value : {})?.faltas_cancel_window_hours ?? 12;
-      } catch { cfgWin = 12; }
+      const _lc = await getLoyaltyConfig();
+      const cfgWin = _lc.faltas_cancel_window_hours;
       if (req.userId && !booking.guest_profile_id && isWithinCancelWindow(minutesUntilClass, cfgWin)) {
         await recordFalta({ userId: req.userId, reason: "cancelación dentro de 12h" });
       }
@@ -8607,9 +8597,8 @@ async function applyCancellationRollback(client, booking, opts = {}) {
   if (wasCheckedIn) {
     // 1) Revertir puntos de loyalty (los +10 que dio el check-in).
     try {
-      const cfgRes = await client.query("SELECT value FROM settings WHERE key='loyalty_config' LIMIT 1");
-      const cfg = cfgRes.rows.length ? cfgRes.rows[0].value : {};
-      const pts = Number(cfg.points_per_class ?? 10);
+      const cfg = await getLoyaltyConfig(client);
+      const pts = Number(cfg.points_per_class);
       if (pts > 0 && booking.user_id) {
         await client.query(
           `INSERT INTO loyalty_transactions (user_id, type, points, description)
@@ -9920,12 +9909,32 @@ app.post("/api/pos/checkout", adminMiddleware, async (req, res) => {
 
 // ─── Loyalty config & rewards admin ─────────────────────────────────────────
 
+const LOYALTY_CONFIG_DEFAULTS = {
+  enabled: true,
+  points_per_class: 10,
+  points_per_peso: 1,
+  welcome_bonus: 50,
+  birthday_bonus: 100,
+  faltas_enabled: true,
+  faltas_threshold: 5,
+  faltas_penalty_points: 50,
+  faltas_cancel_window_hours: 12,
+};
+
+async function getLoyaltyConfig(q = pool) {
+  try {
+    const r = await q.query("SELECT value FROM settings WHERE key='loyalty_config' LIMIT 1");
+    return r.rows.length ? { ...LOYALTY_CONFIG_DEFAULTS, ...r.rows[0].value } : { ...LOYALTY_CONFIG_DEFAULTS };
+  } catch {
+    return { ...LOYALTY_CONFIG_DEFAULTS };
+  }
+}
+
 // GET/PUT /api/loyalty/config
 app.get("/api/loyalty/config", adminMiddleware, async (req, res) => {
   try {
-    const r = await pool.query("SELECT value FROM settings WHERE key='loyalty_config' LIMIT 1");
-    const defaults = { enabled: true, points_per_class: 10, points_per_peso: 1, welcome_bonus: 50, birthday_bonus: 100, faltas_enabled: true, faltas_threshold: 5, faltas_penalty_points: 50, faltas_cancel_window_hours: 12 };
-    return res.json({ data: r.rows.length ? { ...defaults, ...r.rows[0].value } : defaults });
+    const cfg = await getLoyaltyConfig();
+    return res.json({ data: cfg });
   } catch (err) { return res.status(500).json({ message: "Error interno" }); }
 });
 
@@ -12256,9 +12265,8 @@ app.post("/api/memberships", adminMiddleware, async (req, res) => {
     // ── Award loyalty points for membership purchase ────────────────────
     if (userId && Number(_eff) > 0) {
       try {
-        const cfgRes = await pool.query("SELECT value FROM settings WHERE key='loyalty_config' LIMIT 1");
-        const cfg = cfgRes.rows.length ? cfgRes.rows[0].value : {};
-        const pts = Math.floor(Number(_eff) * (cfg.points_per_peso ?? 1));
+        const cfg = await getLoyaltyConfig();
+        const pts = Math.floor(Number(_eff) * cfg.points_per_peso);
         if (cfg.enabled !== false && pts > 0) {
           await pool.query(
             "INSERT INTO loyalty_transactions (user_id, type, points, description) VALUES ($1, 'earn', $2, $3)",
@@ -13056,9 +13064,8 @@ app.put("/api/bookings/:id/check-in", adminMiddleware, async (req, res) => {
     // 3) Otorgar +10 pts SOLO si es primer check-in.
     if (booking.user_id && !wasAlreadyCheckedIn) {
       try {
-        const cfgRes = await pool.query("SELECT value FROM settings WHERE key='loyalty_config' LIMIT 1");
-        const cfg = cfgRes.rows.length ? cfgRes.rows[0].value : {};
-        const pts = cfg.points_per_class ?? 10;
+        const cfg = await getLoyaltyConfig();
+        const pts = cfg.points_per_class;
         if (cfg.enabled !== false && pts > 0) {
           await pool.query(
             "INSERT INTO loyalty_transactions (user_id, type, points, description) VALUES ($1, 'earn', $2, 'Clase asistida')",
@@ -13157,9 +13164,8 @@ app.post("/api/admin/checkin/scan", adminMiddleware, async (req, res) => {
     );
     // Puntos por asistir (igual que el check-in manual del roster)
     try {
-      const cfgRes = await pool.query("SELECT value FROM settings WHERE key='loyalty_config' LIMIT 1");
-      const cfg = cfgRes.rows.length ? cfgRes.rows[0].value : {};
-      const pts = cfg.points_per_class ?? 10;
+      const cfg = await getLoyaltyConfig();
+      const pts = cfg.points_per_class;
       if (cfg.enabled !== false && pts > 0) {
         await pool.query(
           "INSERT INTO loyalty_transactions (user_id, type, points, description) VALUES ($1, 'earn', $2, 'Clase asistida')",
@@ -13516,9 +13522,8 @@ app.put("/api/admin/orders/:id/verify", adminMiddleware, async (req, res) => {
     // Award loyalty points for purchase
     if (justApproved && order.user_id && order.total_amount > 0) {
       try {
-        const cfgRes = await pool.query("SELECT value FROM settings WHERE key='loyalty_config' LIMIT 1");
-        const cfg = cfgRes.rows.length ? cfgRes.rows[0].value : {};
-        const pts = Math.floor((order.total_amount || 0) * (cfg.points_per_peso ?? 1));
+        const cfg = await getLoyaltyConfig();
+        const pts = Math.floor((order.total_amount || 0) * cfg.points_per_peso);
         if (cfg.enabled !== false && pts > 0) {
           await pool.query(
             "INSERT INTO loyalty_transactions (user_id, type, points, description) VALUES ($1, 'earn', $2, $3)",
@@ -13961,9 +13966,8 @@ app.post("/api/admin/loyalty/recalculate/:userId", adminMiddleware, async (req, 
   try {
     const { userId } = req.params;
     // Get loyalty config
-    const cfgRes = await pool.query("SELECT value FROM settings WHERE key='loyalty_config' LIMIT 1");
-    const cfg = cfgRes.rows.length ? cfgRes.rows[0].value : {};
-    const ppp = Number(cfg.points_per_peso ?? 1);
+    const cfg = await getLoyaltyConfig();
+    const ppp = Number(cfg.points_per_peso);
     if (cfg.enabled === false) return res.json({ data: { awarded: 0, message: "Loyalty desactivado en configuración" } });
 
     // Get all active/expired memberships for this user
