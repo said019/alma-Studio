@@ -15337,13 +15337,16 @@ async function runClassReminderCron() {
         c.start_time,
         i.display_name AS instructor_name
       FROM bookings b
-      JOIN classes    c  ON c.id  = b.class_id
+      JOIN classes     c  ON c.id  = b.class_id
       JOIN class_types ct ON ct.id = c.class_type_id
       JOIN instructors i  ON i.id  = c.instructor_id
+      JOIN users       u  ON u.id  = b.user_id
       WHERE b.status = 'confirmed'
+        AND u.receive_reminders IS NOT FALSE
+        AND u.phone IS NOT NULL
         AND (c.date + c.start_time) AT TIME ZONE 'America/Mexico_City'
-              BETWEEN NOW() AT TIME ZONE 'America/Mexico_City' + INTERVAL '105 minutes'
-                  AND NOW() AT TIME ZONE 'America/Mexico_City' + INTERVAL '135 minutes'
+              BETWEEN NOW() + INTERVAL '105 minutes'
+                  AND NOW() + INTERVAL '135 minutes'
     `);
 
     if (res.rows.length === 0) return;
