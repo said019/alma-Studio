@@ -5104,15 +5104,15 @@ async function ensureGoogleWalletClass() {
       issuerName: GW_ISSUER_NAME,
       programName: GW_PROGRAM_NAME,
       programLogo: {
-        sourceUri: { uri: `${SITE_URL}/wallet-program-black.png` },
+        sourceUri: { uri: `${SITE_URL}/alma-mark-light.png` },
         contentDescription: { defaultValue: { language: "es", value: "Alma Movement" } },
       },
       heroImage: {
-        sourceUri: { uri: `${SITE_URL}/wallet-hero-black.png` },
+        sourceUri: { uri: `${SITE_URL}/wallet-hero-alma.png` },
         contentDescription: { defaultValue: { language: "es", value: "Alma Movement — Pilates Studio" } },
       },
-      // Drenched espresso background — the brand "firma" for wallet moments
-      hexBackgroundColor: "#241B1A",
+      // Tarjeta cálida Desert Rock — paleta oficial Alma (club exclusivo)
+      hexBackgroundColor: "#A48D78",
       reviewStatus: "UNDER_REVIEW",
       countryCode: "MX",
       multipleDevicesAndHoldersAllowedStatus: "MULTIPLE_HOLDERS",
@@ -5177,7 +5177,7 @@ function formatWalletEventSchedule(eventPass) {
  *  @param {Object|null} opts.nextBooking - { class_name, instructor_name, date, start_time }
  *  @param {Object|null} opts.activeEventPass - { eventTitle, eventDate, eventStartTime, eventEndTime, eventLocation, passCode }
  */
-function buildGoogleWalletSaveUrl({ userId, userName, points, qrCode, membership, nextBooking, activeEventPass, passKind = "membership" }) {
+function buildGoogleWalletSaveUrl({ userId, userName, points, qrCode, membership, nextBooking, activeEventPass, memberSince = null, passKind = "membership" }) {
   const isEventPass = String(passKind || "membership") === "event";
   const objectId = isEventPass
     ? `${GW_ISSUER_ID}.alma_event_${String(activeEventPass?.eventId || "event").replace(/-/g, "")}_${userId.replace(/-/g, "")}`
@@ -5248,67 +5248,40 @@ function buildGoogleWalletSaveUrl({ userId, userName, points, qrCode, membership
   }
 
   if (!compactEventMode && !isEventPass) {
-    // Row 1: Plan Name
+    // Frente tipo club: NIVEL (paquete) · SOCIA DESDE · DISPONIBLES · VIGENTE.
+    // (El NOMBRE va en accountName; los operativos en la vista de detalle.)
     if (hasMembership) {
       textModules.push({
-        id: "plan",
-        header: passHeader,
+        id: "nivel",
+        header: "NIVEL",
         body: membership.plan_name || "Plan Activo",
       });
-      textModules.push({
-        id: "modalidad",
-        header: "MODALIDAD",
-        body: membershipCategoryLabel,
-      });
-    } else {
-      textModules.push({
-        id: "plan",
-        header: "ESTADO",
-        body: "Sin membresía activa",
-      });
-    }
-
-    // Row 2: Vigencia (valid until)
-    if (hasMembership && membership.end_date) {
-      const endDate = new Date(membership.end_date);
-      const now = new Date();
-      const daysLeft = Math.max(0, Math.ceil((endDate - now) / (1000 * 60 * 60 * 24)));
-      const endFormatted = endDate.toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" });
-      textModules.push({
-        id: "vigencia",
-        header: "VIGENTE HASTA",
-        body: `${endFormatted} (${daysLeft} días restantes)`,
-      });
-    }
-
-    // Row 3: Classes info
-    if (hasMembership) {
+      if (memberSince) {
+        textModules.push({ id: "socia_desde", header: "SOCIA DESDE", body: memberSince });
+      }
       if (isUnlimited) {
-        textModules.push({
-          id: "clases",
-          header: "CLASES",
-          body: "Ilimitadas",
-        });
+        textModules.push({ id: "clases", header: "DISPONIBLES", body: "Ilimitadas" });
       } else if (membership.class_limit && !hasIconStampMode) {
         textModules.push({
           id: "clases",
-          header: "CLASES DEL PLAN",
-          body: `${progressSummary.completionLabel} · ${progressSummary.remainingLabel}`,
+          header: "DISPONIBLES",
+          body: progressSummary.remainingLabel,
         });
       }
-    }
-
-    // Row 3.1: Membership rules
-    if (hasMembership) {
-      const rules = [];
-      if (nonTransferable) rules.push("No transferible");
-      if (nonRepeatable) rules.push("No repetible");
-      if (rules.length) {
+      if (membership.end_date) {
+        const endDate = new Date(membership.end_date);
+        const daysLeft = Math.max(0, Math.ceil((endDate - new Date()) / (1000 * 60 * 60 * 24)));
+        const endFormatted = endDate.toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" });
         textModules.push({
-          id: "reglas",
-          header: "REGLAS",
-          body: rules.join(" · "),
+          id: "vigencia",
+          header: "VIGENTE HASTA",
+          body: `${endFormatted} (${daysLeft} días)`,
         });
+      }
+    } else {
+      textModules.push({ id: "nivel", header: "NIVEL", body: "Bienvenida" });
+      if (memberSince) {
+        textModules.push({ id: "socia_desde", header: "SOCIA DESDE", body: memberSince });
       }
     }
 
@@ -5402,13 +5375,13 @@ function buildGoogleWalletSaveUrl({ userId, userName, points, qrCode, membership
     state: "ACTIVE",
     accountId: userId,
     accountName: userName,
-    // Drenched espresso for all pass types — brand "firma" moment
-    hexBackgroundColor: "#241B1A",
+    // Tarjeta cálida Desert Rock — paleta oficial Alma (club exclusivo)
+    hexBackgroundColor: "#A48D78",
     // Hero a nivel OBJETO: sobreescribe el hero de la clase. Se firma local
     // (sin OAuth), así que limpia el branding viejo aunque la clase persistida
     // en Google no se pueda actualizar todavía. ?v fuerza re-fetch del CDN.
     heroImage: {
-      sourceUri: { uri: `${SITE_URL}/wallet-hero-black.png?v=alma2` },
+      sourceUri: { uri: `${SITE_URL}/wallet-hero-alma.png?v=warm1` },
       contentDescription: { defaultValue: { language: "es", value: "Alma Movement" } },
     },
     barcode: {
@@ -5417,7 +5390,7 @@ function buildGoogleWalletSaveUrl({ userId, userName, points, qrCode, membership
     },
     loyaltyPoints: {
       balance: { int: points },
-      label: "ALMA CLUB",
+      label: "PUNTOS",
     },
     header: {
       defaultValue: { language: "es", value: passHeader },
@@ -5921,10 +5894,15 @@ function sendApplePassUpdatedPush(pushToken, providerToken) {
 }
 
 async function getWalletSnapshotForUser(userId, { eventId = null } = {}) {
-  const userRes = await pool.query("SELECT id, email, display_name FROM users WHERE id = $1 LIMIT 1", [userId]);
+  const userRes = await pool.query("SELECT id, email, display_name, created_at FROM users WHERE id = $1 LIMIT 1", [userId]);
   if (!userRes.rows.length) return null;
   const user = userRes.rows[0];
   const userName = user.display_name || user.email;
+  let memberSince = null;
+  if (user.created_at) {
+    const _ms = new Date(user.created_at).toLocaleDateString("es-MX", { month: "short", year: "numeric" });
+    memberSince = _ms.charAt(0).toUpperCase() + _ms.slice(1);
+  }
 
   const pointsRes = await pool.query(
     "SELECT COALESCE(SUM(CASE WHEN type='earn' THEN points WHEN type='adjust' THEN points ELSE -points END), 0) AS total FROM loyalty_transactions WHERE user_id = $1",
@@ -6043,6 +6021,7 @@ async function getWalletSnapshotForUser(userId, { eventId = null } = {}) {
     userId,
     userName,
     points,
+    memberSince,
     qrCode: Buffer.from(String(userId)).toString("base64"),
     membership,
     nextBooking,
