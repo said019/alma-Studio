@@ -445,15 +445,35 @@ const Checkout = () => {
                     </span>
                   </div>
                 </div>
-
-                <StickyCta>
-                  <PrimaryButton onClick={() => setStep("method")} className="w-full">
-                    Continuar a pago
-                  </PrimaryButton>
-                </StickyCta>
               </Section>
             )}
+            {selectedPlan && <div className="h-24" aria-hidden="true" />}
           </>
+        )}
+
+        {/* Barra fija: al elegir paquete, pagar de una vez sin bajar a confirmar. */}
+        {step === "select" && selectedPlan && (
+          <div
+            className="fixed inset-x-0 bottom-20 lg:bottom-6 z-40 px-5 sm:px-7 lg:px-12"
+            style={{ paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))" }}
+          >
+            <div
+              className="mx-auto flex max-w-[680px] items-center gap-3 rounded-2xl p-3 pl-5"
+              style={{ backgroundColor: ALMA.cream, border: `1px solid ${ALMA.border}`, boxShadow: "0 10px 30px rgba(36,27,26,0.14)" }}
+            >
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[0.6rem] uppercase tracking-[0.18em]" style={{ color: ALMA.ink, opacity: 0.55 }}>
+                  {selectedPlan.name}
+                </p>
+                <p className="nums font-display leading-none" style={{ color: ALMA.ink, fontSize: "1.35rem" }}>
+                  ${formatMoneyMX(finalAmount)} <span className="text-[0.58rem] uppercase tracking-[0.16em]" style={{ color: ALMA.ink, opacity: 0.5 }}>MXN</span>
+                </p>
+              </div>
+              <PrimaryButton onClick={() => setStep("method")} className="shrink-0">
+                Continuar a pago
+              </PrimaryButton>
+            </div>
+          </div>
         )}
 
         {/* ── Step 2: Payment method ── */}
