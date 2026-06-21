@@ -1776,14 +1776,19 @@ async function ensureSchema() {
 
 
   try {
-    const adminHash = await bcrypt.hash("AlmaBarre2026!", 12);
+    // Contraseña del admin: configurable por entorno (recomendado en prod).
+    // Si no se define ADMIN_PASSWORD, usa este valor por defecto.
+    const adminEmail = process.env.ADMIN_EMAIL || "admin@almamovement.mx";
+    const adminPassword = process.env.ADMIN_PASSWORD || "Alma$Reformer2026!";
+    const adminHash = await bcrypt.hash(adminPassword, 12);
     await pool.query(
       `INSERT INTO users (display_name, email, phone, password_hash, role, accepts_terms, accepts_communications)
-       VALUES ('Admin Alma', 'admin@almamovement.mx', '0000000000', $1, 'admin', true, false)
+       VALUES ('Admin Alma', $2, '0000000000', $1, 'admin', true, false)
        ON CONFLICT (email) DO UPDATE SET role = 'admin', password_hash = $1, display_name = 'Admin Alma'`,
-      [adminHash]
+      [adminHash, adminEmail]
     );
-    console.log("✅ Admin user ready: admin@almamovement.mx / AlmaBarre2026!");
+    // No imprimir la contraseña en logs.
+    console.log(`✅ Admin user ready: ${adminEmail}`);
   } catch (err) {
     console.error("Admin seed warning:", err.message);
   }
@@ -2996,7 +3001,8 @@ app.get("/api/memberships/my", authMiddleware, async (req, res) => {
     // migran por-request (antes corrían 8 ALTER TABLE en cada petición).
     const r = await pool.query(
       `SELECT m.id, m.user_id, m.plan_id, m.status, m.start_date, m.end_date,
-              m.classes_remaining, m.payment_method, m.created_at, m.updated_at,
+              m.classes_remaining, m.studio_remaining, m.rt_remaining,
+              m.payment_method, m.created_at, m.updated_at,
               m.order_id, m.cancellations_used,
               COALESCE(m.plan_name_override, '') AS plan_name_override,
               m.class_limit_override,
@@ -3044,7 +3050,8 @@ app.get("/api/memberships/mine/all", authMiddleware, async (req, res) => {
   try {
     const r = await pool.query(
       `SELECT m.id, m.user_id, m.plan_id, m.status, m.start_date, m.end_date,
-              m.classes_remaining, m.payment_method, m.created_at, m.updated_at,
+              m.classes_remaining, m.studio_remaining, m.rt_remaining,
+              m.payment_method, m.created_at, m.updated_at,
               m.order_id, m.cancellations_used,
               COALESCE(m.plan_name_override, '') AS plan_name_override,
               m.class_limit_override,
@@ -3417,10 +3424,8 @@ app.post("/api/bookings", authMiddleware, async (req, res) => {
         [classId]
       );
       if (!isUnlimitedClasses(lockedMembership.classes_remaining)) {
-        await client.query(
-          "UPDATE memberships SET classes_remaining = GREATEST(classes_remaining - 1, 0), updated_at = NOW() WHERE id = $1",
-          [membership.id]
-        );
+        // Descuenta total y, si es mixto, el bucket del área de la clase.
+        await consumeMembershipCredit(client, membership.id, classId);
       }
     }
     await client.query("COMMIT");
@@ -3640,10 +3645,8 @@ app.delete("/api/bookings/:id", authMiddleware, async (req, res) => {
 
         // On-time cancellation: restore credit only if membership has a counted limit
         if (membership.classes_remaining !== null && membership.classes_remaining < 9999) {
-          await pool.query(
-            "UPDATE memberships SET classes_remaining = classes_remaining + 1 WHERE id = $1",
-            [membership.id]
-          );
+          // Devuelve total y, si es mixto, el bucket del área de la clase.
+          await restoreMembershipCredit(pool, membership.id, booking.class_id);
         }
       }
     }
@@ -3919,6 +3922,8 @@ async function finalizeStripeOrder(client, orderId) {
       `UPDATE memberships SET status = 'active', classes_remaining = $1 WHERE id = $2`,
       [newCredits, existing.rows[0].id]
     );
+    // Re-reparte buckets si es mixto (el UPDATE no dispara el trigger de alta).
+    await resyncMixtoBuckets(client, existing.rows[0].id);
   } else {
     await client.query(
       `INSERT INTO memberships
@@ -4950,17 +4955,36 @@ function parseGWServiceAccount() {
   let email = process.env.GOOGLE_SA_EMAIL || "";
   let key = "";
 
+  // El email y la llave de un mismo JSON son SIEMPRE un par. Por eso, cuando la
+  // credencial viene de un JSON completo (base64 o crudo), el client_email de
+  // ESE archivo manda sobre GOOGLE_SA_EMAIL — así nunca se mezcla el email de
+  // una service account con la llave privada de otra (causa típica de OAuth 400).
+  const applyServiceAccountJson = (sa, source) => {
+    if (sa.private_key) key = sa.private_key;
+    if (sa.client_email) email = sa.client_email;
+    console.log(`GW Key: parsed from ${source} ✓`);
+  };
+
   // Option A: whole JSON file base64-encoded (e.g. cat sa.json | base64 -w0 | pbcopy)
   const jsonB64 = process.env.GOOGLE_SA_KEY_JSON_BASE64 || "";
   if (jsonB64) {
     try {
-      const decoded = Buffer.from(jsonB64, "base64").toString("utf8");
-      const sa = JSON.parse(decoded);
-      if (sa.private_key) key = sa.private_key;
-      if (sa.client_email && !email) email = sa.client_email;
-      console.log("GW Key: parsed from GOOGLE_SA_KEY_JSON_BASE64 ✓");
+      applyServiceAccountJson(JSON.parse(Buffer.from(jsonB64, "base64").toString("utf8")), "GOOGLE_SA_KEY_JSON_BASE64");
     } catch (e) {
       console.error("Failed to parse GOOGLE_SA_KEY_JSON_BASE64:", e.message);
+    }
+  }
+
+  // Option A2: el JSON crudo de la service account, tal cual lo descargas de
+  // Google Cloud (sin base64). Mismo formato y mismas garantías que Option A.
+  if (!key) {
+    const rawJson = process.env.GOOGLE_SERVICE_ACCOUNT_JSON || "";
+    if (rawJson.trim()) {
+      try {
+        applyServiceAccountJson(JSON.parse(rawJson), "GOOGLE_SERVICE_ACCOUNT_JSON");
+      } catch (e) {
+        console.error("Failed to parse GOOGLE_SERVICE_ACCOUNT_JSON:", e.message);
+      }
     }
   }
 
@@ -5005,6 +5029,10 @@ function parseGWServiceAccount() {
       console.log("GW Key: parsed from GOOGLE_SA_PRIVATE_KEY, length=" + key.length + ", hasPEM=" + key.includes("-----BEGIN"));
     }
   }
+
+  // Normaliza saltos de línea escapados (\n literal → salto real) para llaves
+  // que vienen de un JSON con doble escape. Idempotente si ya están correctas.
+  if (key && key.includes("\\n")) key = key.replace(/\\n/g, "\n");
 
   // Validate the key can be used for RS256
   if (key) {
@@ -8746,13 +8774,8 @@ async function applyCancellationRollback(client, booking, opts = {}) {
     && (wasConfirmed || (wasCheckedIn && opts.refundCheckedIn));
 
   if (shouldRefundCredit) {
-    await client.query(
-      `UPDATE memberships
-          SET classes_remaining = COALESCE(classes_remaining, 0) + 1,
-              updated_at = NOW()
-        WHERE id = $1 AND classes_remaining IS NOT NULL AND classes_remaining < 9999`,
-      [booking.membership_id],
-    );
+    // Devuelve total y, si es mixto, el bucket del área de la clase.
+    await restoreMembershipCredit(client, booking.membership_id, booking.class_id);
     result.creditRestored = true;
   }
   // Tanto confirmadas como checked_in ocupaban lugar, ambos deben restarse del
@@ -12408,6 +12431,8 @@ app.get("/api/memberships", adminMiddleware, async (req, res) => {
         startDate: m.start_date,
         endDate: m.end_date,
         classesRemaining: m.classes_remaining,
+        studioRemaining: m.studio_remaining,
+        rtRemaining: m.rt_remaining,
         classLimit: m.class_limit,
         durationDays: m.duration_days ?? null,
         createdAt: m.created_at,
@@ -12700,6 +12725,8 @@ app.put("/api/memberships/:id", adminMiddleware, async (req, res) => {
       [status || null, classesRemaining ?? null, resolvedEndDate, startDate || null, paymentMethod || null, req.params.id]
     );
     if (!r.rows.length) return res.status(404).json({ message: "Membresía no encontrada" });
+    // Si el admin cambió el total de una membresía mixta, re-reparte los buckets.
+    if (classesRemaining != null) await resyncMixtoBuckets(pool, req.params.id);
     triggerWalletPassSync(r.rows[0].user_id, "membership_updated");
     return res.json({ data: r.rows[0] });
   } catch (err) {
@@ -13020,10 +13047,8 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
         [classId]
       );
       if (!isUnlimitedClasses(lockedMembership.classes_remaining)) {
-        await client.query(
-          "UPDATE memberships SET classes_remaining = GREATEST(classes_remaining - 1, 0), updated_at = NOW() WHERE id = $1",
-          [membership.id]
-        );
+        // Descuenta total y, si es mixto, el bucket del área de la clase.
+        await consumeMembershipCredit(client, membership.id, classId);
       }
     }
 
@@ -13686,6 +13711,8 @@ app.put("/api/admin/orders/:id/verify", adminMiddleware, async (req, res) => {
             `UPDATE memberships SET status = 'active', classes_remaining = $1 WHERE id = $2`,
             [newCredits, existing.rows[0].id]
           );
+          // Re-reparte buckets si es mixto (el UPDATE no dispara el trigger).
+          await resyncMixtoBuckets(client, existing.rows[0].id);
         } else {
           await client.query(
             `INSERT INTO memberships (user_id, plan_id, status, payment_method, start_date, end_date, classes_remaining, order_id)
