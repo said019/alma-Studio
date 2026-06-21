@@ -358,21 +358,20 @@ async function sendWeeklyReminder(opts) {
     : "";
 
   const content = `
-    ${h1(`¡Hola ${name.split(" ")[0]}! ¿Ya programaste tu semana? 🏃‍♀️`)}
-    ${p("Es un nuevo comienzo. Esta semana tienes nuevos horarios disponibles en Alma Movement.")}
+    ${h1(`Tu semana en Alma, ${name.split(" ")[0]}`)}
+    ${p("Empieza una semana nueva y el horario ya está abierto. Aparta tus clases y date ese tiempo para ti.")}
     ${p(classesText)}
     ${expiryNote}
-    ${h2("¿Por qué no faltar?")}
-    ${p("Saltar en trampolín <strong>quema hasta 800 kcal</strong> por sesión, mejora tu coordinación y eleva tu energía. ¡Vale mucho la pena!")}
-    ${p("Entra ahora y reserva tus clases antes de que se llenen los spots:")}
+    ${h2("Date la cita contigo")}
+    ${p("Grupos pequeños, técnica cuidada y alguien que te recibe por tu nombre. Reserva tus lugares antes de que se llenen.")}
   `;
   const html = baseLayout({
-    preheader: `¡Nueva semana, nuevas clases! Tienes ${classesLeft === null ? "clases ilimitadas" : `${classesLeft} clases`} disponibles.`,
+    preheader: `Nueva semana en Alma. Tienes ${classesLeft === null ? "clases ilimitadas" : `${classesLeft} clases`} para reservar.`,
     content,
     ctaUrl: `${SITE_URL}/app/classes`,
-    ctaText: "Programar mi semana",
+    ctaText: "Reservar mi semana",
   });
-  await sendEmail({ to, subject: `🗓️ ¡Programa tu semana en Alma Movement!`, html });
+  await sendEmail({ to, subject: `Tu semana en Alma — reserva tus clases`, html });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -394,17 +393,17 @@ async function sendRenewalReminder(opts) {
   const isExpiring = reason === "expiring_soon";
 
   const urgencyBlock = isLastClass
-    ? alertBox(`🎯 Te queda <strong>1 sola clase</strong> en tu paquete ${planName}. ¡Renueva antes de quedarte sin acceso!`, B.magenta)
-    : alertBox(`⏰ Tu membresía <strong>${planName}</strong> vence el <strong>${fmtDate(endDate)}</strong>. ¡Renueva para no perder tu ritmo!`, B.violet);
+    ? alertBox(`Te queda <strong>1 clase</strong> en tu paquete ${planName}. Renuévalo para no quedarte sin acceso.`)
+    : alertBox(`Tu membresía <strong>${planName}</strong> vence el <strong>${fmtDate(endDate)}</strong>. Renuévala para mantener tu ritmo.`);
 
   const benefit = isLastClass
     ? p("Aprovecha y reserva esa última clase hoy, y de paso renueva tu paquete para seguir entrenando sin interrupciones.")
     : p("Renovar antes del vencimiento es la mejor forma de mantener tu constancia. ¡No dejes que el progreso se detenga!");
 
   const content = `
-    ${h1(`${name.split(" ")[0]}, es momento de renovar 🔄`)}
+    ${h1(`${name.split(" ")[0]}, es momento de renovar`)}
     ${urgencyBlock}
-    ${p("En Alma Movement nos aseguramos de que nunca pierdas el hilo de tu entrenamiento.")}
+    ${p("En Alma cuidamos tu constancia: renovar a tiempo es la forma de no perder el hilo de tu práctica.")}
     ${infoTable([
     infoRow("Plan actual", planName),
     ...(classesLeft !== null ? [infoRow("Clases restantes", `${classesLeft}`)] : []),
@@ -413,7 +412,7 @@ async function sendRenewalReminder(opts) {
     ${benefit}
   `;
   const html = baseLayout({
-    preheader: isLastClass ? `¡Solo te queda 1 clase! Renueva tu paquete ahora.` : `Tu membresía vence pronto. Renueva para seguir saltando.`,
+    preheader: isLastClass ? `Te queda 1 clase. Renueva tu paquete.` : `Tu membresía vence pronto. Renueva para seguir tu práctica.`,
     content,
     ctaUrl: `${SITE_URL}/app/checkout`,
     ctaText: "Renovar mi membresía",
@@ -421,8 +420,8 @@ async function sendRenewalReminder(opts) {
   await sendEmail({
     to,
     subject: isLastClass
-      ? `⚡ ¡Solo te queda 1 clase! Renueva tu membresía`
-      : `⏰ Tu membresía vence pronto — Alma Movement`,
+      ? `Te queda 1 clase — renueva tu membresía`
+      : `Tu membresía vence pronto — Alma`,
     html,
   });
 }
@@ -445,7 +444,7 @@ async function sendPasswordResetEmail(opts) {
     resetUrl || `${SITE_URL}/auth/reset-password?token=${encodeURIComponent(token)}`,
   );
   const content = `
-    ${h1(`Recupera tu contraseña, ${firstName} 🔐`)}
+    ${h1(`Recupera tu contraseña, ${firstName}`)}
     ${p("Hemos recibido una solicitud para cambiar la contraseña de tu cuenta en Alma Movement.")}
     ${p("Si fuiste tú, haz clic en el siguiente enlace para crear una contraseña nueva. Este enlace expirará en 2 horas.")}
     ${p("Si no solicitaste este cambio, puedes ignorar este correo; tu cuenta seguirá segura.")}
@@ -457,7 +456,7 @@ async function sendPasswordResetEmail(opts) {
     ctaUrl: resolvedResetUrl,
     ctaText: "Reestablecer mi contraseña",
   });
-  await sendEmail({ to, subject: "🔐 Restablecer contraseña — Alma Movement", html });
+  await sendEmail({ to, subject: "Restablecer tu contraseña — Alma", html });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -472,17 +471,10 @@ async function sendPasswordResetEmail(opts) {
 async function sendOrderRejected(opts) {
   const { to, name, reason } = opts;
   const content = `
-    ${h1(`Comprobante no aprobado 😔`)}
-    ${p(`Hola ${name.split(" ")[0]}, revisamos tu comprobante de pago y lamentablemente <strong>no pudo ser aprobado</strong>.`)}
-    <table role="presentation" cellpadding="0" cellspacing="0" width="100%"
-           style="background:rgba(118,33,77,.08);border-left:3px solid #A48D78;border-radius:0 8px 8px 0;margin:16px 0;">
-      <tr><td style="padding:16px 20px;">
-        <p style="margin:0;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:14px;color:#E6DAC8;">
-          <strong style="color:#A48D78;">Motivo:</strong><br>${reason}
-        </p>
-      </td></tr>
-    </table>
-    ${p("Si crees que hubo un error, por favor contáctanos directamente por WhatsApp o responde este correo. ¡Estamos para ayudarte! 💜")}
+    ${h1(`Revisamos tu comprobante`)}
+    ${p(`Hola ${name.split(" ")[0]}, revisamos tu comprobante de pago y por ahora <strong>no pudimos aprobarlo</strong>.`)}
+    ${alertBox(`<strong>Motivo:</strong> ${reason}`)}
+    ${p("Si crees que hubo un error, escríbenos por WhatsApp o responde este correo y lo resolvemos contigo.")}
   `;
   const html = baseLayout({
     preheader: "Tu comprobante de pago fue revisado — Alma Movement",
