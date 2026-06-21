@@ -12,34 +12,37 @@ const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KE
 // Remitente. Configurable por env; el dominio debe estar verificado en Resend.
 const FROM_EMAIL = process.env.EMAIL_FROM || "Alma Movement <noreply@agendafull.com.mx>";
 const SITE_URL = process.env.SITE_URL || "https://alma-movement.com.mx";
-const LOGO_URL = `${SITE_URL}/wallet-logo-black@3x.png`;
+const LOGO_URL = `${SITE_URL}/alma-mark-light.png`; // logo claro sobre el header espresso
 
 // ─── Brand palette (Alma editorial, fondo claro) ───────────────────────────────
 // Conservamos los nombres de clave (magenta/violet/lime/cream...) usados por
 // los helpers; solo cambian los valores al look claro de Alma.
 const B = {
-  bg: "#F4F1EA",     // fondo página (blush apagado)
-  card: "#FAF9F6",   // cream — fondo de la tarjeta
-  border: "#E0D5C6",  // beige rosado — bordes
-  purple: "#43392F", // ink — espresso cálido
-  magenta: "#A48D78",  // berry — primario
-  violet: "#CBB9A4",   // coral — acento
-  lime: "#C0A688",     // naranja
-  cream: "#43392F",    // (ahora "cream" = texto oscuro; clave reutilizada en headings)
-  lilac: "#E6DAC8",    // blush claro
-  text: "#43392F",     // texto principal (ink suave)
-  muted: "#8C7A68",    // gris cálido para texto secundario
+  bg:      "#F4F1EA", // Porcelain Mist — fondo página
+  card:    "#FAF9F6", // Feather White — tarjeta
+  border:  "#E0D5C6", // hairline
+  ink:     "#43392F", // espresso — texto/CTA
+  inkDeep: "#241B1A", // espresso profundo — header band
+  desert:  "#A48D78", // Desert Rock — acento
+  sand:    "#CBB9A4", // Soft Sandstone
+  oat:     "#E6DAC8", // Creamed Oat — tints
+  text:    "#43392F",
+  muted:   "#8C7A68", // gris cálido
+  // Alias legacy (los pasan algunas funciones como color; el diseño ya los ignora).
+  purple: "#43392F", magenta: "#A48D78", violet: "#CBB9A4",
+  lime: "#A48D78", cream: "#43392F", lilac: "#E6DAC8",
 };
+const SERIF = "Georgia, 'Times New Roman', Times, serif";
+const SANS = "'Helvetica Neue', Helvetica, Arial, sans-serif";
 
 // ─── Base layout ──────────────────────────────────────────────────────────────
 function baseLayout({ preheader = "", content = "", ctaUrl = "", ctaText = "" } = {}) {
   const ctaBlock = ctaUrl
-    ? `<tr><td align="center" style="padding:24px 0 8px;">
+    ? `<tr><td align="center" style="padding:26px 0 6px;">
          <a href="${ctaUrl}"
-            style="display:inline-block;background:linear-gradient(135deg,${B.magenta},${B.violet});
-                   color:#fff;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;
-                   font-size:15px;font-weight:700;letter-spacing:.5px;
-                   text-decoration:none;border-radius:50px;padding:14px 36px;">
+            style="display:inline-block;background:${B.ink};color:${B.card};
+                   font-family:${SANS};font-size:12px;font-weight:600;letter-spacing:1.6px;
+                   text-transform:uppercase;text-decoration:none;border-radius:50px;padding:15px 38px;">
            ${ctaText}
          </a>
        </td></tr>`
@@ -59,28 +62,26 @@ function baseLayout({ preheader = "", content = "", ctaUrl = "", ctaText = "" } 
     ${preheader}&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;
   </div>
 
-  <table role="presentation" cellpadding="0" cellspacing="0" width="100%"
-         style="background-color:${B.bg};min-height:100vh;">
-    <tr><td align="center" style="padding:32px 16px 48px;">
+  <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background-color:${B.bg};">
+    <tr><td align="center" style="padding:32px 16px 40px;">
 
       <!-- Card -->
       <table role="presentation" cellpadding="0" cellspacing="0" width="560"
              style="max-width:560px;width:100%;background-color:${B.card};
-                    border:1px solid ${B.border};border-radius:20px;
-                    box-shadow:0 18px 50px -24px rgba(118,33,77,.28);">
+                    border:1px solid ${B.border};border-radius:22px;overflow:hidden;
+                    box-shadow:0 22px 60px -30px rgba(36,27,26,.38);">
 
-        <!-- Header gradient bar -->
-        <tr><td style="height:5px;background:linear-gradient(90deg,${B.magenta},${B.violet},${B.lime});
-                        border-radius:20px 20px 0 0;font-size:0;line-height:0;">&nbsp;</td></tr>
-
-        <!-- Logo -->
-        <tr><td align="center" style="padding:34px 40px 6px;">
-          <img src="${LOGO_URL}" alt="Alma Movement" width="150" height="auto"
-               style="display:block;max-width:150px;" />
+        <!-- Header: banda espresso + logo + tagline (mismo lenguaje que el pase) -->
+        <tr><td align="center" style="background-color:${B.inkDeep};padding:36px 40px 30px;">
+          <img src="${LOGO_URL}" alt="Alma Movement" width="84" height="84"
+               style="display:block;width:84px;height:auto;margin:0 auto 14px;" />
+          <div style="font-family:${SANS};font-size:10px;letter-spacing:4px;text-transform:uppercase;color:${B.oat};">
+            Move with intention
+          </div>
         </td></tr>
 
         <!-- Content -->
-        <tr><td style="padding:8px 40px 8px;">
+        <tr><td style="padding:34px 40px 6px;">
           ${content}
         </td></tr>
 
@@ -88,20 +89,25 @@ function baseLayout({ preheader = "", content = "", ctaUrl = "", ctaText = "" } 
         ${ctaBlock}
 
         <!-- Divider -->
-        <tr><td style="padding:8px 40px 0;">
-          <hr style="border:none;border-top:1px solid ${B.border};margin:16px 0 0;" />
+        <tr><td style="padding:12px 40px 0;">
+          <hr style="border:none;border-top:1px solid ${B.border};margin:18px 0 0;" />
         </td></tr>
 
         <!-- Footer -->
-        <tr><td align="center" style="padding:20px 40px 32px;">
-          <p style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:12px;
-                    color:${B.muted};margin:0;line-height:1.6;">
-            © ${new Date().getFullYear()} Alma Movement · Barre<br>
-            <a href="${SITE_URL}" style="color:${B.magenta};text-decoration:none;">alma-movement.com.mx</a>
+        <tr><td align="center" style="padding:22px 40px 34px;">
+          <p style="font-family:${SANS};font-size:10px;letter-spacing:1.8px;text-transform:uppercase;color:${B.desert};margin:0 0 9px;">
+            Pilates Reformer · Tower · Mat · Barre · Sculpt
+          </p>
+          <p style="font-family:${SANS};font-size:12px;color:${B.muted};margin:0;line-height:1.7;">
+            Alma Movement · Juriquilla, Querétaro<br>
+            <a href="${SITE_URL}" style="color:${B.ink};text-decoration:none;">alma-movement.com.mx</a>
           </p>
         </td></tr>
 
       </table>
+      <p style="font-family:${SANS};font-size:11px;color:${B.muted};margin:16px 0 0;">
+        © ${new Date().getFullYear()} Alma Movement
+      </p>
     </td></tr>
   </table>
 </body>
@@ -110,47 +116,40 @@ function baseLayout({ preheader = "", content = "", ctaUrl = "", ctaText = "" } 
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function h1(text) {
-  return `<h1 style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:26px;
-                      font-weight:800;color:${B.cream};margin:16px 0 8px;line-height:1.25;">${text}</h1>`;
+  return `<h1 style="font-family:${SERIF};font-size:27px;font-weight:500;color:${B.ink};margin:0 0 10px;line-height:1.25;letter-spacing:-.01em;">${text}</h1>`;
 }
 function h2(text) {
-  return `<h2 style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:18px;
-                      font-weight:700;color:${B.violet};margin:20px 0 6px;">${text}</h2>`;
+  return `<h2 style="font-family:${SERIF};font-size:18px;font-weight:500;color:${B.desert};margin:20px 0 6px;">${text}</h2>`;
 }
 function p(text) {
-  return `<p style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:15px;
-                     color:${B.text};line-height:1.7;margin:0 0 12px;">${text}</p>`;
+  return `<p style="font-family:${SANS};font-size:15px;color:${B.text};line-height:1.75;margin:0 0 14px;">${text}</p>`;
 }
 function small(text) {
-  return `<p style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13px;
-                     color:${B.muted};line-height:1.6;margin:0 0 10px;">${text}</p>`;
+  return `<p style="font-family:${SANS};font-size:13px;color:${B.muted};line-height:1.6;margin:0 0 10px;">${text}</p>`;
 }
 function infoRow(label, value) {
   return `<tr>
-    <td style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13px;
-               color:${B.muted};padding:6px 0;border-bottom:1px solid ${B.border};">${label}</td>
-    <td style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13px;
-               color:${B.cream};font-weight:600;padding:6px 0 6px 12px;
+    <td style="font-family:${SANS};font-size:11px;letter-spacing:.6px;text-transform:uppercase;
+               color:${B.muted};padding:9px 0;border-bottom:1px solid ${B.border};">${label}</td>
+    <td style="font-family:${SANS};font-size:14px;color:${B.ink};font-weight:600;padding:9px 0 9px 12px;
                border-bottom:1px solid ${B.border};text-align:right;">${value}</td>
   </tr>`;
 }
 function infoTable(rows) {
   return `<table role="presentation" cellpadding="0" cellspacing="0" width="100%"
-                  style="border-top:1px solid ${B.border};margin:16px 0 20px;">
+                  style="border-top:1px solid ${B.border};margin:18px 0 22px;">
     ${rows.join("")}
   </table>`;
 }
-function pill(text, color) {
-  return `<span style="display:inline-block;background:${color}22;border:1px solid ${color};
-                        color:${color};border-radius:50px;font-size:12px;font-weight:700;
-                        padding:3px 12px;letter-spacing:.5px;">${text}</span>`;
+function pill(text) {
+  return `<span style="display:inline-block;background:${B.oat};border:1px solid ${B.sand};
+                        color:${B.ink};border-radius:50px;font-family:${SANS};font-size:11px;font-weight:600;
+                        padding:5px 14px;letter-spacing:1px;text-transform:uppercase;">${text}</span>`;
 }
-function alertBox(text, color = B.magenta) {
+function alertBox(text) {
   return `<table role="presentation" cellpadding="0" cellspacing="0" width="100%"
-                  style="background:${color}15;border-left:4px solid ${color};
-                         border-radius:8px;margin:12px 0 20px;">
-    <tr><td style="padding:14px 16px;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;
-                    font-size:14px;color:${B.cream};line-height:1.6;">${text}</td></tr>
+                  style="background:${B.oat};border:1px solid ${B.sand};border-radius:14px;margin:14px 0 20px;">
+    <tr><td style="padding:15px 18px;font-family:${SANS};font-size:14px;color:${B.ink};line-height:1.65;">${text}</td></tr>
   </table>`;
 }
 
@@ -211,10 +210,10 @@ async function sendEmail({ to, subject, html }) {
  */
 async function sendMembershipActivated(opts) {
   const { to, name, planName, startDate, endDate, classLimit } = opts;
-  const classesText = classLimit ? `${classLimit} clases` : "Clases ilimitadas ♾";
+  const classesText = classLimit ? `${classLimit} clases` : "Clases ilimitadas";
   const content = `
-    ${h1(`¡Tu membresía está activa, ${name.split(" ")[0]}! 🎉`)}
-    ${p("Tu acceso a Alma Movement ha sido activado. ¡Es momento de saltar!")}
+    ${h1(`Bienvenida a Alma, ${name.split(" ")[0]}`)}
+    ${p("Tu membresía ya está activa. Reserva tu primera clase y empieza a moverte con intención; aquí te acompañamos en cada movimiento.")}
     ${infoTable([
     infoRow("Plan", planName),
     infoRow("Clases incluidas", classesText),
@@ -229,7 +228,7 @@ async function sendMembershipActivated(opts) {
     ctaUrl: `${SITE_URL}/app/classes`,
     ctaText: "Reservar clases",
   });
-  await sendEmail({ to, subject: `✨ Tu membresía en Alma Movement está activa`, html });
+  await sendEmail({ to, subject: `Tu membresía en Alma ya está activa`, html });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -248,14 +247,14 @@ async function sendMembershipActivated(opts) {
  */
 async function sendBookingConfirmed(opts) {
   const { to, name, className, date, startTime, instructor, classesLeft, isWaitlist } = opts;
-  const cancelHours = Number(opts.cancelHours) > 0 ? Number(opts.cancelHours) : 8;
+  const cancelHours = Number(opts.cancelHours) > 0 ? Number(opts.cancelHours) : 12;
 
   const statusPill = isWaitlist
-    ? pill("Lista de espera", B.lime)
-    : pill("Confirmada ✓", B.magenta);
+    ? pill("Lista de espera")
+    : pill("Confirmada");
 
   const classesLeftText = classesLeft === null
-    ? "Ilimitadas ♾"
+    ? "Ilimitadas"
     : classesLeft !== undefined
       ? `${classesLeft} clases restantes`
       : null;
@@ -265,7 +264,7 @@ async function sendBookingConfirmed(opts) {
     : "";
 
   const content = `
-    ${h1(isWaitlist ? `En lista de espera, ${name.split(" ")[0]}` : `¡Reserva confirmada, ${name.split(" ")[0]}! 🏋️`)}
+    ${h1(isWaitlist ? `En lista de espera, ${name.split(" ")[0]}` : `Nos vemos en clase, ${name.split(" ")[0]}`)}
     ${p(isWaitlist
     ? "Te hemos añadido a la lista de espera para la siguiente clase:"
     : "Tu clase ha sido reservada con éxito. ¡Te esperamos!"
@@ -287,7 +286,7 @@ async function sendBookingConfirmed(opts) {
     ctaUrl: `${SITE_URL}/app/bookings`,
     ctaText: "Ver mis reservas",
   });
-  await sendEmail({ to, subject: isWaitlist ? `📋 En lista de espera — ${className}` : `✅ Reserva confirmada — ${className}`, html });
+  await sendEmail({ to, subject: isWaitlist ? `En lista de espera — ${className}` : `Reserva confirmada — ${className}`, html });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -307,11 +306,11 @@ async function sendBookingConfirmed(opts) {
 async function sendBookingCancelled(opts) {
   const { to, name, className, date, startTime, creditRestored, isLate, classesLeft } = opts;
 
-  const classesLeftText = classesLeft === null ? "Ilimitadas ♾" : classesLeft !== undefined ? `${classesLeft} clases` : null;
+  const classesLeftText = classesLeft === null ? "Ilimitadas" : classesLeft !== undefined ? `${classesLeft} clases` : null;
 
   const creditBlock = creditRestored
-    ? alertBox(`✅ <strong>Clase devuelta a tu paquete.</strong> Cancelaste con más de 2 horas de anticipación.`, B.violet)
-    : alertBox(`⚠️ <strong>La clase NO se devolvió a tu paquete.</strong> La cancelación fue con menos de 2 horas de anticipación (política del studio).`, B.magenta);
+    ? alertBox(`<strong>Tu clase regresó a tu paquete.</strong> Cancelaste con más de 12 horas de anticipación.`)
+    : alertBox(`<strong>Esta vez la clase no regresó a tu paquete.</strong> La cancelación fue con menos de 12 horas de anticipación, como indica nuestra política.`);
 
   const content = `
     ${h1(`Reserva cancelada, ${name.split(" ")[0]}`)}
@@ -334,7 +333,7 @@ async function sendBookingCancelled(opts) {
     ctaUrl: `${SITE_URL}/app/classes`,
     ctaText: "Ver horario",
   });
-  await sendEmail({ to, subject: `❌ Reserva cancelada — ${className}`, html });
+  await sendEmail({ to, subject: `Reserva cancelada — ${className}`, html });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -351,11 +350,11 @@ async function sendWeeklyReminder(opts) {
   const { to, name, classesLeft, endDate } = opts;
 
   const classesText = classesLeft === null
-    ? "Tienes clases <strong>ilimitadas</strong> esta semana. ♾"
+    ? "Tienes clases <strong>ilimitadas</strong> esta semana."
     : `Tienes <strong>${classesLeft} clase${classesLeft !== 1 ? "s" : ""}</strong> disponible${classesLeft !== 1 ? "s" : ""} en tu paquete.`;
 
   const expiryNote = endDate
-    ? alertBox(`📅 Tu membresía vence el <strong>${fmtDate(endDate)}</strong>. ¡Aprovecha tus clases!`, B.violet)
+    ? alertBox(`Tu membresía vence el <strong>${fmtDate(endDate)}</strong>. Aún estás a tiempo de aprovechar tus clases.`)
     : "";
 
   const content = `
