@@ -1,10 +1,11 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { Smartphone } from "lucide-react";
 import { useAuthStore } from "@/stores/authStore";
-import { InstallAppPrompt } from "@/components/InstallAppPrompt";
+import { InstallAppPrompt, getDevice, isStandalone } from "@/components/InstallAppPrompt";
 import {
   AuthShell,
   AuthField,
@@ -26,6 +27,13 @@ const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [params] = useSearchParams();
+
+  // Instalar como app (PWA): el modal con pasos por plataforma. El botón queda
+  // siempre visible en móvil para quien quiera instalarla desde el login.
+  const [showInstall, setShowInstall] = useState(false);
+  const [device] = useState(getDevice);
+  const [standalone] = useState(isStandalone);
+  const canInstall = device !== "desktop" && !standalone;
 
   const { register, handleSubmit, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -70,7 +78,7 @@ const Login = () => {
 
   return (
     <>
-      <InstallAppPrompt />
+      <InstallAppPrompt force={showInstall} onClose={() => setShowInstall(false)} />
       <AuthShell
         brandTint="berry"
         brandEyebrow="Bienvenida de vuelta"
@@ -112,6 +120,17 @@ const Login = () => {
         <AuthDivider label="¿Primera vez?" />
 
         <AuthSecondaryLink to="/auth/register">Crear cuenta nueva</AuthSecondaryLink>
+
+        {canInstall && (
+          <button
+            type="button"
+            onClick={() => setShowInstall(true)}
+            className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-border/70 bg-transparent py-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground"
+          >
+            <Smartphone size={15} className="text-primary" />
+            Instala la app en tu celular
+          </button>
+        )}
       </AuthShell>
     </>
   );

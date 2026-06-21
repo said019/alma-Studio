@@ -7,14 +7,14 @@ import { useState, useEffect } from "react";
 import { X, Share, MoreVertical, Plus, Download, Smartphone } from "lucide-react";
 const STORAGE_KEY = "alma_install_prompt_shown";
 
-function isStandalone() {
+export function isStandalone() {
   return (
     window.matchMedia("(display-mode: standalone)").matches ||
     (navigator as any).standalone === true
   );
 }
 
-function getDevice(): "ios" | "android" | "desktop" {
+export function getDevice(): "ios" | "android" | "desktop" {
   const ua = navigator.userAgent.toLowerCase();
   if (/iphone|ipad|ipod/.test(ua)) return "ios";
   if (/android/.test(ua)) return "android";
@@ -32,14 +32,17 @@ export function InstallAppPrompt({ force, onClose }: InstallAppPromptProps) {
   const [device] = useState(getDevice);
 
   useEffect(() => {
-    // Only show on mobile devices
+    // Forzado (la clienta tocó "Instala la app"): abrir de inmediato, en
+    // cualquier dispositivo, ignorando el flag de "ya descartado".
+    if (force) {
+      setVisible(true);
+      return;
+    }
+
+    // Auto (primera visita): solo móvil, solo si no está instalada ni descartada.
     if (device === "desktop") return;
-
-    // Don't show if already installed as PWA
     if (isStandalone()) return;
-
-    // Don't show if already dismissed (unless forced)
-    if (!force && localStorage.getItem(STORAGE_KEY)) return;
+    if (localStorage.getItem(STORAGE_KEY)) return;
 
     // Small delay for smoother UX
     const timer = setTimeout(() => setVisible(true), 1200);
