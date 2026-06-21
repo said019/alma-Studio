@@ -8862,7 +8862,9 @@ app.put("/api/classes/:id/cancel", adminMiddleware, async (req, res) => {
 // con override de política de 2h. Devuelve crédito siempre. Optional body
 // { reason } se incluye en WA.
 app.delete("/api/admin/bookings/:id", adminMiddleware, async (req, res) => {
-  const { reason } = req.body || {};
+  // refundCredit (default true): la admin decide si devolver el crédito. En false
+  // se cancela y libera el lugar pero la clase cuenta como usada (ej. una falta).
+  const { reason, refundCredit } = req.body || {};
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -8896,7 +8898,7 @@ app.delete("/api/admin/bookings/:id", adminMiddleware, async (req, res) => {
     // que cancela manualmente espera que el crédito se devuelva incluso si
     // la alumna ya tenía check-in (suele ser un check-in por error o
     // re-clasificación de la asistencia).
-    const rb = await applyCancellationRollback(client, booking, { refundCheckedIn: true });
+    const rb = await applyCancellationRollback(client, booking, { refundCheckedIn: true, skipCreditRestore: refundCredit === false });
 
     await client.query("COMMIT");
 

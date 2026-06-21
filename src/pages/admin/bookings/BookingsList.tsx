@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks } from "date-fns";
 import { es } from "date-fns/locale";
 import api from "@/lib/api";
@@ -10,6 +10,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { useConfirm } from "@/components/admin/ConfirmDialog";
 import { ErrorState } from "@/components/app/AppShell";
 import { formatMXN } from "@/lib/format";
@@ -51,11 +55,110 @@ const statusConfig: Record<string, { label: string; className: string }> = {
   cancelled:  { label: "Cancelada",       className: "text-alma-ink/40 border-alma-hairline bg-transparent" },
 };
 
+// ── Diálogo de cancelar reserva: muestra la ventana (a tiempo/tarde) y deja
+// elegir si devolver el crédito. Default: devolver (la admin desmarca si no). ──
+const CancelBookingDialog = ({
+  entry, classStartsAt, windowHours, pending, onConfirm, onClose,
+}: {
+  entry: RosterEntry | null;
+  classStartsAt: string | null;
+  windowHours: number;
+  pending: boolean;
+  onConfirm: (args: { reason?: string; refundCredit: boolean }) => void;
+  onClose: () => void;
+}) => {
+  const [reason, setReason] = useState("");
+  const [refundCredit, setRefundCredit] = useState(true);
+
+  useEffect(() => {
+    if (entry) { setReason(""); setRefundCredit(true); }
+  }, [entry?.bookingId]);
+
+  if (!entry) return null;
+
+  const isUnlimited = entry.classesRemaining == null || entry.classesRemaining >= 9999;
+  const minutesUntil = classStartsAt ? (new Date(classStartsAt).getTime() - Date.now()) / 60000 : null;
+  const isLate = minutesUntil != null && minutesUntil < windowHours * 60;
+  const timeLabel = minutesUntil == null ? null
+    : minutesUntil < 0 ? "La clase ya pasó"
+    : minutesUntil < 60 ? `Faltan ${Math.round(minutesUntil)} min`
+    : `Faltan ${Math.round(minutesUntil / 60)} h`;
+
+  return (
+    <Dialog open={!!entry} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-md bg-alma-canvas border-alma-hairline text-alma-ink">
+        <DialogHeader>
+          <DialogTitle className="font-display text-alma-ink">Cancelar reserva de {entry.displayName}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          {timeLabel && (
+            <div className={cn(
+              "rounded-xl border px-3 py-2 text-sm font-medium",
+              isLate ? "border-destructive/30 bg-destructive/5 text-destructive" : "border-alma-olive/40 bg-alma-olive/10 text-alma-olive",
+            )}>
+              {timeLabel} para la clase — {isLate ? `tarde (dentro de ${windowHours}h)` : "a tiempo"}
+            </div>
+          )}
+
+          <div className="space-y-1.5">
+            <Label className="text-xs text-alma-ink/70">Motivo (opcional)</Label>
+            <Textarea
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="Ej. nos pidió moverla por teléfono"
+              rows={2}
+              className="bg-alma-canvas border-alma-sandstone/60 text-alma-ink placeholder:text-alma-ink/40"
+            />
+            <p className="text-[11px] text-alma-ink/50">Se incluye en el WhatsApp que le llega a {entry.displayName}.</p>
+          </div>
+
+          <div className="flex items-center justify-between gap-4 rounded-xl border border-alma-hairline bg-alma-mist px-4 py-3">
+            <div>
+              <Label className="text-sm font-medium text-alma-ink">Devolver crédito</Label>
+              <p className="text-xs text-alma-ink/55">
+                {isUnlimited
+                  ? "Plan ilimitado — no usa créditos."
+                  : refundCredit
+                    ? "La clase regresa a su paquete."
+                    : "La clase cuenta como usada (no se devuelve)."}
+              </p>
+            </div>
+            <Switch
+              checked={refundCredit && !isUnlimited}
+              onCheckedChange={setRefundCredit}
+              disabled={isUnlimited}
+              className="data-[state=checked]:bg-alma-ink data-[state=unchecked]:bg-alma-sandstone/60"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" className="border-alma-sandstone/70 bg-transparent text-alma-ink hover:bg-alma-mist" onClick={onClose} disabled={pending}>
+            Volver
+          </Button>
+          <Button
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            onClick={() => onConfirm({ reason: reason.trim() || undefined, refundCredit: isUnlimited ? false : refundCredit })}
+            disabled={pending}
+          >
+            {pending ? "Cancelando…" : "Cancelar reserva"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
 // ── Class Roster panel ─────────────────────────────────────────────────────────
 const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void }) => {
   const { toast } = useToast();
   const qc = useQueryClient();
   const { confirm, promptText, dialog } = useConfirm();
+  const [cancelTarget, setCancelTarget] = useState<RosterEntry | null>(null);
+  const { data: loyaltyCfgData } = useQuery<{ data: { faltas_cancel_window_hours?: number } }>({
+    queryKey: ["loyalty-config"],
+    queryFn: async () => (await api.get("/loyalty/config")).data,
+  });
+  const creditWindowHours = Number(loyaltyCfgData?.data?.faltas_cancel_window_hours ?? 12) || 12;
   const [assignOpen, setAssignOpen] = useState(false);
   const [visitOpen, setVisitOpen] = useState(false);
   const [memberSearch, setMemberSearch] = useState("");
@@ -150,8 +253,8 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
 
   // Admin cancela reserva (override política 2h, devuelve crédito).
   const cancelMutation = useMutation({
-    mutationFn: ({ id, reason }: { id: string; reason?: string }) =>
-      api.delete(`/admin/bookings/${id}`, { data: { reason } }),
+    mutationFn: ({ id, reason, refundCredit }: { id: string; reason?: string; refundCredit: boolean }) =>
+      api.delete(`/admin/bookings/${id}`, { data: { reason, refundCredit } }),
     onSuccess: (res: any) => {
       qc.invalidateQueries({ queryKey: ["roster", classId] });
       qc.invalidateQueries({ queryKey: ["my-bookings"] });
@@ -160,6 +263,7 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
         title: "Reserva cancelada",
         description: restored ? "Crédito devuelto a la alumna." : "Cancelada (sin crédito por devolver).",
       });
+      setCancelTarget(null);
     },
     onError: (e: any) => toast({
       title: "Error al cancelar",
@@ -256,24 +360,9 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
     cancelClassMutation.mutate(reason || undefined);
   };
 
-  const handleCancelBooking = async (entry: RosterEntry) => {
-    const name = entry.displayName || "la alumna";
-    const reason = await promptText({
-      title: "Motivo de cancelación",
-      description: `Es opcional y se incluye en el WhatsApp que le llega a ${name}.`,
-      placeholder: "Ej. nos pidió moverla por teléfono",
-      confirmLabel: "Continuar",
-    });
-    if (reason === null) return;
-    const ok = await confirm({
-      title: `¿Cancelar la reserva de ${name}?`,
-      description: "Se libera su lugar en la clase y se le devuelve el crédito a su paquete si aplica.",
-      destructive: true,
-      confirmLabel: "Cancelar reserva",
-      cancelLabel: "Volver",
-    });
-    if (!ok) return;
-    cancelMutation.mutate({ id: entry.bookingId, reason: reason || undefined });
+  const handleCancelBooking = (entry: RosterEntry) => {
+    // Abre el diálogo dedicado (ventana de política + elección de crédito).
+    setCancelTarget(entry);
   };
 
   const backButton = (
@@ -805,6 +894,17 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
         open={visitOpen}
         onOpenChange={setVisitOpen}
         onSuccess={() => refetch()}
+      />
+
+      <CancelBookingDialog
+        entry={cancelTarget}
+        classStartsAt={classInfo?.startsAt ?? null}
+        windowHours={creditWindowHours}
+        pending={cancelMutation.isPending}
+        onConfirm={({ reason, refundCredit }) => {
+          if (cancelTarget) cancelMutation.mutate({ id: cancelTarget.bookingId, reason, refundCredit });
+        }}
+        onClose={() => setCancelTarget(null)}
       />
 
       {dialog}
