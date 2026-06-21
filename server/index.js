@@ -7019,6 +7019,17 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
     } catch (_) { /* weekly cap lookup falla silently */ }
   }
 
+  // Socia desde: fecha de registro de la alumna (para el pase tipo club).
+  let memberSinceLabel = null;
+  try {
+    const _u = await pool.query("SELECT created_at FROM users WHERE id = $1", [userId]);
+    const _ca = _u.rows[0]?.created_at;
+    if (_ca) {
+      const _m = new Date(_ca).toLocaleDateString("es-MX", { month: "short", year: "numeric" });
+      memberSinceLabel = _m.charAt(0).toUpperCase() + _m.slice(1);
+    }
+  } catch (_) { /* socia desde opcional */ }
+
   if (hasEventPass) {
     secondaryFields.push({
       key: "event_title",
@@ -7067,21 +7078,31 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
   }
 
   if (hasMembership) {
+    // Frente tipo club: NOMBRE · NIVEL (paquete) + SOCIA DESDE · DISPONIBLES.
+    // Los operativos (modalidad, vigencia, reglas) van al reverso.
     secondaryFields.push({
-      key: "plan_name",
-      label: "PLAN",
-      value: planDisplayName || `${membershipCategoryLabel}${isUnlimited ? " ilimitado" : ""}`,
-    });
-    secondaryFields.push({
-      key: "modalidad",
-      label: "MODALIDAD",
-      value: membershipCategoryLabel,
-    });
-    auxiliaryFields.push({
-      key: "client_name",
-      label: "CLIENTE",
+      key: "nombre",
+      label: "NOMBRE",
       value: memberDisplayName || "Miembro",
     });
+    secondaryFields.push({
+      key: "nivel",
+      label: "NIVEL",
+      value: planDisplayName || `${membershipCategoryLabel}${isUnlimited ? " ilimitado" : ""}`,
+    });
+    if (memberSinceLabel) {
+      auxiliaryFields.push({ key: "socia_desde", label: "SOCIA DESDE", value: memberSinceLabel });
+    }
+    if (isUnlimited) {
+      auxiliaryFields.push({ key: "clases", label: "DISPONIBLES", value: "Ilimitadas" });
+    } else if (classLimit > 0 && !hasIconStampMode && !hasEventPass) {
+      auxiliaryFields.push({
+        key: "clases",
+        label: "DISPONIBLES",
+        value: progressSummary.remainingLabel,
+        changeMessage: "Clases restantes: %@",
+      });
+    }
     // Tope semanal — visible solo si el plan lo tiene
     if (weeklyCap) {
       const remaining = Math.max(0, weeklyCap.limit - weeklyCap.used);
@@ -7108,47 +7129,21 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
         changeMessage: "Tu próximo logro: %@",
       });
     }
-    if (membership.end_date) {
-      const endDate = new Date(membership.end_date);
-      const daysLeft = Math.max(0, Math.ceil((endDate - new Date()) / (1000 * 60 * 60 * 24)));
-      auxiliaryFields.push({
-        key: "vigencia",
-        label: "VIGENTE HASTA",
-        value: `${endDate.toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" })} (${daysLeft}d)`,
-      });
-    }
-    if (isUnlimited) {
-      auxiliaryFields.push({ key: "clases", label: "CLASES", value: "Ilimitadas" });
-    } else if (classLimit > 0 && !hasIconStampMode && !hasEventPass) {
-      auxiliaryFields.push({
-        key: "clases",
-        label: "DISPONIBLES",
-        value: progressSummary.remainingLabel,
-        changeMessage: "Clases restantes: %@",
-      });
-    }
-    const rules = [];
-    if (nonTransferable) rules.push("No transferible");
-    if (nonRepeatable) rules.push("No repetible");
-    if (rules.length) {
-      auxiliaryFields.push({
-        key: "reglas",
-        label: "REGLAS",
-        value: rules.join(" · "),
-      });
-    }
   } else {
-    // Sin membresía activa: pase de bienvenida con CTA a la primera clase.
+    // Sin membresía activa: pase de bienvenida tipo club (NOMBRE · NIVEL · SOCIA DESDE).
     secondaryFields.push({
-      key: "estado",
-      label: "ESTADO",
-      value: "Sin paquete · Bienvenida",
+      key: "nombre",
+      label: "NOMBRE",
+      value: memberDisplayName || "Miembro",
     });
     secondaryFields.push({
-      key: "muestra",
-      label: "PRIMERA CLASE",
-      value: "$150 · Clase muestra Studio",
+      key: "nivel",
+      label: "NIVEL",
+      value: "Bienvenida",
     });
+    if (memberSinceLabel) {
+      auxiliaryFields.push({ key: "socia_desde", label: "SOCIA DESDE", value: memberSinceLabel });
+    }
     backFields.push(
       {
         key: "intro_back",
