@@ -6756,57 +6756,59 @@ function escapeXml(value) {
     .replace(/"/g, "&quot;");
 }
 
+// Logo real de Alma (versión clara, transparente) como data URI, cacheado.
+// Se embebe como <image> en el strip: es imagen, no texto, así que renderiza en
+// el servidor sin depender de fuentes. Devuelve null si no se halla el asset.
+const ALMA_MARK_LIGHT_CACHE = { dataUri: undefined };
+function getAlmaMarkLightDataUri() {
+  if (ALMA_MARK_LIGHT_CACHE.dataUri !== undefined) return ALMA_MARK_LIGHT_CACHE.dataUri;
+  let uri = null;
+  try {
+    const p = findAssetFile(["alma-mark-light.png", "alma/alma-mark-light.png"]);
+    if (p) uri = `data:image/png;base64,${fs.readFileSync(p).toString("base64")}`;
+  } catch (e) { console.warn("[wallet] alma-mark-light no disponible:", e.message); }
+  ALMA_MARK_LIGHT_CACHE.dataUri = uri;
+  return uri;
+}
+
 function buildAlmaStripSvg(ringState, scale = 1, opts = {}) {
   const W = Math.round(375 * scale);
   const H = Math.round(123 * scale);
-  const c = (n) => Math.round(n * scale);
-  const centerX = c(187.5);
-  const centerY = Math.round(H / 2);
+  const fg = "#FAF9F6"; // Feather White
 
-  // SOLO formas vectoriales — CERO texto/glifos (el servidor sharp/resvg no tiene
-  // las fuentes de iOS y el texto salía como cuadros "tofu"). Tarjeta CÁLIDA en
-  // la paleta oficial Alma: fondo Desert Rock con líneas/emblema Feather White.
-  // El nombre vive en el logo del pase; el plan/estado, en los campos nativos.
-  const fg = "#FAF9F6"; // Feather White — líneas y emblema sobre el cálido
+  // Membresía de CLUB EXCLUSIVO: fondo cálido Desert Rock + marco de esquinas +
+  // el LOGO REAL de Alma (imagen embebida, CERO texto → nunca "tofu"). Diseñado
+  // en viewBox 0 0 375 123; resvg lo escala nítido a W×H.
+  const mark = getAlmaMarkLightDataUri();
 
-  // Fondo cálido con sutil sheen: gradiente Desert Rock (claro arriba → profundo abajo).
-  const bgGrad = `
+  // Marco de esquinas (estilo tarjeta de club acuñada).
+  const ins = 14, arm = 16;
+  const cb = (x1, y1, x2, y2) =>
+    `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${fg}" stroke-opacity="0.5" stroke-width="1" stroke-linecap="round" />`;
+  const corners = [
+    cb(ins, ins, ins + arm, ins), cb(ins, ins, ins, ins + arm),
+    cb(375 - ins, ins, 375 - ins - arm, ins), cb(375 - ins, ins, 375 - ins, ins + arm),
+    cb(ins, 123 - ins, ins + arm, 123 - ins), cb(ins, 123 - ins, ins, 123 - ins - arm),
+    cb(375 - ins, 123 - ins, 375 - ins - arm, 123 - ins), cb(375 - ins, 123 - ins, 375 - ins, 123 - ins - arm),
+  ].join("");
+
+  // Emblema central: el logo real; si faltara el asset, anillo vector de respaldo.
+  const lsize = 96, lx = 187.5 - lsize / 2, ly = 61.5 - lsize / 2;
+  const emblem = mark
+    ? `<image href="${mark}" x="${lx}" y="${ly}" width="${lsize}" height="${lsize}" opacity="0.95" preserveAspectRatio="xMidYMid meet" />`
+    : `<circle cx="187.5" cy="61.5" r="13" fill="none" stroke="${fg}" stroke-opacity="0.85" stroke-width="1" /><circle cx="187.5" cy="61.5" r="2" fill="${fg}" />`;
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 375 123">
+  <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%"   stop-color="#AC9682" />
       <stop offset="100%" stop-color="#9A8166" />
-    </linearGradient>`;
-
-  // Ondas concéntricas sutiles (movimiento consciente) ancladas arriba-derecha.
-  const rippleCx = Math.round(W * 0.84);
-  const rippleCy = c(4);
-  const ripples = [c(54), c(88), c(124)]
-    .map((r) => `<circle cx="${rippleCx}" cy="${rippleCy}" r="${r}" fill="none" stroke="${fg}" stroke-opacity="0.12" stroke-width="${c(1)}" />`)
-    .join("");
-
-  // Regla central fina con hueco para el emblema, y dos puntos a cada lado.
-  const ruleY = centerY;
-  const gap = c(30);
-  const ruleStroke = `stroke="${fg}" stroke-opacity="0.45" stroke-width="${c(0.75)}"`;
-  const dotFill = `fill="${fg}" fill-opacity="0.7"`;
-  const dotR = c(1.3);
-  const ringR = c(12.5); // emblema: anillo fino + punto central (la "intención")
-
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
-  <defs>${bgGrad}</defs>
-  <rect width="${W}" height="${H}" fill="url(#bg)" />
-  ${ripples}
-
-  <line x1="${c(30)}" y1="${ruleY}" x2="${centerX - gap}" y2="${ruleY}" ${ruleStroke} />
-  <line x1="${centerX + gap}" y1="${ruleY}" x2="${W - c(30)}" y2="${ruleY}" ${ruleStroke} />
-
-  <circle cx="${centerX - gap - c(8)}"  cy="${ruleY}" r="${dotR}" ${dotFill} />
-  <circle cx="${centerX - gap - c(14)}" cy="${ruleY}" r="${dotR}" ${dotFill} />
-  <circle cx="${centerX + gap + c(8)}"  cy="${ruleY}" r="${dotR}" ${dotFill} />
-  <circle cx="${centerX + gap + c(14)}" cy="${ruleY}" r="${dotR}" ${dotFill} />
-
-  <circle cx="${centerX}" cy="${centerY}" r="${ringR}" fill="none" stroke="${fg}" stroke-opacity="0.9" stroke-width="${c(1)}" />
-  <circle cx="${centerX}" cy="${centerY}" r="${c(2)}" fill="${fg}" fill-opacity="0.95" />
+    </linearGradient>
+  </defs>
+  <rect width="375" height="123" fill="url(#bg)" />
+  ${corners}
+  ${emblem}
 </svg>`;
 }
 
