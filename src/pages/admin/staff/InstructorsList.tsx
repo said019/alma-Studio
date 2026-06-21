@@ -36,7 +36,7 @@ interface Instructor extends Omit<InstructorFormData, "specialties"> {
   id: string;
   specialties?: string[] | string | null;
   photoUrl?: string;
-  photoUrl2?: string;
+  photoUrl_2?: string;
   photoFocusX?: number;
   photoFocusY?: number;
 }
@@ -294,8 +294,8 @@ const InstructorsList = () => {
                               ? <img src={ins.photoUrl} className="w-8 h-8 rounded-full object-cover" style={{ objectPosition: `${clampFocus(ins.photoFocusX)}% ${clampFocus(ins.photoFocusY)}%` }} alt="" />
                               : <div className="w-8 h-8 rounded-full bg-alma-oat flex items-center justify-center text-xs font-bold text-alma-ink">{ins.displayName?.[0]}</div>
                             }
-                            {ins.photoUrl2 && (
-                              <img src={ins.photoUrl2} className="w-6 h-6 rounded-full object-cover ring-1 ring-alma-sandstone/60" alt="2ª foto" title="2ª foto (hover/click)" />
+                            {ins.photoUrl_2 && (
+                              <img src={ins.photoUrl_2} className="w-6 h-6 rounded-full object-cover ring-1 ring-alma-sandstone/60" alt="2ª foto" title="2ª foto (hover/click)" />
                             )}
                           </div>
                         </TableCell>

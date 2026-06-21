@@ -127,7 +127,7 @@ const Index = () => {
     bio?: string;
     specialties?: string | string[];
     photoUrl?: string;
-    photoUrl2?: string;
+    photoUrl_2?: string;
     photoFocusX?: number;
     photoFocusY?: number;
   }[]>([]);
@@ -712,7 +712,7 @@ const CoachPhoto = ({
   );
 };
 
-const CoachesSection = ({ instructors }: { instructors: { id: string; displayName: string; bio?: string; specialties?: string | string[]; photoUrl?: string; photoUrl2?: string; photoFocusX?: number; photoFocusY?: number }[] }) => {
+const CoachesSection = ({ instructors }: { instructors: { id: string; displayName: string; bio?: string; specialties?: string | string[]; photoUrl?: string; photoUrl_2?: string; photoFocusX?: number; photoFocusY?: number }[] }) => {
   if (instructors.length === 0) return null;
 
   const items = instructors.map((inst) => ({
@@ -724,7 +724,7 @@ const CoachesSection = ({ instructors }: { instructors: { id: string; displayNam
       : (typeof inst.specialties === "string" && inst.specialties ? inst.specialties : "Instructora"),
     bio: inst.bio || null,
     photoUrl: inst.photoUrl || null,
-    photoUrl2: inst.photoUrl2 || null,
+    photoUrl2: inst.photoUrl_2 || null,
     photoFocusX: clampFocus(inst.photoFocusX),
     photoFocusY: clampFocus(inst.photoFocusY),
   }));
