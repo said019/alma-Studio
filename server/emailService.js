@@ -12,7 +12,7 @@ const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KE
 // Remitente. Configurable por env; el dominio debe estar verificado en Resend.
 const FROM_EMAIL = process.env.EMAIL_FROM || "Alma Movement <noreply@agendafull.com.mx>";
 const SITE_URL = process.env.SITE_URL || "https://alma-movement.com.mx";
-const LOGO_URL = `${SITE_URL}/alma-mark-light.png`; // logo claro sobre el header espresso
+const LOGO_URL = `${SITE_URL}/email-logo.png`; // medallón autocontenido (visible en cualquier cliente/modo oscuro)
 
 // ─── Brand palette (Alma editorial, fondo claro) ───────────────────────────────
 // Conservamos los nombres de clave (magenta/violet/lime/cream...) usados por
@@ -71,17 +71,17 @@ function baseLayout({ preheader = "", content = "", ctaUrl = "", ctaText = "" } 
                     border:1px solid ${B.border};border-radius:22px;overflow:hidden;
                     box-shadow:0 22px 60px -30px rgba(36,27,26,.38);">
 
-        <!-- Header: banda espresso + logo + tagline (mismo lenguaje que el pase) -->
-        <tr><td align="center" style="background-color:${B.inkDeep};padding:36px 40px 30px;">
-          <img src="${LOGO_URL}" alt="Alma Movement" width="84" height="84"
-               style="display:block;width:84px;height:auto;margin:0 auto 14px;" />
-          <div style="font-family:${SANS};font-size:10px;letter-spacing:4px;text-transform:uppercase;color:${B.oat};">
+        <!-- Header: medallón Alma autocontenido sobre la tarjeta clara (robusto en dark mode) -->
+        <tr><td align="center" style="background-color:${B.card};padding:34px 40px 16px;">
+          <img src="${LOGO_URL}" alt="Alma Movement" width="88" height="88"
+               style="display:block;width:88px;height:88px;border-radius:50%;margin:0 auto 12px;" />
+          <div style="font-family:${SANS};font-size:10px;letter-spacing:4px;text-transform:uppercase;color:${B.desert};">
             Move with intention
           </div>
         </td></tr>
 
         <!-- Content -->
-        <tr><td style="padding:34px 40px 6px;">
+        <tr><td style="padding:18px 40px 6px;">
           ${content}
         </td></tr>
 
