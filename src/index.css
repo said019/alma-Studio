@@ -221,6 +221,8 @@
     @apply bg-background text-foreground;
     font-family: 'Jost', system-ui, sans-serif;
     overflow-x: hidden;
+    /* Evita el rebote (rubber-band) en iOS/PWA que despega el bottom-nav fijo. */
+    overscroll-behavior-y: none;
   }
 
   /* Serif protagonista: todos los titulares son Fraunces editorial. */
