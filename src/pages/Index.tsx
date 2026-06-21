@@ -127,6 +127,7 @@ const Index = () => {
     bio?: string;
     specialties?: string | string[];
     photoUrl?: string;
+    photoUrl2?: string;
     photoFocusX?: number;
     photoFocusY?: number;
   }[]>([]);
@@ -649,7 +650,67 @@ const Index = () => {
 /* ═══════════════════════════════════════════════════════════
    COACHES (Sandstone drench, texto ink)
    ═══════════════════════════════════════════════════════════ */
-const CoachesSection = ({ instructors }: { instructors: { id: string; displayName: string; bio?: string; specialties?: string | string[]; photoUrl?: string; photoFocusX?: number; photoFocusY?: number }[] }) => {
+/* Foto de coach con swap a una 2ª foto: hover en desktop, tap en móvil.
+   Cross-fade entre ambas. Si no hay foto, cae al monograma de iniciales. */
+const CoachPhoto = ({
+  photoUrl, photoUrl2, focusX, focusY, label, isSolo,
+}: {
+  photoUrl: string | null;
+  photoUrl2: string | null;
+  focusX: number;
+  focusY: number;
+  label: string;
+  isSolo: boolean;
+}) => {
+  const [showSecond, setShowSecond] = useState(false);
+  const hasSecond = !!photoUrl2;
+
+  if (!photoUrl) {
+    return (
+      <>
+        <img src={almaMark} alt="" aria-hidden="true" className="pointer-events-none absolute -left-16 -bottom-16 w-[78%] max-w-[330px] opacity-[0.13]" />
+        <span
+          className="relative grid place-items-center rounded-full font-bebas leading-none"
+          style={{ width: isSolo ? 176 : 124, height: isSolo ? 176 : 124, backgroundColor: ALMA.cream, color: ALMA.berry, fontSize: isSolo ? "4rem" : "3rem" }}
+        >
+          {initialsOf(label)}
+        </span>
+      </>
+    );
+  }
+
+  return (
+    <div
+      className={"absolute inset-0 h-full w-full" + (hasSecond ? " cursor-pointer" : "")}
+      onMouseEnter={() => hasSecond && setShowSecond(true)}
+      onMouseLeave={() => setShowSecond(false)}
+      onClick={() => hasSecond && setShowSecond((v) => !v)}
+    >
+      <img
+        src={photoUrl}
+        alt={label}
+        className="absolute inset-0 h-full w-full object-cover transition-opacity duration-500"
+        style={{ objectPosition: `${focusX}% ${focusY}%`, opacity: showSecond ? 0 : 1 }}
+      />
+      {hasSecond && (
+        <img
+          src={photoUrl2!}
+          alt={label}
+          aria-hidden={!showSecond}
+          className="absolute inset-0 h-full w-full object-cover transition-opacity duration-500"
+          style={{ objectPosition: `${focusX}% ${focusY}%`, opacity: showSecond ? 1 : 0 }}
+        />
+      )}
+      {hasSecond && (
+        <span className="pointer-events-none absolute bottom-3 right-3 grid h-7 w-7 place-items-center rounded-full bg-alma-ink-deep/70 text-alma-canvas text-[11px] opacity-80 sm:hidden">
+          ↺
+        </span>
+      )}
+    </div>
+  );
+};
+
+const CoachesSection = ({ instructors }: { instructors: { id: string; displayName: string; bio?: string; specialties?: string | string[]; photoUrl?: string; photoUrl2?: string; photoFocusX?: number; photoFocusY?: number }[] }) => {
   if (instructors.length === 0) return null;
 
   const items = instructors.map((inst) => ({
@@ -661,6 +722,7 @@ const CoachesSection = ({ instructors }: { instructors: { id: string; displayNam
       : (typeof inst.specialties === "string" && inst.specialties ? inst.specialties : "Instructora"),
     bio: inst.bio || null,
     photoUrl: inst.photoUrl || null,
+    photoUrl2: inst.photoUrl2 || null,
     photoFocusX: clampFocus(inst.photoFocusX),
     photoFocusY: clampFocus(inst.photoFocusY),
   }));
@@ -692,13 +754,14 @@ const CoachesSection = ({ instructors }: { instructors: { id: string; displayNam
               className={isSolo ? "lg:col-span-12 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center" : ""}
             >
               <div className={(isSolo ? "lg:col-span-6 " : "") + "relative grid place-items-center overflow-hidden rounded-[24px] " + (isSolo ? "aspect-[5/4] lg:aspect-[16/11]" : "aspect-[4/5]")} style={{ backgroundColor: ALMA.blush }}>
-                <img src={almaMark} alt="" aria-hidden="true" className="pointer-events-none absolute -left-16 -bottom-16 w-[78%] max-w-[330px] opacity-[0.13]" />
-                <span
-                  className="relative grid place-items-center rounded-full font-bebas leading-none"
-                  style={{ width: isSolo ? 176 : 124, height: isSolo ? 176 : 124, backgroundColor: ALMA.cream, color: ALMA.berry, fontSize: isSolo ? "4rem" : "3rem" }}
-                >
-                  {initialsOf(inst.label)}
-                </span>
+                <CoachPhoto
+                  photoUrl={inst.photoUrl}
+                  photoUrl2={inst.photoUrl2}
+                  focusX={inst.photoFocusX}
+                  focusY={inst.photoFocusY}
+                  label={inst.label}
+                  isSolo={isSolo}
+                />
               </div>
               <div className={isSolo ? "lg:col-span-6" : "mt-5"}>
                 <span className="text-[0.62rem] uppercase tracking-[0.24em]" style={{ color: ALMA.ink }}>{inst.sub}</span>

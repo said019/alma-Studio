@@ -36,6 +36,7 @@ interface Instructor extends Omit<InstructorFormData, "specialties"> {
   id: string;
   specialties?: string[] | string | null;
   photoUrl?: string;
+  photoUrl2?: string;
   photoFocusX?: number;
   photoFocusY?: number;
 }
@@ -79,6 +80,7 @@ const InstructorsList = () => {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Instructor | null>(null);
   const [uploadTargetId, setUploadTargetId] = useState<string | null>(null);
+  const [uploadSlot, setUploadSlot] = useState<1 | 2>(1);
   const [magicLink, setMagicLink] = useState<{ name: string; link: string } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -148,12 +150,12 @@ const InstructorsList = () => {
   });
 
   const uploadPhotoMutation = useMutation({
-    mutationFn: ({ id, file }: { id: string; file: File }) => {
+    mutationFn: ({ id, file, slot = 1 }: { id: string; file: File; slot?: 1 | 2 }) => {
       const fd = new FormData();
       fd.append("photo", file);
-      return api.post(`/instructors/${id}/photo`, fd, { headers: { "Content-Type": "multipart/form-data" } });
+      return api.post(`/instructors/${id}/photo${slot === 2 ? "?slot=2" : ""}`, fd, { headers: { "Content-Type": "multipart/form-data" } });
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["instructors"] }); toast({ title: "Foto actualizada" }); },
+    onSuccess: (_d, vars) => { qc.invalidateQueries({ queryKey: ["instructors"] }); toast({ title: vars.slot === 2 ? "2ª foto actualizada" : "Foto actualizada" }); },
     onError: (e: any) => toast({ title: e?.response?.data?.message ?? "Error al subir foto", variant: "destructive" }),
   });
 
@@ -246,9 +248,10 @@ const InstructorsList = () => {
             ref={fileRef}
             onChange={(e) => {
               const f = e.target.files?.[0];
-              if (f && uploadTargetId) uploadPhotoMutation.mutate({ id: uploadTargetId, file: f });
+              if (f && uploadTargetId) uploadPhotoMutation.mutate({ id: uploadTargetId, file: f, slot: uploadSlot });
               e.target.value = "";
               setUploadTargetId(null);
+              setUploadSlot(1);
             }}
           />
 
@@ -286,10 +289,15 @@ const InstructorsList = () => {
                     : instructors.map((ins) => (
                       <TableRow key={ins.id}>
                         <TableCell>
-                          {ins.photoUrl
-                            ? <img src={ins.photoUrl} className="w-8 h-8 rounded-full object-cover" style={{ objectPosition: `${clampFocus(ins.photoFocusX)}% ${clampFocus(ins.photoFocusY)}%` }} alt="" />
-                            : <div className="w-8 h-8 rounded-full bg-alma-oat flex items-center justify-center text-xs font-bold text-alma-ink">{ins.displayName?.[0]}</div>
-                          }
+                          <div className="flex items-center gap-1">
+                            {ins.photoUrl
+                              ? <img src={ins.photoUrl} className="w-8 h-8 rounded-full object-cover" style={{ objectPosition: `${clampFocus(ins.photoFocusX)}% ${clampFocus(ins.photoFocusY)}%` }} alt="" />
+                              : <div className="w-8 h-8 rounded-full bg-alma-oat flex items-center justify-center text-xs font-bold text-alma-ink">{ins.displayName?.[0]}</div>
+                            }
+                            {ins.photoUrl2 && (
+                              <img src={ins.photoUrl2} className="w-6 h-6 rounded-full object-cover ring-1 ring-alma-sandstone/60" alt="2ª foto" title="2ª foto (hover/click)" />
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell className="font-medium text-alma-ink">{ins.displayName}</TableCell>
                         <TableCell className="text-sm text-alma-ink/60">{ins.email ?? <span className="opacity-40">—</span>}</TableCell>
@@ -306,7 +314,8 @@ const InstructorsList = () => {
                             <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal size={14} /></Button></DropdownMenuTrigger>
                             <DropdownMenuContent>
                               <DropdownMenuItem onClick={() => openEdit(ins)}>Editar</DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => { setUploadTargetId(ins.id); setTimeout(() => fileRef.current?.click(), 0); }}>Subir foto</DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => { setUploadSlot(1); setUploadTargetId(ins.id); setTimeout(() => fileRef.current?.click(), 0); }}>Subir foto principal</DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => { setUploadSlot(2); setUploadTargetId(ins.id); setTimeout(() => fileRef.current?.click(), 0); }}>Subir 2ª foto (hover)</DropdownMenuItem>
                               <DropdownMenuItem onClick={() => magicLinkMutation.mutate(ins)}>Magic link</DropdownMenuItem>
                               <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(ins)}>Eliminar</DropdownMenuItem>
                             </DropdownMenuContent>

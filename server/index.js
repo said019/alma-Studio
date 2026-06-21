@@ -971,6 +971,7 @@ async function ensureSchema() {
     `);
     await pool.query(`ALTER TABLE instructors ADD COLUMN IF NOT EXISTS photo_focus_x SMALLINT DEFAULT 50`).catch(() => {});
     await pool.query(`ALTER TABLE instructors ADD COLUMN IF NOT EXISTS photo_focus_y SMALLINT DEFAULT 50`).catch(() => {});
+    await pool.query(`ALTER TABLE instructors ADD COLUMN IF NOT EXISTS photo_url_2 TEXT`).catch(() => {});
     // Esquemas heredados (schema_complete.sql) dejaron instructors.user_id como
     // NOT NULL; el alta de coaches desde admin no envía user_id. Lo relajamos
     // para que POST /api/instructors funcione en cualquier base.
@@ -8606,7 +8607,7 @@ app.get("/api/class-types", async (req, res) => {
 app.get("/api/public/instructors", async (_req, res) => {
   try {
     const r = await pool.query(
-      "SELECT id, display_name, bio, specialties, photo_url, photo_focus_x, photo_focus_y FROM instructors WHERE is_active = true ORDER BY created_at ASC"
+      "SELECT id, display_name, bio, specialties, photo_url, photo_url_2, photo_focus_x, photo_focus_y FROM instructors WHERE is_active = true ORDER BY created_at ASC"
     );
     return res.json({ data: camelRows(r.rows) });
   } catch (err) { return res.status(500).json({ message: "Error interno" }); }
@@ -14345,8 +14346,11 @@ app.post("/api/instructors/:id/photo", adminMiddleware, upload.single("photo"), 
       photoUrl = `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
     }
 
+    // slot=2 actualiza la foto secundaria (la del hover/click); por defecto la principal.
+    // Columna en whitelist — sin riesgo de inyección.
+    const photoColumn = String(req.query.slot || "1") === "2" ? "photo_url_2" : "photo_url";
     const r = await pool.query(
-      "UPDATE instructors SET photo_url=$1, updated_at=NOW() WHERE id=$2 RETURNING *",
+      `UPDATE instructors SET ${photoColumn}=$1, updated_at=NOW() WHERE id=$2 RETURNING *`,
       [photoUrl, instructorId]
     );
     if (!r.rows.length) return res.status(404).json({ message: "Instructor no encontrado" });
