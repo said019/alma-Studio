@@ -364,7 +364,7 @@ const Index = () => {
                 className="group inline-flex items-center gap-3 rounded-full px-7 py-4 text-[0.82rem] font-medium uppercase tracking-[0.16em] transition-transform duration-200 will-change-transform"
                 style={{ backgroundColor: ALMA.ink, color: ALMA.cream }}
               >
-                Reserva tu clase muestra
+                Reserva tu clase de bienvenida
                 <span className="grid h-7 w-7 place-items-center rounded-full bg-white/15 transition-transform duration-300 group-hover:translate-x-1" style={{ transitionTimingFunction: "var(--ease-alma-out)" }}>
                   <ArrowUpRight size={13} />
                 </span>
@@ -392,7 +392,7 @@ const Index = () => {
         {/* Datos del estudio, una línea editorial */}
         <div className="relative mx-auto max-w-[1320px] mt-10 sm:mt-14">
           <p className="nums border-t pt-4 text-[0.74rem] uppercase tracking-[0.22em]" style={{ borderColor: ALMA.border, color: ALMA.berry }}>
-            Grupos de 4 en equipo · 8 en studio · 50 minutos
+            5 disciplinas · Grupos de 4 en equipo · 50 minutos
           </p>
         </div>
       </section>
@@ -428,8 +428,8 @@ const Index = () => {
                 </p>
                 <div className="mt-7 grid grid-cols-2 gap-4">
                   <div>
-                    <div className="font-bebas nums leading-none" style={{ color: ALMA.berry, fontSize: "2.5rem" }}>4–8</div>
-                    <div className="text-[0.6rem] uppercase tracking-[0.18em] mt-1.5" style={{ color: ALMA.ink, opacity: 0.6 }}>lugares por clase</div>
+                    <div className="font-bebas nums leading-none" style={{ color: ALMA.berry, fontSize: "2.5rem" }}>4</div>
+                    <div className="text-[0.6rem] uppercase tracking-[0.18em] mt-1.5" style={{ color: ALMA.ink, opacity: 0.6 }}>en equipo</div>
                   </div>
                   <div>
                     <div className="font-bebas nums leading-none" style={{ color: ALMA.berry, fontSize: "2.5rem" }}>50<span className="text-[1.1rem] ml-0.5">min</span></div>
@@ -768,7 +768,7 @@ const PaquetesSection = ({
             </h2>
           </div>
           <p className="max-w-[42ch] text-[0.95rem] leading-[1.7]" style={{ color: ALMA.cream, opacity: 0.78 }}>
-            Elige tu paquete por modalidad, número de sesiones y vigencia (30 días). Estamos en modo apertura con precios especiales en los planes ilimitados.
+            Elige tu paquete por modalidad, número de sesiones y vigencia (30 o 45 días según el paquete). Estamos en modo apertura con precios especiales en los planes ilimitados.
           </p>
         </div>
 
@@ -938,7 +938,7 @@ const PoliticasSection = () => {
     { num: "03", title: "Cancelaciones", text: "Si cancelas dentro de las 12 horas previas a tu clase y acumulas 5 clases reservadas sin asistir, se aplica una penalización con pérdida de puntos." },
     { num: "04", title: "En el estudio", text: "Respeta el horario de inicio, mantén tu celular en silencio e informa antes cualquier lesión o condición médica." },
     { num: "05", title: "Pagos", text: "Aceptamos transferencia y efectivo. Los datos bancarios te los compartimos al reservar, y puedes pagar en recepción." },
-    { num: "06", title: "Vigencia", text: "Todos los paquetes tienen vigencia de 30 días a partir de la compra." },
+    { num: "06", title: "Vigencia", text: "Los paquetes tienen vigencia de 30 días a partir de la compra; los de 12 sesiones y Alma Experience, 45 días." },
     { num: "07", title: "Asistencia", text: "El check-in con QR registra tus asistencias y reservas. Llega 10 minutos antes para registrarte sin prisa." },
     { num: "08", title: "Comunidad", text: "Avisos y recordatorios de tus clases se comunican principalmente por WhatsApp. Cualquier duda, escríbenos por ahí." },
   ];

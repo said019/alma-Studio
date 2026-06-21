@@ -50,7 +50,7 @@ const Terminos = () => {
           <LegalH2>3. Paquetes y pagos</LegalH2>
           <ul className="list-disc pl-6 space-y-2">
             <li>Los precios de los paquetes están expresados en pesos mexicanos (MXN) e incluyen IVA.</li>
-            <li>Todos los paquetes tienen una vigencia de <strong className="text-foreground">30 días naturales</strong> a partir de la primera clase tomada.</li>
+            <li>Los paquetes tienen una vigencia de <strong className="text-foreground">30 días naturales</strong> a partir de la fecha de compra. Los paquetes de 12 sesiones y Alma Experience tienen vigencia de <strong className="text-foreground">45 días</strong>.</li>
             <li>Los paquetes <strong className="text-foreground">no son transferibles</strong> a otra persona.</li>
             <li>Los paquetes <strong className="text-foreground">no son reembolsables</strong> una vez adquiridos.</li>
             <li>Las clases no utilizadas dentro del periodo de vigencia se pierden sin derecho a reembolso ni extensión.</li>

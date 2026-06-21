@@ -341,6 +341,11 @@ const ClientDetail = () => {
                                 ? "Clases ilimitadas"
                                 : <><span className="nums">{activeMem.classesRemaining}</span>&nbsp;clases restantes</>}
                             </Badge>
+                            {activeMem.classCategory === "mixto" && !isUnlimited(activeMem.classesRemaining) && (
+                              <Badge variant="outline" className="border-alma-sandstone/70 text-alma-ink hover:bg-transparent">
+                                Studio&nbsp;<span className="nums">{activeMem.studioRemaining ?? 0}</span>&nbsp;· R/T&nbsp;<span className="nums">{activeMem.rtRemaining ?? 0}</span>
+                              </Badge>
+                            )}
                           </>
                         ) : (
                           <Badge variant="outline" className="border-alma-hairline text-alma-ink/55 hover:bg-transparent">

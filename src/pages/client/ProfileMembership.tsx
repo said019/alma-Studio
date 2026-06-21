@@ -47,8 +47,10 @@ const ProfileMembership = () => {
     queryFn: async () => (await api.get("/memberships/my")).data,
   });
 
-  const membership: (ClientMembership & { classCategory?: string }) | null =
-    data?.data ?? data ?? null;
+  const membership:
+    | (ClientMembership & { classCategory?: string; studioRemaining?: number | null; rtRemaining?: number | null })
+    | null = data?.data ?? data ?? null;
+  const isMixto = membership?.classCategory === "mixto";
 
   const daysRemaining = membership?.end_date
     ? Math.max(differenceInCalendarDays(safeParse(membership.end_date), new Date()), 0)
@@ -145,6 +147,32 @@ const ProfileMembership = () => {
                 </div>
               </div>
             </Section>
+
+            {isMixto && (
+              <Section title="Créditos por área">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-2xl p-5 text-center" style={{ backgroundColor: ALMA.cream, border: `1px solid ${ALMA.border}` }}>
+                    <div className="nums font-display" style={{ color: ALMA.berry, fontSize: "clamp(1.8rem, 4vw, 2.4rem)" }}>
+                      {Number(membership.studioRemaining ?? 0)}
+                    </div>
+                    <div className="text-[0.64rem] uppercase tracking-[0.16em] mt-1" style={{ color: ALMA.ink, opacity: 0.6 }}>
+                      Studio · Mat · Barre · Sculpt
+                    </div>
+                  </div>
+                  <div className="rounded-2xl p-5 text-center" style={{ backgroundColor: ALMA.cream, border: `1px solid ${ALMA.border}` }}>
+                    <div className="nums font-display" style={{ color: ALMA.berry, fontSize: "clamp(1.8rem, 4vw, 2.4rem)" }}>
+                      {Number(membership.rtRemaining ?? 0)}
+                    </div>
+                    <div className="text-[0.64rem] uppercase tracking-[0.16em] mt-1" style={{ color: ALMA.ink, opacity: 0.6 }}>
+                      Reformer · Tower
+                    </div>
+                  </div>
+                </div>
+                <p className="mt-3 text-[0.78rem]" style={{ color: ALMA.ink, opacity: 0.62 }}>
+                  Tu paquete mixto reparte sus créditos entre las dos áreas; cada uno se usa solo en su disciplina.
+                </p>
+              </Section>
+            )}
 
             {classesPercent !== null && (
               <Section title="Avance del paquete">

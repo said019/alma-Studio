@@ -7,6 +7,10 @@ export interface ClientMembership {
   endDate: string;
   classesRemaining: number | null;
   classLimit: number | null;
+  classCategory?: string;
+  // Paquetes mixtos: créditos por área (NULL en planes no-mixto).
+  studioRemaining?: number | null;
+  rtRemaining?: number | null;
   paymentMethod?: string;
   // snake_case aliases kept for backwards compat
   plan_id?: string;

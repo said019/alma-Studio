@@ -8,7 +8,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import {
   LayoutDashboard, Package, CreditCard, Users, CalendarDays,
   BookOpen, DollarSign,
-  ShoppingCart, BarChart2, Bell, MessageCircle,
+  ShoppingCart, BarChart2, Bell, MessageCircle, Award, Percent,
   Settings, ChevronLeft, ChevronRight, ChevronDown, LogOut, Globe, Menu, X,
 } from "lucide-react";
 import almaMark from "@/assets/alma/alma-mark.png";
@@ -27,13 +27,15 @@ const NAV_GROUPS = [
   },
   {
     label: "Más",
-    collapsible: true,
+    collapsible: false,
     items: [
       { path: "/admin/notifications", label: "Bandeja", icon: Bell },
       { path: "/admin/memberships", label: "Membresías", icon: CreditCard },
       { path: "/admin/plans", label: "Planes", icon: Package },
       { path: "/admin/pos", label: "Tienda", icon: ShoppingCart },
       { path: "/admin/reports", label: "Reportes", icon: BarChart2 },
+      { path: "/admin/loyalty", label: "Lealtad", icon: Award },
+      { path: "/admin/discount-codes", label: "Descuentos", icon: Percent },
     ],
   },
   {

@@ -32,3 +32,33 @@ export function isWithinMorningWindow(startsAt, timeZone = "America/Mexico_City"
   );
   return hour <= lastHour;
 }
+
+// ─── Paquetes MIXTOS: créditos por área (studio / reformer_tower) ───────────
+
+// Columna del bucket que corresponde a la categoría de una clase. null si la
+// categoría no es específica (no debería pasar para una clase real).
+export function mixtoBucketField(classCategory) {
+  const c = normalizeClassCategory(classCategory, "all");
+  if (c === "studio") return "studio_remaining";
+  if (c === "reformer_tower") return "rt_remaining";
+  return null;
+}
+
+// Reparte un total por el ratio studio:rt. Garantiza studio + rt === total
+// (el resto cae en rt). Misma fórmula que el trigger/backfill en SQL.
+export function splitMixtoCredits(total, studioCredits, rtCredits) {
+  const t = Math.max(0, Math.floor(Number(total) || 0));
+  const sc = Math.max(0, Number(studioCredits) || 0);
+  const rc = Math.max(0, Number(rtCredits) || 0);
+  if (sc + rc === 0) return { studio: 0, rt: t };
+  const studio = Math.floor((t * sc) / (sc + rc));
+  return { studio, rt: t - studio };
+}
+
+// ¿Puede una membresía mixta reservar esta categoría? (bucket > 0).
+export function canMixtoBook(buckets, classCategory) {
+  const field = mixtoBucketField(classCategory);
+  if (field === "studio_remaining") return Number(buckets?.studioRemaining) > 0;
+  if (field === "rt_remaining") return Number(buckets?.rtRemaining) > 0;
+  return true;
+}
