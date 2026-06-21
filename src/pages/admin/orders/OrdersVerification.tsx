@@ -164,12 +164,22 @@ const OrderDetail = ({ order, onZoom, onApprove, onReject, approving, rejecting 
         <p className="text-2xl font-semibold text-alma-ink nums mt-0.5">{formatMXN(Number(order.totalAmount))}</p>
       </div>
 
-      <div>
-        <Label className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-alma-ink/70 mb-2 block">
-          Comprobante de pago
-        </Label>
-        <ProofViewer order={order} onZoom={onZoom} />
-      </div>
+      {order.paymentMethod === "card" ? (
+        <div className="rounded-xl border border-alma-sandstone/50 bg-alma-oat/30 px-4 py-3 space-y-1">
+          <p className="text-sm font-semibold text-alma-ink">Pago con tarjeta (automático)</p>
+          <p className="text-xs leading-relaxed text-alma-ink/70">
+            Stripe cobra y activa la membresía sola cuando la clienta completa el pago — no necesitas verificar nada.
+            Si esta orden sigue en espera, la clienta no terminó el pago: puedes ignorarla o rechazarla para limpiarla.
+          </p>
+        </div>
+      ) : (
+        <div>
+          <Label className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-alma-ink/70 mb-2 block">
+            Comprobante de pago
+          </Label>
+          <ProofViewer order={order} onZoom={onZoom} />
+        </div>
+      )}
 
       {isPending(order) && !rejectMode && (
         <>
@@ -245,9 +255,11 @@ type OrdersBoardProps = {
   emptyTitle: string;
   emptyDescription: string;
   emptyIcon: ReactNode;
+  /** Oculta órdenes de tarjeta (se cobran/activan solas con Stripe, no se verifican a mano). */
+  hideCardOrders?: boolean;
 };
 
-const OrdersBoard = ({ sources, emptyTitle, emptyDescription, emptyIcon }: OrdersBoardProps) => {
+const OrdersBoard = ({ sources, emptyTitle, emptyDescription, emptyIcon, hideCardOrders }: OrdersBoardProps) => {
   const { toast } = useToast();
   const qc = useQueryClient();
   const isDesktop = useIsDesktop();
@@ -264,7 +276,9 @@ const OrdersBoard = ({ sources, emptyTitle, emptyDescription, emptyIcon }: Order
 
   const isLoading = results.some((r) => r.isLoading);
   const isError = results.some((r) => r.isError);
-  const orders = results.flatMap((r) => (Array.isArray(r.data?.data) ? r.data!.data : []));
+  const orders = results
+    .flatMap((r) => (Array.isArray(r.data?.data) ? r.data!.data : []))
+    .filter((o) => !(hideCardOrders && o.paymentMethod === "card"));
 
   const detailOrder = orders.find((o) => o.id === selectedId) ?? orders[0] ?? null;
   const closeDetail = () => { setMobileOpen(false); };
@@ -419,9 +433,10 @@ const OrdersVerification = () => (
                 { url: "/admin/orders?status=pending_verification", queryKey: ["orders", "pending_verification"] },
                 { url: "/admin/orders?status=pending_payment", queryKey: ["orders", "pending_payment"] },
               ]}
+              hideCardOrders
               emptyIcon={<CheckCircle2 size={20} strokeWidth={1.8} />}
               emptyTitle="Estás al día"
-              emptyDescription="No hay órdenes esperando verificación."
+              emptyDescription="No hay transferencias ni efectivo esperando verificación. Los pagos con tarjeta se activan solos."
             />
           </TabsContent>
           <TabsContent value="all" className="mt-4">
