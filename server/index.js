@@ -6616,8 +6616,8 @@ function buildAlmaStripSvg(ringState, scale = 1, opts = {}) {
   const ruleY   = c(62);
   const ruleGap = c(72);  // total gap around center text break
   const ruleX1  = c(28);
-  const ruleX2  = centerX - c(ruleGap / 2);
-  const ruleX3  = centerX + c(ruleGap / 2);
+  const ruleX2  = centerX - Math.round(ruleGap / 2);
+  const ruleX3  = centerX + Math.round(ruleGap / 2);
   const ruleX4  = W - c(28);
   const ruleStroke = `stroke="${rule}" stroke-opacity="0.35" stroke-width="${c(0.75)}"`;
 
@@ -6625,10 +6625,10 @@ function buildAlmaStripSvg(ringState, scale = 1, opts = {}) {
   const dotY   = ruleY;
   const dotR   = c(1.2);
   const dotFill = `fill="${rule}" fill-opacity="0.45"`;
-  const dotLeft1  = centerX - c(ruleGap / 2) - c(7);
-  const dotLeft2  = centerX - c(ruleGap / 2) - c(13);
-  const dotRight1 = centerX + c(ruleGap / 2) + c(7);
-  const dotRight2 = centerX + c(ruleGap / 2) + c(13);
+  const dotLeft1  = ruleX2 - c(7);
+  const dotLeft2  = ruleX2 - c(13);
+  const dotRight1 = ruleX3 + c(7);
+  const dotRight2 = ruleX3 + c(13);
 
   const titleY = c(50);
   const subY   = c(83);
@@ -6704,9 +6704,7 @@ function detectStripMode({ membership }) {
 }
 
 async function buildAlmaStripPng(ringState, scale = 1, opts = {}) {
-  const iconHref = getAlmaIconDataUri();
   const svg = buildAlmaStripSvg(ringState, scale, {
-    iconHref,
     mode: opts.mode || "default",
     planName: opts.planName || "",
     classesLabel: opts.classesLabel || "",
@@ -6801,9 +6799,7 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
   const nonTransferable = hasMembership && parseBooleanFlag(membership.is_non_transferable);
   const nonRepeatable = hasMembership && parseBooleanFlag(membership.is_non_repeatable);
   // Drenched espresso card — brand "firma" for wallet
-  const passAccent = hasEventPass
-    ? "rgb(164, 141, 120)"   // stone — warm accent on dark
-    : "rgb(164, 141, 120)";  // stone
+  const passAccent = "rgb(164, 141, 120)";  // stone — warm accent on espresso
   const passForeground = "rgb(250, 249, 246)";  // canvas — legible on espresso
   const passBackground = "rgb(36, 27, 26)";     // ink-deep — drenched espresso
   const classLimit = hasMembership ? Number(membership.class_limit ?? 0) : 0;
@@ -7589,34 +7585,34 @@ app.get("/api/wallet/apple/pkpass", authMiddleware, async (req, res) => {
 <title>Alma Club — ${userName}</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#FFF7F2;color:#2E201C;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
-.pass{width:100%;max-width:380px;border-radius:28px;overflow:hidden;background:#fff;box-shadow:0 20px 60px rgba(118,33,77,.14),0 0 0 1px rgba(118,33,77,.14)}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#241B1A;color:#FAF9F6;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.pass{width:100%;max-width:380px;border-radius:28px;overflow:hidden;background:#241B1A;box-shadow:0 20px 60px rgba(0,0,0,.45),0 0 0 1px rgba(250,249,246,.1)}
 .header{padding:24px 24px 16px;display:flex;align-items:center;justify-content:space-between}
-.logo{font-size:18px;font-weight:850;color:#2E201C}
-.badge{font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:#76214D;background:#FCE6E1;border:1px solid rgba(118,33,77,.24);padding:4px 10px;border-radius:20px}
-.sphere{margin:10px auto 20px;width:168px;height:168px;border-radius:999px;display:grid;place-items:center;background:conic-gradient(#76214D ${progressSummary.completionPercent}%, #F3C6D6 0);position:relative}
-.sphere:before{content:"";position:absolute;inset:15px;border-radius:999px;background:#fff;border:7px solid #D7DDC1}
+.logo{font-size:18px;font-weight:850;color:#FAF9F6}
+.badge{font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:#6E5A46;background:rgba(110,90,70,.15);border:1px solid rgba(110,90,70,.35);padding:4px 10px;border-radius:20px}
+.sphere{margin:10px auto 20px;width:168px;height:168px;border-radius:999px;display:grid;place-items:center;background:conic-gradient(#6E5A46 ${progressSummary.completionPercent}%, #3a2820 0);position:relative}
+.sphere:before{content:"";position:absolute;inset:15px;border-radius:999px;background:#241B1A;border:7px solid #3a2820}
 .sphere:after{content:"";position:absolute;inset:-7px;border-radius:999px;border:4px solid #F58A24;clip-path:polygon(50% 0,100% 0,100% 45%,50% 45%)}
 .sphere-content{position:relative;text-align:center}
-.points-label{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:#76214D;margin-bottom:5px;font-weight:800}
-.points{font-size:42px;font-weight:950;color:#2E201C;line-height:1}
-.points-sub{font-size:12px;color:#7B5B52;margin-top:4px}
+.points-label{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:#6E5A46;margin-bottom:5px;font-weight:800}
+.points{font-size:42px;font-weight:950;color:#FAF9F6;line-height:1}
+.points-sub{font-size:12px;color:#a49588;margin-top:4px}
 .qr-section{display:flex;justify-content:center;padding:0 24px 24px}
-.qr-wrap{background:#fff;border-radius:20px;padding:16px;box-shadow:0 8px 32px rgba(0,0,0,.24)}
+.qr-wrap{background:#FAF9F6;border-radius:20px;padding:16px;box-shadow:0 8px 32px rgba(0,0,0,.4)}
 .qr-wrap img{width:160px;height:160px;display:block}
-.qr-hint{text-align:center;font-size:11px;color:#B78B7E;padding:0 24px 20px;line-height:1.5}
+.qr-hint{text-align:center;font-size:11px;color:#a49588;padding:0 24px 20px;line-height:1.5}
 .fields{padding:0 24px 24px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.field{display:flex;flex-direction:column;gap:4px;padding:12px 14px;background:#FFF7F2;border-radius:14px;border:1px solid rgba(118,33,77,.12)}
+.field{display:flex;flex-direction:column;gap:4px;padding:12px 14px;background:#2e221f;border-radius:14px;border:1px solid rgba(110,90,70,.2)}
 .field.wide{grid-column:1/-1}
-.label{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:#76214D;font-weight:800}
-.value{font-size:14px;font-weight:700;color:#2E201C}
+.label{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:#6E5A46;font-weight:800}
+.value{font-size:14px;font-weight:700;color:#FAF9F6}
 .footer{text-align:center;padding:0 24px 24px;display:flex;gap:8px;justify-content:center}
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:12px 20px;border-radius:14px;border:none;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s}
-.btn-primary{background:#F58A24;color:#2E201C;flex:1}
+.btn-primary{background:#F58A24;color:#241B1A;flex:1}
 .btn-primary:hover{opacity:.9}
-.btn-outline{background:#FFF7F2;color:#2E201C;border:1px solid rgba(118,33,77,.16);flex:1}
-.btn-outline:hover{background:#FCE6E1}
-.name{text-align:center;font-size:16px;font-weight:700;padding:0 24px 4px;color:#2E201C}
+.btn-outline{background:#2e221f;color:#FAF9F6;border:1px solid rgba(110,90,70,.25);flex:1}
+.btn-outline:hover{background:#3a2820}
+.name{text-align:center;font-size:16px;font-weight:700;padding:0 24px 4px;color:#FAF9F6}
 </style>
 </head>
 <body>
@@ -7708,18 +7704,18 @@ app.get("/api/wallet/events/apple/pkpass", authMiddleware, async (req, res) => {
 <title>Pase de Evento — Alma</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#FFF7F2;color:#2E201C;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
-.pass{width:100%;max-width:390px;border-radius:24px;overflow:hidden;background:linear-gradient(165deg,#FFFFFF 0%,#FFF0E4 56%,#FCE6E1 100%);box-shadow:0 22px 60px rgba(118,33,77,.14),0 0 0 1px rgba(118,33,77,.16)}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#241B1A;color:#FAF9F6;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.pass{width:100%;max-width:390px;border-radius:24px;overflow:hidden;background:#241B1A;box-shadow:0 22px 60px rgba(0,0,0,.45),0 0 0 1px rgba(250,249,246,.1)}
 .header{padding:20px 22px 10px}
 .badge{display:inline-flex;align-items:center;gap:8px;padding:4px 10px;border-radius:999px;background:rgba(245,138,36,.13);color:#F58A24;font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase}
-.title{margin-top:10px;font-weight:800;font-size:22px;line-height:1.1;color:#2E201C}
+.title{margin-top:10px;font-weight:800;font-size:22px;line-height:1.1;color:#FAF9F6}
 .meta{padding:0 22px 6px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.meta-item{border:1px solid rgba(118,33,77,.12);border-radius:12px;padding:10px 11px;background:rgba(255,255,255,.7)}
+.meta-item{border:1px solid rgba(110,90,70,.2);border-radius:12px;padding:10px 11px;background:#2e221f}
 .meta-label{font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:#F58A24;font-weight:700}
-.meta-value{font-size:13px;line-height:1.3;color:#2E201C;margin-top:4px}
+.meta-value{font-size:13px;line-height:1.3;color:#FAF9F6;margin-top:4px}
 .qr{display:flex;justify-content:center;padding:16px 20px 10px}
-.qr img{background:#fff;border-radius:18px;padding:12px}
-.code{padding:0 22px 22px;text-align:center;font-size:13px;color:#2E201C}
+.qr img{background:#FAF9F6;border-radius:18px;padding:12px}
+.code{padding:0 22px 22px;text-align:center;font-size:13px;color:#FAF9F6}
 .code strong{color:#F58A24;letter-spacing:.04em}
 </style>
 </head>
