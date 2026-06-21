@@ -150,6 +150,7 @@ const ClientDetail = () => {
   const [editCredits, setEditCredits] = useState("");
   const [editUnlimited, setEditUnlimited] = useState(false);
   const [editStatus, setEditStatus] = useState("");
+  const [editStartDate, setEditStartDate] = useState("");
   const [editEndDate, setEditEndDate] = useState("");
 
   // Paginación por pestaña
@@ -224,15 +225,25 @@ const ClientDetail = () => {
     setEditUnlimited(unlimited);
     setEditCredits(unlimited ? "" : String(m.classesRemaining));
     setEditStatus(m.status ?? "active");
+    setEditStartDate(m.startDate ? String(m.startDate).slice(0, 10) : "");
     setEditEndDate(m.endDate ? String(m.endDate).slice(0, 10) : "");
+  };
+
+  const handleEditStartDateChange = (val: string) => {
+    setEditStartDate(val);
+    // Auto-recalculate end date if plan has a known duration
+    if (val && editMem?.durationDays) {
+      const d = new Date(val);
+      d.setDate(d.getDate() + Number(editMem.durationDays));
+      setEditEndDate(d.toISOString().slice(0, 10));
+    }
   };
 
   const editMemMutation = useMutation({
     mutationFn: () => {
       const body: any = { status: editStatus };
-      // "Ilimitado" se representa con 9999 en el backend (mismo payload de
-      // siempre); con el toggle apagado se manda el número capturado.
       body.classesRemaining = editUnlimited ? 9999 : Math.max(0, Number(editCredits || 0));
+      if (editStartDate) body.startDate = editStartDate;
       if (editEndDate) body.endDate = editEndDate;
       return api.put(`/memberships/${editMem.id}`, body);
     },
@@ -417,6 +428,7 @@ const ClientDetail = () => {
                           <TableRow className="border-alma-hairline hover:bg-transparent">
                             <TableHead className={headCls}>Plan</TableHead>
                             <TableHead className={headCls}>Estado</TableHead>
+                            <TableHead className={headCls}>Inicio</TableHead>
                             <TableHead className={headCls}>Vence</TableHead>
                             <TableHead className={headCls}>Clases</TableHead>
                             <TableHead className="w-20" />
@@ -429,6 +441,7 @@ const ClientDetail = () => {
                               <TableCell>
                                 <Badge className={memStatusCls(m.status)}>{MEMBERSHIP_STATUS[m.status] ?? m.status}</Badge>
                               </TableCell>
+                              <TableCell className="text-alma-ink/70 nums">{m.startDate ? formatDate(m.startDate) : "—"}</TableCell>
                               <TableCell className="text-alma-ink/70 nums">{m.endDate ? formatDate(m.endDate) : "—"}</TableCell>
                               <TableCell className="text-alma-ink/70">
                                 {isUnlimited(m.classesRemaining) ? "Ilimitadas" : <span className="nums">{m.classesRemaining}</span>}
@@ -706,15 +719,32 @@ const ClientDetail = () => {
                   </Select>
                 </div>
 
-                <div className="space-y-1">
-                  <Label className="text-xs text-alma-ink/70">Vence (opcional)</Label>
-                  <Input
-                    type="date"
-                    className={cn(fieldCls, "nums")}
-                    value={editEndDate}
-                    onChange={(e) => setEditEndDate(e.target.value)}
-                  />
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-alma-ink/70">Inicio</Label>
+                    <Input
+                      type="date"
+                      className={cn(fieldCls, "nums")}
+                      value={editStartDate}
+                      onChange={(e) => handleEditStartDateChange(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-alma-ink/70">Vence</Label>
+                    <Input
+                      type="date"
+                      className={cn(fieldCls, "nums")}
+                      value={editEndDate}
+                      onChange={(e) => setEditEndDate(e.target.value)}
+                    />
+                  </div>
                 </div>
+                {editMem?.durationDays && editStartDate && (
+                  <p className="text-xs text-alma-ink/50">
+                    Vencimiento calculado automáticamente ({editMem.durationDays} días desde el inicio).
+                    Puedes ajustarlo manualmente.
+                  </p>
+                )}
               </div>
             )}
             <DialogFooter>

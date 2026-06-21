@@ -12197,6 +12197,7 @@ app.get("/api/memberships", adminMiddleware, async (req, res) => {
         endDate: m.end_date,
         classesRemaining: m.classes_remaining,
         classLimit: m.class_limit,
+        durationDays: m.duration_days ?? null,
         createdAt: m.created_at,
       }))
     });
@@ -12442,12 +12443,9 @@ app.put("/api/memberships/:id/cancel", adminMiddleware, async (req, res) => {
 // PUT /api/memberships/:id — update any field
 app.put("/api/memberships/:id", adminMiddleware, async (req, res) => {
   try {
-    const { status, classesRemaining, endDate, paymentMethod } = req.body;
+    const { status, classesRemaining, endDate, startDate, paymentMethod } = req.body;
 
-    // Validar enum de status. Valores SACADOS DEL ENUM REAL `membership_status`
-    // en Postgres (verificado contra prod 2026-05): pending_payment,
-    // pending_activation, active, expired, paused, cancelled. Si Postgres rechaza
-    // un valor inválido el UPDATE truena con 500; este check devuelve 400 limpio.
+    // Validar enum de status.
     const VALID_STATUS = ["pending_payment", "pending_activation", "active", "expired", "paused", "cancelled"];
     if (status !== undefined && status !== null && !VALID_STATUS.includes(status)) {
       return res.status(400).json({
@@ -12455,11 +12453,26 @@ app.put("/api/memberships/:id", adminMiddleware, async (req, res) => {
       });
     }
 
-    // classesRemaining no puede ser negativo (cota lógica del dominio).
     if (classesRemaining !== undefined && classesRemaining !== null) {
       const n = Number(classesRemaining);
       if (!Number.isFinite(n) || n < 0) {
         return res.status(400).json({ message: "classesRemaining debe ser >= 0" });
+      }
+    }
+
+    // Si se cambia start_date y no se provee end_date explícito,
+    // recalcular end_date = start_date + duration_days del plan.
+    let resolvedEndDate = endDate || null;
+    if (startDate && !endDate) {
+      const planRes = await pool.query(
+        `SELECT p.duration_days FROM memberships m JOIN plans p ON p.id = m.plan_id WHERE m.id = $1`,
+        [req.params.id]
+      );
+      const durationDays = planRes.rows[0]?.duration_days;
+      if (durationDays) {
+        const d = new Date(startDate);
+        d.setDate(d.getDate() + durationDays);
+        resolvedEndDate = d.toISOString().slice(0, 10);
       }
     }
 
@@ -12468,10 +12481,11 @@ app.put("/api/memberships/:id", adminMiddleware, async (req, res) => {
          status = COALESCE($1, status),
          classes_remaining = COALESCE($2, classes_remaining),
          end_date = COALESCE($3, end_date),
-         payment_method = COALESCE($4, payment_method),
+         start_date = COALESCE($4, start_date),
+         payment_method = COALESCE($5, payment_method),
          updated_at = NOW()
-       WHERE id = $5 RETURNING *`,
-      [status || null, classesRemaining ?? null, endDate || null, paymentMethod || null, req.params.id]
+       WHERE id = $6 RETURNING *`,
+      [status || null, classesRemaining ?? null, resolvedEndDate, startDate || null, paymentMethod || null, req.params.id]
     );
     if (!r.rows.length) return res.status(404).json({ message: "Membresía no encontrada" });
     triggerWalletPassSync(r.rows[0].user_id, "membership_updated");
