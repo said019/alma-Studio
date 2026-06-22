@@ -221,18 +221,32 @@ function CalendarView({
   });
 
   const clearWeekMutation = useMutation({
-    mutationFn: () => api.delete("/classes/week", { data: { startDate: start, endDate: end } }),
+    mutationFn: (force?: boolean) => api.delete("/classes/week", { data: { startDate: start, endDate: end, force } }),
     onSuccess: (res: any) => {
       qc.invalidateQueries({ queryKey: ["classes"] });
       const deleted = Number(res?.data?.deleted ?? 0);
+      const cancelled = Number(res?.data?.bookingsCancelled ?? 0);
       toast({
         title: deleted === 1 ? "1 clase eliminada de la semana" : `${deleted} clases eliminadas de la semana`,
+        description: cancelled > 0 ? `${cancelled} reserva${cancelled === 1 ? "" : "s"} cancelada${cancelled === 1 ? "" : "s"}, crédito devuelto.` : undefined,
       });
       setSheetOpen(false);
     },
-    onError: (error: any) => {
-      const message = error?.response?.data?.message ?? "No se pudo limpiar la semana";
-      toast({ title: message, variant: "destructive" });
+    onError: async (error: any) => {
+      // 409 = hay reservas activas: ofrecer forzar (cancela + devuelve crédito).
+      if (error?.response?.status === 409) {
+        const n = Number(error?.response?.data?.activeBookings ?? 0);
+        const force = await confirm({
+          title: "Hay reservas activas",
+          description: `Esta semana tiene ${n} reserva${n === 1 ? "" : "s"} activa${n === 1 ? "" : "s"}. ¿Forzar la limpieza? Se cancelan y se devuelve el crédito a cada alumna.`,
+          destructive: true,
+          confirmLabel: "Forzar y limpiar",
+          cancelLabel: "Volver",
+        });
+        if (force) clearWeekMutation.mutate(true);
+        return;
+      }
+      toast({ title: error?.response?.data?.message ?? "No se pudo limpiar la semana", variant: "destructive" });
     },
   });
 
@@ -310,7 +324,7 @@ function CalendarView({
       confirmLabel: "Eliminar clases",
       destructive: true,
     });
-    if (ok) clearWeekMutation.mutate();
+    if (ok) clearWeekMutation.mutate(false);
   };
 
   const handleCancelClass = async () => {

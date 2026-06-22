@@ -9802,46 +9802,72 @@ app.post("/api/bookings/with-guest", authMiddleware, async (req, res) => {
 
 // DELETE /api/classes/week — clear classes in date range
 app.delete("/api/classes/week", adminMiddleware, async (req, res) => {
+  const client = await pool.connect();
   try {
-    const { startDate, endDate } = req.body || {};
+    // force=true: cancela las reservas activas (devolviendo crédito) y limpia igual.
+    const { startDate, endDate, force } = req.body || {};
     const start = typeof startDate === "string" ? startDate.slice(0, 10) : null;
     const end = typeof endDate === "string" ? endDate.slice(0, 10) : null;
 
     if (!start || !end) {
+      client.release();
       return res.status(400).json({ message: "startDate y endDate requeridos" });
     }
     if (start > end) {
+      client.release();
       return res.status(400).json({ message: "Rango de fechas inválido" });
     }
 
-    const activeBookingsRes = await pool.query(
-      `SELECT COUNT(*)::INT AS total
-       FROM bookings b
-       JOIN classes c ON c.id = b.class_id
-       WHERE c.date >= $1 AND c.date <= $2
-         AND b.status != 'cancelled'`,
+    await client.query("BEGIN");
+
+    const activeRes = await client.query(
+      `SELECT b.id, b.user_id, b.class_id, b.membership_id, b.status
+         FROM bookings b
+         JOIN classes c ON c.id = b.class_id
+        WHERE c.date >= $1 AND c.date <= $2
+          AND b.status != 'cancelled'`,
       [start, end]
     );
-    const activeBookings = Number(activeBookingsRes.rows?.[0]?.total ?? 0);
-    if (activeBookings > 0) {
+    if (activeRes.rows.length > 0 && !force) {
+      await client.query("ROLLBACK");
       return res.status(409).json({
         message: "No se puede limpiar esta semana porque hay reservas activas.",
-        activeBookings,
+        activeBookings: activeRes.rows.length,
       });
     }
 
-    const deleted = await pool.query(
+    // Forzado: devuelve crédito (y revierte puntos) de cada reserva activa.
+    for (const b of activeRes.rows) {
+      await applyCancellationRollback(client, b, { refundCheckedIn: true });
+    }
+
+    // Borra TODAS las reservas del rango (activas + canceladas) para que el
+    // DELETE de clases no choque con la FK, y luego borra las clases.
+    await client.query(
+      `DELETE FROM bookings WHERE class_id IN (SELECT id FROM classes WHERE date >= $1 AND date <= $2)`,
+      [start, end]
+    );
+    const deleted = await client.query(
       "DELETE FROM classes WHERE date >= $1 AND date <= $2 RETURNING id",
       [start, end]
     );
+    await client.query("COMMIT");
+
+    for (const b of activeRes.rows) {
+      if (b.user_id) triggerWalletPassSync(b.user_id, "week_cleared");
+    }
     return res.json({
       deleted: deleted.rowCount ?? deleted.rows.length,
+      bookingsCancelled: activeRes.rows.length,
       startDate: start,
       endDate: end,
     });
   } catch (err) {
+    await client.query("ROLLBACK").catch(() => {});
     console.error("DELETE /classes/week error:", err);
     return res.status(500).json({ message: "Error interno" });
+  } finally {
+    client.release();
   }
 });
 
