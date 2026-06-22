@@ -132,6 +132,7 @@ function CalendarView({
   const { confirm, dialog } = useConfirm();
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
   const [createOpen, setCreateOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedClass, setSelectedClass] = useState<ClassInstance | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [mobileDay, setMobileDay] = useState(() => format(new Date(), "yyyy-MM-dd"));
@@ -188,6 +189,20 @@ function CalendarView({
     },
     onError: (e: any) => toast({
       title: e?.response?.data?.message ?? "No se pudo crear la clase",
+      variant: "destructive",
+    }),
+  });
+
+  const editMutation = useMutation({
+    mutationFn: ({ id, d }: { id: string; d: ClassFormData }) => api.put(`/admin/classes/${id}`, d),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["classes"] });
+      toast({ title: "Clase actualizada" });
+      setCreateOpen(false);
+      setEditingId(null);
+    },
+    onError: (e: any) => toast({
+      title: e?.response?.data?.message ?? "No se pudo actualizar la clase",
       variant: "destructive",
     }),
   });
@@ -255,7 +270,24 @@ function CalendarView({
   }, [weekStart, mobileDay]);
 
   const openCreate = (date: string) => {
+    setEditingId(null);
     form.reset({ startTime: date + "T09:00", endTime: date + "T10:00", maxCapacity: 5 });
+    setCreateOpen(true);
+  };
+
+  // Editar una clase existente: reusa el mismo formulario, precargado.
+  const openEdit = (cls: any) => {
+    const fmt = (t: any) => (t ? String(t).slice(0, 16) : "");
+    form.reset({
+      classTypeId: cls.classTypeId ?? cls.class_type_id ?? "",
+      instructorId: cls.instructorId ?? cls.instructor_id ?? "",
+      startTime: fmt(cls.startTime ?? cls.start_time),
+      endTime: fmt(cls.endTime ?? cls.end_time),
+      maxCapacity: cls.maxCapacity ?? cls.max_capacity ?? 5,
+      notes: cls.notes ?? "",
+    });
+    setEditingId(cls.id);
+    setSheetOpen(false);
     setCreateOpen(true);
   };
 
@@ -541,13 +573,13 @@ function CalendarView({
       {/* Create dialog */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>Nueva clase</DialogTitle></DialogHeader>
-          <form onSubmit={form.handleSubmit((d) => createMutation.mutate(d))} className="space-y-5">
+          <DialogHeader><DialogTitle>{editingId ? "Editar clase" : "Nueva clase"}</DialogTitle></DialogHeader>
+          <form onSubmit={form.handleSubmit((d) => editingId ? editMutation.mutate({ id: editingId, d }) : createMutation.mutate(d))} className="space-y-5">
             <fieldset className="space-y-3">
               <legend className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-alma-berry">Clase</legend>
               <div className="space-y-1">
                 <Label>Tipo de clase</Label>
-                <Select onValueChange={(v) => form.setValue("classTypeId", v)}>
+                <Select value={form.watch("classTypeId")} onValueChange={(v) => form.setValue("classTypeId", v, { shouldValidate: true })}>
                   <SelectTrigger><SelectValue placeholder="Seleccionar tipo" /></SelectTrigger>
                   <SelectContent>
                     {types.map((t) => (
@@ -563,7 +595,7 @@ function CalendarView({
               </div>
               <div className="space-y-1">
                 <Label>Instructora</Label>
-                <Select onValueChange={(v) => form.setValue("instructorId", v)}>
+                <Select value={form.watch("instructorId")} onValueChange={(v) => form.setValue("instructorId", v, { shouldValidate: true })}>
                   <SelectTrigger><SelectValue placeholder="Seleccionar instructora" /></SelectTrigger>
                   <SelectContent>
                     {instructors.map((inst) => (
@@ -587,9 +619,9 @@ function CalendarView({
             </fieldset>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>Cancelar</Button>
-              <Button type="submit" disabled={createMutation.isPending}>
-                {createMutation.isPending && <Loader2 size={14} className="mr-2 animate-spin" />}
-                Crear clase
+              <Button type="submit" disabled={createMutation.isPending || editMutation.isPending}>
+                {(createMutation.isPending || editMutation.isPending) && <Loader2 size={14} className="mr-2 animate-spin" />}
+                {editingId ? "Guardar cambios" : "Crear clase"}
               </Button>
             </DialogFooter>
           </form>
@@ -735,6 +767,11 @@ function CalendarView({
                 );
               })()}
               <div className="flex flex-col gap-2 pt-4">
+                {!selectedClass.isCancelled && (
+                  <Button variant="outline" className="border-alma-sandstone/70 text-alma-ink" onClick={() => openEdit(selectedClass)}>
+                    Editar clase
+                  </Button>
+                )}
                 {!selectedClass.isCancelled && (
                   <Button variant="destructive" onClick={handleCancelClass} disabled={cancelMutation.isPending}>
                     {cancelMutation.isPending && <Loader2 size={14} className="mr-2 animate-spin" />}
