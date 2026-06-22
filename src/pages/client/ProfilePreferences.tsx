@@ -7,9 +7,12 @@ import {
   AppShell,
   PageHeader,
   Section,
+  ListGroup,
+  ListRow,
   ALMA,
 } from "@/components/app/AppShell";
 import { BackLink } from "@/components/app/widgets";
+import { ShieldCheck } from "lucide-react";
 // Switch shadcn ya tematizado: track activo = --primary (#43392F, ink),
 // track inactivo = --input (hairline) y focus ring = --ring (#6E5A46, berry).
 import { Switch } from "@/components/ui/switch";
@@ -121,6 +124,18 @@ const ProfilePreferences = () => {
               </li>
             ))}
           </ul>
+        </Section>
+
+        <Section title="Privacidad">
+          <ListGroup>
+            <ListRow
+              to="/legal/privacidad"
+              icon={<ShieldCheck size={17} strokeWidth={1.7} />}
+              iconTint="olive"
+              title="Cómo cuidamos tus datos"
+              description="Aviso de privacidad"
+            />
+          </ListGroup>
         </Section>
       </AppShell>
     </ClientAuthGuard>

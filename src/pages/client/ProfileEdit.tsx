@@ -6,12 +6,14 @@ import { useNavigate } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { useAuthStore } from "@/stores/authStore";
-import { Camera } from "lucide-react";
+import { Camera, ShieldCheck } from "lucide-react";
 import { ClientAuthGuard } from "@/components/layout/ClientAuthGuard";
 import {
   AppShell,
   PageHeader,
   Section,
+  ListGroup,
+  ListRow,
   PrimaryButton,
   GhostButton,
 } from "@/components/app/AppShell";
@@ -199,6 +201,18 @@ const ProfileEdit = () => {
               hint="Solo el equipo del estudio ve esta información."
               {...register("healthNotes")}
             />
+          </Section>
+
+          <Section title="Seguridad">
+            <ListGroup>
+              <ListRow
+                to="/app/profile/security"
+                icon={<ShieldCheck size={17} strokeWidth={1.7} />}
+                iconTint="berry"
+                title="Cambiar contraseña"
+                description="Actualiza tu acceso"
+              />
+            </ListGroup>
           </Section>
 
           <StickyCta>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { X } from "lucide-react";
 import api from "@/lib/api";
 import { ALMA } from "@/components/app/tokens";
@@ -48,6 +48,7 @@ export const ResponsivaDialog = ({
   defaultPhone = "",
 }: ResponsivaDialogProps) => {
   const { toast } = useToast();
+  const qc = useQueryClient();
 
   const [fullName, setFullName] = useState(defaultName);
   const [phone, setPhone] = useState(defaultPhone);
@@ -83,6 +84,7 @@ export const ResponsivaDialog = ({
         signature_data: signatureData,
       }),
     onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["my-waiver"] });
       toast({ title: "Responsiva firmada. ¡Bienvenida a Alma Movement!" });
       onSigned();
     },
