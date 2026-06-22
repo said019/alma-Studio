@@ -485,6 +485,41 @@ async function sendOrderRejected(opts) {
   await sendEmail({ to, subject: "Comprobante de pago no aprobado — Alma Movement", html });
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// ── 8. BIENVENIDA DE ADMINISTRADORA (acceso + contraseña temporal) ────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+/**
+ * @param {object} opts
+ * @param {string} opts.to            Correo de la nueva administradora
+ * @param {string} opts.name          Nombre (se usa el primer nombre para saludar)
+ * @param {string} opts.tempPassword  Contraseña temporal en claro (la cambia al entrar)
+ * @param {string} [opts.loginUrl]    URL de acceso (default: SITE_URL/auth/login)
+ */
+async function sendAdminWelcome(opts) {
+  const { to, name, tempPassword, loginUrl } = opts;
+  const safeName = String(name || "").trim();
+  const firstName = safeName.split(/\s+/)[0] || "Hola";
+  const resolvedLoginUrl = String(loginUrl || `${SITE_URL}/auth/login`);
+  const content = `
+    ${h1(`Bienvenida al equipo, ${firstName}`)}
+    ${p("Te damos acceso de <strong>administradora</strong> a la plataforma de Alma Movement. Desde tu cuenta podrás gestionar clases, reservas, membresías, comprobantes y más.")}
+    ${p("Estos son tus datos de acceso:")}
+    ${infoTable([
+      infoRow("Correo", to),
+      infoRow("Contraseña temporal", tempPassword),
+    ])}
+    ${alertBox("Por tu seguridad, <strong>cambia esta contraseña</strong> la primera vez que entres: Perfil → Editar perfil → Seguridad.")}
+    ${small("Si no esperabas este correo, ignóralo o escríbenos y lo revisamos.")}
+  `;
+  const html = baseLayout({
+    preheader: "Tu acceso de administradora a Alma Movement",
+    content,
+    ctaUrl: resolvedLoginUrl,
+    ctaText: "Entrar a la plataforma",
+  });
+  await sendEmail({ to, subject: "Tu acceso de administradora — Alma Movement", html });
+}
+
 // ─── Exports ──────────────────────────────────────────────────────────────────
 export {
   sendMembershipActivated,
@@ -494,4 +529,5 @@ export {
   sendRenewalReminder,
   sendPasswordResetEmail,
   sendOrderRejected,
+  sendAdminWelcome,
 };
