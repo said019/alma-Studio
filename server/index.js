@@ -3937,6 +3937,12 @@ async function finalizeStripeOrder(client, orderId) {
   if (order.discount_code_id) {
     await incrementDiscountUsage(order.discount_code_id, client);
   }
+
+  // Empuja la actualización del pase (Apple APNs + Google object) tras activar
+  // por tarjeta. El sync es diferido (debounce interno), así que lee la
+  // membresía ya commiteada — antes faltaba y por eso la compra con tarjeta no
+  // disparaba notificación al pase (las de transferencia sí, al verificarlas).
+  triggerWalletPassSync(order.user_id, "stripe_payment_completed");
 }
 
 // ── Generate short order number: OPH-YYMM-XXXX ──
