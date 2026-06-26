@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { AuthGuard } from "@/components/admin/AuthGuard";
@@ -11,6 +12,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { CreditCard, MoreHorizontal } from "lucide-react";
 
@@ -94,6 +98,37 @@ const MembershipTable = ({
     onError: (e: any) => toast({ title: e?.response?.data?.message ?? "Error al cancelar la membresía", variant: "destructive" }),
   });
 
+  // ── Editar vigencia (preventa: vender ahora, que valga en fechas futuras) ──
+  const [editing, setEditing] = useState<Membership | null>(null);
+  const [startVal, setStartVal] = useState("");
+  const [endVal, setEndVal] = useState("");
+  const [autoEnd, setAutoEnd] = useState(true);
+
+  const openEdit = (m: Membership) => {
+    setEditing(m);
+    setStartVal((m.startDate ?? "").slice(0, 10));
+    setEndVal((m.endDate ?? "").slice(0, 10));
+    setAutoEnd(true);
+  };
+
+  const editMutation = useMutation({
+    mutationFn: (body: { startDate?: string; endDate?: string }) =>
+      api.put(`/memberships/${editing!.id}`, body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["memberships"] });
+      toast({ title: "Vigencia actualizada" });
+      setEditing(null);
+    },
+    onError: (e: any) => toast({ title: e?.response?.data?.message ?? "Error al actualizar la vigencia", variant: "destructive" }),
+  });
+
+  const submitEdit = () => {
+    if (!startVal) { toast({ title: "Elige la fecha de inicio", variant: "destructive" }); return; }
+    const body: { startDate?: string; endDate?: string } = { startDate: startVal };
+    if (!autoEnd && endVal) body.endDate = endVal;
+    editMutation.mutate(body);
+  };
+
   const requestActivate = async (m: Membership) => {
     const who = m.userName ?? "La clienta";
     const ok = await confirm({
@@ -140,6 +175,52 @@ const MembershipTable = ({
   return (
     <div>
       {dialog}
+
+      <Dialog open={!!editing} onOpenChange={(o) => { if (!o) setEditing(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar vigencia</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {editing && (
+              <p className="text-sm text-alma-ink/60">
+                {editing.userName ?? "Clienta"} · {editing.planName ?? ""}
+              </p>
+            )}
+            <div className="space-y-1.5">
+              <Label htmlFor="m-start">Fecha de inicio</Label>
+              <Input id="m-start" type="date" value={startVal} onChange={(e) => setStartVal(e.target.value)} />
+            </div>
+            <label className="flex items-center gap-2 text-sm text-alma-ink/80 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={autoEnd}
+                onChange={(e) => setAutoEnd(e.target.checked)}
+                style={{ accentColor: "#6E5A46", width: 16, height: 16 }}
+              />
+              Recalcular el fin con la duración del plan
+            </label>
+            {!autoEnd && (
+              <div className="space-y-1.5">
+                <Label htmlFor="m-end">Fecha de fin (vigencia)</Label>
+                <Input id="m-end" type="date" value={endVal} onChange={(e) => setEndVal(e.target.value)} />
+              </div>
+            )}
+            <p className="text-xs text-alma-ink/50">
+              Para preventa: fija el inicio en la fecha en que la membresía debe empezar a valer.
+              Con el recálculo activado, el vencimiento se ajusta solo según la duración del plan;
+              desactívalo para poner una fecha de fin manual.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setEditing(null)}>Cancelar</Button>
+            <Button onClick={submitEdit} disabled={editMutation.isPending}>
+              {editMutation.isPending ? "Guardando…" : "Guardar vigencia"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <div className="rounded-xl border border-alma-hairline bg-alma-mist overflow-hidden">
         <Table>
           <TableHeader>
@@ -175,7 +256,10 @@ const MembershipTable = ({
                       <Badge variant={STATUS_VARIANTS[m.status]}>{STATUS_LABELS[m.status]}</Badge>
                     </TableCell>
                     <TableCell className="nums text-sm text-alma-ink/70">
-                      {m.endDate ? formatDate(m.endDate) : "—"}
+                      <div>{m.endDate ? formatDate(m.endDate) : "—"}</div>
+                      {m.startDate && (
+                        <div className="text-xs text-alma-ink/45">desde {formatDate(m.startDate)}</div>
+                      )}
                     </TableCell>
                     <TableCell className="nums text-alma-ink">{formatRemaining(m)}</TableCell>
                     <TableCell>
@@ -184,6 +268,7 @@ const MembershipTable = ({
                           <Button variant="ghost" size="icon"><MoreHorizontal size={14} /></Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent>
+                          <DropdownMenuItem onClick={() => openEdit(m)}>Editar vigencia</DropdownMenuItem>
                           {m.status !== "active" && (
                             <DropdownMenuItem onClick={() => requestActivate(m)}>Activar</DropdownMenuItem>
                           )}
