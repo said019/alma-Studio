@@ -98,9 +98,15 @@ const PlanRow = ({
   const isUnlimited = Number(classLimit) >= 900;
   const nonTransferable = flag(plan.isNonTransferable ?? plan.is_non_transferable);
   const nonRepeatable = flag(plan.isNonRepeatable ?? plan.is_non_repeatable);
+  // Precio efectivo (anticipado/apertura) — el mismo que muestra el index y
+  // que cobra Stripe. Antes el checkout usaba plan.price (regular) → desfase.
+  const regularPrice = Number(plan.price ?? 0);
+  const effectivePrice = Number(plan.effectivePrice ?? plan.effective_price ?? regularPrice);
+  const hasOpening =
+    Boolean(plan.openingActive ?? plan.opening_active) && effectivePrice > 0 && effectivePrice < regularPrice;
   const perClass =
-    !isUnlimited && Number(plan.price) > 0 && Number(classLimit) > 1
-      ? Math.round(Number(plan.price) / Number(classLimit))
+    !isUnlimited && effectivePrice > 0 && Number(classLimit) > 1
+      ? Math.round(effectivePrice / Number(classLimit))
       : null;
 
   return (
@@ -144,10 +150,19 @@ const PlanRow = ({
           )}
         </div>
         <div className="text-right">
+          {hasOpening && (
+            <div className="nums text-[0.72rem] line-through" style={{ color: ALMA.ink, opacity: 0.4 }}>
+              ${formatMoneyMX(regularPrice)}
+            </div>
+          )}
           <div className="font-display nums leading-none" style={{ color: ALMA.berry, fontSize: "clamp(1.4rem, 2.2vw, 1.8rem)" }}>
-            ${formatMoneyMX(plan.price ?? 0)}
+            ${formatMoneyMX(effectivePrice)}
           </div>
-          {perClass ? (
+          {hasOpening ? (
+            <div className="text-[0.72rem] uppercase tracking-[0.18em] mt-1" style={{ color: ALMA.berry }}>
+              apertura
+            </div>
+          ) : perClass ? (
             <div className="nums text-[0.72rem] mt-1" style={{ color: ALMA.berry }}>
               ${formatMoneyMX(perClass)} por clase
             </div>
@@ -301,9 +316,12 @@ const Checkout = () => {
       }),
   });
 
+  const selectedEffective = Number(
+    selectedPlan?.effectivePrice ?? selectedPlan?.effective_price ?? selectedPlan?.price ?? 0
+  );
   const finalAmount = discountResult
-    ? (selectedPlan?.price ?? 0) - (discountResult.discount_amount ?? 0)
-    : selectedPlan?.price ?? 0;
+    ? selectedEffective - (discountResult.discount_amount ?? 0)
+    : selectedEffective;
 
   const STEPS: { id: Step; label: string }[] = [
     { id: "select", label: "Plan" },
