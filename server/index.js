@@ -3517,34 +3517,45 @@ app.post("/api/bookings", authMiddleware, async (req, res) => {
 
 // DELETE /api/bookings/:id
 app.delete("/api/bookings/:id", authMiddleware, async (req, res) => {
+  const client = await pool.connect();
   try {
-    // Load booking
-    const r = await pool.query(
+    await client.query("BEGIN");
+
+    // Load + LOCK booking (FOR UPDATE OF b) para serializar cancelaciones
+    // concurrentes: con doble-clic, la 2ª petición espera y ve status
+    // 'cancelled' → aborta. Evita doble devolución de crédito / doble falta.
+    const r = await client.query(
       `SELECT b.*, c.date, c.start_time, ct.name AS class_type_name
        FROM bookings b
        JOIN classes c ON b.class_id = c.id
        JOIN class_types ct ON c.class_type_id = ct.id
-       WHERE b.id = $1 AND b.user_id = $2`,
+       WHERE b.id = $1 AND b.user_id = $2
+       FOR UPDATE OF b`,
       [req.params.id, req.userId]
     );
-    if (r.rows.length === 0) return res.status(404).json({ message: "Reserva no encontrada" });
+    if (r.rows.length === 0) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ message: "Reserva no encontrada" });
+    }
     const booking = r.rows[0];
 
     if (booking.status === "cancelled") {
+      await client.query("ROLLBACK");
       return res.status(400).json({ message: "Esta reserva ya fue cancelada" });
     }
 
     // ── Check membership cancellation limit (max 2 per membership period) ──
     let membership = null;
     if (booking.membership_id) {
-      const memRes = await pool.query(
-        "SELECT id, classes_remaining, cancellations_used, plan_id FROM memberships WHERE id = $1",
+      const memRes = await client.query(
+        "SELECT id, classes_remaining, cancellations_used, plan_id FROM memberships WHERE id = $1 FOR UPDATE",
         [booking.membership_id]
       );
       membership = memRes.rows[0] ?? null;
     }
 
     if (membership && (membership.cancellations_used ?? 0) >= 2) {
+      await client.query("ROLLBACK");
       return res.status(403).json({
         message: "Has alcanzado el límite de 2 cancelaciones permitidas en tu membresía actual. Contacta con el studio si necesitas ayuda.",
       });
@@ -3552,7 +3563,7 @@ app.delete("/api/bookings/:id", authMiddleware, async (req, res) => {
 
     // ── Ventana de aviso para devolución de crédito (política Alma: 12 h) ──
     // Las clases están en hora de Ciudad de México; comparamos contra el inicio real.
-    const classStartRes = await pool.query(
+    const classStartRes = await client.query(
       `SELECT (c.date + c.start_time::time) AT TIME ZONE 'America/Mexico_City' AS class_start_utc
        FROM classes c WHERE c.id = $1`,
       [booking.class_id]
@@ -3572,87 +3583,48 @@ app.delete("/api/bookings/:id", authMiddleware, async (req, res) => {
       if (Number.isFinite(w) && w > 0) cancelWindowHours = w;
     } catch (e) { console.warn("[cancel] loyalty config:", e.message); }
     const isLate = isWithinCancelWindow(minutesUntilClass, cancelWindowHours); // dentro de la ventana = tardía
+    const wasConfirmed = booking.status === "confirmed";
 
     // Cancel the booking
-    await pool.query(
+    await client.query(
       "UPDATE bookings SET status = 'cancelled', cancelled_at = NOW() WHERE id = $1",
       [req.params.id]
     );
 
-    // ── Falta por cancelación tardía (MISMA ventana de 12h que la pérdida de
-    //    crédito). Se registra UNA sola vez aquí. Excluye invitadas (guest).
-    try {
-      if (req.userId && !booking.guest_profile_id && isLate) {
-        await recordFalta({ userId: req.userId, reason: `cancelación dentro de ${cancelWindowHours}h` });
-      }
-    } catch (e) { console.warn("[faltas] late-cancel:", e.message); }
-
-    if (booking.status === "confirmed") {
+    if (wasConfirmed) {
       // Always free the class spot
-      await pool.query(
+      await client.query(
         "UPDATE classes SET current_bookings = GREATEST(current_bookings - 1, 0) WHERE id = $1",
         [booking.class_id]
       );
 
       if (membership) {
         // Increment cancellations_used regardless of timing
-        await pool.query(
+        await client.query(
           "UPDATE memberships SET cancellations_used = COALESCE(cancellations_used, 0) + 1 WHERE id = $1",
           [membership.id]
         );
 
-        if (isLate) {
-          // Late cancellation: credit is LOST — do not restore
-          // Email: cancelled, no credit restored
-          try {
-            const uRes = await pool.query("SELECT email, display_name, phone FROM users WHERE id = $1", [req.userId]);
-            const memAfter = await pool.query("SELECT classes_remaining FROM memberships WHERE id = $1", [membership.id]);
-            if (uRes.rows[0]) {
-              const u = uRes.rows[0];
-              if (await areEmailNotificationsEnabled()) {
-                sendBookingCancelled({
-                  to: u.email,
-                  name: u.display_name || "Alumna",
-                  className: booking.class_type_name || "tu clase",
-                  date: booking.date,
-                  startTime: booking.start_time,
-                  creditRestored: false,
-                  isLate: true,
-                  classesLeft: memAfter.rows[0]?.classes_remaining ?? null,
-                }).catch((e) => console.error("[Email] booking cancelled late:", e.message));
-              }
-              sendConfiguredWhatsAppTemplate({
-                templateKey: "booking_cancelled",
-                phone: u.phone,
-                vars: {
-                  name: u.display_name || "Alumna",
-                  class: booking.class_type_name || "tu clase",
-                  date: booking.date ? new Date(booking.date).toLocaleDateString("es-MX") : "",
-                  time: booking.start_time ? String(booking.start_time).slice(0, 5) : "",
-                  creditRestored: "No",
-                },
-                fallbackMessage: `Hola ${u.display_name || "Alumna"}, cancelamos tu reserva de ${booking.class_type_name || "tu clase"}. Por cancelación tardía, la clase no se devolvió.`,
-              }).catch((e) => console.error("[WA] booking cancelled late:", e.message));
-            }
-          } catch (emailErr) {
-            console.error("[Email] cancelled late query:", emailErr.message);
-          }
-          triggerWalletPassSync(req.userId, "booking_cancelled_late");
-          return res.json({
-            message: `Reserva cancelada. Por cancelar con menos de ${cancelWindowHours} horas de anticipación, la clase cuenta como utilizada y NO se devuelve a tu paquete.`,
-            creditRestored: false,
-          });
-        }
-
-        // On-time cancellation: restore credit only if membership has a counted limit
-        if (membership.classes_remaining !== null && membership.classes_remaining < 9999) {
+        // On-time: restore credit only if membership has a counted limit.
+        // Late: credit is LOST — do not restore.
+        if (!isLate && membership.classes_remaining !== null && membership.classes_remaining < 9999) {
           // Devuelve total y, si es mixto, el bucket del área de la clase.
-          await restoreMembershipCredit(pool, membership.id, booking.class_id);
+          await restoreMembershipCredit(client, membership.id, booking.class_id);
         }
       }
     }
 
-    // ── Email: booking cancelled ───────────────────────────────────────────
+    await client.query("COMMIT");
+
+    // ── Side effects (best-effort, ya fuera de la transacción) ──────────────
+    // Falta por cancelación tardía (MISMA ventana). Excluye invitadas (guest).
+    if (req.userId && !booking.guest_profile_id && isLate) {
+      try {
+        await recordFalta({ userId: req.userId, reason: `cancelación dentro de ${cancelWindowHours}h` });
+      } catch (e) { console.warn("[faltas] late-cancel:", e.message); }
+    }
+
+    // ── Email + WhatsApp: booking cancelled ────────────────────────────────
     try {
       const uRes = await pool.query("SELECT email, display_name, phone FROM users WHERE id = $1", [req.userId]);
       const memAfter = membership
@@ -3691,16 +3663,19 @@ app.delete("/api/bookings/:id", authMiddleware, async (req, res) => {
       console.error("[Email] cancelled query:", emailErr.message);
     }
 
-    triggerWalletPassSync(req.userId, "booking_cancelled");
+    triggerWalletPassSync(req.userId, isLate ? "booking_cancelled_late" : "booking_cancelled");
     return res.json({
       message: isLate
-        ? "Reserva cancelada. La clase no se devolvió al paquete (cancelación tardía)."
+        ? `Reserva cancelada. Por cancelar con menos de ${cancelWindowHours} horas de anticipación, la clase cuenta como utilizada y NO se devuelve a tu paquete.`
         : "Reserva cancelada. Se devolvió el crédito a tu paquete.",
       creditRestored: !isLate,
     });
   } catch (err) {
+    try { await client.query("ROLLBACK"); } catch (_) { }
     console.error("DELETE bookings error:", err.message, err.stack);
     return res.status(500).json({ message: "Error interno", detail: err.message });
+  } finally {
+    client.release();
   }
 });
 
