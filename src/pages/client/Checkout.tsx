@@ -196,6 +196,7 @@ const Checkout = () => {
   const [step, setStep] = useState<Step>("select");
   const [selectedPlan, setSelectedPlan] = useState<any>(null);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("transfer");
+  const [modality, setModality] = useState<string>("studio");
   const [discountCode, setDiscountCode] = useState("");
   const [discountResult, setDiscountResult] = useState<any>(null);
   const [orderId, setOrderId] = useState<string | null>(null);
@@ -232,18 +233,35 @@ const Checkout = () => {
   const isVisitPack = (p: any): boolean =>
     Boolean(p?.isVisitPack ?? p?.is_visit_pack);
 
-  // Para Alma (estudio de Pilates): no se usan tabs por categoría.
-  // Sólo se separan las clases sueltas (1 clase) de los paquetes mensuales (>1 clase).
-  // Los packs de visitas se muestran aparte para que la socia entienda que son
-  // para llevar acompañantes, no para asistir ella misma.
-  const allMonthlyPackages = useMemo(() => {
-    return activePlans
-      .filter((p) => Number(p.classLimit ?? p.class_limit ?? 0) > 1)
-      .filter((p) => !isVisitPack(p))
-      .filter((p) => !String(p.name ?? "").toLowerCase().includes("muestra"))
-      .sort((a, b) => Number(a.price ?? 0) - Number(b.price ?? 0));
+  // Agrupado por modalidad: el catálogo tiene ~14 paquetes; verlos todos juntos
+  // abruma. Se separan por modalidad (Studio / Reformer-Tower / Mixto / Todo) y
+  // la alumna ve solo los de la modalidad elegida. Las clases sueltas aparecen
+  // dentro de su modalidad (las más baratas, arriba). Los packs de visita van
+  // aparte (son para llevar acompañantes, no para asistir ella misma).
+  const MODALITY_ORDER = ["studio", "reformer_tower", "mixto", "all"] as const;
+  const MODALITY_LABEL: Record<string, string> = {
+    studio: "Studio",
+    reformer_tower: "Reformer/Tower",
+    mixto: "Mixto",
+    all: "Todo",
+  };
+
+  const plansByModality = useMemo(() => {
+    const map: Record<string, any[]> = { studio: [], reformer_tower: [], mixto: [], all: [] };
+    for (const p of activePlans) {
+      if (isVisitPack(p)) continue;
+      if (String(p.name ?? "").toLowerCase().includes("muestra")) continue;
+      const cat = detectCategory(p);
+      (map[cat] ?? (map[cat] = [])).push(p);
+    }
+    for (const k of Object.keys(map)) {
+      map[k].sort((a, b) => Number(a.price ?? 0) - Number(b.price ?? 0));
+    }
+    return map;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plansData]);
+
+  const availableModalities = MODALITY_ORDER.filter((m) => (plansByModality[m]?.length ?? 0) > 0);
 
   const visitPacks = useMemo(() => {
     return activePlans
@@ -253,16 +271,16 @@ const Checkout = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plansData]);
 
-  const singleClassPlan = useMemo(() => {
-    return activePlans.find((p) => {
-      const limit = Number(p.classLimit ?? p.class_limit ?? 0);
-      const name = String(p.name ?? "").toLowerCase();
-      return limit === 1 && !name.includes("muestra") && !isVisitPack(p);
-    }) ?? null;
+  // Si la modalidad activa se queda sin planes (datos cargados), cae a la 1ª disponible.
+  useEffect(() => {
+    if (availableModalities.length && !(availableModalities as readonly string[]).includes(modality)) {
+      setModality(availableModalities[0]);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [plansData]);
+  }, [availableModalities.join(","), modality]);
 
-  const recommendedMonthlyId = useMemo(() => bestPerClassId(allMonthlyPackages), [allMonthlyPackages]);
+  const modalityPlans = plansByModality[modality] ?? [];
+  const recommendedModalityId = useMemo(() => bestPerClassId(modalityPlans), [modalityPlans]);
   const recommendedVisitId = useMemo(() => bestPerClassId(visitPacks), [visitPacks]);
 
   const validateCodeMutation = useMutation({
@@ -361,19 +379,52 @@ const Checkout = () => {
         {/* ── Step 1: Select plan ── */}
         {step === "select" && !plansError && (
           <>
-            <Section title="Clase suelta">
+            <Section title="Elige tu paquete">
               {loadingPlans ? (
-                <SkeletonRow height={88} />
-              ) : singleClassPlan ? (
-                <PlanRow
-                  plan={singleClassPlan}
-                  selected={selectedPlan?.id === singleClassPlan.id}
-                  onSelect={() => { setSelectedPlan(singleClassPlan); setDiscountResult(null); }}
-                />
-              ) : (
+                <div className="space-y-3">
+                  {[1, 2, 3].map((i) => <SkeletonRow key={i} height={88} />)}
+                </div>
+              ) : availableModalities.length === 0 ? (
                 <p className="text-[0.86rem]" style={{ color: ALMA.ink, opacity: 0.55 }}>
-                  No hay clase suelta disponible.
+                  Aún no hay paquetes activos. Si esto persiste, escríbenos por WhatsApp.
                 </p>
+              ) : (
+                <>
+                  {/* Tabs de modalidad: la alumna ve solo su disciplina */}
+                  <div role="tablist" aria-label="Modalidad" className="flex flex-wrap gap-2 mb-4">
+                    {availableModalities.map((m) => {
+                      const active = modality === m;
+                      return (
+                        <button
+                          key={m}
+                          type="button"
+                          role="tab"
+                          aria-selected={active}
+                          onClick={() => setModality(m)}
+                          className="rounded-full px-4 py-2 text-[0.8rem] font-medium transition-colors cursor-pointer"
+                          style={{
+                            backgroundColor: active ? ALMA.berry : ALMA.cream,
+                            color: active ? ALMA.cream : ALMA.ink,
+                            border: `1px solid ${active ? ALMA.berry : ALMA.border}`,
+                          }}
+                        >
+                          {MODALITY_LABEL[m] ?? m}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="space-y-3">
+                    {modalityPlans.map((plan: any) => (
+                      <PlanRow
+                        key={plan.id}
+                        plan={plan}
+                        selected={selectedPlan?.id === plan.id}
+                        recommended={recommendedModalityId === plan.id}
+                        onSelect={() => { setSelectedPlan(plan); setDiscountResult(null); }}
+                      />
+                    ))}
+                  </div>
+                </>
               )}
             </Section>
 
@@ -395,30 +446,6 @@ const Checkout = () => {
                 </div>
               </Section>
             )}
-
-            <Section title="Paquetes mensuales">
-              {loadingPlans ? (
-                <div className="space-y-3">
-                  {[1, 2, 3].map((i) => <SkeletonRow key={i} height={88} />)}
-                </div>
-              ) : allMonthlyPackages.length === 0 ? (
-                <p className="text-[0.86rem]" style={{ color: ALMA.ink, opacity: 0.55 }}>
-                  Aún no hay paquetes activos. Si esto persiste, escríbenos por WhatsApp.
-                </p>
-              ) : (
-                <div className="space-y-3">
-                  {allMonthlyPackages.map((plan: any) => (
-                    <PlanRow
-                      key={plan.id}
-                      plan={plan}
-                      selected={selectedPlan?.id === plan.id}
-                      recommended={recommendedMonthlyId === plan.id}
-                      onSelect={() => { setSelectedPlan(plan); setDiscountResult(null); }}
-                    />
-                  ))}
-                </div>
-              )}
-            </Section>
 
             {selectedPlan && (
               <Section title="Resumen">
