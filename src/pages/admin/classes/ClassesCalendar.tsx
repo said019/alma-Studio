@@ -43,6 +43,7 @@ interface ClassInstance {
   bookedCount?: number;
   currentBookings?: number;
   isCancelled: boolean;
+  isClosed: boolean;
   notes?: string;
 }
 
@@ -170,6 +171,7 @@ function CalendarView({
         bookedCount:      c.current_bookings ?? 0,
         currentBookings:  c.current_bookings ?? 0,
         isCancelled:      c.status === "cancelled" || c.is_cancelled === true,
+        isClosed:         c.status === "closed",
         notes:            c.notes,
       }));
       return { data: mapped };
@@ -216,6 +218,34 @@ function CalendarView({
     },
     onError: (e: any) => toast({
       title: e?.response?.data?.message ?? "No se pudo cancelar la clase",
+      variant: "destructive",
+    }),
+  });
+
+  // Cerrar = dejar de aceptar NUEVAS reservas sin cancelar (sin reembolso). Las
+  // reservas existentes siguen válidas. Distinto de Cancelar.
+  const closeMutation = useMutation({
+    mutationFn: (id: string) => api.put("/classes/" + id + "/close"),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["classes"] });
+      toast({ title: "Clase cerrada", description: "Ya no acepta nuevas reservas. Las existentes siguen válidas." });
+      setSheetOpen(false);
+    },
+    onError: (e: any) => toast({
+      title: e?.response?.data?.message ?? "No se pudo cerrar la clase",
+      variant: "destructive",
+    }),
+  });
+
+  const reopenMutation = useMutation({
+    mutationFn: (id: string) => api.put("/classes/" + id + "/reopen"),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["classes"] });
+      toast({ title: "Clase reabierta" });
+      setSheetOpen(false);
+    },
+    onError: (e: any) => toast({
+      title: e?.response?.data?.message ?? "No se pudo reabrir la clase",
       variant: "destructive",
     }),
   });
@@ -340,6 +370,16 @@ function CalendarView({
       destructive: true,
     });
     if (ok) cancelMutation.mutate(selectedClass.id);
+  };
+
+  const handleCloseClass = async () => {
+    if (!selectedClass || closeMutation.isPending) return;
+    const ok = await confirm({
+      title: "¿Cerrar esta clase?",
+      description: "La clase se marcará como cerrada y dejará de aceptar nuevas reservas. Las reservas existentes y los créditos NO se modifican (es distinto de cancelar).",
+      confirmLabel: "Cerrar clase",
+    });
+    if (ok) closeMutation.mutate(selectedClass.id);
   };
 
   const mobileDayDate = parseISO(mobileDay);
@@ -481,6 +521,8 @@ function CalendarView({
                         </div>
                         {c.isCancelled ? (
                           <Badge variant="destructive" className="text-[10px]">Cancelada</Badge>
+                        ) : c.isClosed ? (
+                          <Badge variant="outline" className="border-alma-sandstone/70 text-[10px] text-alma-ink/70">Cerrada</Badge>
                         ) : (
                           <Badge variant="outline" className="border-alma-sandstone/60 text-[10px] text-alma-ink/70">Activa</Badge>
                         )}
@@ -565,6 +607,7 @@ function CalendarView({
                                 {(c.bookedCount ?? c.currentBookings ?? 0)}/{c.maxCapacity ?? c.capacity ?? "?"}
                               </div>
                               {c.isCancelled && <Badge variant="destructive" className="mt-1 px-1 text-[0.6rem]">Cancelada</Badge>}
+                              {c.isClosed && <Badge variant="outline" className="mt-1 px-1 text-[0.6rem] border-alma-sandstone/70 text-alma-ink/70">Cerrada</Badge>}
                             </button>
                           );
                         })}
@@ -781,9 +824,21 @@ function CalendarView({
                 );
               })()}
               <div className="flex flex-col gap-2 pt-4">
-                {!selectedClass.isCancelled && (
+                {!selectedClass.isCancelled && !selectedClass.isClosed && (
                   <Button variant="outline" className="border-alma-sandstone/70 text-alma-ink" onClick={() => openEdit(selectedClass)}>
                     Editar clase
+                  </Button>
+                )}
+                {!selectedClass.isCancelled && !selectedClass.isClosed && (
+                  <Button variant="outline" className="border-alma-sandstone/70 text-alma-ink" onClick={handleCloseClass} disabled={closeMutation.isPending}>
+                    {closeMutation.isPending && <Loader2 size={14} className="mr-2 animate-spin" />}
+                    Cerrar clase
+                  </Button>
+                )}
+                {selectedClass.isClosed && (
+                  <Button variant="outline" className="border-alma-sandstone/70 text-alma-ink" onClick={() => reopenMutation.mutate(selectedClass.id)} disabled={reopenMutation.isPending}>
+                    {reopenMutation.isPending && <Loader2 size={14} className="mr-2 animate-spin" />}
+                    Reabrir clase
                   </Button>
                 )}
                 {!selectedClass.isCancelled && (
@@ -792,6 +847,7 @@ function CalendarView({
                     Cancelar clase
                   </Button>
                 )}
+                {selectedClass.isClosed && <Badge variant="outline" className="w-fit border-alma-sandstone/70 text-alma-ink/70">Clase cerrada</Badge>}
                 {selectedClass.isCancelled && <Badge variant="destructive" className="w-fit">Clase cancelada</Badge>}
               </div>
             </div>

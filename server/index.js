@@ -3331,9 +3331,11 @@ app.post("/api/bookings", authMiddleware, async (req, res) => {
       return res.status(404).json({ message: "Clase no encontrada" });
     }
     const cls = classRes.rows[0];
-    if (cls.status === "cancelled") {
+    if (cls.status === "cancelled" || cls.status === "closed") {
       await client.query("ROLLBACK");
-      return res.status(400).json({ message: "Esta clase fue cancelada" });
+      return res.status(400).json({
+        message: cls.status === "closed" ? "Esta clase ya no admite nuevas reservas." : "Esta clase fue cancelada",
+      });
     }
 
     // ── Cierre de reservas: las clientas no pueden reservar dentro de las
@@ -8935,6 +8937,46 @@ app.put("/api/classes/:id/cancel", adminMiddleware, async (req, res) => {
   }
 });
 
+// PUT /api/classes/:id/close — cierra la clase a NUEVAS reservas SIN cancelarla.
+// Las reservas existentes siguen válidas, NO se reembolsa nada, NO se avisa de
+// cancelación. Distinto de cancelar. Solo aplica a clases 'scheduled' (abiertas).
+app.put("/api/classes/:id/close", adminMiddleware, async (req, res) => {
+  try {
+    const r = await pool.query(
+      `UPDATE classes SET status='closed', updated_at=NOW()
+        WHERE id=$1 AND status='scheduled'
+        RETURNING id, status`,
+      [req.params.id],
+    );
+    if (!r.rows.length) {
+      return res.status(404).json({ message: "Clase no encontrada o no está abierta" });
+    }
+    return res.json({ data: r.rows[0] });
+  } catch (err) {
+    console.error("[PUT /classes/:id/close]", err.message);
+    return res.status(500).json({ message: "Error interno", error: err.message });
+  }
+});
+
+// PUT /api/classes/:id/reopen — reabre una clase cerrada (vuelve a 'scheduled').
+app.put("/api/classes/:id/reopen", adminMiddleware, async (req, res) => {
+  try {
+    const r = await pool.query(
+      `UPDATE classes SET status='scheduled', updated_at=NOW()
+        WHERE id=$1 AND status='closed'
+        RETURNING id, status`,
+      [req.params.id],
+    );
+    if (!r.rows.length) {
+      return res.status(404).json({ message: "Clase no encontrada o no está cerrada" });
+    }
+    return res.json({ data: r.rows[0] });
+  } catch (err) {
+    console.error("[PUT /classes/:id/reopen]", err.message);
+    return res.status(500).json({ message: "Error interno", error: err.message });
+  }
+});
+
 // DELETE /api/admin/bookings/:id — admin cancela un booking individual
 // con override de política de 2h. Devuelve crédito siempre. Optional body
 // { reason } se incluye en WA.
@@ -9650,9 +9692,11 @@ app.post("/api/bookings/with-guest", authMiddleware, async (req, res) => {
       return res.status(404).json({ message: "Clase no encontrada" });
     }
     const cls = clsRes.rows[0];
-    if (cls.status === "cancelled") {
+    if (cls.status === "cancelled" || cls.status === "closed") {
       await dbClient.query("ROLLBACK");
-      return res.status(400).json({ message: "Esta clase fue cancelada" });
+      return res.status(400).json({
+        message: cls.status === "closed" ? "Esta clase ya no admite nuevas reservas." : "Esta clase fue cancelada",
+      });
     }
     if (cls.starts_at) {
       const msToStart = new Date(cls.starts_at).getTime() - Date.now();
@@ -9885,47 +9929,64 @@ function parseTimeSlotTo24Hour(timeValue) {
   return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 }
 
-// POST /api/classes/generate — bulk generate
+// POST /api/classes/generate — bulk generate (transaccional: o se crean todas
+// o ninguna; antes un fallo a mitad dejaba clases a medias y respondía 500).
 app.post("/api/classes/generate", adminMiddleware, async (req, res) => {
+  const { startDate, endDate, classTypeId, instructorId, daysOfWeek, startTime, endTime, maxCapacity = 5 } = req.body;
+  if (!startDate || !endDate) return res.status(400).json({ message: "startDate y endDate requeridos" });
+  if (!classTypeId) return res.status(400).json({ message: "classTypeId requerido" });
+  if (!instructorId) return res.status(400).json({ message: "instructorId requerido" });
+  if (!Array.isArray(daysOfWeek) || !daysOfWeek.length) return res.status(400).json({ message: "Selecciona al menos un día" });
+  if (!/^\d{2}:\d{2}$/.test(String(startTime || "")) || !/^\d{2}:\d{2}$/.test(String(endTime || ""))) {
+    return res.status(400).json({ message: "startTime y endTime deben tener formato HH:mm" });
+  }
+  if (String(endTime) <= String(startTime)) {
+    return res.status(400).json({ message: "La hora de fin debe ser posterior a la de inicio." });
+  }
+  const cap = Number(maxCapacity);
+  if (!Number.isInteger(cap) || cap < 1) {
+    return res.status(400).json({ message: "El cupo debe ser un entero >= 1" });
+  }
+  // Append T00:00:00 to parse as local midnight (not UTC)
+  const start = new Date(startDate + "T00:00:00");
+  const end = new Date(endDate + "T00:00:00");
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return res.status(400).json({ message: "Fechas inválidas" });
+  }
+  if (end < start) {
+    return res.status(400).json({ message: "La fecha de fin no puede ser anterior a la de inicio." });
+  }
+
+  const client = await pool.connect();
   try {
-    const { startDate, endDate, classTypeId, instructorId, daysOfWeek, startTime, endTime, maxCapacity = 5 } = req.body;
-    if (!startDate || !endDate) return res.status(400).json({ message: "startDate y endDate requeridos" });
-    if (!classTypeId) return res.status(400).json({ message: "classTypeId requerido" });
-    if (!instructorId) return res.status(400).json({ message: "instructorId requerido" });
-    if (!Array.isArray(daysOfWeek) || !daysOfWeek.length) return res.status(400).json({ message: "Selecciona al menos un día" });
-    if (!/^\d{2}:\d{2}$/.test(String(startTime || "")) || !/^\d{2}:\d{2}$/.test(String(endTime || ""))) {
-      return res.status(400).json({ message: "startTime y endTime deben tener formato HH:mm" });
-    }
-
+    await client.query("BEGIN");
     const created = [];
-    // Append T00:00:00 to parse as local midnight (not UTC)
-    const start = new Date(startDate + "T00:00:00");
-    const end = new Date(endDate + "T00:00:00");
 
-    // If classTypeId + daysOfWeek provided → generate from form data
+    // Modo formulario (el que usa la app): classTypeId + daysOfWeek + horas.
     if (classTypeId && Array.isArray(daysOfWeek) && daysOfWeek.length && startTime && endTime) {
       for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
         const jsDay = d.getDay(); // 0=Sun,1=Mon...
         if (!daysOfWeek.includes(jsDay)) continue;
         const classDate = toDbDateString(d);
-        const exists = await pool.query(
+        const exists = await client.query(
           "SELECT id FROM classes WHERE date = $1 AND start_time = $2 AND class_type_id = $3",
           [classDate, startTime, classTypeId]
         );
         if (exists.rows.length) continue;
-        const r = await pool.query(
+        const r = await client.query(
           `INSERT INTO classes (class_type_id, instructor_id, date, start_time, end_time, max_capacity, status)
            VALUES ($1,$2,$3,$4,$5,$6,'scheduled') RETURNING *`,
-          [classTypeId, instructorId, classDate, startTime, endTime, maxCapacity]
+          [classTypeId, instructorId, classDate, startTime, endTime, cap]
         );
         created.push(r.rows[0]);
       }
+      await client.query("COMMIT");
       return res.json({ created: created.length, data: created });
     }
 
     // Fallback: generate from schedule_templates
-    const slotsRes = await pool.query("SELECT * FROM schedule_templates WHERE is_active = true");
-    const classTypeRes = await pool.query("SELECT id, name, category FROM class_types WHERE is_active = true");
+    const slotsRes = await client.query("SELECT * FROM schedule_templates WHERE is_active = true");
+    const classTypeRes = await client.query("SELECT id, name, category FROM class_types WHERE is_active = true");
     const classTypes = classTypeRes.rows;
     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
       const dayOfWeek = d.getDay() === 0 ? 7 : d.getDay();
@@ -9936,15 +9997,15 @@ app.post("/api/classes/generate", adminMiddleware, async (req, res) => {
         const classDate = toDbDateString(d);
         const endTimeValue = addMinutesToTimeString(startTimeValue, 55);
         const label = slot.class_label?.toLowerCase();
-        let ct = classTypes.find(c => c.category?.toLowerCase() === label || c.name?.toLowerCase().includes(label));
+        let ct = classTypes.find(c => c.category?.toLowerCase() === label || (label && c.name?.toLowerCase().includes(label)));
         if (!ct) ct = classTypes[0];
         if (!ct) continue;
-        const exists = await pool.query(
+        const exists = await client.query(
           "SELECT id FROM classes WHERE date = $1 AND start_time = $2 AND class_type_id = $3",
           [classDate, startTimeValue, ct.id]
         );
         if (exists.rows.length) continue;
-        const r = await pool.query(
+        const r = await client.query(
           `INSERT INTO classes (class_type_id, instructor_id, date, start_time, end_time, max_capacity, status)
            VALUES ($1,$2,$3,$4,$5,10,'scheduled') RETURNING *`,
           [ct.id, instructorId, classDate, startTimeValue, endTimeValue]
@@ -9952,8 +10013,15 @@ app.post("/api/classes/generate", adminMiddleware, async (req, res) => {
         created.push(r.rows[0]);
       }
     }
+    await client.query("COMMIT");
     return res.json({ created: created.length, data: created });
-  } catch (err) { console.error("generate classes error:", err); return res.status(500).json({ message: "Error interno" }); }
+  } catch (err) {
+    await client.query("ROLLBACK").catch(() => {});
+    console.error("generate classes error:", err);
+    return res.status(500).json({ message: "Error interno" });
+  } finally {
+    client.release();
+  }
 });
 
 // ─── Schedules (schedule_slots) CRUD ────────────────────────────────────────
@@ -14535,6 +14603,16 @@ app.put("/api/admin/classes/:id", adminMiddleware, async (req, res) => {
       classTypeId, instructorId, startTime, endTime,
       maxCapacity, capacity, status, notes,
     } = req.body || {};
+
+    // Cancelar tiene su propia cascada (PUT /api/classes/:id/cancel) que
+    // reembolsa y avisa. Por aquí NO se permite, para no dejar reservas activas
+    // en una clase 'cancelled' sin devolver crédito. 'closed' (cerrar) sí.
+    if (status === "cancelled") {
+      return res.status(400).json({
+        message: "Para cancelar usa la opción Cancelar clase (devuelve créditos y avisa a las alumnas).",
+      });
+    }
+
     // Acepta cualquiera de los dos nombres para no romper consumidores viejos.
     const newCap = maxCapacity ?? capacity;
     if (newCap != null) {
@@ -14549,22 +14627,42 @@ app.put("/api/admin/classes/:id", adminMiddleware, async (req, res) => {
         });
       }
     }
+
+    // startTime/endTime pueden venir como datetime-local "YYYY-MM-DDTHH:mm".
+    // La tabla usa columnas DATE y TIME separadas → hay que separarlas. Antes se
+    // escribía el ISO completo en la columna TIME y nunca se tocaba `date`, por
+    // eso editar (reprogramar) una clase fallaba o corrompía la hora.
+    let dateStr = null, startTimeStr = null, endTimeStr = null;
+    if (startTime) {
+      const s = String(startTime);
+      if (s.includes("T")) { const [d, t] = s.split("T"); dateStr = d; startTimeStr = t.slice(0, 5); }
+      else if (s.length >= 5) { startTimeStr = s.slice(0, 5); }
+    }
+    if (endTime) {
+      const e = String(endTime);
+      endTimeStr = e.includes("T") ? e.split("T")[1].slice(0, 5) : (e.length >= 5 ? e.slice(0, 5) : null);
+    }
+    if (startTimeStr && endTimeStr && endTimeStr <= startTimeStr) {
+      return res.status(400).json({ message: "La hora de fin debe ser posterior a la de inicio." });
+    }
+
     const r = await pool.query(
       `UPDATE classes SET
          class_type_id = COALESCE($1, class_type_id),
          instructor_id = COALESCE($2, instructor_id),
-         start_time    = COALESCE($3, start_time),
-         end_time      = COALESCE($4, end_time),
-         max_capacity  = COALESCE($5, max_capacity),
-         status        = COALESCE($6, status),
-         notes         = COALESCE($7, notes),
+         date          = COALESCE($3, date),
+         start_time    = COALESCE($4, start_time),
+         end_time      = COALESCE($5, end_time),
+         max_capacity  = COALESCE($6, max_capacity),
+         status        = COALESCE($7, status),
+         notes         = COALESCE($8, notes),
          updated_at    = NOW()
-       WHERE id = $8 RETURNING *`,
+       WHERE id = $9 RETURNING *`,
       [
         classTypeId || null, instructorId || null,
-        startTime || null, endTime || null,
+        dateStr, startTimeStr, endTimeStr,
         newCap != null ? Number(newCap) : null,
-        status || null, notes || null,
+        status || null, notes ?? null,
         req.params.id,
       ]
     );
@@ -14586,55 +14684,11 @@ app.delete("/api/admin/classes/:id", adminMiddleware, async (req, res) => {
   }
 });
 
-// POST /api/admin/classes/generate — bulk generate from schedule templates
-app.post("/api/admin/classes/generate", adminMiddleware, async (req, res) => {
-  try {
-    const { startDate, endDate, instructorId } = req.body;
-    if (!startDate || !endDate) return res.status(400).json({ message: "startDate y endDate requeridos" });
-    if (!instructorId) return res.status(400).json({ message: "instructorId requerido" });
-    // Get schedule slots
-    const slotsRes = await pool.query("SELECT * FROM schedule_templates WHERE is_active = true");
-    const slots = slotsRes.rows;
-    if (!slots.length) return res.status(400).json({ message: "No hay horarios configurados" });
-    // Get a default class type for each label
-    const classTypeRes = await pool.query("SELECT id, name, category FROM class_types WHERE is_active = true");
-    const classTypes = classTypeRes.rows;
-    const created = [];
-    // Append T00:00:00 to parse as local midnight (not UTC)
-    const start = new Date(startDate + "T00:00:00");
-    const end = new Date(endDate + "T00:00:00");
-    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-      const dayOfWeek = d.getDay() === 0 ? 7 : d.getDay(); // Mon=1..Sun=7
-      const daySlots = slots.filter(s => s.day_of_week === dayOfWeek);
-      for (const slot of daySlots) {
-        const classDate = toDbDateString(d);
-        const startTimeValue = parseTimeSlotTo24Hour(slot.time_slot);
-        if (!startTimeValue) continue;
-        const endTimeValue = addMinutesToTimeString(startTimeValue, 55);
-        // Pick class type by label
-        const label = slot.class_label?.toUpperCase();
-        let ct = classTypes.find(ct => ct.category?.toLowerCase() === label?.toLowerCase());
-        if (!ct) ct = classTypes[0];
-        if (!ct) continue;
-        // Check no duplicate
-        const exists = await pool.query(
-          "SELECT id FROM classes WHERE date = $1 AND start_time = $2 AND class_type_id = $3",
-          [classDate, startTimeValue, ct.id]
-        );
-        if (exists.rows.length) continue;
-        const r = await pool.query(
-          `INSERT INTO classes (class_type_id, instructor_id, date, start_time, end_time, max_capacity, status)
-           VALUES ($1,$2,$3,$4,$5,10,'scheduled') RETURNING *`,
-          [ct.id, instructorId, classDate, startTimeValue, endTimeValue]
-        );
-        created.push(r.rows[0]);
-      }
-    }
-    return res.json({ created: created.length, data: created });
-  } catch (err) {
-    console.error("POST /admin/classes/generate error:", err);
-    return res.status(500).json({ message: "Error interno" });
-  }
+// POST /api/admin/classes/generate — OBSOLETO. La app usa POST /api/classes/generate
+// (transaccional, modo formulario). Se conserva como 410 para evitar mantener dos
+// generadores casi-iguales con comportamiento divergente.
+app.post("/api/admin/classes/generate", adminMiddleware, async (_req, res) => {
+  return res.status(410).json({ message: "Endpoint obsoleto. Usa POST /api/classes/generate." });
 });
 
 // GET /api/admin/referrals
