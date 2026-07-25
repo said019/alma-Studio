@@ -26,6 +26,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight, Plus, CalendarDays, Loader2, ArrowRight } from "lucide-react";
 import { resolveClassColor, classTint, CLASSES_SECTION_TABS } from "./palette";
+import { WellhubClassControl } from "./WellhubClassControl";
 
 /* ── Types ── */
 interface ClassInstance {
@@ -823,6 +824,11 @@ function CalendarView({
                   </div>
                 );
               })()}
+              {!selectedClass.isCancelled && (
+                <div className="pt-2">
+                  <WellhubClassControl classId={selectedClass.id} />
+                </div>
+              )}
               <div className="flex flex-col gap-2 pt-4">
                 {!selectedClass.isCancelled && !selectedClass.isClosed && (
                   <Button variant="outline" className="border-alma-sandstone/70 text-alma-ink" onClick={() => openEdit(selectedClass)}>

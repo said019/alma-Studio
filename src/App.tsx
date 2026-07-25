@@ -58,6 +58,8 @@ import InstructorsList from "./pages/admin/staff/InstructorsList";
 import ReportsPage from "./pages/admin/reports/ReportsPage";
 import AdminReviewsDashboard from "./pages/admin/reviews/AdminReviewsDashboard";
 import SettingsPage from "./pages/admin/settings/SettingsPage";
+import PartnerPlatforms from "./pages/admin/settings/PartnerPlatforms";
+import PartnerCheckins from "./pages/admin/bookings/PartnerCheckins";
 
 // Legal pages
 import Privacidad from "./pages/legal/Privacidad";
@@ -150,6 +152,8 @@ const App = () => (
           <Route path="/admin/reports" element={<ReportsPage />} />
           <Route path="/admin/reviews" element={<AdminReviewsDashboard />} />
           <Route path="/admin/settings" element={<SettingsPage />} />
+          <Route path="/admin/settings/platforms" element={<PartnerPlatforms />} />
+          <Route path="/admin/bookings/partners-checkins" element={<PartnerCheckins />} />
 
           {/* 404 */}
           <Route path="*" element={<NotFound />} />
