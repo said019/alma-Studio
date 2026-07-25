@@ -1667,6 +1667,75 @@ async function ensureSchema() {
       )
     `).catch(() => { });
 
+    // ── Wellhub / partner channels ──────────────────────────────────────────
+    await pool.query(`CREATE TABLE IF NOT EXISTS platform_credentials (
+      channel        VARCHAR(20) PRIMARY KEY,
+      environment    VARCHAR(20) NOT NULL DEFAULT 'production',
+      is_enabled     BOOLEAN NOT NULL DEFAULT false,
+      gym_id         TEXT,
+      webhook_secret TEXT,
+      access_token   TEXT,
+      api_base_url   TEXT, booking_base_url TEXT, access_base_url TEXT,
+      webhook_url    TEXT,
+      extra_config   JSONB DEFAULT '{}'::jsonb,
+      created_at     TIMESTAMPTZ DEFAULT NOW(),
+      updated_at     TIMESTAMPTZ DEFAULT NOW()
+    )`).catch((e) => console.warn("[schema] platform_credentials:", e.message));
+
+    await pool.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS channel VARCHAR(20) DEFAULT 'app'`).catch(() => { });
+    await pool.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS external_ref TEXT`).catch(() => { });
+    await pool.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS partner_metadata JSONB DEFAULT '{}'::jsonb`).catch(() => { });
+    await pool.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS partner_status TEXT`).catch(() => { });
+    await pool.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS partner_reported_at TIMESTAMPTZ`).catch(() => { });
+    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS uq_bookings_channel_ref
+      ON bookings(channel, external_ref) WHERE channel <> 'app' AND external_ref IS NOT NULL`).catch(() => { });
+
+    await pool.query(`CREATE TABLE IF NOT EXISTS channel_inventory (
+      class_id UUID NOT NULL, channel VARCHAR(20) NOT NULL,
+      max_spots INT NOT NULL DEFAULT 0, booked_spots INT NOT NULL DEFAULT 0,
+      updated_at TIMESTAMPTZ DEFAULT NOW(), PRIMARY KEY (class_id, channel)
+    )`).catch((e) => console.warn("[schema] channel_inventory:", e.message));
+
+    await pool.query(`CREATE TABLE IF NOT EXISTS partner_class_mappings (
+      class_id UUID NOT NULL, channel VARCHAR(20) NOT NULL,
+      external_class_id TEXT, external_slot_id TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW(), PRIMARY KEY (class_id, channel)
+    )`).catch((e) => console.warn("[schema] partner_class_mappings:", e.message));
+
+    await pool.query(`CREATE TABLE IF NOT EXISTS partner_checkins (
+      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+      booking_id UUID, user_id UUID, channel VARCHAR(20) NOT NULL,
+      status VARCHAR(20) NOT NULL DEFAULT 'pending',
+      method VARCHAR(20) NOT NULL DEFAULT 'automated',
+      validated_at TIMESTAMPTZ, external_response JSONB,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )`).catch((e) => console.warn("[schema] partner_checkins:", e.message));
+
+    await pool.query(`CREATE TABLE IF NOT EXISTS processed_events (
+      event_id TEXT PRIMARY KEY, channel VARCHAR(20), created_at TIMESTAMPTZ DEFAULT NOW()
+    )`).catch((e) => console.warn("[schema] processed_events:", e.message));
+
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS wellhub_id TEXT`).catch(() => { });
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS platform_plan TEXT`).catch(() => { });
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS source TEXT`).catch(() => { });
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_users_wellhub_id ON users(wellhub_id)`).catch(() => { });
+
+    // Trigger: booked_spots por canal = COUNT real de bookings activas (el código nunca lo toca a mano).
+    await pool.query(`CREATE OR REPLACE FUNCTION fn_update_channel_inventory() RETURNS TRIGGER AS $$
+      DECLARE cid UUID; ch VARCHAR(20);
+      BEGIN
+        cid := COALESCE(NEW.class_id, OLD.class_id); ch := COALESCE(NEW.channel, OLD.channel);
+        IF ch IS NULL OR ch = 'app' THEN RETURN NULL; END IF;
+        UPDATE channel_inventory SET booked_spots = (
+          SELECT COUNT(*) FROM bookings b WHERE b.class_id = cid AND b.channel = ch
+            AND b.status NOT IN ('cancelled','no_show')
+        ), updated_at = NOW() WHERE class_id = cid AND channel = ch;
+        RETURN NULL;
+      END; $$ LANGUAGE plpgsql`).catch((e) => console.warn("[schema] inv fn:", e.message));
+    await pool.query(`DROP TRIGGER IF EXISTS trg_channel_inventory ON bookings`).catch(() => { });
+    await pool.query(`CREATE TRIGGER trg_channel_inventory AFTER INSERT OR UPDATE OR DELETE ON bookings
+      FOR EACH ROW EXECUTE FUNCTION fn_update_channel_inventory()`).catch((e) => console.warn("[schema] inv trg:", e.message));
+
     console.log("✅ Schema ensured");
   } catch (err) {
     console.error("Schema migration warning:", err.message);
