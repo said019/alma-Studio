@@ -44,6 +44,8 @@ const NAV_GROUPS = [
     items: [
       { path: "/admin/settings?tab=whatsapp", label: "WhatsApp", icon: MessageCircle },
       { path: "/admin/settings", label: "Configuración", icon: Settings },
+      { path: "/admin/settings/platforms", label: "Wellhub", icon: Package },
+      { path: "/admin/bookings/partners-checkins", label: "Check-ins Wellhub", icon: BookOpen },
     ],
   },
 ];
