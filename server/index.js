@@ -27,6 +27,11 @@ import { ALMA_CLASS_TYPES, ALMA_SCHEDULE_SLOTS, ALMA_SCHEDULE_DAYS, ALMA_PLANS, 
 import { resolveEffectivePrice } from "./lib/pricing.js";
 import { isMembershipCategoryCompatible as ruleCategoryCompatible, normalizeClassCategory as ruleNormalizeCategory, isWithinMorningWindow, categoryLabel } from "./lib/bookingRules.js";
 import { isWithinCancelWindow, penaltyDueAt } from "./lib/faltas.js";
+import { verifyWellhubSignature, extractSignatureHeader } from "./lib/wellhub/signature.js";
+import { extractGymId, computeEventId } from "./lib/wellhub/payload.js";
+import { getWellhubCredentials } from "./lib/wellhub/credentials.js";
+import { validateWellhubVisit as wellhubValidateVisit } from "./lib/wellhub/api.js";
+import { handleBookingRequested, handleCheckin, handleCancel, handlePlanChange } from "./lib/wellhub/flows.js";
 import {
   validateStripeConfig,
   createOrGetStripeCustomer,
@@ -1974,12 +1979,74 @@ app.use(createSimpleRateLimiter({
 app.use((req, res, next) => {
   if (req.path.startsWith("/api/drive/upload-chunk/")) return next();
   if (req.path === "/api/stripe/webhook") return next();
+  if (req.path.startsWith("/webhooks/wellhub")) return next();
   express.json({ limit: "20mb" })(req, res, next);
 });
 app.use((req, res, next) => {
   if (req.path.startsWith("/api/drive/upload-chunk/")) return next();
   if (req.path === "/api/stripe/webhook") return next();
+  if (req.path.startsWith("/webhooks/wellhub")) return next();
   express.urlencoded({ extended: true, limit: "20mb" })(req, res, next);
+});
+
+// ─── Wellhub / partner webhooks (raw body, firma HMAC-SHA1, idempotencia) ────
+async function wellhubWebhookHandler(req, res, eventTypeOverride) {
+  const rawBuf = Buffer.isBuffer(req.body) ? req.body : Buffer.from(String(req.body ?? ""));
+  let payload;
+  try { payload = JSON.parse(rawBuf.toString("utf8")); }
+  catch { return res.status(400).json({ message: "JSON inválido" }); }
+
+  const creds = await getWellhubCredentials(pool).catch(() => null);
+  if (!creds || !creds.is_enabled) return res.status(503).json({ message: "Wellhub no habilitado" });
+
+  const sig = extractSignatureHeader(req.headers);
+  const verdict = verifyWellhubSignature(rawBuf, sig, creds.webhook_secret);
+  if (verdict === false) return res.status(401).json({ message: "Firma Wellhub inválida" });
+  if (verdict === null) console.warn("[wellhub] sin webhook_secret — firma omitida (configurar en prod)");
+
+  const gymId = extractGymId(payload);
+  if (gymId && creds.gym_id && String(gymId) !== String(creds.gym_id)) {
+    return res.status(200).json({ status: "ignored", reason: "gym_mismatch" });
+  }
+
+  const eventType = eventTypeOverride || payload.event_type || payload.type;
+  const eventId = computeEventId(eventType, payload);
+  try {
+    const r = await pool.query(
+      "INSERT INTO processed_events (event_id, channel) VALUES ($1,'wellhub') ON CONFLICT (event_id) DO NOTHING RETURNING event_id",
+      [eventId],
+    );
+    if (!r.rows.length) return res.status(200).json({ status: "already_processed" });
+  } catch (e) { console.warn("[wellhub] idempotency:", e.message); }
+
+  try {
+    let result;
+    switch (eventType) {
+      case "booking-requested": result = await handleBookingRequested(pool, creds, payload); break;
+      case "checkin":
+      case "checkin-booking-occurred": result = await handleCheckin(pool, creds, payload); break;
+      case "booking-canceled": result = await handleCancel(pool, creds, payload, { late: false }); break;
+      case "booking-late-canceled": result = await handleCancel(pool, creds, payload, { late: true }); break;
+      case "change":
+      case "cancel": result = await handlePlanChange(pool, creds, payload); break;
+      default: result = { status: "ignored", eventType };
+    }
+    return res.status(200).json(result);
+  } catch (err) {
+    console.error("[wellhub] handler error:", err.message);
+    await pool.query("DELETE FROM processed_events WHERE event_id=$1", [eventId]).catch(() => {});
+    return res.status(500).json({ message: "Error interno" });
+  }
+}
+
+app.post("/webhooks/wellhub", express.raw({ type: "*/*" }), (req, res) => wellhubWebhookHandler(req, res));
+app.post("/webhooks/wellhub/checkin", express.raw({ type: "*/*" }), (req, res) => wellhubWebhookHandler(req, res, "checkin"));
+app.post("/webhooks/wellhub/cancel", express.raw({ type: "*/*" }), (req, res) => wellhubWebhookHandler(req, res, "cancel"));
+app.post("/webhooks/wellhub/change", express.raw({ type: "*/*" }), (req, res) => wellhubWebhookHandler(req, res, "change"));
+app.post("/webhooks/wellhub/debug/echo", express.raw({ type: "*/*" }), (req, res) => {
+  let body = null;
+  try { body = JSON.parse(req.body.toString("utf8")); } catch { body = req.body?.toString?.("utf8") ?? null; }
+  return res.status(200).json({ ok: true, headers: req.headers, body });
 });
 
 // ─── Helper: snake_case → camelCase row mapper ──────────────────────────────
@@ -13502,6 +13569,24 @@ app.put("/api/bookings/:id/check-in", adminMiddleware, async (req, res) => {
       [req.params.id],
     );
     const booking = r.rows[0];
+    // ── Reflejar visita Wellhub si el check-in fue local (recepción/QR/coach) ──
+    // Fire-and-forget, best-effort: valida la visita contra Wellhub para facturar.
+    if (booking.channel === "wellhub" && !wasAlreadyCheckedIn) {
+      (async () => {
+        try {
+          const creds = await getWellhubCredentials(pool);
+          if (creds && creds.is_enabled) {
+            const u = await pool.query("SELECT wellhub_id FROM users WHERE id=$1", [booking.user_id]);
+            const vres = await wellhubValidateVisit(creds, { customCode: u.rows[0]?.wellhub_id });
+            await pool.query(
+              `INSERT INTO partner_checkins (booking_id, user_id, channel, status, method, validated_at, external_response)
+               VALUES ($1,$2,'wellhub',$3,'manual',NOW(),$4)`,
+              [booking.id, booking.user_id, vres.ok ? "confirmed" : "failed", JSON.stringify(vres.data || {})],
+            );
+          }
+        } catch (e) { console.warn("[wellhub] reflect visit:", e.message); }
+      })();
+    }
     // 3) Otorgar +10 pts SOLO si es primer check-in.
     if (booking.user_id && !wasAlreadyCheckedIn) {
       try {
