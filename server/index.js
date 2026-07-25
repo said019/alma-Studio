@@ -2049,6 +2049,117 @@ app.post("/webhooks/wellhub/debug/echo", express.raw({ type: "*/*" }), (req, res
   return res.status(200).json({ ok: true, headers: req.headers, body });
 });
 
+// ─── Wellhub / partner management (admin) ───────────────────────────────────
+app.get("/api/partners/settings", adminMiddleware, async (_req, res) => {
+  try {
+    const r = await pool.query("SELECT * FROM platform_credentials WHERE channel='wellhub'");
+    return res.json({ data: r.rows[0] || null });
+  } catch (err) { console.error("[partners settings GET]", err.message); return res.status(500).json({ message: "Error interno" }); }
+});
+
+app.put("/api/partners/settings", adminMiddleware, async (req, res) => {
+  try {
+    const b = req.body || {};
+    await pool.query(
+      `INSERT INTO platform_credentials (channel, environment, is_enabled, gym_id, webhook_secret, access_token, api_base_url, booking_base_url, access_base_url, webhook_url, extra_config, updated_at)
+       VALUES ('wellhub', $1,$2,$3,$4,$5,$6,$7,$8,$9,$10, NOW())
+       ON CONFLICT (channel) DO UPDATE SET
+         environment=EXCLUDED.environment, is_enabled=EXCLUDED.is_enabled, gym_id=EXCLUDED.gym_id,
+         webhook_secret=EXCLUDED.webhook_secret, access_token=EXCLUDED.access_token,
+         api_base_url=EXCLUDED.api_base_url, booking_base_url=EXCLUDED.booking_base_url,
+         access_base_url=EXCLUDED.access_base_url, webhook_url=EXCLUDED.webhook_url,
+         extra_config=EXCLUDED.extra_config, updated_at=NOW()`,
+      [b.environment || "production", b.is_enabled ?? false, b.gym_id || null, b.webhook_secret || null,
+       b.access_token || null, b.api_base_url || null, b.booking_base_url || null, b.access_base_url || null,
+       b.webhook_url || null, JSON.stringify(b.extra_config || {})],
+    );
+    const r = await pool.query("SELECT * FROM platform_credentials WHERE channel='wellhub'");
+    return res.json({ data: r.rows[0] });
+  } catch (err) { console.error("[partners settings PUT]", err.message); return res.status(500).json({ message: "Error interno", error: err.message }); }
+});
+
+app.post("/api/partners/wellhub/publish/:classId", adminMiddleware, async (req, res) => {
+  try {
+    const { classId } = req.params;
+    const quota = Number(req.body?.quota ?? 0);
+    const externalSlotId = req.body?.externalSlotId || null;
+    if (!Number.isFinite(quota) || quota < 0) return res.status(400).json({ message: "quota inválida" });
+    await pool.query(
+      `INSERT INTO channel_inventory (class_id, channel, max_spots) VALUES ($1,'wellhub',$2)
+       ON CONFLICT (class_id, channel) DO UPDATE SET max_spots=EXCLUDED.max_spots, updated_at=NOW()`,
+      [classId, quota],
+    );
+    await pool.query(
+      `INSERT INTO partner_class_mappings (class_id, channel, external_slot_id) VALUES ($1,'wellhub',$2)
+       ON CONFLICT (class_id, channel) DO UPDATE SET external_slot_id=EXCLUDED.external_slot_id`,
+      [classId, externalSlotId],
+    );
+    return res.json({ data: { classId, quota, externalSlotId } });
+  } catch (err) { console.error("[partners publish]", err.message); return res.status(500).json({ message: "Error interno" }); }
+});
+
+app.post("/api/partners/wellhub/unpublish/:classId", adminMiddleware, async (req, res) => {
+  try {
+    await pool.query("DELETE FROM channel_inventory WHERE class_id=$1 AND channel='wellhub'", [req.params.classId]);
+    await pool.query("DELETE FROM partner_class_mappings WHERE class_id=$1 AND channel='wellhub'", [req.params.classId]);
+    return res.json({ data: { classId: req.params.classId, published: false } });
+  } catch (err) { console.error("[partners unpublish]", err.message); return res.status(500).json({ message: "Error interno" }); }
+});
+
+app.get("/api/partners/wellhub/class-status/:classId", adminMiddleware, async (req, res) => {
+  try {
+    const inv = await pool.query("SELECT max_spots, booked_spots FROM channel_inventory WHERE class_id=$1 AND channel='wellhub'", [req.params.classId]);
+    const map = await pool.query("SELECT external_slot_id FROM partner_class_mappings WHERE class_id=$1 AND channel='wellhub'", [req.params.classId]);
+    return res.json({ data: {
+      published: inv.rows.length > 0,
+      maxSpots: inv.rows[0]?.max_spots ?? 0,
+      bookedSpots: inv.rows[0]?.booked_spots ?? 0,
+      externalSlotId: map.rows[0]?.external_slot_id ?? null,
+    } });
+  } catch (err) { return res.status(500).json({ message: "Error interno" }); }
+});
+
+app.get("/api/partners/checkins", adminMiddleware, async (_req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT pc.id, pc.status, pc.method, pc.validated_at, pc.created_at, pc.channel,
+              u.display_name AS user_name, u.wellhub_id,
+              c.date AS class_date, ct.name AS class_name
+         FROM partner_checkins pc
+         LEFT JOIN users u ON u.id = pc.user_id
+         LEFT JOIN bookings b ON b.id = pc.booking_id
+         LEFT JOIN classes c ON c.id = b.class_id
+         LEFT JOIN class_types ct ON ct.id = c.class_type_id
+        ORDER BY pc.created_at DESC LIMIT 200`,
+    );
+    return res.json({ data: r.rows });
+  } catch (err) { console.error("[partners checkins]", err.message); return res.status(500).json({ message: "Error interno" }); }
+});
+
+app.post("/api/partners/checkins/:id/confirm", adminMiddleware, async (req, res) => {
+  try {
+    const r = await pool.query(
+      "UPDATE partner_checkins SET status='confirmed', validated_at=COALESCE(validated_at,NOW()), method='manual' WHERE id=$1 RETURNING *",
+      [req.params.id],
+    );
+    if (!r.rows.length) return res.status(404).json({ message: "Check-in no encontrado" });
+    return res.json({ data: r.rows[0] });
+  } catch (err) { return res.status(500).json({ message: "Error interno" }); }
+});
+
+app.get("/api/partners/summary", adminMiddleware, async (_req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT channel, COUNT(*)::int AS checkins,
+              COUNT(*) FILTER (WHERE status='confirmed')::int AS confirmed
+         FROM partner_checkins
+        WHERE created_at >= date_trunc('month', NOW())
+        GROUP BY channel`,
+    );
+    return res.json({ data: r.rows });
+  } catch (err) { return res.status(500).json({ message: "Error interno" }); }
+});
+
 // ─── Helper: snake_case → camelCase row mapper ──────────────────────────────
 function camelRow(row) {
   if (!row || typeof row !== "object") return row;
@@ -16004,6 +16115,36 @@ function scheduleEmailCrons() {
       console.error("[Cron] class_reminder interval error:", e?.message),
     );
   }, 10 * 60 * 1000); // every 10 minutes
+
+  // ── Wellhub: reconcile inventario cada 5 min (safety net del trigger) ──
+  setInterval(async () => {
+    try {
+      await pool.query(`UPDATE channel_inventory ci SET booked_spots = (
+        SELECT COUNT(*) FROM bookings b WHERE b.class_id = ci.class_id AND b.channel = ci.channel
+          AND b.status NOT IN ('cancelled','no_show')
+      ), updated_at = NOW()`);
+    } catch (e) { console.error("[Cron] wellhub reconcile:", e?.message); }
+  }, 5 * 60 * 1000);
+
+  // ── Wellhub: resumen diario de check-ins confirmados (ventana 23:40 MX) ──
+  setInterval(async () => {
+    try {
+      const mx = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Mexico_City" }));
+      if (mx.getMinutes() < 40 || mx.getMinutes() >= 45 || mx.getHours() !== 23) return; // 1 tick/día
+      const creds = await getWellhubCredentials(pool);
+      const url = creds?.is_enabled ? creds.extra_config?.daily_summary_url : null;
+      if (!url) return;
+      const r = await pool.query(
+        `SELECT id, user_id, validated_at FROM partner_checkins
+          WHERE channel='wellhub' AND status='confirmed' AND created_at::date = NOW()::date`,
+      );
+      await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(creds.access_token ? { Authorization: `Bearer ${creds.access_token}` } : {}) },
+        body: JSON.stringify({ date: mx.toISOString().slice(0, 10), checkins: r.rows }),
+      }).catch(() => {});
+    } catch (e) { console.error("[Cron] wellhub daily summary:", e?.message); }
+  }, 5 * 60 * 1000);
 }
 
 // ─── Start ───────────────────────────────────────────────────────────────────
