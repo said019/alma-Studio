@@ -1,7 +1,9 @@
-// Colores de marca Wellhub — para diferenciar visualmente lo de Wellhub del
-// resto de Alma (Alma es cream/espresso; Wellhub es amarillo lima + negro).
+// Colores de marca Wellhub (rebrand 2024: verde/azul teal, NO amarillo).
+// primary = "Well Blue" teal documentado de Wellhub (#00888B). Si tienes el hex
+// exacto del brand kit de Wellhub, cámbialo aquí y se actualiza en toda la UI.
 export const WELLHUB = {
-  yellow: "#E6FB4E",      // acento principal Wellhub
-  yellowSoft: "#FBFFE6",  // tinte suave para fondos
-  ink: "#1A1A1A",         // negro Wellhub para texto/contraste
+  primary: "#00888B",   // teal Wellhub
+  soft: "#E6F4F4",      // tinte suave para fondos
+  ink: "#0A3536",       // teal oscuro para texto
+  on: "#FFFFFF",        // texto sobre el teal
 };

@@ -49,7 +49,7 @@ const PartnerCheckins = () => {
       <AdminLayout>
         <div className="admin-page max-w-5xl">
           <div className="mb-6 flex items-center gap-2">
-            <span className="rounded-md px-2 py-1 text-xs font-bold tracking-tight" style={{ backgroundColor: WELLHUB.yellow, color: WELLHUB.ink }}>Wellhub</span>
+            <span className="rounded-md px-2 py-1 text-xs font-bold tracking-tight" style={{ backgroundColor: WELLHUB.primary, color: WELLHUB.on }}>Wellhub</span>
             <h1 className="admin-title font-semibold text-alma-ink">Check-ins de convenio</h1>
           </div>
           <div className="overflow-hidden rounded-xl border border-alma-hairline bg-alma-mist">

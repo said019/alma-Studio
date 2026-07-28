@@ -54,7 +54,7 @@ const PartnerPlatforms = () => {
       <AdminLayout>
         <div className="admin-page max-w-2xl">
           <div className="mb-2 flex items-center gap-2">
-            <span className="rounded-md px-2 py-1 text-xs font-bold tracking-tight" style={{ backgroundColor: WELLHUB.yellow, color: WELLHUB.ink }}>Wellhub</span>
+            <span className="rounded-md px-2 py-1 text-xs font-bold tracking-tight" style={{ backgroundColor: WELLHUB.primary, color: WELLHUB.on }}>Wellhub</span>
             <h1 className="admin-title font-semibold text-alma-ink">Plataformas</h1>
           </div>
           <p className="text-sm text-alma-ink/60 mb-6">
@@ -65,7 +65,7 @@ const PartnerPlatforms = () => {
           {isLoading ? (
             <p className="text-alma-ink/60">Cargando…</p>
           ) : (
-            <div className="space-y-5 rounded-xl border border-alma-hairline bg-alma-mist p-6" style={{ borderLeft: `4px solid ${WELLHUB.yellow}` }}>
+            <div className="space-y-5 rounded-xl border border-alma-hairline bg-alma-mist p-6" style={{ borderLeft: `4px solid ${WELLHUB.primary}` }}>
               <div className="flex items-center justify-between">
                 <div>
                   <Label>Activo</Label>
@@ -135,7 +135,7 @@ const PartnerPlatforms = () => {
                 </div>
               </details>
 
-              <Button onClick={() => save.mutate()} disabled={save.isPending} className="hover:opacity-90" style={{ backgroundColor: WELLHUB.yellow, color: WELLHUB.ink, fontWeight: 600 }}>
+              <Button onClick={() => save.mutate()} disabled={save.isPending} className="hover:opacity-90" style={{ backgroundColor: WELLHUB.primary, color: WELLHUB.on, fontWeight: 600 }}>
                 {save.isPending ? "Guardando…" : "Guardar"}
               </Button>
             </div>

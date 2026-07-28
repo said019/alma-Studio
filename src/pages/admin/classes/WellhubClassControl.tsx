@@ -35,19 +35,19 @@ export function WellhubClassControl({ classId }: { classId: string }) {
   return (
     <div
       className="rounded-lg p-3 text-sm"
-      style={{ backgroundColor: WELLHUB.yellowSoft, border: `1px solid ${WELLHUB.yellow}`, borderLeft: `4px solid ${WELLHUB.yellow}` }}
+      style={{ backgroundColor: WELLHUB.soft, border: `1px solid ${WELLHUB.primary}`, borderLeft: `4px solid ${WELLHUB.primary}` }}
     >
       <div className="mb-2 flex items-center justify-between">
         <span className="flex items-center gap-1.5 font-bold tracking-tight" style={{ color: WELLHUB.ink }}>
-          <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: WELLHUB.yellow, boxShadow: `0 0 0 1.5px ${WELLHUB.ink}` }} />
+          <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: WELLHUB.primary }} />
           Wellhub
         </span>
         {status?.published ? (
-          <span className="rounded-full px-2 py-0.5 text-xs font-semibold" style={{ backgroundColor: WELLHUB.yellow, color: WELLHUB.ink }}>
+          <span className="rounded-full px-2 py-0.5 text-xs font-semibold" style={{ backgroundColor: WELLHUB.primary, color: WELLHUB.on }}>
             Publicada · {status.bookedSpots}/{status.maxSpots}
           </span>
         ) : (
-          <span className="text-xs" style={{ color: WELLHUB.ink, opacity: 0.45 }}>No publicada</span>
+          <span className="text-xs" style={{ color: WELLHUB.ink, opacity: 0.5 }}>No publicada</span>
         )}
       </div>
       <div>
@@ -59,7 +59,7 @@ export function WellhubClassControl({ classId }: { classId: string }) {
           onClick={() => publish.mutate()}
           disabled={publish.isPending || !quota}
           className="hover:opacity-90"
-          style={{ backgroundColor: WELLHUB.yellow, color: WELLHUB.ink, fontWeight: 600 }}
+          style={{ backgroundColor: WELLHUB.primary, color: WELLHUB.on, fontWeight: 600 }}
         >
           {status?.published ? "Actualizar" : "Publicar"}
         </Button>
@@ -69,7 +69,7 @@ export function WellhubClassControl({ classId }: { classId: string }) {
             variant="outline"
             onClick={() => unpublish.mutate()}
             disabled={unpublish.isPending}
-            style={{ borderColor: WELLHUB.ink, color: WELLHUB.ink }}
+            style={{ borderColor: WELLHUB.primary, color: WELLHUB.ink }}
           >
             Despublicar
           </Button>
