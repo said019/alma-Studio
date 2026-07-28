@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatDate } from "@/lib/format";
 import { useToast } from "@/hooks/use-toast";
+import { WELLHUB } from "@/lib/wellhubBrand";
 
 interface PartnerCheckin {
   id: string;
@@ -47,7 +48,10 @@ const PartnerCheckins = () => {
     <AuthGuard>
       <AdminLayout>
         <div className="admin-page max-w-5xl">
-          <h1 className="admin-title font-semibold text-alma-ink mb-6">Check-ins de convenio (Wellhub)</h1>
+          <div className="mb-6 flex items-center gap-2">
+            <span className="rounded-md px-2 py-1 text-xs font-bold tracking-tight" style={{ backgroundColor: WELLHUB.yellow, color: WELLHUB.ink }}>Wellhub</span>
+            <h1 className="admin-title font-semibold text-alma-ink">Check-ins de convenio</h1>
+          </div>
           <div className="overflow-hidden rounded-xl border border-alma-hairline bg-alma-mist">
             <Table>
               <TableHeader>

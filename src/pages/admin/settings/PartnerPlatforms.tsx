@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
+import { WELLHUB } from "@/lib/wellhubBrand";
 
 interface WellhubSettings {
   environment?: string;
@@ -52,7 +53,10 @@ const PartnerPlatforms = () => {
     <AuthGuard>
       <AdminLayout>
         <div className="admin-page max-w-2xl">
-          <h1 className="admin-title font-semibold text-alma-ink mb-2">Plataformas — Wellhub</h1>
+          <div className="mb-2 flex items-center gap-2">
+            <span className="rounded-md px-2 py-1 text-xs font-bold tracking-tight" style={{ backgroundColor: WELLHUB.yellow, color: WELLHUB.ink }}>Wellhub</span>
+            <h1 className="admin-title font-semibold text-alma-ink">Plataformas</h1>
+          </div>
           <p className="text-sm text-alma-ink/60 mb-6">
             La URL de webhook registrada en Wellhub es la del gateway compartido:
             <code className="ml-1 break-all text-xs">{GATEWAY_URL}</code>
@@ -61,7 +65,7 @@ const PartnerPlatforms = () => {
           {isLoading ? (
             <p className="text-alma-ink/60">Cargando…</p>
           ) : (
-            <div className="space-y-5 rounded-xl border border-alma-hairline bg-alma-mist p-6">
+            <div className="space-y-5 rounded-xl border border-alma-hairline bg-alma-mist p-6" style={{ borderLeft: `4px solid ${WELLHUB.yellow}` }}>
               <div className="flex items-center justify-between">
                 <div>
                   <Label>Activo</Label>
@@ -131,7 +135,7 @@ const PartnerPlatforms = () => {
                 </div>
               </details>
 
-              <Button onClick={() => save.mutate()} disabled={save.isPending}>
+              <Button onClick={() => save.mutate()} disabled={save.isPending} className="hover:opacity-90" style={{ backgroundColor: WELLHUB.yellow, color: WELLHUB.ink, fontWeight: 600 }}>
                 {save.isPending ? "Guardando…" : "Guardar"}
               </Button>
             </div>

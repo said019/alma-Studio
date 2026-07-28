@@ -4,6 +4,7 @@ import api from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
+import { WELLHUB } from "@/lib/wellhubBrand";
 
 // Control por clase para publicar/despublicar a Wellhub con cupo + mapear el
 // slot externo. Se embebe en el sheet de la clase del calendario.
@@ -32,22 +33,44 @@ export function WellhubClassControl({ classId }: { classId: string }) {
   });
 
   return (
-    <div className="rounded-lg border border-alma-hairline bg-alma-mist p-3 text-sm">
+    <div
+      className="rounded-lg p-3 text-sm"
+      style={{ backgroundColor: WELLHUB.yellowSoft, border: `1px solid ${WELLHUB.yellow}`, borderLeft: `4px solid ${WELLHUB.yellow}` }}
+    >
       <div className="mb-2 flex items-center justify-between">
-        <span className="font-medium text-alma-ink">Wellhub</span>
-        {status?.published
-          ? <span className="text-xs text-alma-olive">Publicada · {status.bookedSpots}/{status.maxSpots}</span>
-          : <span className="text-xs text-alma-ink/50">No publicada</span>}
+        <span className="flex items-center gap-1.5 font-bold tracking-tight" style={{ color: WELLHUB.ink }}>
+          <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: WELLHUB.yellow, boxShadow: `0 0 0 1.5px ${WELLHUB.ink}` }} />
+          Wellhub
+        </span>
+        {status?.published ? (
+          <span className="rounded-full px-2 py-0.5 text-xs font-semibold" style={{ backgroundColor: WELLHUB.yellow, color: WELLHUB.ink }}>
+            Publicada · {status.bookedSpots}/{status.maxSpots}
+          </span>
+        ) : (
+          <span className="text-xs" style={{ color: WELLHUB.ink, opacity: 0.45 }}>No publicada</span>
+        )}
       </div>
       <div>
         <Input placeholder="Cupo para Wellhub" type="number" value={quota} onChange={(e) => setQuota(e.target.value)} />
       </div>
       <div className="mt-2 flex gap-2">
-        <Button size="sm" onClick={() => publish.mutate()} disabled={publish.isPending || !quota}>
+        <Button
+          size="sm"
+          onClick={() => publish.mutate()}
+          disabled={publish.isPending || !quota}
+          className="hover:opacity-90"
+          style={{ backgroundColor: WELLHUB.yellow, color: WELLHUB.ink, fontWeight: 600 }}
+        >
           {status?.published ? "Actualizar" : "Publicar"}
         </Button>
         {status?.published && (
-          <Button size="sm" variant="outline" onClick={() => unpublish.mutate()} disabled={unpublish.isPending}>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => unpublish.mutate()}
+            disabled={unpublish.isPending}
+            style={{ borderColor: WELLHUB.ink, color: WELLHUB.ink }}
+          >
             Despublicar
           </Button>
         )}
