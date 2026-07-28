@@ -94,6 +94,12 @@ const PartnerPlatforms = () => {
               ))}
 
               <div className="space-y-1.5">
+                <Label>Product ID (Wellhub)</Label>
+                <p className="text-xs text-alma-ink/55">El ID del producto que representa tus clases en Wellhub (si te lo dieron).</p>
+                <Input value={form.extra_config?.product_id || ""} onChange={(e) => setExtra("product_id", e.target.value)} />
+              </div>
+
+              <div className="space-y-1.5">
                 <Label>Precio de convenio por visita (MXN)</Label>
                 <Input
                   type="number"

@@ -6,7 +6,7 @@
 // mejor aproximación según WELLHUB_INTEGRATION.md; ajustar contra la referencia
 // real de Wellhub durante las pruebas en sandbox (gym_id 439).
 
-async function call(url, { method = "POST", token, gymId, body } = {}) {
+async function call(url, { method = "POST", token, gymId, productId, body } = {}) {
   try {
     const res = await fetch(url, {
       method,
@@ -14,6 +14,7 @@ async function call(url, { method = "POST", token, gymId, body } = {}) {
         "Content-Type": "application/json",
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...(gymId ? { "X-Gym-Id": String(gymId) } : {}),
+        ...(productId ? { "X-Product-Id": String(productId) } : {}),
       },
       body: body ? JSON.stringify(body) : undefined,
     });
@@ -28,23 +29,23 @@ async function call(url, { method = "POST", token, gymId, body } = {}) {
 // Confirma (reserve) una reserva solicitada por Wellhub.
 export async function confirmWellhubBooking(creds, { bookingNumber, reason } = {}) {
   const url = `${creds.bookingBaseUrl}/bookings/${encodeURIComponent(bookingNumber)}/reserve`;
-  return call(url, { token: creds.access_token, gymId: creds.gym_id, body: reason ? { reason } : {} });
+  return call(url, { token: creds.access_token, gymId: creds.gym_id, productId: creds.extra_config?.product_id, body: reason ? { reason } : {} });
 }
 
 // Rechaza una reserva (CLASS_NOT_FOUND, CLASS_IS_FULL, etc.).
 export async function rejectWellhubBooking(creds, { bookingNumber, reason } = {}) {
   const url = `${creds.bookingBaseUrl}/bookings/${encodeURIComponent(bookingNumber)}/reject`;
-  return call(url, { token: creds.access_token, gymId: creds.gym_id, body: { reason: reason || "REJECTED" } });
+  return call(url, { token: creds.access_token, gymId: creds.gym_id, productId: creds.extra_config?.product_id, body: { reason: reason || "REJECTED" } });
 }
 
 // Cancela una reserva confirmada.
 export async function cancelWellhubBooking(creds, { bookingNumber, reason } = {}) {
   const url = `${creds.bookingBaseUrl}/bookings/${encodeURIComponent(bookingNumber)}/cancel`;
-  return call(url, { token: creds.access_token, gymId: creds.gym_id, body: reason ? { reason } : {} });
+  return call(url, { token: creds.access_token, gymId: creds.gym_id, productId: creds.extra_config?.product_id, body: reason ? { reason } : {} });
 }
 
 // Valida la visita (Access Control) — es lo que "cobra" al convenio.
 export async function validateWellhubVisit(creds, { customCode } = {}) {
   const url = `${creds.accessBaseUrl}/validate`;
-  return call(url, { token: creds.access_token, gymId: creds.gym_id, body: { custom_code: customCode } });
+  return call(url, { token: creds.access_token, gymId: creds.gym_id, productId: creds.extra_config?.product_id, body: { custom_code: customCode } });
 }
