@@ -591,6 +591,35 @@ async function ensureSchema() {
       console.warn("[ensureSchema] ALTER TYPE user_role ADD VALUE 'guest':", e?.message);
     });
 
+    // ── Auditoria 2026-09-08 — correcciones que DEBEN existir en la base ──
+    // El deploy corre `node server/index.js`, no un paso de migraciones, asi
+    // que estas tres van aqui: si viven solo en supabase/migrations, en
+    // produccion no se aplican nunca y el arreglo del doble cobro no existe.
+    // Las tres son idempotentes.
+    //
+    // 1) El trigger descontaba la clase al hacer check-in mientras la app ya la
+    //    descuenta al reservar: cada clase asistida costaba 2 creditos.
+    await pool.query(`DROP TRIGGER IF EXISTS trigger_decrement_classes ON bookings`).catch((e) => {
+      console.warn("[ensureSchema] drop trigger_decrement_classes:", e?.message);
+    });
+    await pool.query(`DROP FUNCTION IF EXISTS decrement_membership_classes()`).catch(() => { });
+    // 2) 'closed' lo escribe PUT /api/classes/:id/close y no existia en el enum.
+    await pool.query(`ALTER TYPE class_status ADD VALUE IF NOT EXISTS 'closed'`).catch((e) => {
+      console.warn("[ensureSchema] ALTER TYPE class_status ADD VALUE 'closed':", e?.message);
+    });
+    // 3) Reparar el contador de cupo que quedo inflado mientras el trigger y el
+    //    handler sumaban los dos. A partir de ahora solo lo mantiene el trigger.
+    await pool.query(`
+      UPDATE classes c SET current_bookings = COALESCE((
+        SELECT COUNT(*) FROM bookings b
+         WHERE b.class_id = c.id AND b.status IN ('confirmed','checked_in')), 0)
+       WHERE c.date >= CURRENT_DATE - INTERVAL '1 day'
+         AND c.current_bookings IS DISTINCT FROM COALESCE((
+        SELECT COUNT(*) FROM bookings b
+         WHERE b.class_id = c.id AND b.status IN ('confirmed','checked_in')), 0)`)
+      .then((r) => { if (r.rowCount) console.log(`✅ Cupo recalculado en ${r.rowCount} clases`); })
+      .catch((e) => console.warn("[ensureSchema] recalculo de cupo:", e?.message));
+
     // ── Ensure all users columns the app needs ────────────────────────────
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255)`).catch(() => { });
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS accepts_terms BOOLEAN DEFAULT false`).catch(() => { });
