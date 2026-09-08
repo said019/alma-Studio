@@ -21,7 +21,7 @@ const NAV_GROUPS = [
       { path: "/admin/dashboard", label: "Inicio", icon: LayoutDashboard },
       { path: "/admin/bookings", label: "Reservas", icon: BookOpen },
       { path: "/admin/classes", label: "Clases", icon: CalendarDays },
-      { path: "/admin/payments", label: "Cobros", icon: DollarSign },
+      { path: "/admin/payments", label: "Cobros", icon: DollarSign, ownerOnly: true },
       { path: "/admin/clients", label: "Personas", icon: Users },
     ],
   },
@@ -33,7 +33,7 @@ const NAV_GROUPS = [
       { path: "/admin/memberships", label: "Membresías", icon: CreditCard },
       { path: "/admin/plans", label: "Planes", icon: Package },
       { path: "/admin/pos", label: "Tienda", icon: ShoppingCart },
-      { path: "/admin/reports", label: "Reportes", icon: BarChart2 },
+      { path: "/admin/reports", label: "Reportes", icon: BarChart2, ownerOnly: true },
       { path: "/admin/loyalty", label: "Lealtad", icon: Award },
       { path: "/admin/discount-codes", label: "Descuentos", icon: Percent },
     ],
@@ -50,12 +50,18 @@ const NAV_GROUPS = [
   },
 ];
 
+// Recepción e instructoras operan el estudio pero no ven dinero: el backend
+// devuelve 403 en esas rutas (auditoría 2026-09-08, P1-1), así que tampoco
+// deben aparecer en el menú y llevar a una pantalla vacía.
+const OWNER_ROLES = ["admin", "super_admin"];
+const canSeeFinance = (role?: string) => OWNER_ROLES.includes(String(role ?? ""));
+
 const MOBILE_QUICK_NAV = [
   { path: "/admin/dashboard", label: "Inicio", icon: LayoutDashboard },
   { path: "/admin/bookings", label: "Reservas", icon: BookOpen },
   { path: "/admin/classes", label: "Clases", icon: CalendarDays },
   { path: "/admin/clients", label: "Personas", icon: Users },
-  { path: "/admin/payments", label: "Cobros", icon: DollarSign },
+  { path: "/admin/payments", label: "Cobros", icon: DollarSign, ownerOnly: true },
 ];
 
 interface AdminLayoutProps {
@@ -88,13 +94,19 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
     setOpenGroups((prev) => ({ ...prev, [label]: !prev[label] }));
   };
 
-  const allItems = NAV_GROUPS.flatMap((g) => g.items);
+  const showFinance = canSeeFinance(user?.role);
+  const navGroups = NAV_GROUPS.map((g) => ({
+    ...g,
+    items: g.items.filter((i: any) => showFinance || !i.ownerOnly),
+  })).filter((g) => g.items.length > 0);
+  const mobileQuickNav = MOBILE_QUICK_NAV.filter((i: any) => showFinance || !i.ownerOnly);
+  const allItems = navGroups.flatMap((g) => g.items);
   const matchPath = (itemPath: string) => {
     const basePath = itemPath.split("?")[0];
     return location.pathname === basePath || location.pathname.startsWith(basePath + "/");
   };
   const currentItem = allItems.find((i) => matchPath(i.path));
-  const activeGroup = NAV_GROUPS.find((g) => g.items.some((i) => matchPath(i.path)));
+  const activeGroup = navGroups.find((g) => g.items.some((i) => matchPath(i.path)));
 
   const isCompact = collapsed && !mobileOpen;
 
@@ -157,7 +169,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
         </div>
 
         <nav className="flex-1 overflow-y-auto py-3 scrollbar-thin">
-          {NAV_GROUPS.map((group) => {
+          {navGroups.map((group) => {
             const isGroupActive = activeGroup?.label === group.label;
             const isOpen = group.collapsible ? (openGroups[group.label] ?? isGroupActive) : true;
 
@@ -293,7 +305,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
         {isMobile && (
           <nav className="fixed inset-x-2 bottom-2 z-40 rounded-2xl border border-alma-hairline bg-alma-canvas p-1 pb-safe shadow-sm lg:hidden">
             <ul className="grid grid-cols-5 gap-1">
-              {MOBILE_QUICK_NAV.map((item) => {
+              {mobileQuickNav.map((item) => {
                 const active = location.pathname === item.path || location.pathname.startsWith(item.path + "/");
                 return (
                   <li key={item.path}>

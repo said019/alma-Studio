@@ -3,6 +3,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import api from "@/lib/api";
+import { useAuthStore } from "@/stores/authStore";
 import { AuthGuard } from "@/components/admin/AuthGuard";
 import AdminLayout from "@/components/admin/AdminLayout";
 import { Button } from "@/components/ui/button";
@@ -102,6 +103,13 @@ const CardShell = ({ to, ariaLabel, className, children }: {
 const Dashboard = () => {
   const [scanOpen, setScanOpen] = useState(false);
 
+  // Recepción e instructoras no tienen acceso a finanzas (el backend devuelve
+  // 403). Sin este gate, el dashboard pedía los reportes igual y mostraba
+  // "revisa tu conexión", que es un mensaje falso: no es la red, es el
+  // permiso. Auditoría 2026-09-08, P1-1.
+  const currentRole = useAuthStore((s) => (s.user as any)?.role);
+  const canSeeFinance = currentRole === "admin" || currentRole === "super_admin";
+
   const { data: stats, isLoading, isError: statsError, refetch: refetchStats } = useQuery<Stats>({
     queryKey: ["admin-stats"],
     queryFn: async () => (await api.get("/admin/stats")).data,
@@ -127,10 +135,12 @@ const Dashboard = () => {
     },
   });
 
-  const { data: revenueData, isLoading: revenueLoading, isError: revenueError, refetch: refetchRevenue } = useQuery<any>({
+  const { data: revenueData, isLoading: revenueLoading, isError: revenueErrorRaw, refetch: refetchRevenue } = useQuery<any>({
     queryKey: ["dashboard-revenue"],
     queryFn: async () => (await api.get("/reports/revenue")).data,
+    enabled: canSeeFinance,
   });
+  const revenueError = canSeeFinance && revenueErrorRaw;
   const revenueRows: { month: string; amount: number }[] = Array.isArray(revenueData?.data)
     ? revenueData.data.map((r: any) => ({
         month: r.month ? new Date(r.month).toLocaleDateString("es-MX", { month: "short" }) : "",
@@ -138,10 +148,12 @@ const Dashboard = () => {
       })).slice(-6)
     : [];
 
-  const { data: dormantData, isLoading: dormantLoading, isError: dormantError, refetch: refetchDormant } = useQuery<any>({
+  const { data: dormantData, isLoading: dormantLoading, isError: dormantErrorRaw, refetch: refetchDormant } = useQuery<any>({
     queryKey: ["dashboard-dormant"],
     queryFn: async () => (await api.get("/reports/dormant")).data,
+    enabled: canSeeFinance,
   });
+  const dormantError = canSeeFinance && dormantErrorRaw;
 
   const dorm = dormantData?.data ?? null;
   const dormantRows = dorm ? [
