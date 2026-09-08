@@ -29,6 +29,9 @@ export async function login(email, password) {
   return { token: r.body.token, user: r.body.user };
 }
 
+/** Id de la reserva: la API devuelve { message, booking }. */
+export const bookingId = (r) => r.body?.booking?.id ?? r.body?.data?.id ?? r.body?.id;
+
 export const day = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
 
 /** Créditos vivos = suma de todas las membresías activas (el sistema debita la más antigua). */

@@ -3669,10 +3669,7 @@ app.post("/api/bookings", authMiddleware, async (req, res) => {
     );
 
     if (!isWaitlist) {
-      await client.query(
-        "UPDATE classes SET current_bookings = current_bookings + 1 WHERE id = $1",
-        [classId]
-      );
+      // Cupo: lo mantiene el trigger update_class_booking_count (auditoría 2026-09-08, P1-6).
       if (!isUnlimitedClasses(lockedMembership.classes_remaining)) {
         // Descuenta total y, si es mixto, el bucket del área de la clase.
         await consumeMembershipCredit(client, membership.id, classId);
@@ -3842,10 +3839,7 @@ app.delete("/api/bookings/:id", authMiddleware, async (req, res) => {
 
     if (wasConfirmed) {
       // Always free the class spot
-      await client.query(
-        "UPDATE classes SET current_bookings = GREATEST(current_bookings - 1, 0) WHERE id = $1",
-        [booking.class_id]
-      );
+      // Cupo: lo mantiene el trigger update_class_booking_count (auditoría 2026-09-08, P1-6).
 
       if (membership) {
         // Increment cancellations_used regardless of timing
@@ -9055,10 +9049,7 @@ async function applyCancellationRollback(client, booking, opts = {}) {
   // Tanto confirmadas como checked_in ocupaban lugar, ambos deben restarse del
   // cupo cuando se cancelan.
   if (wasConfirmed || wasCheckedIn) {
-    await client.query(
-      `UPDATE classes SET current_bookings = GREATEST(current_bookings - 1, 0) WHERE id = $1`,
-      [booking.class_id],
-    );
+    // Cupo: lo mantiene el trigger update_class_booking_count (auditoría 2026-09-08, P1-6).
   }
 
   if (wasCheckedIn) {
@@ -9137,7 +9128,13 @@ app.put("/api/classes/:id/cancel", adminMiddleware, async (req, res) => {
       if (rollback.pointsReverted) pointsReverted += rollback.pointsReverted;
     }
     // 4) Reset class.current_bookings
-    await client.query("UPDATE classes SET current_bookings = 0 WHERE id = $1", [req.params.id]);
+    // Red de seguridad: recalcula desde las reservas vivas en vez de asumir 0.
+      await client.query(
+        `UPDATE classes c SET current_bookings = COALESCE((
+           SELECT COUNT(*) FROM bookings b WHERE b.class_id = c.id AND b.status IN ('confirmed','checked_in')
+         ), 0) WHERE c.id = $1`,
+        [req.params.id],
+      );
 
     await client.query("COMMIT");
 
@@ -9864,10 +9861,7 @@ app.post("/api/admin/classes/:id/walkin-visit", adminMiddleware, async (req, res
         [memRow.id]
       );
     }
-    await dbClient.query(
-      "UPDATE classes SET current_bookings = current_bookings + 1 WHERE id = $1",
-      [classId]
-    );
+    // Cupo: lo mantiene el trigger update_class_booking_count (auditoría 2026-09-08, P1-6).
     await dbClient.query("COMMIT");
 
     return res.status(201).json({
@@ -10023,10 +10017,7 @@ app.post("/api/bookings/with-guest", authMiddleware, async (req, res) => {
         [pack.id]
       );
     }
-    await dbClient.query(
-      "UPDATE classes SET current_bookings = current_bookings + 1 WHERE id = $1",
-      [classId]
-    );
+    // Cupo: lo mantiene el trigger update_class_booking_count (auditoría 2026-09-08, P1-6).
     await dbClient.query("COMMIT");
 
     // Notificar a la dueña/admins de la nueva reserva (con acompañante).
@@ -13019,10 +13010,7 @@ app.put("/api/memberships/:id/cancel", adminMiddleware, async (req, res) => {
         `UPDATE bookings SET status='cancelled', cancelled_at=NOW() WHERE id = $1`,
         [b.id]
       );
-      await client.query(
-        `UPDATE classes SET current_bookings = GREATEST(current_bookings - 1, 0) WHERE id = $1`,
-        [b.class_id]
-      );
+      // Cupo: lo mantiene el trigger update_class_booking_count (auditoría 2026-09-08, P1-6).
       bookingsCancelled++;
     }
 
@@ -13410,10 +13398,7 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
     );
 
     if (!isWaitlist) {
-      await client.query(
-        "UPDATE classes SET current_bookings = current_bookings + 1 WHERE id = $1",
-        [classId]
-      );
+      // Cupo: lo mantiene el trigger update_class_booking_count (auditoría 2026-09-08, P1-6).
       if (!isUnlimitedClasses(lockedMembership.classes_remaining)) {
         // Descuenta total y, si es mixto, el bucket del área de la clase.
         await consumeMembershipCredit(client, membership.id, classId);
@@ -13543,10 +13528,7 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
          VALUES ($1, $2, $3, $4, 'confirmed') RETURNING *`,
         [classId, guestUser.id, guestMembershipId, guestProfile.id]
       );
-      await client.query(
-        "UPDATE classes SET current_bookings = current_bookings + 1 WHERE id = $1",
-        [classId]
-      );
+      // Cupo: lo mantiene el trigger update_class_booking_count (auditoría 2026-09-08, P1-6).
       guestData = {
         booking: guestBookingIns.rows[0],
         guestProfile,

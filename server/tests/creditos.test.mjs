@@ -2,7 +2,7 @@
 // Invariante: reservar debita 1; el check-in NO vuelve a debitar.
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
-import { api, login, sql, credits, makeClient, studioFixtures, makeClass, giveMembership, cleanup, closeDb, day, ADMIN } from "./helpers.mjs";
+import { api, login, sql, credits, makeClient, studioFixtures, makeClass, giveMembership, cleanup, closeDb, day, bookingId, ADMIN } from "./helpers.mjs";
 
 const PFX = "rgcred";
 let A, f, cliente;
@@ -67,7 +67,8 @@ test("P1-6 cancelar deja el contador en cero", async () => {
   const id = await makeClass(A, f, { date: day(10) });
   await sql(`UPDATE memberships SET classes_remaining=8 WHERE user_id=$1`, [cliente.id]);
   const r = await api("POST", "/api/bookings", { token: cliente.token, body: { classId: id } });
-  await api("DELETE", `/api/bookings/${r.body?.data?.id || r.body?.id}`, { token: cliente.token });
+  const cancel = await api("DELETE", `/api/bookings/${bookingId(r)}`, { token: cliente.token });
+  assert.equal(cancel.status, 200, `cancelar devolvió ${cancel.status}`);
   const [c] = await sql(`SELECT current_bookings FROM classes WHERE id=$1`, [id]);
   assert.equal(c.current_bookings, 0, "tras cancelar la única reserva el contador debe ser 0");
 });
