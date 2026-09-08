@@ -12609,11 +12609,23 @@ app.post("/api/drive/make-public/:fileId", adminMiddleware, async (req, res) => 
     return res.json({ ok: true });
   } catch (err) {
     console.error("Drive make-public error:", err?.response?.data || err.message);
-    return res.status(500).json({ message: "Error al hacer público el archivo" });
+    return res.status(driveErrorStatus(err)).json({ message: "No se pudo publicar el archivo" });
   }
 });
 
 // GET /api/drive/image/:fileId — proxy a public Google Drive image
+// Un proxy a Google Drive no debe devolver 500 por algo que decidio Drive:
+// si no hay credenciales es 503, y un archivo inexistente o un id invalido es
+// 404/400. Auditoria 2026-09-08, familia P2 (regla "el panel no da 500").
+function driveErrorStatus(err) {
+  const upstream = Number(err?.response?.status) || 0;
+  if (upstream === 404) return 404;
+  if (upstream === 401 || upstream === 403) return 503;
+  if (upstream >= 400 && upstream < 500) return 400;
+  if (/credential|token|no configurad|not configured/i.test(String(err?.message || ""))) return 503;
+  return 502;
+}
+
 app.get("/api/drive/image/:fileId", async (req, res) => {
   try {
     const { fileId } = req.params;
@@ -12636,7 +12648,7 @@ app.get("/api/drive/image/:fileId", async (req, res) => {
     driveResp.data.pipe(res);
   } catch (err) {
     console.error("Drive image proxy error:", err?.response?.data || err.message);
-    if (!res.headersSent) res.status(500).json({ message: "Error al obtener imagen" });
+    if (!res.headersSent) res.status(driveErrorStatus(err)).json({ message: "No se pudo obtener la imagen" });
   }
 });
 
@@ -12678,7 +12690,7 @@ app.get("/api/drive/video/:fileId", async (req, res) => {
     driveResp.data.pipe(res);
   } catch (err) {
     console.error("Drive video proxy error:", err?.response?.status || err?.message);
-    if (!res.headersSent) res.status(500).json({ message: "Error al obtener video" });
+    if (!res.headersSent) res.status(driveErrorStatus(err)).json({ message: "No se pudo obtener el video" });
   }
 });
 
