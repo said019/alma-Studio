@@ -73,11 +73,22 @@ const DEFAULT_GENERAL_SETTINGS = {
   opening_pricing_active: true,
 };
 
+// Valores válidos del enum payment_method en la base.
+const PAYMENT_METHODS = ["cash", "transfer", "card", "online"];
+
+// Operación diaria: dueña, recepción e instructoras.
+const OPERATIONS_ROLES = ["admin", "super_admin", "instructor", "reception"];
+// Dinero y configuración sensible: SÓLO la dueña.
+const OWNER_ROLES = ["admin", "super_admin"];
+
+// Los datos bancarios reales vivían aquí, en el repositorio. Ahora se leen del
+// entorno y, en operación normal, de settings.bank_info (editable desde el
+// panel con PUT /api/admin/bank-info). Auditoría 2026-09-08, P0-5.
 const DEFAULT_BANK_INFO = Object.freeze({
-  bank: "Banorte",
-  account_holder: "Estefanía Torres Lanzagorta",
-  account_number: "4189143097040441",
-  clabe: "072298012591154950",
+  bank: process.env.BANK_NAME || "",
+  account_holder: process.env.BANK_ACCOUNT_HOLDER || "",
+  account_number: process.env.BANK_ACCOUNT_NUMBER || "",
+  clabe: process.env.BANK_CLABE || "",
 });
 
 function digitsOnly(value) {
@@ -96,6 +107,7 @@ function formatAccountNumber(value) {
   return String(value || "").trim();
 }
 
+let bankInfoWarned = false;
 function normalizeBankInfo(rawValue) {
   const raw = rawValue && typeof rawValue === "object" ? rawValue : {};
   const candidate = {
@@ -120,6 +132,14 @@ function normalizeBankInfo(rawValue) {
     holderLower.includes("alma barre studio");
 
   const base = shouldUseDefault ? DEFAULT_BANK_INFO : candidate;
+  if (shouldUseDefault && !DEFAULT_BANK_INFO.clabe && !bankInfoWarned) {
+    bankInfoWarned = true;
+    console.warn(
+      "⚠️  No hay datos bancarios configurados. Captúralos en el panel " +
+      "(Ajustes → Datos bancarios) o define BANK_NAME / BANK_ACCOUNT_HOLDER / " +
+      "BANK_ACCOUNT_NUMBER / BANK_CLABE: sin esto la pantalla de transferencia sale vacía."
+    );
+  }
   const formattedAccount = formatAccountNumber(base.account_number || DEFAULT_BANK_INFO.account_number);
   const formattedClabe = formatClabe(base.clabe || DEFAULT_BANK_INFO.clabe);
   const holder = String(base.account_holder || DEFAULT_BANK_INFO.account_holder).trim();
@@ -1851,19 +1871,34 @@ async function ensureSchema() {
 
 
   try {
-    // Contraseña del admin: configurable por entorno (recomendado en prod).
-    // Si no se define ADMIN_PASSWORD, usa este valor por defecto.
+    // Alta del admin SÓLO si no existe. Antes esto hacía
+    // "ON CONFLICT DO UPDATE SET password_hash", así que cada reinicio
+    // revertía la contraseña de la dueña al valor por defecto — y ese valor
+    // estaba escrito aquí, en un repositorio git. Auditoría 2026-09-08, P0-4.
     const adminEmail = process.env.ADMIN_EMAIL || "admin@almamovement.mx";
-    const adminPassword = process.env.ADMIN_PASSWORD || "Alma$Reformer2026!";
-    const adminHash = await bcrypt.hash(adminPassword, 12);
-    await pool.query(
-      `INSERT INTO users (display_name, email, phone, password_hash, role, accepts_terms, accepts_communications)
-       VALUES ('Admin Alma', $2, '0000000000', $1, 'admin', true, false)
-       ON CONFLICT (email) DO UPDATE SET role = 'admin', password_hash = $1, display_name = 'Admin Alma'`,
-      [adminHash, adminEmail]
-    );
-    // No imprimir la contraseña en logs.
-    console.log(`✅ Admin user ready: ${adminEmail}`);
+    const adminPassword = process.env.ADMIN_PASSWORD;
+    const existing = await pool.query("SELECT id FROM users WHERE email = $1", [adminEmail]);
+    if (existing.rows.length) {
+      // Nunca se toca la contraseña de una cuenta que ya existe.
+      await pool.query("UPDATE users SET role = 'admin' WHERE email = $1 AND role <> 'admin'", [adminEmail]);
+      console.log(`✅ Admin user ready: ${adminEmail}`);
+    } else if (!adminPassword) {
+      console.warn(
+        `⚠️  No existe ${adminEmail} y no se definió ADMIN_PASSWORD. ` +
+        `Define ADMIN_PASSWORD para crear la cuenta de administración.`
+      );
+    } else if (!isStrongPassword(adminPassword)) {
+      console.warn("⚠️  ADMIN_PASSWORD es débil (mínimo 8 caracteres, una mayúscula y un número). No se creó la cuenta.");
+    } else {
+      const adminHash = await bcrypt.hash(adminPassword, 12);
+      await pool.query(
+        `INSERT INTO users (display_name, email, phone, password_hash, role, accepts_terms, accepts_communications)
+         VALUES ('Admin Alma', $2, '0000000000', $1, 'admin', true, false)
+         ON CONFLICT (email) DO NOTHING`,
+        [adminHash, adminEmail]
+      );
+      console.log(`✅ Admin user created: ${adminEmail}`);
+    }
   } catch (err) {
     console.error("Admin seed warning:", err.message);
   }
@@ -1989,6 +2024,23 @@ app.use((req, res, next) => {
   express.urlencoded({ extended: true, limit: "20mb" })(req, res, next);
 });
 
+// ─── Validación de parámetros de ruta ────────────────────────────────────────
+// Un id mal formado (uuid basura, fecha imposible, número negativo) llegaba
+// crudo a Postgres y salía como 500 "Error interno" desde el catch de cada
+// handler. Son ~236 respuestas 500 con un solo origen: falta de validación.
+// Estos nombres SÍ mapean a columnas uuid; :key, :fileId, :sessionId,
+// :deviceId, :passTypeId y :serial no, y por eso quedan fuera.
+// Auditoría 2026-09-08, familia P2.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+for (const paramName of ["id", "userId", "eventId", "classId", "regId"]) {
+  app.param(paramName, (req, res, next, value) => {
+    if (!UUID_RE.test(String(value || ""))) {
+      return res.status(400).json({ message: "Identificador inválido" });
+    }
+    next();
+  });
+}
+
 // ─── Wellhub / partner webhooks (raw body, firma HMAC-SHA1, idempotencia) ────
 async function wellhubWebhookHandler(req, res, eventTypeOverride) {
   const rawBuf = Buffer.isBuffer(req.body) ? req.body : Buffer.from(String(req.body ?? ""));
@@ -2075,7 +2127,7 @@ app.put("/api/partners/settings", adminMiddleware, async (req, res) => {
     );
     const r = await pool.query("SELECT * FROM platform_credentials WHERE channel='wellhub'");
     return res.json({ data: r.rows[0] });
-  } catch (err) { console.error("[partners settings PUT]", err.message); return res.status(500).json({ message: "Error interno", error: err.message }); }
+  } catch (err) { console.error("[partners settings PUT]", err.message); return res.status(500).json({ message: "Error interno" }); }
 });
 
 app.post("/api/partners/wellhub/publish/:classId", adminMiddleware, async (req, res) => {
@@ -2856,16 +2908,32 @@ async function authMiddleware(req, res, next) {
   }
 }
 
-async function adminMiddleware(req, res, next) {
-  authMiddleware(req, res, async () => {
-    try {
-      const r = await pool.query("SELECT role FROM users WHERE id = $1", [req.userId]);
-      if (!r.rows.length || !["admin", "super_admin", "instructor", "reception"].includes(r.rows[0].role)) {
-        return res.status(403).json({ message: "Acceso restringido" });
-      }
-      next();
-    } catch { return res.status(500).json({ message: "Error interno" }); }
-  });
+function roleGuard(allowed) {
+  return async function guard(req, res, next) {
+    authMiddleware(req, res, async () => {
+      try {
+        const r = await pool.query("SELECT role FROM users WHERE id = $1", [req.userId]);
+        const role = r.rows[0]?.role;
+        if (!role || !allowed.includes(role)) {
+          return res.status(403).json({ message: "Acceso restringido" });
+        }
+        req.userRole = role;
+        next();
+      } catch { return res.status(500).json({ message: "Error interno" }); }
+    });
+  };
+}
+
+// Declaraciones (no const): estas referencias se usan en rutas registradas
+// más arriba en el archivo y necesitan hoisting.
+function adminMiddleware(req, res, next) {
+  return roleGuard(OPERATIONS_ROLES)(req, res, next);
+}
+
+// Recepción e instructoras pueden operar el estudio, pero no ver ingresos,
+// reportes de negocio ni datos bancarios. Auditoría 2026-09-08, P1-1.
+function ownerMiddleware(req, res, next) {
+  return roleGuard(OWNER_ROLES)(req, res, next);
 }
 
 function mapUser(u) {
@@ -3916,7 +3984,7 @@ app.delete("/api/bookings/:id", authMiddleware, async (req, res) => {
   } catch (err) {
     try { await client.query("ROLLBACK"); } catch (_) { }
     console.error("DELETE bookings error:", err.message, err.stack);
-    return res.status(500).json({ message: "Error interno", detail: err.message });
+    return res.status(500).json({ message: "Error interno" });
   } finally {
     client.release();
   }
@@ -4497,7 +4565,7 @@ app.post("/api/orders/:id/proof", authMiddleware, upload.any(), async (req, res)
     return res.json({ message: "Comprobante recibido — estamos verificando tu pago" });
   } catch (err) {
     console.error("POST orders/proof error:", err.message, err.stack);
-    return res.status(500).json({ message: "Error interno", detail: err.message });
+    return res.status(500).json({ message: "Error interno" });
   }
 });
 
@@ -9175,7 +9243,7 @@ app.put("/api/classes/:id/cancel", adminMiddleware, async (req, res) => {
   } catch (err) {
     await client.query("ROLLBACK").catch(() => {});
     console.error("[PUT /classes/:id/cancel]", err.message);
-    return res.status(500).json({ message: "Error interno", error: err.message });
+    return res.status(500).json({ message: "Error interno" });
   } finally {
     client.release();
   }
@@ -9198,7 +9266,7 @@ app.put("/api/classes/:id/close", adminMiddleware, async (req, res) => {
     return res.json({ data: r.rows[0] });
   } catch (err) {
     console.error("[PUT /classes/:id/close]", err.message);
-    return res.status(500).json({ message: "Error interno", error: err.message });
+    return res.status(500).json({ message: "Error interno" });
   }
 });
 
@@ -9217,7 +9285,7 @@ app.put("/api/classes/:id/reopen", adminMiddleware, async (req, res) => {
     return res.json({ data: r.rows[0] });
   } catch (err) {
     console.error("[PUT /classes/:id/reopen]", err.message);
-    return res.status(500).json({ message: "Error interno", error: err.message });
+    return res.status(500).json({ message: "Error interno" });
   }
 });
 
@@ -9296,7 +9364,7 @@ app.delete("/api/admin/bookings/:id", adminMiddleware, async (req, res) => {
   } catch (err) {
     await client.query("ROLLBACK").catch(() => {});
     console.error("[DELETE /admin/bookings/:id]", err.message);
-    return res.status(500).json({ message: "Error interno", error: err.message });
+    return res.status(500).json({ message: "Error interno" });
   } finally {
     client.release();
   }
@@ -9717,7 +9785,7 @@ app.post("/api/admin/visit-sale", adminMiddleware, async (req, res) => {
   } catch (err) {
     await dbClient.query("ROLLBACK").catch(() => {});
     console.error("[POST /admin/visit-sale]", err.message);
-    return res.status(500).json({ message: "Error interno", error: err.message });
+    return res.status(500).json({ message: "Error interno" });
   } finally {
     dbClient.release();
   }
@@ -9877,7 +9945,7 @@ app.post("/api/admin/classes/:id/walkin-visit", adminMiddleware, async (req, res
   } catch (err) {
     await dbClient.query("ROLLBACK").catch(() => {});
     console.error("[POST /admin/classes/:id/walkin-visit]", err.message);
-    return res.status(500).json({ message: "Error interno", error: err.message });
+    return res.status(500).json({ message: "Error interno" });
   } finally {
     dbClient.release();
   }
@@ -10057,7 +10125,7 @@ app.post("/api/bookings/with-guest", authMiddleware, async (req, res) => {
   } catch (err) {
     await dbClient.query("ROLLBACK").catch(() => {});
     console.error("[POST /bookings/with-guest]", err.message);
-    return res.status(500).json({ message: "Error interno", error: err.message });
+    return res.status(500).json({ message: "Error interno" });
   } finally {
     dbClient.release();
   }
@@ -10567,7 +10635,7 @@ app.post("/api/admin/loyalty-milestones", adminMiddleware, async (req, res) => {
        award_reward_id || null, message_template_key || null, is_active, Number(sort_order) || 0],
     );
     return res.status(201).json({ data: r.rows[0] });
-  } catch (err) { return res.status(500).json({ message: "Error interno", error: err.message }); }
+  } catch (err) { return res.status(500).json({ message: "Error interno" }); }
 });
 
 // PUT /api/admin/loyalty-milestones/:id
@@ -10597,7 +10665,7 @@ app.put("/api/admin/loyalty-milestones/:id", adminMiddleware, async (req, res) =
     );
     if (!r.rows.length) return res.status(404).json({ message: "Milestone no encontrado" });
     return res.json({ data: r.rows[0] });
-  } catch (err) { return res.status(500).json({ message: "Error interno", error: err.message }); }
+  } catch (err) { return res.status(500).json({ message: "Error interno" }); }
 });
 
 // DELETE /api/admin/loyalty-milestones/:id
@@ -10922,7 +10990,7 @@ app.post("/api/admin/campaigns/preview", adminMiddleware, async (req, res) => {
         first_names: targets.slice(0, 8).map((t) => firstNameOf(t.display_name, "alumna")),
       },
     });
-  } catch (err) { return res.status(500).json({ message: "Error interno", error: err.message }); }
+  } catch (err) { return res.status(500).json({ message: "Error interno" }); }
 });
 
 // POST /api/admin/campaigns/send — crea campaign + dispara envío en background.
@@ -10981,7 +11049,7 @@ app.post("/api/admin/campaigns/send", adminMiddleware, async (req, res) => {
       console.error("[Campaign] dispatch error:", err?.message);
     });
     return res.status(201).json({ data: { campaign, total_targets: targets.length } });
-  } catch (err) { return res.status(500).json({ message: "Error interno", error: err.message }); }
+  } catch (err) { return res.status(500).json({ message: "Error interno" }); }
 });
 
 // GET /api/admin/campaigns — listado paginado.
@@ -11045,27 +11113,47 @@ app.get("/api/loyalty/points/:userId", adminMiddleware, async (req, res) => {
 // ─── Reports sub-routes ──────────────────────────────────────────────────────
 
 // Helper: parsea ?from=&to= y devuelve current + previous range (mismo número de días hacia atrás)
+// Fecha civil local (NO toISOString(), que convierte a UTC y en México adelanta
+// el día a partir de las 18:00). Auditoría 2026-09-08, P0-2.
+function localDate(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+// Los reportes comparan con BETWEEN $1 AND $2. Si el extremo superior es una
+// fecha "pelona", Postgres la interpreta como medianoche y TODO lo del día en
+// curso queda fuera: el dashboard mostraba $0 de ingresos y 0 reservas hasta
+// el día siguiente. El extremo superior se cierra al final del día.
+// Auditoría 2026-09-08, P0-2.
 function parseDateRange(req) {
   const now = new Date();
   let from, to;
   if (req.query.from && req.query.to) {
-    from = new Date(req.query.from);
-    to = new Date(req.query.to);
+    from = new Date(`${String(req.query.from).slice(0, 10)}T00:00:00`);
+    to = new Date(`${String(req.query.to).slice(0, 10)}T00:00:00`);
   } else {
-    // Default: este mes
+    // Default: este mes, hasta hoy inclusive
     from = new Date(now.getFullYear(), now.getMonth(), 1);
     to = now;
   }
-  const days = Math.max(1, Math.ceil((to - from) / 86400000));
-  const prevFrom = new Date(from);
-  prevFrom.setDate(prevFrom.getDate() - days);
+  if (isNaN(from) || isNaN(to)) {
+    from = new Date(now.getFullYear(), now.getMonth(), 1);
+    to = now;
+  }
+  const days = Math.max(1, Math.round((to - from) / 86400000) + 1);
   const prevTo = new Date(from);
   prevTo.setDate(prevTo.getDate() - 1);
+  const prevFrom = new Date(prevTo);
+  prevFrom.setDate(prevFrom.getDate() - (days - 1));
+  const endOfDay = (d) => `${localDate(d)} 23:59:59.999`;
   return {
-    from: from.toISOString().slice(0, 10),
-    to: to.toISOString().slice(0, 10),
-    prevFrom: prevFrom.toISOString().slice(0, 10),
-    prevTo: prevTo.toISOString().slice(0, 10),
+    from: localDate(from),
+    to: endOfDay(to),
+    toDate: localDate(to),
+    prevFrom: localDate(prevFrom),
+    prevTo: endOfDay(prevTo),
     days,
   };
 }
@@ -11077,7 +11165,7 @@ function pctChange(curr, prev) {
   return Number((((curr - prev) / prev) * 100).toFixed(1));
 }
 
-app.get("/api/reports/overview", adminMiddleware, async (req, res) => {
+app.get("/api/reports/overview", ownerMiddleware, async (req, res) => {
   try {
     const range = parseDateRange(req);
     const monthStart = range.from;
@@ -11192,17 +11280,17 @@ app.get("/api/reports/overview", adminMiddleware, async (req, res) => {
           reviewsAvg: pctChange(reviewsAvg, prevReviewsAvg),
           cancelRate: pctChange(cancelRate, prevCancelRate),
         },
-        range: { from: range.from, to: range.to, days: range.days },
+        range: { from: range.from, to: range.toDate, days: range.days },
       }
     });
   } catch (err) {
     console.error("[reports/overview]", err.message);
-    return res.status(500).json({ message: "Error interno", error: err.message });
+    return res.status(500).json({ message: "Error interno" });
   }
 });
 
 // Sparkline data: ingresos por semana últimas 12 semanas
-app.get("/api/reports/revenue-sparkline", adminMiddleware, async (req, res) => {
+app.get("/api/reports/revenue-sparkline", ownerMiddleware, async (req, res) => {
   try {
     const r = await pool.query(`
       WITH weeks AS (
@@ -11220,7 +11308,7 @@ app.get("/api/reports/revenue-sparkline", adminMiddleware, async (req, res) => {
   } catch (err) { return res.status(500).json({ message: "Error interno" }); }
 });
 
-app.get("/api/reports/revenue", adminMiddleware, async (req, res) => {
+app.get("/api/reports/revenue", ownerMiddleware, async (req, res) => {
   try {
     const r = await pool.query(
       `WITH months AS (
@@ -11246,7 +11334,7 @@ app.get("/api/reports/revenue", adminMiddleware, async (req, res) => {
   } catch (err) { return res.status(500).json({ message: "Error interno" }); }
 });
 
-app.get("/api/reports/classes", adminMiddleware, async (req, res) => {
+app.get("/api/reports/classes", ownerMiddleware, async (req, res) => {
   try {
     // Excluye bookings cancelados de la columna 'bookings' para que refleje
     // demanda real, no intención.
@@ -11264,7 +11352,7 @@ app.get("/api/reports/classes", adminMiddleware, async (req, res) => {
   } catch (err) { return res.status(500).json({ message: "Error interno" }); }
 });
 
-app.get("/api/reports/retention", adminMiddleware, async (req, res) => {
+app.get("/api/reports/retention", ownerMiddleware, async (req, res) => {
   try {
     // Time-series mensual: para cada uno de los últimos 12 meses, calcula
     // % de alumnas que estaban activas el mes anterior y siguen activas este mes.
@@ -11312,7 +11400,7 @@ app.get("/api/reports/retention", adminMiddleware, async (req, res) => {
 });
 
 // Top alumnas por asistencia (lifetime + último mes)
-app.get("/api/reports/top-attendance", adminMiddleware, async (req, res) => {
+app.get("/api/reports/top-attendance", ownerMiddleware, async (req, res) => {
   try {
     const limit = Math.min(Number(req.query.limit) || 10, 50);
     const r = await pool.query(
@@ -11333,7 +11421,7 @@ app.get("/api/reports/top-attendance", adminMiddleware, async (req, res) => {
 });
 
 // Conversión clase muestra → paquete recurrente
-app.get("/api/reports/conversion", adminMiddleware, async (req, res) => {
+app.get("/api/reports/conversion", ownerMiddleware, async (req, res) => {
   try {
     const r = await pool.query(`
       WITH muestras AS (
@@ -11364,7 +11452,7 @@ app.get("/api/reports/conversion", adminMiddleware, async (req, res) => {
 });
 
 // Dormant cohort: distribución por días sin venir
-app.get("/api/reports/dormant", adminMiddleware, async (req, res) => {
+app.get("/api/reports/dormant", ownerMiddleware, async (req, res) => {
   try {
     const r = await pool.query(`
       WITH last_visit AS (
@@ -11388,7 +11476,7 @@ app.get("/api/reports/dormant", adminMiddleware, async (req, res) => {
   } catch (err) { return res.status(500).json({ message: "Error interno" }); }
 });
 
-app.get("/api/reports/instructors", adminMiddleware, async (req, res) => {
+app.get("/api/reports/instructors", ownerMiddleware, async (req, res) => {
   try {
     const r = await pool.query(
       `SELECT i.id,
@@ -11535,7 +11623,7 @@ app.post("/api/admin/referrals/codes", adminMiddleware, async (req, res) => {
     return res.status(201).json({ data: r.rows[0] });
   } catch (err) {
     console.error("[POST /admin/referrals/codes]", err.message);
-    return res.status(500).json({ message: "Error interno", error: err.message });
+    return res.status(500).json({ message: "Error interno" });
   }
 });
 
@@ -11623,7 +11711,7 @@ app.put("/api/settings/:key", adminMiddleware, async (req, res) => {
 // ── Datos de transferencia bancaria — editables por el admin ─────────────────
 // GET devuelve los datos actuales (ya normalizados); el cliente los usa en el
 // checkout. PUT valida y guarda en settings.key='bank_info'.
-app.get("/api/admin/bank-info", adminMiddleware, async (_req, res) => {
+app.get("/api/admin/bank-info", ownerMiddleware, async (_req, res) => {
   try {
     const info = await getConfiguredBankInfo(pool);
     return res.json({ data: info });
@@ -11632,7 +11720,7 @@ app.get("/api/admin/bank-info", adminMiddleware, async (_req, res) => {
   }
 });
 
-app.put("/api/admin/bank-info", adminMiddleware, async (req, res) => {
+app.put("/api/admin/bank-info", ownerMiddleware, async (req, res) => {
   try {
     const { bank, account_holder, clabe, account_number } = req.body || {};
     const clabeDigits = digitsOnly(clabe);
@@ -11901,7 +11989,7 @@ app.post("/api/admin/whatsapp-templates/test-send", adminMiddleware, async (req,
     });
   } catch (err) {
     console.error("[test-send]", err.message);
-    return res.status(500).json({ message: "Error interno", error: err.message });
+    return res.status(500).json({ message: "Error interno" });
   }
 });
 
@@ -12639,7 +12727,7 @@ app.get("/api/admin/birthdays", adminMiddleware, async (req, res) => {
   }
 });
 
-app.get("/api/admin/stats", adminMiddleware, async (req, res) => {
+app.get("/api/admin/stats", ownerMiddleware, async (req, res) => {
   try {
     const today = new Date().toISOString().slice(0, 10);
     const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
@@ -12806,8 +12894,18 @@ app.get("/api/memberships", adminMiddleware, async (req, res) => {
 // POST /api/memberships — admin assigns membership to a user
 app.post("/api/memberships", adminMiddleware, async (req, res) => {
   try {
-    const { userId, planId, paymentMethod = "efectivo", startDate } = req.body;
+    const { userId, planId, startDate } = req.body;
     if (!userId || !planId) return res.status(400).json({ message: "userId y planId requeridos" });
+    // El método de pago se exige explícito: el default anterior ("efectivo") ni
+    // siquiera era un valor del enum payment_method y reventaba con 500, además
+    // de registrar como efectivo lo que quizá fue transferencia.
+    // Auditoría 2026-09-08, P0-3 / P2.
+    const paymentMethod = String(req.body.paymentMethod || "").trim();
+    if (!PAYMENT_METHODS.includes(paymentMethod)) {
+      return res.status(400).json({
+        message: `Método de pago requerido. Opciones: ${PAYMENT_METHODS.join(", ")}.`,
+      });
+    }
     const planRes = await pool.query("SELECT * FROM plans WHERE id = $1 AND is_active = true", [planId]);
     if (!planRes.rows.length) return res.status(404).json({ message: "Plan no encontrado" });
     const plan = planRes.rows[0];
@@ -12820,11 +12918,37 @@ app.post("/api/memberships", adminMiddleware, async (req, res) => {
     const start = startDate ? new Date(startDate) : new Date();
     const end = new Date(start);
     end.setDate(end.getDate() + (plan.duration_days || 30));
-    const r = await pool.query(
-      `INSERT INTO memberships (user_id, plan_id, status, payment_method, start_date, end_date, classes_remaining)
-       VALUES ($1,$2,'active',$3,$4,$5,$6) RETURNING *`,
-      [userId, planId, paymentMethod, start.toISOString(), end.toISOString(), plan.class_limit ?? null]
-    );
+
+    // La venta de mostrador (efectivo/transferencia) también genera su orden
+    // aprobada: los ingresos se calculan sobre `orders`, así que sin esto todo
+    // lo cobrado en recepción quedaba fuera del reporte. Membresía y orden se
+    // escriben en la misma transacción. Auditoría 2026-09-08, P0-3.
+    const saleClient = await pool.connect();
+    let r;
+    try {
+      await saleClient.query("BEGIN");
+      r = await saleClient.query(
+        `INSERT INTO memberships (user_id, plan_id, status, payment_method, start_date, end_date, classes_remaining)
+         VALUES ($1,$2,'active',$3,$4,$5,$6) RETURNING *`,
+        [userId, planId, paymentMethod, start.toISOString(), end.toISOString(), plan.class_limit ?? null]
+      );
+      const orderRes = await saleClient.query(
+        `INSERT INTO orders (user_id, plan_id, status, payment_method, subtotal, tax_amount, total_amount,
+                             channel, verified_at, verified_by, approved_at, approved_by, paid_at)
+         VALUES ($1,$2,'approved',$3,$4,0,$4,'counter',NOW(),$5,NOW(),$5,NOW())
+         RETURNING id`,
+        [userId, planId, paymentMethod, _eff ?? 0, req.userId || null]
+      );
+      await saleClient.query(`UPDATE memberships SET order_id = $2 WHERE id = $1`,
+        [r.rows[0].id, orderRes.rows[0].id]);
+      r.rows[0].order_id = orderRes.rows[0].id;
+      await saleClient.query("COMMIT");
+    } catch (saleErr) {
+      await saleClient.query("ROLLBACK").catch(() => { });
+      throw saleErr;
+    } finally {
+      saleClient.release();
+    }
 
     // ── Email: membership activated ──────────────────────────────────────
     try {
@@ -13109,9 +13233,16 @@ app.put("/api/plans/:id", adminMiddleware, async (req, res) => {
     const cat = validCats.includes(classCategory) ? classCategory : null;
     const openingPrice = opening_price === "" || opening_price == null ? null : Number(opening_price);
     const morningOnly = morning_only === undefined ? null : parseBooleanFlag(morning_only);
-    const nonTransferable = parseBooleanFlag(isNonTransferable ?? req.body.is_non_transferable);
-    const nonRepeatable = parseBooleanFlag(isNonRepeatable ?? req.body.is_non_repeatable);
-    const safeRepeatKey = nonRepeatable
+    // Un flag ausente del cuerpo se conserva (null → COALESCE), no se apaga:
+    // parseBooleanFlag(undefined) devuelve false y borraba la configuración del
+    // plan en cualquier PUT parcial. Auditoría 2026-09-08, P1-2.
+    const flagOrNull = (...keys) =>
+      keys.some((k) => Object.prototype.hasOwnProperty.call(req.body, k))
+        ? parseBooleanFlag(keys.map((k) => req.body[k]).find((v) => v !== undefined))
+        : null;
+    const nonTransferable = flagOrNull("isNonTransferable", "is_non_transferable");
+    const nonRepeatable = flagOrNull("isNonRepeatable", "is_non_repeatable");
+    const safeRepeatKey = nonRepeatable === true
       ? String(repeatKey ?? req.body.repeat_key ?? "").trim() || null
       : null;
     // features can be array or comma-string — always store as jsonb array
@@ -13120,26 +13251,34 @@ app.put("/api/plans/:id", adminMiddleware, async (req, res) => {
       : typeof features === "string" && features.trim()
         ? features.split(",").map((s) => s.trim()).filter(Boolean)
         : [];
-    const isVisitPack = parseBooleanFlag(req.body.isVisitPack ?? req.body.is_visit_pack);
+    const isVisitPack = flagOrNull("isVisitPack", "is_visit_pack");
     const r = await pool.query(
-      `UPDATE plans SET name=$1, description=$2, price=$3, currency=$4, duration_days=$5,
-       class_limit=$6, features=$7, is_active=$8, sort_order=$9,
+      // PUT parcial: lo que el cuerpo no menciona se conserva. Un cuerpo
+      // incompleto llegaba a borrar el nombre y el precio del plan (o a
+      // reventar con NOT NULL). Auditoría 2026-09-08, P1-2.
+      `UPDATE plans SET name=COALESCE($1, name), description=COALESCE($2, description),
+       price=COALESCE($3, price), currency=COALESCE($4, currency),
+       duration_days=COALESCE($5, duration_days),
+       class_limit=COALESCE($6, class_limit), features=COALESCE($7, features),
+       is_active=COALESCE($8, is_active), sort_order=COALESCE($9, sort_order),
        class_category=COALESCE($10, class_category),
-       is_non_transferable=$11, is_non_repeatable=$12, repeat_key=$13,
-       is_visit_pack=$14,
+       is_non_transferable=COALESCE($11, is_non_transferable),
+       is_non_repeatable=COALESCE($12, is_non_repeatable),
+       repeat_key=CASE WHEN $12::boolean IS NULL THEN repeat_key ELSE $13 END,
+       is_visit_pack=COALESCE($14, is_visit_pack),
        opening_price=COALESCE($15, opening_price), morning_only=COALESCE($16, morning_only),
        updated_at=NOW()
        WHERE id=$17 RETURNING *`,
       [
-        name,
-        description || null,
-        price,
-        currency || "MXN",
-        durationDays || 30,
+        name ?? null,
+        description ?? null,
+        price ?? null,
+        currency || null,
+        durationDays ?? null,
         classLimit ?? null,
-        JSON.stringify(featuresArr),
-        isActive !== false,
-        sortOrder || 0,
+        Object.prototype.hasOwnProperty.call(req.body, "features") ? JSON.stringify(featuresArr) : null,
+        isActive === undefined ? null : isActive !== false,
+        sortOrder ?? null,
         cat,
         nonTransferable,
         nonRepeatable,
@@ -14249,7 +14388,7 @@ app.put("/api/admin/orders/:id/reject", adminMiddleware, async (req, res) => {
 // ─── Payments admin ──────────────────────────────────────────────────────────
 
 // GET /api/payments
-app.get("/api/payments", adminMiddleware, async (req, res) => {
+app.get("/api/payments", ownerMiddleware, async (req, res) => {
   try {
     const { startDate, endDate, userId, limit = 200 } = req.query;
     const params = [];
@@ -14665,13 +14804,35 @@ app.post("/api/instructors", adminMiddleware, async (req, res) => {
 // PUT /api/instructors/:id
 app.put("/api/instructors/:id", adminMiddleware, async (req, res) => {
   try {
-    const { displayName, email, phone, bio, specialties, isActive, photoFocusX = 50, photoFocusY = 50 } = req.body;
-    const specialtiesValue = serializeSpecialtiesForDb(specialties);
-    const safeFocusX = Math.max(0, Math.min(100, Number(photoFocusX || 50)));
-    const safeFocusY = Math.max(0, Math.min(100, Number(photoFocusY || 50)));
+    // PUT parcial: un cuerpo que no menciona un campo NO debe borrarlo. Antes
+    // este UPDATE era de reemplazo y cambiar sólo el nombre dejaba email,
+    // teléfono y bio en NULL devolviendo 200. Auditoría 2026-09-08, P1-2.
+    const { displayName, email, phone, bio, specialties, isActive, photoFocusX, photoFocusY } = req.body;
+    const has = (k) => Object.prototype.hasOwnProperty.call(req.body, k);
+    const clampFocus = (v) => Math.max(0, Math.min(100, Number(v ?? 50)));
     const r = await pool.query(
-      "UPDATE instructors SET display_name=$1, email=$2, phone=$3, bio=$4, specialties=$5, is_active=$6, photo_focus_x=$7, photo_focus_y=$8, updated_at=NOW() WHERE id=$9 RETURNING *",
-      [displayName, email || null, phone || null, bio || null, specialtiesValue, isActive !== false, safeFocusX, safeFocusY, req.params.id]
+      `UPDATE instructors SET
+         display_name  = COALESCE($1, display_name),
+         email         = CASE WHEN $2::boolean THEN $3 ELSE email END,
+         phone         = CASE WHEN $4::boolean THEN $5 ELSE phone END,
+         bio           = CASE WHEN $6::boolean THEN $7 ELSE bio END,
+         specialties   = CASE WHEN $8::boolean THEN $9::jsonb ELSE specialties END,
+         is_active     = COALESCE($10, is_active),
+         photo_focus_x = COALESCE($11, photo_focus_x),
+         photo_focus_y = COALESCE($12, photo_focus_y),
+         updated_at    = NOW()
+       WHERE id=$13 RETURNING *`,
+      [
+        displayName ?? null,
+        has("email"), email || null,
+        has("phone"), phone || null,
+        has("bio"), bio || null,
+        has("specialties"), has("specialties") ? serializeSpecialtiesForDb(specialties) : null,
+        isActive === undefined ? null : isActive !== false,
+        has("photoFocusX") ? clampFocus(photoFocusX) : null,
+        has("photoFocusY") ? clampFocus(photoFocusY) : null,
+        req.params.id,
+      ]
     );
     if (!r.rows.length) return res.status(404).json({ message: "Instructor no encontrado" });
     return res.json({ data: camelRow(r.rows[0]) });
@@ -14917,7 +15078,7 @@ app.put("/api/admin/classes/:id", adminMiddleware, async (req, res) => {
     return res.json({ data: r.rows[0] });
   } catch (err) {
     console.error("[PUT /admin/classes/:id]", err.message);
-    return res.status(500).json({ message: "Error interno", error: err.message });
+    return res.status(500).json({ message: "Error interno" });
   }
 });
 
@@ -15879,6 +16040,14 @@ app.get("*", (req, res) => {
 // Devolvemos JSON limpio para que el toast muestre un mensaje claro.
 app.use((err, _req, res, next) => {
   if (res.headersSent) return next(err);
+  // Cuerpo JSON malformado: es un error del que llama, no del servidor. Sin
+  // esto, 94 rutas devolvían 500. Auditoría 2026-09-08, familia P2.
+  if (err?.type === "entity.parse.failed" || err instanceof SyntaxError && "body" in err) {
+    return res.status(400).json({ message: "El cuerpo de la petición no es JSON válido" });
+  }
+  if (err?.type === "entity.too.large") {
+    return res.status(413).json({ message: "El cuerpo de la petición es demasiado grande" });
+  }
   if (err?.code === "LIMIT_FILE_SIZE") {
     return res.status(413).json({ message: "El archivo supera el límite de 10 MB" });
   }
