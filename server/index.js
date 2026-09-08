@@ -11142,7 +11142,11 @@ function parseDateRange(req) {
     from = new Date(now.getFullYear(), now.getMonth(), 1);
     to = now;
   }
-  const days = Math.max(1, Math.round((to - from) / 86400000) + 1);
+  // Contar días civiles: con `to = now`, restar milisegundos redondeaba hacia
+  // arriba después del mediodía y el período previo salía un día más largo que
+  // el actual, torciendo todos los deltas. Revisión de código 2026-09-08, R7.
+  const midnight = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const days = Math.max(1, Math.round((midnight(to) - midnight(from)) / 86400000) + 1);
   const prevTo = new Date(from);
   prevTo.setDate(prevTo.getDate() - 1);
   const prevFrom = new Date(prevTo);
@@ -12739,7 +12743,7 @@ app.get("/api/admin/birthdays", adminMiddleware, async (req, res) => {
   }
 });
 
-app.get("/api/admin/stats", ownerMiddleware, async (req, res) => {
+app.get("/api/admin/stats", adminMiddleware, async (req, res) => {
   try {
     const today = new Date().toISOString().slice(0, 10);
     const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
@@ -12751,10 +12755,15 @@ app.get("/api/admin/stats", ownerMiddleware, async (req, res) => {
       pool.query("SELECT COUNT(*) FROM orders WHERE status = 'pending_verification'"),
     ]);
 
+    // Recepción e instructoras necesitan los contadores operativos (clases de
+    // hoy, membresías activas, órdenes por verificar); el ingreso del mes es
+    // sólo de la dueña. Cerrar la ruta entera les dejaba ceros presentados como
+    // hechos. Revisión de código 2026-09-08, R4.
+    const puedeVerDinero = OWNER_ROLES.includes(req.userRole);
     return res.json({
       classesToday: parseInt(classesToday.rows[0].count),
       activeMembers: parseInt(activeMembers.rows[0].count),
-      monthlyRevenue: parseFloat(monthlyRevenue.rows[0].total),
+      monthlyRevenue: puedeVerDinero ? parseFloat(monthlyRevenue.rows[0].total) : null,
       pendingAlerts: parseInt(pendingAlerts.rows[0].count),
     });
   } catch (err) {
@@ -13268,10 +13277,16 @@ app.put("/api/plans/:id", adminMiddleware, async (req, res) => {
       // PUT parcial: lo que el cuerpo no menciona se conserva. Un cuerpo
       // incompleto llegaba a borrar el nombre y el precio del plan (o a
       // reventar con NOT NULL). Auditoría 2026-09-08, P1-2.
-      `UPDATE plans SET name=COALESCE($1, name), description=COALESCE($2, description),
+      // class_limit y description SI admiten NULL como valor real (NULL =
+      // ilimitado, y el formulario manda classLimit:null para eso). Un COALESCE
+      // hacia imposible volver ilimitado un plan. Se distingue "no vino en el
+      // cuerpo" de "vino como null". Revision de codigo 2026-09-08, R2.
+      `UPDATE plans SET name=COALESCE($1, name),
+       description = CASE WHEN $18::boolean THEN $2 ELSE description END,
        price=COALESCE($3, price), currency=COALESCE($4, currency),
        duration_days=COALESCE($5, duration_days),
-       class_limit=COALESCE($6, class_limit), features=COALESCE($7, features),
+       class_limit = CASE WHEN $19::boolean THEN $6 ELSE class_limit END,
+       features=COALESCE($7, features),
        is_active=COALESCE($8, is_active), sort_order=COALESCE($9, sort_order),
        class_category=COALESCE($10, class_category),
        is_non_transferable=COALESCE($11, is_non_transferable),
@@ -13299,6 +13314,9 @@ app.put("/api/plans/:id", adminMiddleware, async (req, res) => {
         openingPrice,
         morningOnly,
         req.params.id,
+        Object.prototype.hasOwnProperty.call(req.body, "description"),
+        Object.prototype.hasOwnProperty.call(req.body, "classLimit")
+          || Object.prototype.hasOwnProperty.call(req.body, "class_limit"),
       ]
     );
     if (!r.rows.length) return res.status(404).json({ message: "Plan no encontrado" });
@@ -14071,7 +14089,16 @@ app.post("/api/admin/clients/manual", adminMiddleware, async (req, res) => {
       // Cupón opcional: valida y calcula el precio final que pagó la clienta
       // (queda registrado en las notas para control del admin). Si el cupón es
       // inválido para este plan, abortamos para que el admin lo sepa.
+      // Si hay dinero de por medio, el metodo de pago se valida contra el enum
+      // (no se asume efectivo). Revision de codigo 2026-09-08, R3.
+      if (!PAYMENT_METHODS.includes(String(paymentMethod))) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({
+          message: `Método de pago inválido. Opciones: ${PAYMENT_METHODS.join(", ")}.`,
+        });
+      }
       let priceNote = "";
+      let orderDiscount = 0;
       if (discountCode) {
         const dc = await findApplicableDiscountCode({
           code: discountCode,
@@ -14088,6 +14115,7 @@ app.post("/api/admin/clients/manual", adminMiddleware, async (req, res) => {
         const discount = calculateDiscountAmount(dc.discount_type, Number(dc.discount_value), subtotal);
         const finalPrice = Math.max(0, subtotal - discount);
         priceNote = ` · Cupón ${dc.code}: $${subtotal} → $${finalPrice}`;
+        orderDiscount = discount;
         // Incrementa el uso del cupón.
         await client.query("UPDATE discount_codes SET uses_count = uses_count + 1 WHERE id = $1", [dc.id]).catch(() => {});
       }
@@ -14102,6 +14130,23 @@ app.post("/api/admin/clients/manual", adminMiddleware, async (req, res) => {
         (notes || `Alta manual por admin`) + priceNote]
       );
       membership = camelRow(memRes.rows[0]);
+
+      // Esta es la OTRA via de venta de mostrador (el alta manual con paquete).
+      // Los ingresos se calculan sobre `orders`, asi que sin esto el dinero
+      // cobrado aqui tampoco aparecia en el reporte — el mismo P0-3, en la ruta
+      // que se me habia pasado. Revision de codigo 2026-09-08, R3.
+      const ordRes = await client.query(
+        `INSERT INTO orders (user_id, plan_id, status, payment_method, subtotal, tax_amount,
+                             total_amount, discount_amount, channel, verified_at, verified_by,
+                             approved_at, approved_by, paid_at)
+         VALUES ($1,$2,'approved',$3,$4,0,$5,$6,'counter',NOW(),$7,NOW(),$7,NOW())
+         RETURNING id`,
+        [user.id, plan.id, paymentMethod, Number(_eff) || 0,
+         Math.max(0, (Number(_eff) || 0) - orderDiscount), orderDiscount, req.userId || null]
+      );
+      await client.query(`UPDATE memberships SET order_id = $2 WHERE id = $1`,
+        [memRes.rows[0].id, ordRes.rows[0].id]);
+      membership.orderId = ordRes.rows[0].id;
     }
 
     await client.query("COMMIT");
@@ -14828,7 +14873,7 @@ app.put("/api/instructors/:id", adminMiddleware, async (req, res) => {
          email         = CASE WHEN $2::boolean THEN $3 ELSE email END,
          phone         = CASE WHEN $4::boolean THEN $5 ELSE phone END,
          bio           = CASE WHEN $6::boolean THEN $7 ELSE bio END,
-         specialties   = CASE WHEN $8::boolean THEN $9::jsonb ELSE specialties END,
+         specialties   = CASE WHEN $8::boolean THEN $9 ELSE specialties END,
          is_active     = COALESCE($10, is_active),
          photo_focus_x = COALESCE($11, photo_focus_x),
          photo_focus_y = COALESCE($12, photo_focus_y),

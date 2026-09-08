@@ -56,6 +56,8 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 -- Estado de clase
 DO $$ BEGIN
     CREATE TYPE class_status AS ENUM ('scheduled', 'in_progress', 'completed', 'cancelled');
+-- 'closed' lo escribe PUT /api/classes/:id/close (auditoria 2026-09-08, P1-3).
+ALTER TYPE class_status ADD VALUE IF NOT EXISTS 'closed';
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- Estado de reservación
@@ -1496,10 +1498,13 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- trigger_decrement_classes: ELIMINADO a proposito (auditoria 2026-09-08, P0-1).
+-- Descontaba la clase al hacer check-in mientras la aplicacion ya la descuenta
+-- al reservar, asi que cada clase asistida costaba 2 creditos. Este archivo se
+-- reaplica en cada `npm run db:schema`, asi que volver a crearlo aqui
+-- reinstalaria el doble cobro en toda instalacion nueva.
 DROP TRIGGER IF EXISTS trigger_decrement_classes ON bookings;
-CREATE TRIGGER trigger_decrement_classes
-    AFTER UPDATE ON bookings
-    FOR EACH ROW EXECUTE FUNCTION decrement_membership_classes();
+DROP FUNCTION IF EXISTS decrement_membership_classes();
 
 -- Actualizar contador de reservaciones en clase
 CREATE OR REPLACE FUNCTION update_class_booking_count()

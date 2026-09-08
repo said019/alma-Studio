@@ -113,7 +113,6 @@ const Dashboard = () => {
   const { data: stats, isLoading, isError: statsError, refetch: refetchStats } = useQuery<Stats>({
     queryKey: ["admin-stats"],
     queryFn: async () => (await api.get("/admin/stats")).data,
-    enabled: canSeeFinance,
   });
 
   const { data: memberships, isLoading: memsLoading, isError: memsError, refetch: refetchMems } = useQuery<{ data: Stats["recentMemberships"] }>({

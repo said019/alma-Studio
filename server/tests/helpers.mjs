@@ -5,7 +5,14 @@ import bcrypt from "bcryptjs";
 
 export const API = process.env.API_URL || "http://127.0.0.1:8101";
 export const DB  = process.env.DATABASE_URL || "postgres://alma:alma@127.0.0.1:5501/alma_fix";
-export const ADMIN = { email: "admin@almamovement.mx", password: process.env.ADMIN_PASSWORD || "Alma$Reformer2026!" };
+// La suite siembra su propio admin: el servidor ya no crea uno con contrasena
+// por defecto (auditoria 2026-09-08, P0-4), asi que depender de esa cuenta
+// hacia fallar la suite en una base limpia — y volvia a meter la contrasena
+// literal en el repositorio, justo lo que seguridad.test.mjs prohibe.
+export const ADMIN = {
+  email: process.env.QA_ADMIN_EMAIL || "qa-admin@alma.test",
+  password: process.env.QA_ADMIN_PASSWORD || `Qa${Math.random().toString(36).slice(2, 10)}A1!`,
+};
 
 const pool = new pg.Pool({ connectionString: DB, max: 10 });
 export const sql = async (q, p = []) => (await pool.query(q, p)).rows;
@@ -23,7 +30,19 @@ export async function api(method, route, { token, body, raw, headers = {} } = {}
   return { status: res.status, body: parsed };
 }
 
+/** Crea (o repone la contrasena de) la cuenta admin sintetica de la suite. */
+export async function ensureAdmin() {
+  const hash = await bcrypt.hash(ADMIN.password, 10);
+  await sql(
+    `INSERT INTO users (display_name, email, phone, password_hash, role, accepts_terms, is_active)
+     VALUES ('QA Admin', $1, '0000000001', $2, 'admin', true, true)
+     ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash, role = 'admin'`,
+    [ADMIN.email, hash]);
+  return ADMIN;
+}
+
 export async function login(email, password) {
+  if (email === ADMIN.email) await ensureAdmin();
   const r = await api("POST", "/api/auth/login", { body: { email, password } });
   if (r.status !== 200) throw new Error(`login ${email} → ${r.status} ${JSON.stringify(r.body).slice(0, 150)}`);
   return { token: r.body.token, user: r.body.user };
@@ -94,4 +113,5 @@ export async function cleanup(prefix) {
   await sql(`DELETE FROM classes WHERE instructor_id IN (SELECT id FROM instructors WHERE display_name LIKE $1)`, [`${prefix}%`]);
   await sql(`DELETE FROM instructors WHERE display_name LIKE $1`, [`${prefix}%`]);
   await sql(`DELETE FROM users WHERE email LIKE $1`, [`${prefix}%`]);
+  await sql(`DELETE FROM users WHERE email = $1`, [ADMIN.email]);
 }
