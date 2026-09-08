@@ -40,11 +40,29 @@ No se hicieron 340 arreglos: se hicieron **9**, porque los síntomas venían de 
 
 ---
 
+## Revisión adversarial del diff (misma fecha)
+
+Revisé mi propio diff buscando refutarlo. **Encontró 7 regresiones que yo mismo introduje**, todas reproducidas antes de aceptarlas:
+
+| # | Qué rompí | Consecuencia si se hubiera fusionado |
+|---|---|---|
+| R1 | `schema_complete.sql` seguía creando `trigger_decrement_classes`, y `db-apply-schema.cjs` lo reaplica siempre. La migración nueva no estaba en ningún camino automático | **Toda instalación nueva reinstalaba el doble cobro.** El arreglo estrella sólo funcionaba en mi base, porque yo apliqué la migración a mano después |
+| R2 | `class_limit = COALESCE(...)` volvía NULL irrepresentable | Un plan **ya no podía volver a ser ilimitado**: el formulario manda `null` y el servidor lo ignoraba con un 200 |
+| R3 | `POST /api/admin/clients/manual` es la **otra** vía de venta de mostrador y seguía sin generar orden | Ese dinero seguía fuera del reporte: arreglé el P0-3 a medias |
+| R4 | `/api/admin/stats` pasó entera a `ownerMiddleware`, pero también trae clases de hoy, membresías activas y órdenes pendientes | Recepción veía **ceros presentados como hechos** en vez de sus contadores |
+| R5 | El harness llevaba escrita la contraseña que `seguridad.test.mjs` prohíbe, y dependía de una cuenta que el servidor ya no siembra | **La suite fallaba en una base limpia** — mis 34 verdes eran sobre una base que ya traía el admin viejo |
+| R6 | El cast a `jsonb` en el PUT de instructoras | 500 donde `specialties` es TEXT (`index.js` crea la tabla así como respaldo) |
+| R7 | `days` en milisegundos con `to = now` | Después del mediodía el período previo salía un día más largo: los deltas quedaban torcidos — el mismo tipo de bug que acababa de arreglar |
+
+Las siete están corregidas y cubiertas por 11 pruebas nuevas (`instalacion.test.mjs`, `revision.test.mjs`).
+
+**La lección**: los tres primeros arreglos parecían verdes porque los verifiqué sobre una base que yo mismo había preparado paso a paso. La verificación honesta es **una instalación desde cero con el aplicador real**, y eso es lo que ahora hacen las pruebas.
+
 ## Estado de las pruebas
 
 | Suite | Antes | Ahora |
 |---|---|---|
-| `server/tests/*.test.mjs` (regresión nueva, 34 casos) | **24 en rojo** | **34/34 verde** |
+| `server/tests/*.test.mjs` (regresión, 45 casos) | 24 en rojo (+ 4 y 7 más tras la revisión) | **45/45 verde sobre una instalación nueva** |
 | `npm test` — frontend | 19/19 | 19/19 |
 | `npm test` — servidor (38 casos) | **no se ejecutaban** | 38/38, ya incluidos en `npm test` |
 | Barrido de 245 rutas × 4 roles (923 llamadas) | **342 respuestas 5xx** | **6**, todas `503 Google Wallet no configurado` (proveedor apagado) |
@@ -53,6 +71,8 @@ No se hicieron 340 arreglos: se hicieron **9**, porque los síntomas venían de 
 | Navegador: 28 rutas del panel | 27 limpias | 27 limpias, sin regresión |
 
 Comandos: `npm test` · `npm run test:regression` (requiere API viva y base desechable).
+
+La corrida decisiva es sobre una base creada con `node scripts/db-apply-schema.cjs`, no sobre una preparada a mano: es la única que demuestra que una instalación nueva no trae el doble cobro de vuelta.
 
 ---
 
