@@ -569,6 +569,15 @@ function isGoogleDriveConfigured() {
   );
 }
 
+async function storePhotoReference(value) {
+  if (typeof value !== "string" || !value.startsWith("data:")) return value;
+  const match = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=\s]+)$/.exec(value);
+  if (!match) throw new Error("Formato de imagen no permitido");
+  if (!isGoogleDriveConfigured()) throw new Error("Almacenamiento de fotos no disponible");
+  const { fileId } = await uploadBufferToGoogleDrive(Buffer.from(match[2], "base64"), `studio_${Date.now()}`, match[1]);
+  return `https://lh3.googleusercontent.com/d/${fileId}=w1600`;
+}
+
 async function uploadBufferToGoogleDrive(buffer, filename, mimeType) {
   if (!["image/jpeg", "image/png", "image/webp"].includes(mimeType)) throw new Error("Formato de imagen no permitido");
   const tokenResp = await fetch("https://oauth2.googleapis.com/token", {
@@ -11785,6 +11794,7 @@ app.put("/api/settings/:key", adminMiddleware, async (req, res) => {
       return res.status(400).json({ message: "Falta `value` en el body" });
     }
     const merged = mergeSettingsWithDefaults(req.params.key, value);
+    if (req.params.key === "general_settings" && typeof merged.venue_media_url === "string" && merged.venue_media_url.startsWith("data:image/")) merged.venue_media_url = await storePhotoReference(merged.venue_media_url);
     await pool.query(
       "INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value=$2, updated_at=NOW()",
       [req.params.key, JSON.stringify(merged)]
@@ -14987,6 +14997,16 @@ app.delete("/api/instructors/:id", adminMiddleware, async (req, res) => {
   } catch (err) {
     return res.status(500).json({ message: "Error interno" });
   }
+});
+
+// Public studio photos use separate credentials from videos and documents.
+app.post("/api/photos/upload", adminMiddleware, upload.single("photo"), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ message: "Debes adjuntar una imagen" });
+    if (!isGoogleDriveConfigured()) return res.status(503).json({ message: "Almacenamiento de fotos no disponible" });
+    const { fileId } = await uploadBufferToGoogleDrive(req.file.buffer, `studio_${Date.now()}`, req.file.mimetype);
+    return res.json({ fileId, url: `https://lh3.googleusercontent.com/d/${fileId}=w1600` });
+  } catch (error) { return res.status(503).json({ message: "No se pudo guardar la foto. Intenta de nuevo." }); }
 });
 
 // POST /api/instructors/:id/photo — upload instructor photo to Google Drive
