@@ -554,20 +554,72 @@ async function processProfilePhoto(inputBuffer) {
 // Sube una foto de perfil ya procesada al almacenamiento y la hace pública.
 // Devuelve la URL servida por el proxy (/api/drive/image/<id>) o null si el
 // almacenamiento no está configurado (en cuyo caso el caller decide fallback).
-async function storeProfilePhoto(processed, label) {
-  const isDriveConfigured = Boolean(
-    process.env.GOOGLE_DRIVE_FOLDER_ID && process.env.GOOGLE_CLIENT_ID &&
-    process.env.GOOGLE_CLIENT_SECRET && process.env.GOOGLE_REFRESH_TOKEN
+function photoDriveConfig() {
+  const dedicated = Boolean(process.env.PHOTOS_DRIVE_CLIENT_ID || process.env.PHOTOS_DRIVE_CLIENT_SECRET || process.env.PHOTOS_DRIVE_REFRESH_TOKEN);
+  const prefix = dedicated ? "PHOTOS_DRIVE_" : "GOOGLE_";
+  return { clientId: process.env[prefix + "CLIENT_ID"], clientSecret: process.env[prefix + "CLIENT_SECRET"], refreshToken: process.env[prefix + "REFRESH_TOKEN"], folderId: dedicated ? process.env.PHOTOS_DRIVE_FOLDER_ID : process.env.GOOGLE_DRIVE_FOLDER_ID };
+}
+
+function isGoogleDriveConfigured() {
+  return Boolean(
+    photoDriveConfig().folderId &&
+    photoDriveConfig().clientId &&
+    photoDriveConfig().clientSecret &&
+    photoDriveConfig().refreshToken
   );
-  if (!isDriveConfigured) {
-    return `data:${processed.mimeType};base64,${processed.buffer.toString("base64")}`;
+}
+
+async function uploadBufferToGoogleDrive(buffer, filename, mimeType) {
+  if (!["image/jpeg", "image/png", "image/webp"].includes(mimeType)) throw new Error("Formato de imagen no permitido");
+  const tokenResp = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: photoDriveConfig().clientId,
+      client_secret: photoDriveConfig().clientSecret,
+      refresh_token: photoDriveConfig().refreshToken,
+      grant_type: "refresh_token",
+    }),
+  });
+  const tokenData = await tokenResp.json();
+  if (!tokenResp.ok || !tokenData.access_token) {
+    throw new Error(`Google OAuth error: ${tokenData.error_description || tokenData.error || "unknown"}`);
   }
-  const token = await getGoogleDriveAccessToken();
-  const fileName = `perfil_${label}_${Date.now()}.${processed.ext}`;
-  const up = await uploadBufferToDrive(processed.buffer, fileName, processed.mimeType, token);
-  if (!up?.id) throw new Error("upload falló");
-  await makeGoogleDriveFilePublic(up.id, token);
-  return `/api/drive/image/${up.id}`;
+  const accessToken = tokenData.access_token;
+
+  const boundary = "drive_upload_" + Date.now();
+  const metadata = JSON.stringify({
+    name: filename,
+    parents: [photoDriveConfig().folderId],
+  });
+  const body = Buffer.concat([
+    Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadata}\r\n--${boundary}\r\nContent-Type: ${mimeType}\r\n\r\n`),
+    buffer,
+    Buffer.from(`\r\n--${boundary}--`),
+  ]);
+
+  const uploadResp = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": `multipart/related; boundary=${boundary}` },
+    body,
+  });
+  const uploadJson = await uploadResp.json();
+  if (!uploadJson.id) throw new Error(`Drive upload failed: ${JSON.stringify(uploadJson)}`);
+
+  const permission = await fetch(`https://www.googleapis.com/drive/v3/files/${uploadJson.id}/permissions`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ role: "reader", type: "anyone" }),
+  });
+
+  if (!permission.ok) throw new Error("No se pudo publicar la foto");
+  return { fileId: uploadJson.id };
+}
+
+async function storeProfilePhoto(processed, label) {
+  if (!isGoogleDriveConfigured()) return `data:${processed.mimeType};base64,${processed.buffer.toString("base64")}`;
+  const { fileId } = await uploadBufferToGoogleDrive(processed.buffer, `perfil_${label}_${Date.now()}.${processed.ext}`, processed.mimeType);
+  return `https://lh3.googleusercontent.com/d/${fileId}=w1600`;
 }
 
 const pool = new Pool({
@@ -14943,56 +14995,7 @@ app.post("/api/instructors/:id/photo", adminMiddleware, upload.single("photo"), 
     if (!req.file) return res.status(400).json({ message: "No se envió archivo" });
     const instructorId = req.params.id;
 
-    const isDriveConfigured = Boolean(
-      process.env.GOOGLE_DRIVE_FOLDER_ID &&
-      process.env.GOOGLE_CLIENT_ID &&
-      process.env.GOOGLE_CLIENT_SECRET &&
-      process.env.GOOGLE_REFRESH_TOKEN
-    );
-
-    let photoUrl;
-    if (isDriveConfigured) {
-      const tokenResp = await fetch("https://oauth2.googleapis.com/token", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-          client_id: process.env.GOOGLE_CLIENT_ID,
-          client_secret: process.env.GOOGLE_CLIENT_SECRET,
-          refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
-          grant_type: "refresh_token",
-        }),
-      });
-      const { access_token } = await tokenResp.json();
-
-      const boundary = "instructor_photo_" + Date.now();
-      const metadata = JSON.stringify({
-        name: `instructor_${instructorId}_${Date.now()}.${req.file.originalname.split(".").pop()}`,
-        parents: [getDriveFolderId()],
-      });
-      const body = Buffer.concat([
-        Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadata}\r\n--${boundary}\r\nContent-Type: ${req.file.mimetype}\r\n\r\n`),
-        req.file.buffer,
-        Buffer.from(`\r\n--${boundary}--`),
-      ]);
-
-      const uploadResp = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${access_token}`, "Content-Type": `multipart/related; boundary=${boundary}` },
-        body,
-      });
-      const uploadJson = await uploadResp.json();
-      if (!uploadJson.id) throw new Error("Error al subir imagen a Drive");
-
-      await fetch(`https://www.googleapis.com/drive/v3/files/${uploadJson.id}/permissions`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${access_token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ role: "reader", type: "anyone" }),
-      });
-
-      photoUrl = `/api/drive/image/${uploadJson.id}`;
-    } else {
-      photoUrl = `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
-    }
+    const photoUrl = await storeProfilePhoto({ buffer: req.file.buffer, mimeType: req.file.mimetype, ext: 'image' }, instructorId);
 
     // slot=2 actualiza la foto secundaria (la del hover/click); por defecto la principal.
     // Columna en whitelist — sin riesgo de inyección.
