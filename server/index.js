@@ -586,20 +586,81 @@ async function processProfilePhoto(inputBuffer) {
 // Sube una foto de perfil ya procesada al almacenamiento y la hace pública.
 // Devuelve la URL servida por el proxy (/api/drive/image/<id>) o null si el
 // almacenamiento no está configurado (en cuyo caso el caller decide fallback).
-async function storeProfilePhoto(processed, label) {
-  const isDriveConfigured = Boolean(
-    process.env.GOOGLE_DRIVE_FOLDER_ID && process.env.GOOGLE_CLIENT_ID &&
-    process.env.GOOGLE_CLIENT_SECRET && process.env.GOOGLE_REFRESH_TOKEN
+function photoDriveConfig() {
+  const dedicated = Boolean(process.env.PHOTOS_DRIVE_CLIENT_ID || process.env.PHOTOS_DRIVE_CLIENT_SECRET || process.env.PHOTOS_DRIVE_REFRESH_TOKEN);
+  const prefix = dedicated ? "PHOTOS_DRIVE_" : "GOOGLE_";
+  return { clientId: process.env[prefix + "CLIENT_ID"], clientSecret: process.env[prefix + "CLIENT_SECRET"], refreshToken: process.env[prefix + "REFRESH_TOKEN"], folderId: dedicated ? process.env.PHOTOS_DRIVE_FOLDER_ID : process.env.GOOGLE_DRIVE_FOLDER_ID };
+}
+
+function isGoogleDriveConfigured() {
+  return Boolean(
+    photoDriveConfig().folderId &&
+    photoDriveConfig().clientId &&
+    photoDriveConfig().clientSecret &&
+    photoDriveConfig().refreshToken
   );
-  if (!isDriveConfigured) {
-    return `data:${processed.mimeType};base64,${processed.buffer.toString("base64")}`;
+}
+
+async function storePhotoReference(value) {
+  if (typeof value !== "string" || !value.startsWith("data:")) return value;
+  const match = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=\s]+)$/.exec(value);
+  if (!match) throw new Error("Formato de imagen no permitido");
+  if (!isGoogleDriveConfigured()) throw new Error("Almacenamiento de fotos no disponible");
+  const { fileId } = await uploadBufferToGoogleDrive(Buffer.from(match[2], "base64"), `studio_${Date.now()}`, match[1]);
+  return `https://lh3.googleusercontent.com/d/${fileId}=w1600`;
+}
+
+async function uploadBufferToGoogleDrive(buffer, filename, mimeType) {
+  if (!["image/jpeg", "image/png", "image/webp"].includes(mimeType)) throw new Error("Formato de imagen no permitido");
+  const tokenResp = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: photoDriveConfig().clientId,
+      client_secret: photoDriveConfig().clientSecret,
+      refresh_token: photoDriveConfig().refreshToken,
+      grant_type: "refresh_token",
+    }),
+  });
+  const tokenData = await tokenResp.json();
+  if (!tokenResp.ok || !tokenData.access_token) {
+    throw new Error(`Google OAuth error: ${tokenData.error_description || tokenData.error || "unknown"}`);
   }
-  const token = await getGoogleDriveAccessToken();
-  const fileName = `perfil_${label}_${Date.now()}.${processed.ext}`;
-  const up = await uploadBufferToDrive(processed.buffer, fileName, processed.mimeType, token);
-  if (!up?.id) throw new Error("upload falló");
-  await makeGoogleDriveFilePublic(up.id, token);
-  return `/api/drive/image/${up.id}`;
+  const accessToken = tokenData.access_token;
+
+  const boundary = "drive_upload_" + Date.now();
+  const metadata = JSON.stringify({
+    name: filename,
+    parents: [photoDriveConfig().folderId],
+  });
+  const body = Buffer.concat([
+    Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadata}\r\n--${boundary}\r\nContent-Type: ${mimeType}\r\n\r\n`),
+    buffer,
+    Buffer.from(`\r\n--${boundary}--`),
+  ]);
+
+  const uploadResp = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": `multipart/related; boundary=${boundary}` },
+    body,
+  });
+  const uploadJson = await uploadResp.json();
+  if (!uploadJson.id) throw new Error(`Drive upload failed: ${JSON.stringify(uploadJson)}`);
+
+  const permission = await fetch(`https://www.googleapis.com/drive/v3/files/${uploadJson.id}/permissions`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ role: "reader", type: "anyone" }),
+  });
+
+  if (!permission.ok) throw new Error("No se pudo publicar la foto");
+  return { fileId: uploadJson.id };
+}
+
+async function storeProfilePhoto(processed, label) {
+  if (!isGoogleDriveConfigured()) return `data:${processed.mimeType};base64,${processed.buffer.toString("base64")}`;
+  const { fileId } = await uploadBufferToGoogleDrive(processed.buffer, `perfil_${label}_${Date.now()}.${processed.ext}`, processed.mimeType);
+  return `https://lh3.googleusercontent.com/d/${fileId}=w1600`;
 }
 
 const pool = new Pool({
@@ -11777,6 +11838,7 @@ app.put("/api/settings/:key", adminMiddleware, async (req, res) => {
       return res.status(400).json({ message: "Falta `value` en el body" });
     }
     const merged = mergeSettingsWithDefaults(req.params.key, value);
+    if (req.params.key === "general_settings" && typeof merged.venue_media_url === "string" && merged.venue_media_url.startsWith("data:image/")) merged.venue_media_url = await storePhotoReference(merged.venue_media_url);
     await pool.query(
       "INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value=$2, updated_at=NOW()",
       [req.params.key, JSON.stringify(merged)]
@@ -14981,62 +15043,23 @@ app.delete("/api/instructors/:id", adminMiddleware, async (req, res) => {
   }
 });
 
+// Public studio photos use separate credentials from videos and documents.
+app.post("/api/photos/upload", adminMiddleware, upload.single("photo"), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ message: "Debes adjuntar una imagen" });
+    if (!isGoogleDriveConfigured()) return res.status(503).json({ message: "Almacenamiento de fotos no disponible" });
+    const { fileId } = await uploadBufferToGoogleDrive(req.file.buffer, `studio_${Date.now()}`, req.file.mimetype);
+    return res.json({ fileId, url: `https://lh3.googleusercontent.com/d/${fileId}=w1600` });
+  } catch (error) { return res.status(503).json({ message: "No se pudo guardar la foto. Intenta de nuevo." }); }
+});
+
 // POST /api/instructors/:id/photo — upload instructor photo to Google Drive
 app.post("/api/instructors/:id/photo", adminMiddleware, upload.single("photo"), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ message: "No se envió archivo" });
     const instructorId = req.params.id;
 
-    const isDriveConfigured = Boolean(
-      process.env.GOOGLE_DRIVE_FOLDER_ID &&
-      process.env.GOOGLE_CLIENT_ID &&
-      process.env.GOOGLE_CLIENT_SECRET &&
-      process.env.GOOGLE_REFRESH_TOKEN
-    );
-
-    let photoUrl;
-    if (isDriveConfigured) {
-      const tokenResp = await fetch("https://oauth2.googleapis.com/token", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-          client_id: process.env.GOOGLE_CLIENT_ID,
-          client_secret: process.env.GOOGLE_CLIENT_SECRET,
-          refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
-          grant_type: "refresh_token",
-        }),
-      });
-      const { access_token } = await tokenResp.json();
-
-      const boundary = "instructor_photo_" + Date.now();
-      const metadata = JSON.stringify({
-        name: `instructor_${instructorId}_${Date.now()}.${req.file.originalname.split(".").pop()}`,
-        parents: [getDriveFolderId()],
-      });
-      const body = Buffer.concat([
-        Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadata}\r\n--${boundary}\r\nContent-Type: ${req.file.mimetype}\r\n\r\n`),
-        req.file.buffer,
-        Buffer.from(`\r\n--${boundary}--`),
-      ]);
-
-      const uploadResp = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${access_token}`, "Content-Type": `multipart/related; boundary=${boundary}` },
-        body,
-      });
-      const uploadJson = await uploadResp.json();
-      if (!uploadJson.id) throw new Error("Error al subir imagen a Drive");
-
-      await fetch(`https://www.googleapis.com/drive/v3/files/${uploadJson.id}/permissions`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${access_token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ role: "reader", type: "anyone" }),
-      });
-
-      photoUrl = `/api/drive/image/${uploadJson.id}`;
-    } else {
-      photoUrl = `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
-    }
+    const photoUrl = await storeProfilePhoto({ buffer: req.file.buffer, mimeType: req.file.mimetype, ext: 'image' }, instructorId);
 
     // slot=2 actualiza la foto secundaria (la del hover/click); por defecto la principal.
     // Columna en whitelist — sin riesgo de inyección.
@@ -15618,10 +15641,10 @@ app.post("/api/events", adminMiddleware, async (req, res) => {
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
        RETURNING *`,
       [
-        type, title, description, instructor_name, instructor_photo || null,
+        type, title, description, instructor_name, await storePhotoReference(instructor_photo) || null,
         date, start_time, end_time, location, capacity, price,
         early_bird_price || null, early_bird_deadline || null, member_discount,
-        image || null, requirements,
+        await storePhotoReference(image) || null, requirements,
         JSON.stringify(Array.isArray(includes) ? includes.filter(Boolean) : []),
         JSON.stringify(Array.isArray(tags) ? tags.filter(Boolean) : []),
         status, req.userId,
@@ -15647,7 +15670,7 @@ app.put("/api/events/:id", adminMiddleware, async (req, res) => {
     const vals = [];
     for (const key of allowed) {
       if (req.body[key] !== undefined) {
-        vals.push(["includes", "tags"].includes(key) ? JSON.stringify(req.body[key]) : req.body[key]);
+        vals.push(["includes", "tags"].includes(key) ? JSON.stringify(req.body[key]) : ["image", "instructor_photo"].includes(key) ? await storePhotoReference(req.body[key]) : req.body[key]);
         sets.push(`${key} = $${vals.length}`);
       }
     }
