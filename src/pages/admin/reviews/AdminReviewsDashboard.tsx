@@ -1,3 +1,4 @@
+import { parseISO } from "date-fns";
 import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -187,7 +188,10 @@ const AdminReviewsDashboard = () => {
   const renderClassLabel = (r: AdminReview) => {
     const classLabel = r.class_type_name || "Clase";
     if (!r.class_date) return classLabel;
-    const date = new Date(r.class_date);
+    // parseISO, no new Date: `new Date("2026-09-14")` interpreta la fecha civil
+    // como medianoche UTC y en CDMX (UTC-6) la pinta como el día anterior.
+    // Auditoría de zona, 2026-09-14.
+    const date = parseISO(String(r.class_date));
     const dateLabel = Number.isNaN(date.getTime()) ? r.class_date : date.toLocaleDateString("es-MX");
     const timeLabel = r.class_start_time ? String(r.class_start_time).slice(0, 5) : "";
     return `${classLabel} · ${dateLabel}${timeLabel ? ` ${timeLabel}` : ""}`;
