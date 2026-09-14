@@ -57,7 +57,15 @@ export async function login(email, password) {
 /** Id de la reserva: la API devuelve { message, booking }. */
 export const bookingId = (r) => r.body?.booking?.id ?? r.body?.data?.id ?? r.body?.id;
 
-export const day = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
+// Fecha civil del estudio: toISOString() devuelve UTC y despues de las 18:00
+// en CDMX sembraria las fixtures en un dia distinto al que ve el servidor.
+export const day = (n) => {
+  const d = new Date();
+  d.setDate(d.getDate() + n);
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: STUDIO_TIMEZONE, year: "numeric", month: "2-digit", day: "2-digit",
+  }).format(d);
+};
 
 /** Créditos vivos = suma de todas las membresías activas (el sistema debita la más antigua). */
 export const credits = async (userId) =>

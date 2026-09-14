@@ -7,8 +7,29 @@ import "dotenv/config";
 // recordatorios se agendan un día corrido y los reportes cortan mal el día.
 // Se fija ANTES de cualquier uso de Date; Node lee process.env.TZ de forma
 // perezosa, asi que asignarlo aqui alcanza. Auditoria de zona, 2026-09-14.
-export const STUDIO_TIMEZONE = process.env.STUDIO_TIMEZONE || "America/Mexico_City";
+const TZ_PEDIDA = process.env.STUDIO_TIMEZONE || "America/Mexico_City";
+// Una zona invalida en el arranque de libpq tumba TODAS las conexiones con
+// `FATAL: invalid value for parameter "TimeZone"`, asi que se valida antes de
+// usarla y se cae al default con un aviso, en vez de dejar el sistema muerto.
+function zonaValida(z) {
+  try { new Intl.DateTimeFormat("en-US", { timeZone: z }); return true; } catch { return false; }
+}
+export const STUDIO_TIMEZONE = zonaValida(TZ_PEDIDA) ? TZ_PEDIDA : "America/Mexico_City";
+if (STUDIO_TIMEZONE !== TZ_PEDIDA) {
+  console.warn(`⚠️  STUDIO_TIMEZONE="${TZ_PEDIDA}" no es una zona valida; se usa ${STUDIO_TIMEZONE}.`);
+}
+// OJO: en ESM los `import` se evaluan ANTES que esta linea, asi que esto no
+// protege a un modulo importado que capture la zona al cargarse. La garantia
+// de verdad es arrancar el contenedor con TZ ya puesta (nixpacks.toml lo hace);
+// esta asignacion es la red de seguridad para Date en este proceso.
 process.env.TZ = STUDIO_TIMEZONE;
+
+/** Fecha civil de HOY en el estudio, "YYYY-MM-DD". */
+export function todayInStudio(d = new Date()) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: STUDIO_TIMEZONE, year: "numeric", month: "2-digit", day: "2-digit",
+  }).format(d);
+}
 
 import express from "express";
 import cors from "cors";
@@ -1363,7 +1384,7 @@ async function ensureSchema() {
            SELECT COUNT(*) FROM bookings b
             WHERE b.class_id = c.id AND b.status IN ('confirmed','checked_in')
          ), 0)
-       WHERE c.date >= (NOW() AT TIME ZONE 'America/Mexico_City')::date
+       WHERE c.date >= (NOW() AT TIME ZONE '${STUDIO_TIMEZONE}')::date
     `).catch(() => { });
 
     // Índice único para impedir reservas activas duplicadas (mismo user+clase).
@@ -3624,7 +3645,7 @@ async function checkWeeklyClassLimit(client, userId, membershipId, classDate) {
 // Devuelve para CADA membresía activa con weekly_class_limit el conteo + remaining.
 app.get("/api/bookings/weekly-status", authMiddleware, async (req, res) => {
   try {
-    const ref = req.query.date || new Date().toISOString().slice(0, 10);
+    const ref = req.query.date || todayInStudio();
     const r = await pool.query(
       `SELECT m.id AS membership_id, p.name AS plan_name, p.weekly_class_limit AS limit,
               (SELECT COUNT(*)::int FROM bookings b
@@ -3685,7 +3706,7 @@ app.post("/api/bookings", authMiddleware, async (req, res) => {
     // Lock class row to avoid overbooking in concurrent requests
     const classRes = await client.query(
       `SELECT c.id, c.max_capacity, c.current_bookings, c.status, c.date, c.start_time,
-              ((c.date + c.start_time) AT TIME ZONE 'America/Mexico_City') AS starts_at,
+              ((c.date + c.start_time) AT TIME ZONE '${STUDIO_TIMEZONE}') AS starts_at,
               ct.category AS class_category
        FROM classes c
        JOIN class_types ct ON c.class_type_id = ct.id
@@ -3930,7 +3951,7 @@ app.delete("/api/bookings/:id", authMiddleware, async (req, res) => {
     // ── Ventana de aviso para devolución de crédito (política Alma: 12 h) ──
     // Las clases están en hora de Ciudad de México; comparamos contra el inicio real.
     const classStartRes = await client.query(
-      `SELECT (c.date + c.start_time::time) AT TIME ZONE 'America/Mexico_City' AS class_start_utc
+      `SELECT (c.date + c.start_time::time) AT TIME ZONE '${STUDIO_TIMEZONE}' AS class_start_utc
        FROM classes c WHERE c.id = $1`,
       [booking.class_id]
     );
@@ -6674,15 +6695,15 @@ async function pickMotivationTemplate(userId) {
   // Cada fila = una semana con check-ins; week_offset 0 es la semana actual.
   const weeksRes = await pool.query(
     `SELECT FLOOR(EXTRACT(EPOCH FROM (
-              date_trunc('week', NOW() AT TIME ZONE 'America/Mexico_City')::date
-              - date_trunc('week', (checked_in_at AT TIME ZONE 'America/Mexico_City'))::date
+              date_trunc('week', NOW() AT TIME ZONE '${STUDIO_TIMEZONE}')::date
+              - date_trunc('week', (checked_in_at AT TIME ZONE '${STUDIO_TIMEZONE}'))::date
             )) / 604800)::int AS week_offset,
             COUNT(*)::int AS classes
        FROM bookings
       WHERE user_id = $1
         AND status = 'checked_in'
         AND checked_in_at IS NOT NULL
-        AND checked_in_at >= (NOW() AT TIME ZONE 'America/Mexico_City') - INTERVAL '12 weeks'
+        AND checked_in_at >= (NOW() AT TIME ZONE '${STUDIO_TIMEZONE}') - INTERVAL '12 weeks'
       GROUP BY 1
       ORDER BY 1 ASC`,
     [userId],
@@ -6785,13 +6806,13 @@ async function checkLoyaltyMilestones(userId) {
     if (period === "month") {
       q = `SELECT COUNT(*)::int AS n FROM bookings
             WHERE user_id = $1 AND status = 'checked_in'
-              AND date_trunc('month', checked_in_at AT TIME ZONE 'America/Mexico_City')
-                = date_trunc('month', NOW() AT TIME ZONE 'America/Mexico_City')`;
+              AND date_trunc('month', checked_in_at AT TIME ZONE '${STUDIO_TIMEZONE}')
+                = date_trunc('month', NOW() AT TIME ZONE '${STUDIO_TIMEZONE}')`;
     } else if (period === "year") {
       q = `SELECT COUNT(*)::int AS n FROM bookings
             WHERE user_id = $1 AND status = 'checked_in'
-              AND date_trunc('year', checked_in_at AT TIME ZONE 'America/Mexico_City')
-                = date_trunc('year', NOW() AT TIME ZONE 'America/Mexico_City')`;
+              AND date_trunc('year', checked_in_at AT TIME ZONE '${STUDIO_TIMEZONE}')
+                = date_trunc('year', NOW() AT TIME ZONE '${STUDIO_TIMEZONE}')`;
     } else {
       q = "SELECT COUNT(*)::int AS n FROM bookings WHERE user_id = $1 AND status = 'checked_in'";
     }
@@ -9703,7 +9724,7 @@ app.get("/api/admin/today-roster", adminMiddleware, async (_req, res) => {
          FROM classes c
          JOIN class_types ct ON c.class_type_id = ct.id
          JOIN instructors i ON c.instructor_id = i.id
-        WHERE c.date = (NOW() AT TIME ZONE 'America/Mexico_City')::date
+        WHERE c.date = (NOW() AT TIME ZONE '${STUDIO_TIMEZONE}')::date
           AND c.status <> 'cancelled'
         ORDER BY c.start_time ASC`
     );
@@ -9808,7 +9829,7 @@ app.post("/api/admin/visit-sale", adminMiddleware, async (req, res) => {
     const _eff = resolveEffectivePrice(plan, _gen?.opening_pricing_active !== false);
     const guest = await findOrCreateGuestProfile({ ...profile, hostUserId }, dbClient);
     const user = await findOrCreateGuestUser(guest, dbClient);
-    const startStr = startDate ? String(startDate).slice(0, 10) : new Date().toISOString().slice(0, 10);
+    const startStr = startDate ? String(startDate).slice(0, 10) : todayInStudio();
     const endStr = calcMembershipEndDate(startStr, plan);
     const pm = normalizePaymentMethod(paymentMethod);
     const memRes = await dbClient.query(
@@ -9950,7 +9971,7 @@ app.post("/api/admin/classes/:id/walkin-visit", adminMiddleware, async (req, res
       const _gen = await getSettingValueWithDefaults("general_settings");
       const _eff = resolveEffectivePrice(plan, _gen?.opening_pricing_active !== false);
       const pm = normalizePaymentMethod(sale.paymentMethod || "cash");
-      const startStr = new Date().toISOString().slice(0, 10);
+      const startStr = todayInStudio();
       const endStr = calcMembershipEndDate(startStr, plan);
       const memIns = await dbClient.query(
         `INSERT INTO memberships
@@ -10042,7 +10063,7 @@ app.post("/api/bookings/with-guest", authMiddleware, async (req, res) => {
     // Validar clase + ventana de 2 h (misma regla que reservar para sí misma).
     const clsRes = await dbClient.query(
       `SELECT c.id, c.max_capacity, c.status,
-              ((c.date + c.start_time) AT TIME ZONE 'America/Mexico_City') AS starts_at
+              ((c.date + c.start_time) AT TIME ZONE '${STUDIO_TIMEZONE}') AS starts_at
          FROM classes c
         WHERE c.id = $1
         FOR UPDATE`,
@@ -12797,7 +12818,7 @@ app.get("/api/admin/birthdays", adminMiddleware, async (req, res) => {
 
 app.get("/api/admin/stats", adminMiddleware, async (req, res) => {
   try {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayInStudio();
     const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
 
     const [classesToday, activeMembers, monthlyRevenue, pendingAlerts] = await Promise.all([
@@ -12888,7 +12909,7 @@ app.delete("/api/users/:id", adminMiddleware, async (req, res) => {
             WHERE user_id = $1 AND status IN ('active','pending_activation','pending_payment')) AS memberships,
          (SELECT COUNT(*) FROM bookings b JOIN classes c ON b.class_id = c.id
             WHERE b.user_id = $1 AND b.status IN ('confirmed','checked_in')
-              AND c.date >= (NOW() AT TIME ZONE 'America/Mexico_City')::date) AS upcoming`,
+              AND c.date >= (NOW() AT TIME ZONE '${STUDIO_TIMEZONE}')::date) AS upcoming`,
       [id]
     );
     const d = deps.rows[0] || {};
@@ -12927,8 +12948,8 @@ app.get("/api/memberships", adminMiddleware, async (req, res) => {
       // membresías activas que vencen dentro de los próximos 7 días.
       q += ` AND m.status = 'active'
              AND m.end_date IS NOT NULL
-             AND m.end_date >= ((NOW() AT TIME ZONE 'America/Mexico_City')::date)
-             AND m.end_date <= ((NOW() AT TIME ZONE 'America/Mexico_City')::date + INTERVAL '7 days')`;
+             AND m.end_date >= ((NOW() AT TIME ZONE '${STUDIO_TIMEZONE}')::date)
+             AND m.end_date <= ((NOW() AT TIME ZONE '${STUDIO_TIMEZONE}')::date + INTERVAL '7 days')`;
     } else if (status) {
       params.push(status); q += ` AND m.status = $${params.length}`;
     }
@@ -13534,7 +13555,7 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
 
     const classRes = await client.query(
       `SELECT c.id, c.max_capacity, c.current_bookings, c.status, c.date, c.start_time,
-              ((c.date + c.start_time) AT TIME ZONE 'America/Mexico_City') AS starts_at,
+              ((c.date + c.start_time) AT TIME ZONE '${STUDIO_TIMEZONE}') AS starts_at,
               ct.category AS class_category
        FROM classes c
        JOIN class_types ct ON c.class_type_id = ct.id
@@ -13684,7 +13705,7 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
         const _gen = await getSettingValueWithDefaults("general_settings");
         const _eff = resolveEffectivePrice(plan, _gen?.opening_pricing_active !== false);
         const pm = normalizePaymentMethod(guestSale.paymentMethod || "cash");
-        const startStr = new Date().toISOString().slice(0, 10);
+        const startStr = todayInStudio();
         const endStr = calcMembershipEndDate(startStr, plan);
         // Si no especifica class_limit, asumimos clase suelta (1).
         const credits = plan.class_limit ?? 1;
@@ -13980,8 +14001,8 @@ app.post("/api/admin/checkin/scan", adminMiddleware, async (req, res) => {
         WHERE b.user_id = $1
           AND b.status IN ('confirmed','checked_in')
           AND c.status <> 'cancelled'
-          AND c.date = (NOW() AT TIME ZONE 'America/Mexico_City')::date
-        ORDER BY ABS(EXTRACT(EPOCH FROM (((c.date + c.start_time) AT TIME ZONE 'America/Mexico_City') - NOW())))
+          AND c.date = (NOW() AT TIME ZONE '${STUDIO_TIMEZONE}')::date
+        ORDER BY ABS(EXTRACT(EPOCH FROM (((c.date + c.start_time) AT TIME ZONE '${STUDIO_TIMEZONE}') - NOW())))
         LIMIT 1`,
       [userId]
     );
@@ -16080,7 +16101,9 @@ app.get("/api/health", async (_req, res) => {
       process: procTz,
       db: row.db_tz,
       today: row.studio_today,
-      matchesDb: row.db_today === row.studio_today && procTz === STUDIO_TIMEZONE,
+      // Comparar NOMBRES de zona, no fechas: dos fechas coinciden ~18 h al dia
+      // aunque la sesion este en UTC, asi que compararlas oculta el fallo de dia.
+      matchesDb: row.db_tz === STUDIO_TIMEZONE && procTz === STUDIO_TIMEZONE,
     };
     if (!out.timezone.matchesDb) {
       out.status = "degraded";
@@ -16314,7 +16337,7 @@ async function runClassReminderCron() {
       WHERE b.status = 'confirmed'
         AND u.receive_reminders IS NOT FALSE
         AND u.phone IS NOT NULL
-        AND (c.date + c.start_time) AT TIME ZONE 'America/Mexico_City'
+        AND (c.date + c.start_time) AT TIME ZONE '${STUDIO_TIMEZONE}'
               BETWEEN NOW() + INTERVAL '105 minutes'
                   AND NOW() + INTERVAL '135 minutes'
     `);
@@ -16415,7 +16438,10 @@ function scheduleEmailCrons() {
   // ── Wellhub: resumen diario de check-ins confirmados (ventana 23:40 MX) ──
   setInterval(async () => {
     try {
-      const mx = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Mexico_City" }));
+      // El proceso ya corre en hora del estudio, asi que getHours/getMinutes
+      // son locales. El round-trip por toLocaleString que habia aqui sumaba el
+      // offset dos veces y etiquetaba el resumen con la fecha de manana.
+      const mx = new Date();
       if (mx.getMinutes() < 40 || mx.getMinutes() >= 45 || mx.getHours() !== 23) return; // 1 tick/día
       const creds = await getWellhubCredentials(pool);
       const url = creds?.is_enabled ? creds.extra_config?.daily_summary_url : null;
@@ -16427,7 +16453,7 @@ function scheduleEmailCrons() {
       await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...(creds.access_token ? { Authorization: `Bearer ${creds.access_token}` } : {}) },
-        body: JSON.stringify({ date: mx.toISOString().slice(0, 10), checkins: r.rows }),
+        body: JSON.stringify({ date: todayInStudio(mx), checkins: r.rows }),
       }).catch(() => {});
     } catch (e) { console.error("[Cron] wellhub daily summary:", e?.message); }
   }, 5 * 60 * 1000);
