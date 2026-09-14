@@ -1,4 +1,15 @@
 import "dotenv/config";
+
+// ─── Zona horaria del estudio ────────────────────────────────────────────────
+// El contenedor de Railway corre en UTC, pero el estudio opera en hora civil de
+// CDMX. Sin anclar esto, a partir de las 18:00 hora local el proceso ya cree
+// que es el día siguiente: una membresía que vence hoy se lee vencida, los
+// recordatorios se agendan un día corrido y los reportes cortan mal el día.
+// Se fija ANTES de cualquier uso de Date; Node lee process.env.TZ de forma
+// perezosa, asi que asignarlo aqui alcanza. Auditoria de zona, 2026-09-14.
+export const STUDIO_TIMEZONE = process.env.STUDIO_TIMEZONE || "America/Mexico_City";
+process.env.TZ = STUDIO_TIMEZONE;
+
 import express from "express";
 import cors from "cors";
 import { Pool } from "pg";
@@ -573,6 +584,18 @@ async function storeProfilePhoto(processed, label) {
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.DATABASE_URL?.includes("railway") ? { rejectUnauthorized: false } : false,
+  // Ancla la zona en cada conexion: con esto CURRENT_DATE, NOW()::date y los
+  // casts implicitos timestamp→timestamptz operan en hora del estudio, no en la
+  // del servidor. Es la defensa de fondo: neutraliza de raiz los 54
+  // CURRENT_DATE y los 4 NOW()::date que hay repartidos por el archivo, en vez
+  // de parchear consulta por consulta. Auditoria de zona, 2026-09-14.
+  options: `-c TimeZone=${STUDIO_TIMEZONE}`,
+});
+
+// Red de seguridad: si algun proveedor ignora `options`, se fija por sesion.
+pool.on("connect", (client) => {
+  client.query(`SET TIME ZONE '${STUDIO_TIMEZONE}'`).catch((e) =>
+    console.warn("[pool] no se pudo fijar la zona de la sesion:", e?.message));
 });
 
 // Ensure users table has password_hash column (idempotent migration)
@@ -3662,7 +3685,7 @@ app.post("/api/bookings", authMiddleware, async (req, res) => {
     // Lock class row to avoid overbooking in concurrent requests
     const classRes = await client.query(
       `SELECT c.id, c.max_capacity, c.current_bookings, c.status, c.date, c.start_time,
-              (c.date || 'T' || c.start_time || '-06:00')::timestamptz AS starts_at,
+              ((c.date + c.start_time) AT TIME ZONE 'America/Mexico_City') AS starts_at,
               ct.category AS class_category
        FROM classes c
        JOIN class_types ct ON c.class_type_id = ct.id
@@ -10019,7 +10042,7 @@ app.post("/api/bookings/with-guest", authMiddleware, async (req, res) => {
     // Validar clase + ventana de 2 h (misma regla que reservar para sí misma).
     const clsRes = await dbClient.query(
       `SELECT c.id, c.max_capacity, c.status,
-              (c.date || 'T' || c.start_time || '-06:00')::timestamptz AS starts_at
+              ((c.date + c.start_time) AT TIME ZONE 'America/Mexico_City') AS starts_at
          FROM classes c
         WHERE c.id = $1
         FOR UPDATE`,
@@ -13511,7 +13534,7 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
 
     const classRes = await client.query(
       `SELECT c.id, c.max_capacity, c.current_bookings, c.status, c.date, c.start_time,
-              (c.date || 'T' || c.start_time || '-06:00')::timestamptz AS starts_at,
+              ((c.date + c.start_time) AT TIME ZONE 'America/Mexico_City') AS starts_at,
               ct.category AS class_category
        FROM classes c
        JOIN class_types ct ON c.class_type_id = ct.id
@@ -13958,7 +13981,7 @@ app.post("/api/admin/checkin/scan", adminMiddleware, async (req, res) => {
           AND b.status IN ('confirmed','checked_in')
           AND c.status <> 'cancelled'
           AND c.date = (NOW() AT TIME ZONE 'America/Mexico_City')::date
-        ORDER BY ABS(EXTRACT(EPOCH FROM ((c.date || 'T' || c.start_time || '-06:00')::timestamptz - NOW())))
+        ORDER BY ABS(EXTRACT(EPOCH FROM (((c.date + c.start_time) AT TIME ZONE 'America/Mexico_City') - NOW())))
         LIMIT 1`,
       [userId]
     );
@@ -16038,8 +16061,34 @@ app.get("/api/health", async (_req, res) => {
     googleWallet: isGoogleWalletConfigured() ? "configured" : "disabled",
   };
   try {
-    await pool.query("SELECT 1");
+    // Zona horaria efectiva: el estudio opera en hora civil de CDMX y el
+    // contenedor de Railway arranca en UTC. Exponerlo aqui permite detectar un
+    // contenedor o una base mal configurados sin entrar a la base, que es
+    // justo el fallo que no da error y solo se nota de noche.
+    // Auditoria de zona, 2026-09-14.
+    const tz = await pool.query(
+      `SELECT current_setting('TimeZone') AS db_tz,
+              CURRENT_DATE::text          AS db_today,
+              (now() AT TIME ZONE $1)::date::text AS studio_today`,
+      [STUDIO_TIMEZONE],
+    );
     out.db = "ok";
+    const row = tz.rows[0];
+    const procTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    out.timezone = {
+      studio: STUDIO_TIMEZONE,
+      process: procTz,
+      db: row.db_tz,
+      today: row.studio_today,
+      matchesDb: row.db_today === row.studio_today && procTz === STUDIO_TIMEZONE,
+    };
+    if (!out.timezone.matchesDb) {
+      out.status = "degraded";
+      out.timezoneWarning =
+        `El servidor no opera en hora del estudio (proceso=${procTz}, base=${row.db_tz}, ` +
+        `hoy segun la base=${row.db_today}, hoy en el estudio=${row.studio_today}). ` +
+        `Las vigencias y los cortes de dia van a fallar por la tarde.`;
+    }
   } catch (err) {
     out.db = "error";
     out.dbError = String(err?.message ?? err).slice(0, 160);

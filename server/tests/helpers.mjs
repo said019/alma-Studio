@@ -14,7 +14,13 @@ export const ADMIN = {
   password: process.env.QA_ADMIN_PASSWORD || `Qa${Math.random().toString(36).slice(2, 10)}A1!`,
 };
 
-const pool = new pg.Pool({ connectionString: DB, max: 10 });
+// El harness lee la base como lo hace la app: con la zona del estudio anclada.
+// Sin esto, las aserciones de fecha miden la zona del runner, no la del producto.
+export const STUDIO_TIMEZONE = process.env.STUDIO_TIMEZONE || "America/Mexico_City";
+const pool = new pg.Pool({
+  connectionString: DB, max: 10,
+  options: `-c TimeZone=${STUDIO_TIMEZONE}`,
+});
 export const sql = async (q, p = []) => (await pool.query(q, p)).rows;
 export const closeDb = () => pool.end();
 
