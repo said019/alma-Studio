@@ -14,7 +14,7 @@
     "start": "node server/index.js",
     "db:local": "node scripts/db-local.cjs",
     "db:schema": "node scripts/db-apply-schema.cjs",
-    "test:server": "node --test --test-concurrency=1 \"server/lib/*.test.js\" \"server/lib/wellhub/*.test.js\"",
+    "test:server": "node --test --test-concurrency=1 \"server/*.test.mjs\" \"server/lib/*.test.js\" \"server/lib/wellhub/*.test.js\"",
     "test:regression": "node --test --test-concurrency=1 \"server/tests/*.test.mjs\""
   },
   "dependencies": {
