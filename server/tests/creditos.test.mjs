@@ -2,7 +2,7 @@
 // Invariante: reservar debita 1; el check-in NO vuelve a debitar.
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
-import { api, login, sql, credits, makeClient, studioFixtures, makeClass, giveMembership, cleanup, closeDb, day, bookingId, ADMIN } from "./helpers.mjs";
+import { api, login, sql, credits, makeClient, studioFixtures, makeClass, giveMembership, cleanup, closeDb, day, bookingId, ventanaAhora, ADMIN } from "./helpers.mjs";
 
 const PFX = "rgcred";
 let A, f, cliente;
@@ -24,9 +24,10 @@ test("P0-1 reservar debita exactamente 1 crédito", async () => {
 });
 
 test("P0-1 el check-in NO vuelve a debitar (el crédito ya se apartó al reservar)", async () => {
-  const hoy = new Date(); const h = String(hoy.getHours()).padStart(2, "0");
-  const id = await makeClass(A, f, { date: day(0), start: `${h}:00`, end: `${h}:50` });
-  await api("POST", "/api/admin/bookings/assign", { token: A, body: { userId: cliente.id, classId: id } });
+  const v = ventanaAhora();
+  const id = await makeClass(A, f, { date: day(0), start: v.start, end: v.end });
+  const asg = await api("POST", "/api/admin/bookings/assign", { token: A, body: { userId: cliente.id, classId: id } });
+  assert.ok(asg.status < 300, `asignar devolvió ${asg.status}: ${JSON.stringify(asg.body).slice(0, 200)}`);
   const trasReservar = await credits(cliente.id);
   const [bk] = await sql(`SELECT id FROM bookings WHERE class_id=$1 AND user_id=$2`, [id, cliente.id]);
   const ci = await api("PUT", `/api/bookings/${bk.id}/check-in`, { token: A });
@@ -37,10 +38,11 @@ test("P0-1 el check-in NO vuelve a debitar (el crédito ya se apartó al reserva
 
 test("P0-1 una clase completa (reservar + asistir) cuesta 1 crédito, no 2", async () => {
   await sql(`UPDATE memberships SET classes_remaining=8 WHERE user_id=$1`, [cliente.id]);
-  const hoy = new Date(); const h = String(hoy.getHours()).padStart(2, "0");
-  const id = await makeClass(A, f, { date: day(0), start: `${h}:05`, end: `${h}:55` });
+  const v = ventanaAhora();
+  const id = await makeClass(A, f, { date: day(0), start: v.start, end: v.end });
   const antes = await credits(cliente.id);
-  await api("POST", "/api/admin/bookings/assign", { token: A, body: { userId: cliente.id, classId: id } });
+  const asg2 = await api("POST", "/api/admin/bookings/assign", { token: A, body: { userId: cliente.id, classId: id } });
+  assert.ok(asg2.status < 300, `asignar devolvió ${asg2.status}: ${JSON.stringify(asg2.body).slice(0, 200)}`);
   const [bk] = await sql(`SELECT id FROM bookings WHERE class_id=$1 AND user_id=$2`, [id, cliente.id]);
   await api("PUT", `/api/bookings/${bk.id}/check-in`, { token: A });
   assert.equal(antes - (await credits(cliente.id)), 1, "1 clase asistida debe costar 1 crédito");

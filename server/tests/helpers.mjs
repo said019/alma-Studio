@@ -95,9 +95,42 @@ export async function studioFixtures(prefix, adminToken) {
   const r = await api("POST", "/api/instructors", { token: adminToken, body: { displayName: `${prefix} Coach`, isActive: true } });
   const instructorId = r.body?.data?.id;
   const [ct] = await sql(`SELECT id, category FROM class_types WHERE is_active ORDER BY sort_order NULLS LAST LIMIT 1`);
+  // Se excluyen planes restringidos (solo matutinos, packs de visita): la
+  // suite prueba el flujo general y un plan con reglas propias la hace fallar
+  // por el motivo equivocado.
   const [plan] = await sql(
-    `SELECT id, name, price FROM plans WHERE is_active AND class_category=$1 AND class_limit>=8 ORDER BY class_limit LIMIT 1`, [ct.category]);
+    `SELECT id, name, price FROM plans
+      WHERE is_active AND class_category=$1 AND class_limit>=8
+        AND COALESCE(morning_only,false) = false
+        AND COALESCE(is_visit_pack,false) = false
+      ORDER BY class_limit LIMIT 1`, [ct.category]);
   return { instructorId, classTypeId: ct.id, category: ct.category, plan };
+}
+
+/**
+ * Ventana horaria de una clase que está ocurriendo AHORA, para probar check-in.
+ * Antes cada prueba usaba `${hora_actual}:00`, así que a las 08:47 la clase de
+ * las 08:00 ya casi terminaba y el alta fallaba: la suite pasaba o no según la
+ * hora del día. Revisión de código, 2026-09-15.
+ */
+export function ventanaAhora(offsetMin = 0) {
+  // La hora se lee SIEMPRE en la zona del estudio. Usar getHours() aquí fue el
+  // mismo error que se estuvo corrigiendo en el producto: el runner corre con
+  // TZ=UTC, asi que creaba la clase seis horas mas tarde y un paquete
+  // "solo matutino" la rechazaba con razon.
+  const fmt = new Intl.DateTimeFormat("en-GB", {
+    timeZone: STUDIO_TIMEZONE, hour: "2-digit", minute: "2-digit", hour12: false,
+  });
+  const enEstudio = (d) => fmt.format(d);            // "HH:MM"
+  const inicio = new Date(Date.now() + offsetMin * 60000);
+  const [h, m] = enEstudio(inicio).split(":").map(Number);
+  const totalFin = h * 60 + m + 50;
+  if (totalFin >= 24 * 60) return { start: "23:00", end: "23:59" }; // no cruzar de día
+  const pad = (n) => String(n).padStart(2, "0");
+  return {
+    start: `${pad(h)}:${pad(m)}`,
+    end: `${pad(Math.floor(totalFin / 60))}:${pad(totalFin % 60)}`,
+  };
 }
 
 export async function makeClass(adminToken, f, { date = day(7), start = "07:00", end = "08:00", cap = 5 } = {}) {
