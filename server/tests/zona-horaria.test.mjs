@@ -132,3 +132,32 @@ test("TZ12 el contenedor arranca en la zona del estudio", () => {
   assert.match(nixpacks, /TZ\s*=\s*"America\/Mexico_City"/,
     "en ESM los imports corren antes del entry point: la garantía real es arrancar el contenedor ya en esta zona");
 });
+
+test("TZ13 ningún job calcula la hora local con un offset a mano", () => {
+  // `(getUTCHours() - 6 + 24) % 24` era el gemelo en JS de los offsets SQL:
+  // mismo error, otro lenguaje. El proceso ya corre en hora del estudio, así
+  // que getHours() basta.
+  // Se ignoran los comentarios: esta misma explicación cita el patrón viejo.
+  const codigo = SRC.split("\n")
+    .filter((l) => !l.trim().startsWith("//") && !l.trim().startsWith("*"))
+    .join("\n");
+  const hits = [...codigo.matchAll(/getUTC(?:Hours|Day|Date|Minutes)\(\)\s*[-+]\s*\d/g)];
+  assert.equal(hits.length, 0,
+    `${hits.length} cálculos de hora local con offset a mano: ${hits.map(h => h[0]).slice(0, 3)}`);
+});
+
+test("TZ14 los avisos programados corren a hora de reloj, no por intervalo", () => {
+  // Un setInterval cuenta desde el arranque: la hora de corrida la decide el
+  // último deploy, y un reinicio a destiempo duplica o se salta el envío.
+  assert.match(SRC, /scheduleAt\("recordatorio de renovacion"/,
+    "el recordatorio de renovación debe estar agendado a hora fija");
+  assert.match(SRC, /scheduleAt\("recordatorio semanal"/,
+    "el recordatorio semanal debe estar agendado a hora fija");
+  assert.match(SRC, /scheduleAt\("resumen diario Wellhub"/,
+    "el resumen diario de Wellhub debe estar agendado a hora fija");
+  // Los intervalos que SÍ deben seguir siéndolo: limpieza de memoria, barrido
+  // de clases próximas y reconciliación de inventario.
+  const intervalos = [...SRC.matchAll(/setInterval\(/g)];
+  assert.equal(intervalos.length, 3,
+    `hay ${intervalos.length} setInterval; deben quedar 3 (limpieza, barrido de clases, reconciliación)`);
+});

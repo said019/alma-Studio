@@ -59,6 +59,7 @@ import { ALMA_CLASS_TYPES, ALMA_SCHEDULE_SLOTS, ALMA_SCHEDULE_DAYS, ALMA_PLANS, 
 import { resolveEffectivePrice } from "./lib/pricing.js";
 import { isMembershipCategoryCompatible as ruleCategoryCompatible, normalizeClassCategory as ruleNormalizeCategory, isWithinMorningWindow, categoryLabel } from "./lib/bookingRules.js";
 import { isWithinCancelWindow, penaltyDueAt } from "./lib/faltas.js";
+import { scheduleAt } from "./lib/schedule.js";
 import { verifyWellhubSignature, extractSignatureHeader } from "./lib/wellhub/signature.js";
 import { extractGymId, computeEventId } from "./lib/wellhub/payload.js";
 import { getWellhubCredentials } from "./lib/wellhub/credentials.js";
@@ -16411,35 +16412,19 @@ async function runClassReminderCron() {
 }
 
 function scheduleEmailCrons() {
-  // Check every hour if it's time to run
-  setInterval(async () => {
-    const now = new Date();
-    // Mexico City = UTC-6 (adjust for daylight saving if needed)
-    const mexicoHour = (now.getUTCHours() - 6 + 24) % 24;
-    const dayOfWeek = now.getUTCDay(); // 0 = Sunday, 1 = Monday
-
-    // Weekly reminder: every Sunday at 8:00 AM Mexico time
-    if (dayOfWeek === 0 && mexicoHour === 8 && now.getUTCMinutes() < 60) {
-      console.log("[Cron] Triggering weekly reminder...");
-      runWeeklyReminderCron();
-    }
-
-    // Renewal reminder + wallet sync: every day at 9:00 AM Mexico time
-    if (mexicoHour === 9 && now.getUTCMinutes() < 60) {
-      console.log("[Cron] Triggering renewal reminder...");
-      runRenewalReminderCron();
-    }
-
-    // Membership expired check: every day at 9:05 AM Mexico time
-    if (mexicoHour === 9 && now.getUTCMinutes() >= 5 && now.getUTCMinutes() < 60) {
-      // Run once per hour-block; the > 5 min guard avoids same-hour double-fire with renewal cron
-      // (the >= 5 ensures it doesn't collide with renewal at minute 0-4).
-    }
-    if (mexicoHour === 10 && now.getUTCMinutes() < 60) {
-      console.log("[Cron] Triggering membership-expired sweep...");
-      runMembershipExpiredCron();
-    }
-  }, 60 * 60 * 1000); // every 1 hour
+  // Jobs a hora de reloj del estudio. Antes esto era un setInterval de 1 h que
+  // comparaba contra `(getUTCHours() - 6 + 24) % 24`: el offset -6 escrito a
+  // mano, el dia de la semana tomado en UTC, y el minuto de corrida decidido
+  // por la hora del ultimo deploy. Con reinicios en la hora equivocada el
+  // bloque podia dispararse dos veces (correos duplicados: el recordatorio de
+  // renovacion no tiene guard de idempotencia) o ninguna.
+  // Auditoria de zona, 2026-09-15.
+  scheduleAt("recordatorio semanal", { hour: 8, minute: 0, weekday: 0 }, () =>
+    runWeeklyReminderCron());
+  scheduleAt("recordatorio de renovacion", { hour: 9, minute: 0 }, () =>
+    runRenewalReminderCron());
+  scheduleAt("barrido de membresias vencidas", { hour: 10, minute: 0 }, () =>
+    runMembershipExpiredCron());
 
   // Pre-class reminder: every 10 minutes, find classes starting in ~2 hours
   setInterval(async () => {
@@ -16458,14 +16443,12 @@ function scheduleEmailCrons() {
     } catch (e) { console.error("[Cron] wellhub reconcile:", e?.message); }
   }, 5 * 60 * 1000);
 
-  // ── Wellhub: resumen diario de check-ins confirmados (ventana 23:40 MX) ──
-  setInterval(async () => {
+  // ── Wellhub: resumen diario de check-ins confirmados (23:40 hora del estudio) ──
+  // Antes era un setInterval de 5 min con una ventana 23:40-23:45: si el
+  // servidor se reiniciaba en ese hueco, el resumen de ese dia no salia nunca.
+  scheduleAt("resumen diario Wellhub", { hour: 23, minute: 40 }, async () => {
     try {
-      // El proceso ya corre en hora del estudio, asi que getHours/getMinutes
-      // son locales. El round-trip por toLocaleString que habia aqui sumaba el
-      // offset dos veces y etiquetaba el resumen con la fecha de manana.
       const mx = new Date();
-      if (mx.getMinutes() < 40 || mx.getMinutes() >= 45 || mx.getHours() !== 23) return; // 1 tick/día
       const creds = await getWellhubCredentials(pool);
       const url = creds?.is_enabled ? creds.extra_config?.daily_summary_url : null;
       if (!url) return;
@@ -16479,7 +16462,7 @@ function scheduleEmailCrons() {
         body: JSON.stringify({ date: todayInStudio(mx), checkins: r.rows }),
       }).catch(() => {});
     } catch (e) { console.error("[Cron] wellhub daily summary:", e?.message); }
-  }, 5 * 60 * 1000);
+  });
 }
 
 // ─── Start ───────────────────────────────────────────────────────────────────
