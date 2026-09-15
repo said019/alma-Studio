@@ -16419,12 +16419,31 @@ function scheduleEmailCrons() {
   // bloque podia dispararse dos veces (correos duplicados: el recordatorio de
   // renovacion no tiene guard de idempotencia) o ninguna.
   // Auditoria de zona, 2026-09-15.
+  // Registro de ultima corrida en `settings`: permite recuperar un aviso que se
+  // perdio porque el proceso estaba caido a esa hora, y a la vez impide que un
+  // reinicio lo repita (runRenewalReminderCron no tiene guard de idempotencia,
+  // asi que repetirlo son correos duplicados a las clientas).
+  const cronStore = {
+    async get(label) {
+      const r = await pool.query(
+        `SELECT value->>$1 AS v FROM settings WHERE key = 'cron_last_run'`, [label]);
+      return r.rows[0]?.v ?? null;
+    },
+    async set(label, iso) {
+      await pool.query(
+        `INSERT INTO settings (key, value) VALUES ('cron_last_run', jsonb_build_object($1::text, $2::text))
+         ON CONFLICT (key) DO UPDATE SET value = settings.value || jsonb_build_object($1::text, $2::text)`,
+        [label, iso]);
+    },
+  };
+  const opciones = { store: cronStore };
+
   scheduleAt("recordatorio semanal", { hour: 8, minute: 0, weekday: 0 }, () =>
-    runWeeklyReminderCron());
+    runWeeklyReminderCron(), opciones);
   scheduleAt("recordatorio de renovacion", { hour: 9, minute: 0 }, () =>
-    runRenewalReminderCron());
+    runRenewalReminderCron(), opciones);
   scheduleAt("barrido de membresias vencidas", { hour: 10, minute: 0 }, () =>
-    runMembershipExpiredCron());
+    runMembershipExpiredCron(), opciones);
 
   // Pre-class reminder: every 10 minutes, find classes starting in ~2 hours
   setInterval(async () => {
@@ -16462,7 +16481,7 @@ function scheduleEmailCrons() {
         body: JSON.stringify({ date: todayInStudio(mx), checkins: r.rows }),
       }).catch(() => {});
     } catch (e) { console.error("[Cron] wellhub daily summary:", e?.message); }
-  });
+  }, opciones);
 }
 
 // ─── Start ───────────────────────────────────────────────────────────────────

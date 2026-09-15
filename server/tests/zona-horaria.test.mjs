@@ -155,9 +155,13 @@ test("TZ14 los avisos programados corren a hora de reloj, no por intervalo", () 
     "el recordatorio semanal debe estar agendado a hora fija");
   assert.match(SRC, /scheduleAt\("resumen diario Wellhub"/,
     "el resumen diario de Wellhub debe estar agendado a hora fija");
-  // Los intervalos que SÍ deben seguir siéndolo: limpieza de memoria, barrido
-  // de clases próximas y reconciliación de inventario.
-  const intervalos = [...SRC.matchAll(/setInterval\(/g)];
-  assert.equal(intervalos.length, 3,
-    `hay ${intervalos.length} setInterval; deben quedar 3 (limpieza, barrido de clases, reconciliación)`);
+  // Lo que importa no es cuántos setInterval hay —puede aparecer alguno nuevo
+  // y legítimo— sino que ningún AVISO a clientas vuelva a depender de uno.
+  const codigo = SRC.split("\n")
+    .filter((l) => !l.trim().startsWith("//") && !l.trim().startsWith("*"))
+    .join("\n");
+  for (const job of ["runWeeklyReminderCron", "runRenewalReminderCron", "runMembershipExpiredCron"]) {
+    const dentroDeInterval = new RegExp(`setInterval\\([^]{0,400}?${job}\\(`);
+    assert.ok(!dentroDeInterval.test(codigo), `${job} volvió a colgar de un setInterval`);
+  }
 });

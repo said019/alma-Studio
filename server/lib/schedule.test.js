@@ -113,3 +113,71 @@ test("cancelar detiene la agenda", async () => {
     assert.equal(n, 0, "cancelado no debe correr");
   } finally { mock.timers.reset(); }
 });
+
+// ── Recuperación de corridas perdidas (revisión de código, 15 sep 2026) ──
+// Un deploy que abarque las 09:00 no debe costar un día de recordatorios.
+function memoriaStore() {
+  const m = new Map();
+  return { get: async (k) => m.get(k) ?? null, set: async (k, v) => { m.set(k, v); }, _m: m };
+}
+
+test("recupera una corrida perdida mientras el proceso estaba caído", async () => {
+  const { mock } = await import("node:test");
+  mock.timers.enable({ apis: ["setTimeout", "Date"], now: new Date("2026-09-15T09:20:00").getTime() });
+  try {
+    const corridas = [];
+    const store = memoriaStore();           // nunca corrió: se perdió la de las 09:00
+    const silencio = { log() {}, error() {} };
+    const cancelar = scheduleAt("renovacion", { hour: 9, minute: 0 },
+      () => { corridas.push("corrio"); }, { logger: silencio, store });
+    await new Promise((r) => setImmediate(r));
+    assert.equal(corridas.length, 1, "debe recuperar la corrida de las 09:00 perdida hace 20 min");
+    cancelar();
+  } finally { mock.timers.reset(); }
+});
+
+test("no recupera si ya había corrido hoy", async () => {
+  const { mock } = await import("node:test");
+  mock.timers.enable({ apis: ["setTimeout", "Date"], now: new Date("2026-09-15T09:20:00").getTime() });
+  try {
+    const corridas = [];
+    const store = memoriaStore();
+    await store.set("renovacion", "2026-09-15T09:00:00.000");
+    const silencio = { log() {}, error() {} };
+    const cancelar = scheduleAt("renovacion", { hour: 9, minute: 0 },
+      () => { corridas.push("corrio"); }, { logger: silencio, store });
+    await new Promise((r) => setImmediate(r));
+    assert.equal(corridas.length, 0, "no debe reenviar lo que ya se envió: un reinicio no duplica correos");
+    cancelar();
+  } finally { mock.timers.reset(); }
+});
+
+test("no recupera corridas demasiado viejas", async () => {
+  const { mock } = await import("node:test");
+  mock.timers.enable({ apis: ["setTimeout", "Date"], now: new Date("2026-09-18T09:20:00").getTime() });
+  try {
+    const corridas = [];
+    const store = memoriaStore();
+    await store.set("renovacion", "2026-09-15T09:00:00.000"); // 3 días sin correr
+    const silencio = { log() {}, error() {} };
+    const cancelar = scheduleAt("renovacion", { hour: 9, minute: 0 },
+      () => { corridas.push("corrio"); }, { logger: silencio, store, maxCatchUpMs: 6 * 60 * 60 * 1000 });
+    await new Promise((r) => setImmediate(r));
+    assert.equal(corridas.length, 1, "la de HOY (hace 20 min) sí se recupera");
+    assert.equal(store._m.get("renovacion").slice(0, 10), "2026-09-18", "marca la corrida de hoy, no la vieja");
+    cancelar();
+  } finally { mock.timers.reset(); }
+});
+
+test("sin store sigue funcionando (no rompe a quien no lo pase)", async () => {
+  const { mock } = await import("node:test");
+  mock.timers.enable({ apis: ["setTimeout", "Date"], now: new Date("2026-09-15T09:20:00").getTime() });
+  try {
+    const silencio = { log() {}, error() {} };
+    let n = 0;
+    const cancelar = scheduleAt("sin store", { hour: 9, minute: 0 }, () => { n++; }, { logger: silencio });
+    await new Promise((r) => setImmediate(r));
+    assert.equal(n, 0, "sin store no hay recuperación, pero tampoco error");
+    cancelar();
+  } finally { mock.timers.reset(); }
+});
