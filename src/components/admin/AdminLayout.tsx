@@ -223,6 +223,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
                       data-press
                       title={isCompact ? label : undefined}
                       className={adminNavItemClass(active, isCompact)}
+                      aria-current={active ? "page" : undefined}
                     >
                       <span className="relative shrink-0 inline-flex">
                         <Icon size={15} />
@@ -293,7 +294,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
             )}
           </div>
           <div className="flex items-center gap-2 min-w-0">
-            <div className="w-7 h-7 rounded-full bg-sunken flex items-center justify-center text-[11px] font-semibold text-ink">
+            <div className="w-7 h-7 rounded-full bg-sunken flex items-center justify-center text-[0.75rem] font-semibold text-ink">
               {user?.displayName?.[0]?.toUpperCase() ?? user?.display_name?.[0]?.toUpperCase() ?? user?.email?.[0]?.toUpperCase() ?? "A"}
             </div>
             {!isCompact && (
@@ -317,7 +318,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
                       to={item.path}
                       data-press
                       className={cn(
-                        "flex h-12 min-h-[44px] flex-col items-center justify-center rounded-xl text-[11px] font-semibold transition-colors",
+                        "flex h-12 min-h-[44px] flex-col items-center justify-center rounded-xl text-[0.75rem] font-semibold transition-colors",
                         active
                           ? "bg-sunken text-ink ring-1 ring-inset ring-line-strong/50"
                           : "text-ink-muted hover:bg-sunken/40 hover:text-ink",

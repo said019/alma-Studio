@@ -1,13 +1,38 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
+
+// window.localStorage en este entorno de prueba es un stub roto (sólo trae
+// los métodos de Object.prototype; a `useAuthStore` — que usa el middleware
+// `persist` de zustand — le hace falta un `setItem` real). zustand lee
+// `window.localStorage` una sola vez, al importar el store, así que el
+// parche tiene que estar listo antes de esa importación: `vi.hoisted` mueve
+// este bloque por encima de los imports (incluido el de AdminLayout, que
+// importa `useAuthStore`). Es un polyfill mínimo en memoria sólo para esta
+// prueba; no toca la app ni el setup global de pruebas.
+vi.hoisted(() => {
+  const store = new Map<string, string>();
+  const memoryStorage = {
+    getItem: (k: string) => store.get(k) ?? null,
+    setItem: (k: string, v: string) => void store.set(k, v),
+    removeItem: (k: string) => void store.delete(k),
+    clear: () => store.clear(),
+    key: (i: number) => Array.from(store.keys())[i] ?? null,
+    get length() { return store.size; },
+  };
+  Object.defineProperty(globalThis, "localStorage", { value: memoryStorage, configurable: true, writable: true });
+});
+
 import fs from "fs";
 import path from "path";
 import { buttonVariants } from "@/components/ui/button";
 import { badgeVariants } from "@/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { adminNavItemClass } from "./AdminLayout";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import AdminLayout, { adminNavItemClass } from "./AdminLayout";
 import FigureCard from "./FigureCard";
 import SectionTabs from "./SectionTabs";
+import { useAuthStore } from "@/stores/authStore";
 import { COLOR } from "@/design/tokens";
 
 const root = path.resolve(__dirname, "..", "..", "..");
@@ -82,5 +107,59 @@ describe("SectionTabs", () => {
     expect(activa).toHaveAttribute("aria-current", "page");
     expect(activa.className).toMatch(/\bbg-ink\b.*\btext-canvas\b/);
     for (const a of screen.getAllByRole("link")) expect(a.className).toMatch(/min-h-\[44px\]/);
+  });
+});
+
+// Fix round 1 — hallazgo 2: shadcn TabsTrigger quedaba por debajo del mínimo
+// de 44 px táctiles (spec §4.1/§4.4), usado en al menos 10 pantallas del panel.
+describe("shadcn Tabs", () => {
+  it("la pestaña mide al menos 44 px y la lista ya no fija h-12", () => {
+    render(
+      <Tabs defaultValue="a">
+        <TabsList>
+          <TabsTrigger value="a">A</TabsTrigger>
+        </TabsList>
+      </Tabs>,
+    );
+    expect(screen.getByRole("tab").className).toMatch(/min-h-\[44px\]/);
+    expect(screen.getByRole("tablist").className).not.toMatch(/\bh-12\b/);
+  });
+});
+
+// Fix round 1 — hallazgo 3: el ítem activo del menú lateral no llevaba
+// aria-current="page", a diferencia de SectionTabs y la barra inferior móvil
+// del mismo archivo. Se renderiza AdminLayout en una ruta de admin (en vez de
+// una prueba de sólo-fuente) porque adminNavItemClass sólo genera el
+// className — el atributo aria-current vive en el JSX del <Link>, así que
+// hace falta el árbol real para verificar que está puesto (ver el parche de
+// localStorage arriba, necesario para que useAuthStore pueda renderizar).
+describe("AdminLayout — menú lateral", () => {
+  it("el ítem activo del menú lleva aria-current=page", () => {
+    useAuthStore.setState({ user: { role: "admin" } as any });
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <MemoryRouter initialEntries={["/admin/dashboard"]}>
+          <AdminLayout>{null}</AdminLayout>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    const activo = screen.getByRole("link", { name: "Inicio" });
+    expect(activo).toHaveAttribute("aria-current", "page");
+    const inactivo = screen.getByRole("link", { name: "Reservas" });
+    expect(inactivo).not.toHaveAttribute("aria-current");
+  });
+});
+
+// Fix round 1 — hallazgo 1: Ruling 3 (mínimo 12 px) quedó incompleta —
+// sobrevivían tamaños de texto arbitrarios por debajo de 12 px.
+describe("AdminLayout — tamaños de texto", () => {
+  it("ningún text-[...] arbitrario baja de 12 px", () => {
+    const src = fs.readFileSync(path.join(root, "src/components/admin/AdminLayout.tsx"), "utf8");
+    const tamaños = [...src.matchAll(/\btext-\[([\d.]+)(px|rem)\]/g)];
+    expect(tamaños.length).toBeGreaterThan(0);
+    for (const [token, num, unit] of tamaños) {
+      const px = unit === "rem" ? parseFloat(num) * 16 : parseFloat(num);
+      expect(px, token).toBeGreaterThanOrEqual(12);
+    }
   });
 });
