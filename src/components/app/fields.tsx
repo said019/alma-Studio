@@ -18,15 +18,18 @@ import { COLOR } from "@/design/tokens";
    ChangePassword; cualquier form nuevo debe importar de aquí.
    ═══════════════════════════════════════════════════════════ */
 
+/* Campos: fondo blanco, borde lineStrong (3:1), foco negro con halo coral
+   suave y error en danger que dice qué pasa (spec §4.4). */
 const CONTROL =
-  "w-full rounded-2xl px-4 py-3 text-[0.95rem] outline-none transition-shadow " +
-  "focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-offset-2 focus-visible:ring-offset-canvas " +
-  "placeholder:text-ink/35 disabled:opacity-60";
+  "w-full rounded-xl px-4 py-3 text-[0.95rem] outline-none transition-shadow " +
+  "focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-0 " +
+  "focus-visible:shadow-[0_0_0_5px_theme(colors.accent.soft)] " +
+  "placeholder:text-ink-muted disabled:opacity-60";
 
 const controlStyle = (hasError?: boolean): CSSProperties => ({
-  backgroundColor: COLOR.canvas,
+  backgroundColor: COLOR.surface,
   color: COLOR.ink,
-  border: `1px solid ${hasError ? COLOR.danger : COLOR.line}`,
+  border: `1.5px solid ${hasError ? COLOR.danger : COLOR.lineStrong}`,
   minHeight: 48,
 });
 
@@ -35,8 +38,8 @@ const idFromLabel = (label: string) =>
 
 export const FieldError = ({ msg }: { msg?: string }) =>
   msg ? (
-    <p className="flex items-center gap-1.5 text-[0.78rem]" style={{ color: COLOR.danger }}>
-      <AlertCircle size={13} />
+    <p className="flex items-center gap-1.5 text-[0.8125rem] font-semibold" style={{ color: COLOR.danger }}>
+      <AlertCircle size={14} />
       {msg}
     </p>
   ) : null;
@@ -49,20 +52,17 @@ type FieldShellProps = {
   children: ReactNode;
 };
 
+/* Etiqueta con el rol "label" del spec §3.3: 12 px, mayúsculas, +0.12em. */
 const FieldShell = ({ label, htmlFor, error, hint, children }: FieldShellProps) => (
   <div className="flex flex-col gap-1.5">
-    <label
-      htmlFor={htmlFor}
-      className="text-[0.72rem] font-medium uppercase tracking-[0.18em]"
-      style={{ color: COLOR.ink, opacity: 0.62 }}
-    >
+    <label htmlFor={htmlFor} className="text-[0.75rem] font-bold uppercase tracking-[0.12em]" style={{ color: COLOR.inkMuted }}>
       {label}
     </label>
     {children}
     {error ? (
       <FieldError msg={error} />
     ) : hint ? (
-      <p className="text-[0.78rem]" style={{ color: COLOR.ink, opacity: 0.55 }}>
+      <p className="text-[0.8125rem]" style={{ color: COLOR.inkMuted }}>
         {hint}
       </p>
     ) : null}
@@ -199,7 +199,7 @@ export const PasswordRules = ({ password = "" }: { password?: string }) => {
       {rules.map((r) => (
         <li
           key={r.label}
-          className="flex items-center gap-2 text-[0.74rem]"
+          className="flex items-center gap-2 text-[0.75rem]"
           style={{ color: r.ok ? COLOR.success : COLOR.ink, opacity: r.ok ? 1 : 0.55 }}
         >
           <span
