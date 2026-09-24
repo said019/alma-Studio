@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { Check, Copy, ArrowLeft } from "lucide-react";
-import { ALMA, type AlmaTone } from "@/components/app/tokens";
+import { ALMA } from "@/components/app/tokens";
+import { COLOR, resolveTone, type ToneInput } from "@/design/tokens";
 
 /* ═══════════════════════════════════════════════════════════
    formatMoneyMX
@@ -214,52 +215,53 @@ export const StickyCta = ({ children }: StickyCtaProps) => {
 };
 
 /* ═══════════════════════════════════════════════════════════
-   StatusPill — semantic status (booking, order, etc.)
+   StatusPill — estado semántico (reserva, orden, pago…)
+   El color nunca va solo: siempre con la palabra y un punto.
    ═══════════════════════════════════════════════════════════ */
 type StatusPillProps = {
   label: string;
-  tone: AlmaTone;
+  tone: ToneInput;
   variant?: "soft" | "solid";
 };
 export const StatusPill = ({ label, tone, variant = "soft" }: StatusPillProps) => {
-  const c = ALMA[tone];
-  const isSoft = variant === "soft";
+  const t = resolveTone(tone);
+  const soft = variant === "soft";
   return (
     <span
-      className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[0.72rem] font-medium uppercase tracking-[0.18em]"
+      className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[0.75rem] font-semibold leading-none"
       style={
-        isSoft
-          ? { backgroundColor: `${c}1a`, color: c }
-          : { backgroundColor: c, color: ALMA.cream }
+        soft
+          ? { backgroundColor: t.softBg, color: t.softFg, boxShadow: `inset 0 0 0 1px ${COLOR.line}` }
+          : { backgroundColor: t.solidBg, color: t.solidFg }
       }
     >
-      <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ backgroundColor: isSoft ? c : ALMA.cream }} />
+      <span aria-hidden="true" className="inline-block h-1.5 w-1.5 rounded-full" style={{ backgroundColor: "currentColor" }} />
       {label}
     </span>
   );
 };
 
 /* ═══════════════════════════════════════════════════════════
-   InfoBanner — soft inline banner (not toast)
+   InfoBanner — aviso en línea (no toast)
    ═══════════════════════════════════════════════════════════ */
 type InfoBannerProps = {
-  tone?: AlmaTone;
+  tone?: ToneInput;
   title: string;
   description?: string;
   action?: ReactNode;
 };
-export const InfoBanner = ({ tone = "berry", title, description, action }: InfoBannerProps) => {
-  const c = ALMA[tone];
+export const InfoBanner = ({ tone = "accent", title, description, action }: InfoBannerProps) => {
+  const t = resolveTone(tone);
   return (
     <div
       className="flex items-start gap-4 rounded-2xl p-4"
-      style={{ backgroundColor: `${c}10`, border: `1px solid ${c}30`, color: ALMA.ink }}
+      style={{ backgroundColor: t.softBg, border: `1px solid ${COLOR.line}`, color: COLOR.ink }}
     >
-      <span className="mt-1 inline-block h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: c }} />
+      <span aria-hidden="true" className="mt-1.5 inline-block h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: t.fg }} />
       <div className="min-w-0 flex-1">
-        <p className="text-[0.92rem] font-medium leading-snug" style={{ color: ALMA.ink }}>{title}</p>
+        <p className="text-[0.95rem] font-semibold leading-snug" style={{ color: COLOR.ink }}>{title}</p>
         {description && (
-          <p className="mt-1 text-[0.84rem] leading-[1.5]" style={{ color: ALMA.ink, opacity: 0.7 }}>
+          <p className="mt-1 text-[0.875rem] leading-[1.5]" style={{ color: COLOR.inkMuted }}>
             {description}
           </p>
         )}
