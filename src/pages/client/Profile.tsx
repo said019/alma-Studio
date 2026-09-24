@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { FEATURES } from "@/config/features";
 import { useAuthStore } from "@/stores/authStore";
 import { ClientAuthGuard } from "@/components/layout/ClientAuthGuard";
 import { STUDIO } from "@/lib/studio";
@@ -112,13 +113,15 @@ const Profile = () => {
               title="Editar perfil"
               description="Nombre, foto, contacto"
             />
-            <ListRow
-              to="/app/profile/membership"
-              icon={<CreditCard size={17} strokeWidth={1.7} />}
-              iconTint="olive"
-              title="Mi membresía"
-              description="Plan, vigencia, clases por usar"
-            />
+            {FEATURES.membershipDetail && (
+              <ListRow
+                to="/app/profile/membership"
+                icon={<CreditCard size={17} strokeWidth={1.7} />}
+                iconTint="olive"
+                title="Mi membresía"
+                description="Plan, vigencia, clases por usar"
+              />
+            )}
             <ListRow
               to="/app/orders"
               icon={<FileText size={17} strokeWidth={1.7} />}

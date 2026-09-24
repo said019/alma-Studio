@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { FEATURES } from "@/config/features";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
 import {
@@ -315,17 +316,19 @@ const BookClasses = () => {
               <SkeletonRow height={22} />
             </div>
           ) : membershipError ? null : hasActive ? (
-            <Link
-              to="/app/profile/membership"
-              className="nums inline-flex min-h-[44px] items-center gap-1.5 text-[0.92rem] no-underline"
-              style={{ color: ALMA.ink }}
-            >
-              <span>
-                {remainingLabel}
-                {endLabel && <span style={{ opacity: 0.7 }}> · vence {endLabel}</span>}
-              </span>
-              <ChevronRight size={14} style={{ color: ALMA.berry }} />
-            </Link>
+            FEATURES.membershipDetail && (
+              <Link
+                to="/app/profile/membership"
+                className="nums inline-flex min-h-[44px] items-center gap-1.5 text-[0.92rem] no-underline"
+                style={{ color: ALMA.ink }}
+              >
+                <span>
+                  {remainingLabel}
+                  {endLabel && <span style={{ opacity: 0.7 }}> · vence {endLabel}</span>}
+                </span>
+                <ChevronRight size={14} style={{ color: ALMA.berry }} />
+              </Link>
+            )
           ) : (
             <InfoBanner
               title="Aún no tienes paquete activo."

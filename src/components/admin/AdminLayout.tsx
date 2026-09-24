@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { useAuthStore } from "@/stores/authStore";
+import { FEATURES } from "@/config/features";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
@@ -29,12 +30,12 @@ const NAV_GROUPS = [
     label: "Más",
     collapsible: false,
     items: [
-      { path: "/admin/notifications", label: "Bandeja", icon: Bell },
+      { path: "/admin/notifications", label: "Bandeja", icon: Bell, feature: "adminInbox" },
       { path: "/admin/memberships", label: "Membresías", icon: CreditCard },
       { path: "/admin/plans", label: "Planes", icon: Package },
-      { path: "/admin/pos", label: "Tienda", icon: ShoppingCart },
+      { path: "/admin/pos", label: "Tienda", icon: ShoppingCart, feature: "pos" },
       { path: "/admin/reports", label: "Reportes", icon: BarChart2, ownerOnly: true },
-      { path: "/admin/loyalty", label: "Lealtad", icon: Award },
+      { path: "/admin/loyalty", label: "Lealtad", icon: Award, feature: "loyalty" },
       { path: "/admin/discount-codes", label: "Descuentos", icon: Percent },
     ],
   },
@@ -42,10 +43,10 @@ const NAV_GROUPS = [
     label: "Sistema",
     collapsible: false,
     items: [
-      { path: "/admin/settings?tab=whatsapp", label: "WhatsApp", icon: MessageCircle },
+      { path: "/admin/settings?tab=whatsapp", label: "WhatsApp", icon: MessageCircle, feature: "whatsappTemplates" },
       { path: "/admin/settings", label: "Configuración", icon: Settings },
-      { path: "/admin/settings/platforms", label: "Wellhub", icon: Package },
-      { path: "/admin/bookings/partners-checkins", label: "Check-ins Wellhub", icon: BookOpen },
+      { path: "/admin/settings/platforms", label: "Wellhub", icon: Package, feature: "partnerPlatforms" },
+      { path: "/admin/bookings/partners-checkins", label: "Check-ins Wellhub", icon: BookOpen , feature: "partnerPlatforms" },
     ],
   },
 ];
@@ -97,9 +98,11 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
   const showFinance = canSeeFinance(user?.role);
   const navGroups = NAV_GROUPS.map((g) => ({
     ...g,
-    items: g.items.filter((i: any) => showFinance || !i.ownerOnly),
+    items: g.items.filter((i: any) =>
+      (showFinance || !i.ownerOnly) && (!i.feature || (FEATURES as any)[i.feature])),
   })).filter((g) => g.items.length > 0);
-  const mobileQuickNav = MOBILE_QUICK_NAV.filter((i: any) => showFinance || !i.ownerOnly);
+  const mobileQuickNav = MOBILE_QUICK_NAV.filter((i: any) =>
+    (showFinance || !i.ownerOnly) && (!i.feature || (FEATURES as any)[i.feature]));
   const allItems = navGroups.flatMap((g) => g.items);
   const matchPath = (itemPath: string) => {
     const basePath = itemPath.split("?")[0];

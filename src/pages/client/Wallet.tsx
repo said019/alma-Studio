@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { FEATURES } from "@/config/features";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { QRCodeSVG } from "qrcode.react";
 import api from "@/lib/api";
@@ -398,18 +399,22 @@ const Wallet = () => {
         {/* Accesos: lista editorial, no pills */}
         <Section title="Tus puntos y reservas">
           <ListGroup>
-            <ListRow
-              to="/app/wallet/history"
-              icon={<History size={17} strokeWidth={1.7} />}
-              title="Historial de puntos"
-              description="Movimiento a movimiento"
-            />
-            <ListRow
-              to="/app/wallet/rewards"
-              icon={<Gift size={17} strokeWidth={1.7} />}
-              title="Canjear puntos"
-              description="Las recompensas del estudio"
-            />
+            {FEATURES.walletExtras && (
+              <ListRow
+                to="/app/wallet/history"
+                icon={<History size={17} strokeWidth={1.7} />}
+                title="Historial de puntos"
+                description="Movimiento a movimiento"
+              />
+            )}
+            {FEATURES.walletExtras && (
+              <ListRow
+                to="/app/wallet/rewards"
+                icon={<Gift size={17} strokeWidth={1.7} />}
+                title="Canjear puntos"
+                description="Las recompensas del estudio"
+              />
+            )}
             <ListRow
               to="/app/classes"
               icon={<CalendarDays size={17} strokeWidth={1.7} />}

@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { FEATURES } from "@/config/features";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { es } from "date-fns/locale";
@@ -191,62 +192,66 @@ const Dashboard = () => {
           <Section
             title="Tu próximo logro"
             trailing={
-              <Link to="/app/wallet/rewards" className="no-underline" style={{ color: ALMA.berry }}>
-                Ver todos
-              </Link>
+              FEATURES.walletExtras && (
+                <Link to="/app/wallet/rewards" className="no-underline" style={{ color: ALMA.berry }}>
+                  Ver todos
+                </Link>
+              )
             }
           >
-            <Link
-              to="/app/wallet/rewards"
-              data-lift
-              className="block no-underline rounded-3xl p-5 sm:p-6"
-              style={{ backgroundColor: ALMA.cream, border: `1px solid ${ALMA.border}` }}
-            >
-              <div className="flex items-start gap-4">
-                <span
-                  className="grid h-12 w-12 place-items-center rounded-2xl shrink-0"
-                  style={{ backgroundColor: ALMA.blush, color: ALMA.berry }}
-                >
-                  <Award size={20} strokeWidth={1.8} />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-baseline justify-between gap-2 flex-wrap">
-                    <h3 className="font-display leading-tight" style={{ color: ALMA.ink, fontSize: "1.25rem" }}>
-                      {ms.next_milestone.name}
-                    </h3>
-                    <span className="nums text-[0.72rem] font-medium uppercase tracking-[0.18em]" style={{ color: ALMA.berry }}>
-                      +{ms.next_milestone.award_points} pts
-                    </span>
-                  </div>
-                  <div className="mt-3">
-                    <div className="flex items-center justify-between gap-3 text-[0.74rem]">
-                      <span className="nums" style={{ color: ALMA.ink, opacity: 0.7 }}>
-                        <strong style={{ color: ALMA.berry }}>{ms.lifetime_classes}</strong> de {ms.next_milestone.classes_required} clases
-                      </span>
-                      <span className="nums font-medium" style={{ color: ALMA.berry }}>
-                        Te faltan {ms.next_remaining ?? 0}
+            {FEATURES.walletExtras && (
+              <Link
+                to="/app/wallet/rewards"
+                data-lift
+                className="block no-underline rounded-3xl p-5 sm:p-6"
+                style={{ backgroundColor: ALMA.cream, border: `1px solid ${ALMA.border}` }}
+              >
+                <div className="flex items-start gap-4">
+                  <span
+                    className="grid h-12 w-12 place-items-center rounded-2xl shrink-0"
+                    style={{ backgroundColor: ALMA.blush, color: ALMA.berry }}
+                  >
+                    <Award size={20} strokeWidth={1.8} />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-baseline justify-between gap-2 flex-wrap">
+                      <h3 className="font-display leading-tight" style={{ color: ALMA.ink, fontSize: "1.25rem" }}>
+                        {ms.next_milestone.name}
+                      </h3>
+                      <span className="nums text-[0.72rem] font-medium uppercase tracking-[0.18em]" style={{ color: ALMA.berry }}>
+                        +{ms.next_milestone.award_points} pts
                       </span>
                     </div>
-                    <div
-                      className="mt-2 h-1.5 rounded-full overflow-hidden"
-                      style={{ backgroundColor: ALMA.blush }}
-                      role="progressbar"
-                      aria-valuemin={0}
-                      aria-valuemax={ms.next_milestone.classes_required}
-                      aria-valuenow={ms.lifetime_classes}
-                    >
+                    <div className="mt-3">
+                      <div className="flex items-center justify-between gap-3 text-[0.74rem]">
+                        <span className="nums" style={{ color: ALMA.ink, opacity: 0.7 }}>
+                          <strong style={{ color: ALMA.berry }}>{ms.lifetime_classes}</strong> de {ms.next_milestone.classes_required} clases
+                        </span>
+                        <span className="nums font-medium" style={{ color: ALMA.berry }}>
+                          Te faltan {ms.next_remaining ?? 0}
+                        </span>
+                      </div>
                       <div
-                        className="h-full rounded-full"
-                        style={{
-                          width: `${Math.min(100, Math.round((ms.lifetime_classes / Math.max(1, ms.next_milestone.classes_required)) * 100))}%`,
-                          backgroundColor: ALMA.berry,
-                        }}
-                      />
+                        className="mt-2 h-1.5 rounded-full overflow-hidden"
+                        style={{ backgroundColor: ALMA.blush }}
+                        role="progressbar"
+                        aria-valuemin={0}
+                        aria-valuemax={ms.next_milestone.classes_required}
+                        aria-valuenow={ms.lifetime_classes}
+                      >
+                        <div
+                          className="h-full rounded-full"
+                          style={{
+                            width: `${Math.min(100, Math.round((ms.lifetime_classes / Math.max(1, ms.next_milestone.classes_required)) * 100))}%`,
+                            backgroundColor: ALMA.berry,
+                          }}
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            </Link>
+              </Link>
+            )}
           </Section>
         ) : null}
 
@@ -292,7 +297,9 @@ const Dashboard = () => {
                     )}
                   </div>
                   <div className="mt-5 flex flex-wrap gap-3">
-                    <PrimaryButton size="sm" to="/app/profile/membership">Ver membresía</PrimaryButton>
+                    {FEATURES.membershipDetail && (
+                      <PrimaryButton size="sm" to="/app/profile/membership">Ver membresía</PrimaryButton>
+                    )}
                     <GhostButton to="/app/checkout">Renovar</GhostButton>
                   </div>
                 </>
@@ -418,13 +425,15 @@ const Dashboard = () => {
               title="Mis reservas"
               description="Próximas y pasadas"
             />
-            <ListRow
-              to="/app/wallet/rewards"
-              icon={<Award size={17} strokeWidth={1.7} />}
-              iconTint="berry"
-              title="Recompensas"
-              description="Canjea tus puntos"
-            />
+            {FEATURES.walletExtras && (
+              <ListRow
+                to="/app/wallet/rewards"
+                icon={<Award size={17} strokeWidth={1.7} />}
+                iconTint="berry"
+                title="Recompensas"
+                description="Canjea tus puntos"
+              />
+            )}
             <ListRow
               to="/app/orders"
               icon={<ShoppingBag size={17} strokeWidth={1.7} />}

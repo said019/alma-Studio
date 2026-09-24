@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { FEATURES } from "@/config/features";
 import type { CSSProperties, ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
@@ -301,7 +302,7 @@ const Dashboard = () => {
             </CardShell>
 
             <CardShell
-              to={dormantError ? undefined : "/admin/whatsapp-templates"}
+              to={dormantError || !FEATURES.whatsappTemplates ? undefined : "/admin/whatsapp-templates"}
               ariaLabel="Reactivar clientas dormidas con una plantilla de WhatsApp"
               className="p-5"
             >

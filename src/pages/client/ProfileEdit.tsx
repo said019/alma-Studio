@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { FEATURES } from "@/config/features";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -205,13 +206,15 @@ const ProfileEdit = () => {
 
           <Section title="Seguridad">
             <ListGroup>
-              <ListRow
-                to="/app/profile/security"
-                icon={<ShieldCheck size={17} strokeWidth={1.7} />}
-                iconTint="berry"
-                title="Cambiar contraseña"
-                description="Actualiza tu acceso"
-              />
+              {FEATURES.profileSecurity && (
+                <ListRow
+                  to="/app/profile/security"
+                  icon={<ShieldCheck size={17} strokeWidth={1.7} />}
+                  iconTint="berry"
+                  title="Cambiar contraseña"
+                  description="Actualiza tu acceso"
+                />
+              )}
             </ListGroup>
           </Section>
 

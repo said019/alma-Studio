@@ -1,4 +1,5 @@
 import { useState, type ComponentType, type ReactNode } from "react";
+import { FEATURES } from "@/config/features";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -207,7 +208,7 @@ const ClientsList = () => {
           <SectionTabs
             tabs={[
               { label: "Clientas", to: "/admin/clients" },
-              { label: "Visitas", to: "/admin/visitas" },
+              ...(FEATURES.visits ? [{ label: "Visitas", to: "/admin/visitas" }] : []),
               { label: "Coaches", to: "/admin/staff" },
             ]}
           />

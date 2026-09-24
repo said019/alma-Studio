@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { FEATURES } from "@/config/features";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { AuthGuard } from "@/components/admin/AuthGuard";
@@ -390,7 +391,7 @@ const ReportsPage = () => {
           <SectionTabs
             tabs={[
               { label: "Reportes", to: "/admin/reports" },
-              { label: "Lealtad", to: "/admin/loyalty" },
+              ...(FEATURES.loyalty ? [{ label: "Lealtad", to: "/admin/loyalty" }] : []),
               { label: "Descuentos", to: "/admin/discount-codes" },
             ]}
           />

@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { Smartphone } from "lucide-react";
+import { FEATURES } from "@/config/features";
 import { useAuthStore } from "@/stores/authStore";
 import { InstallAppPrompt, getDevice, isStandalone } from "@/components/InstallAppPrompt";
 import {
@@ -50,7 +51,8 @@ const Login = () => {
     let target: string;
     if (returnUrl) target = returnUrl;
     else if (["admin", "super_admin", "instructor", "reception"].includes(role)) target = "/admin/dashboard";
-    else if (onboardingDone === false) target = "/auth/onboarding";
+    // Con el cuestionario apagado (paridad con Velan) se entra directo a la app.
+    else if (FEATURES.onboarding && onboardingDone === false) target = "/auth/onboarding";
     else target = "/app";
     if (location.pathname !== target) {
       navigate(target, { replace: true });
@@ -66,7 +68,7 @@ const Login = () => {
       if (returnUrl) { navigate(returnUrl, { replace: true }); return; }
       if (["admin", "super_admin", "instructor", "reception"].includes(authedUser?.role ?? "")) {
         navigate("/admin/dashboard", { replace: true });
-      } else if (authedUser?.onboardingCompleted === false) {
+      } else if (FEATURES.onboarding && authedUser?.onboardingCompleted === false) {
         navigate("/auth/onboarding", { replace: true });
       } else {
         navigate("/app", { replace: true });

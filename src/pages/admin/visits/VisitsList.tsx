@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { FEATURES } from "@/config/features";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { AuthGuard } from "@/components/admin/AuthGuard";
@@ -123,7 +124,7 @@ const VisitsList = () => {
           <SectionTabs
             tabs={[
               { label: "Clientas", to: "/admin/clients" },
-              { label: "Visitas", to: "/admin/visitas" },
+              ...(FEATURES.visits ? [{ label: "Visitas", to: "/admin/visitas" }] : []),
               { label: "Coaches", to: "/admin/staff" },
             ]}
           />
