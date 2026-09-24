@@ -49,7 +49,7 @@ describe("cableado de tokens", () => {
       .filter((f) => f.endsWith(".tsx"))
       .filter((f) => {
         const src = fs.readFileSync(path.join(dir, f), "utf8");
-        return /\b[\w-]+(\[[^\]]*\])?:bg-accent(\/\d+)?\b/.test(src) || /\btext-accent-foreground\b/.test(src);
+        return /:bg-accent(\/\d+)?(?![\w-])/.test(src) || /\btext-accent-foreground\b/.test(src);
       });
     expect(conProblema).toEqual([]);
   });

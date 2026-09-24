@@ -7,7 +7,8 @@ export const ALMA = {
   cream: COLOR.canvas,
   mist: COLOR.sunken,
   blush: COLOR.sunken,
-  sandstone: COLOR.line,
+  // borde en 126/131 usos; la migración (Tarea 5) aplica el mapeo por prefijo
+  sandstone: COLOR.lineStrong,
   stone: COLOR.inkMuted,
   coral: COLOR.inkMuted, // alias viejo de "stone": era beige, NO el coral de HIVE
   berry: COLOR.accentStrong,

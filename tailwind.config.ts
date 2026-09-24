@@ -53,7 +53,8 @@ export default {
           canvas: COLOR.canvas,
           mist: COLOR.sunken,
           oat: COLOR.sunken,
-          sandstone: COLOR.line,
+          // borde en 126/131 usos; la migración (Tarea 5) aplica el mapeo por prefijo
+          sandstone: COLOR.lineStrong,
           stone: COLOR.inkMuted,
           berry: COLOR.accentStrong,
           ink: COLOR.ink,
