@@ -48,4 +48,17 @@ describe("piezas con tono", () => {
     const circulo = screen.getByTestId("action-row-arrow");
     expect(circulo).toHaveStyle({ backgroundColor: COLOR.accent, color: COLOR.onAccent });
   });
+
+  it("Tag suave lleva contorno line (success/danger no quedan blanco sobre blanco)", () => {
+    wrap(<Tag tint="success">Pagado</Tag>);
+    const style = screen.getByText("Pagado").getAttribute("style") ?? "";
+    expect(style).toContain("inset 0 0 0 1px");
+  });
+
+  it("ListRow: el chip del ícono lleva contorno line (success/danger no quedan blanco sobre blanco)", () => {
+    wrap(<ListRow title="Cerrar sesión" destructive icon={<span>i</span>} onClick={() => {}} />);
+    const chip = screen.getByText("i").parentElement;
+    const style = chip?.getAttribute("style") ?? "";
+    expect(style).toContain("inset 0 0 0 1px");
+  });
 });

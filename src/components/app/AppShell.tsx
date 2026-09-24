@@ -382,7 +382,10 @@ export const ListRow = ({ to, onClick, icon, iconTint = "accent", title, descrip
   const inner = (
     <div className="grid grid-cols-[auto_1fr_auto] items-center gap-4 py-4">
       {icon ? (
-        <span className="grid h-10 w-10 place-items-center rounded-xl shrink-0" style={{ backgroundColor: t.softBg, color: t.fg }}>
+        <span
+          className="grid h-10 w-10 place-items-center rounded-xl shrink-0"
+          style={{ backgroundColor: t.softBg, color: t.fg, boxShadow: `inset 0 0 0 1px ${COLOR.line}` }}
+        >
           {icon}
         </span>
       ) : (
@@ -464,7 +467,11 @@ export const Tag = ({ children, tint = "accent", variant = "soft" }: TagProps) =
   return (
     <span
       className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[0.75rem] font-bold leading-none"
-      style={soft ? { backgroundColor: t.softBg, color: t.softFg } : { backgroundColor: t.solidBg, color: t.solidFg }}
+      style={
+        soft
+          ? { backgroundColor: t.softBg, color: t.softFg, boxShadow: `inset 0 0 0 1px ${COLOR.line}` }
+          : { backgroundColor: t.solidBg, color: t.solidFg }
+      }
     >
       {children}
     </span>
