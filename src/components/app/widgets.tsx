@@ -22,11 +22,7 @@ type SegmentedTabsProps<T extends string> = {
 };
 export function SegmentedTabs<T extends string>({ options, value, onChange }: SegmentedTabsProps<T>) {
   return (
-    <div
-      role="tablist"
-      className="inline-flex p-1 rounded-full"
-      style={{ backgroundColor: COLOR.sunken }}
-    >
+    <div role="tablist" className="inline-flex gap-1 p-1 rounded-full" style={{ backgroundColor: COLOR.surface, boxShadow: `inset 0 0 0 1px ${COLOR.line}` }}>
       {options.map((opt) => {
         const active = opt.value === value;
         return (
@@ -35,22 +31,11 @@ export function SegmentedTabs<T extends string>({ options, value, onChange }: Se
             role="tab"
             aria-selected={active}
             onClick={() => onChange(opt.value)}
-            className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-[0.78rem] font-medium uppercase tracking-[0.16em] transition-colors"
-            style={{
-              backgroundColor: active ? COLOR.ink : "transparent",
-              color: active ? COLOR.canvas : COLOR.ink,
-              opacity: active ? 1 : 0.65,
-            }}
+            className="inline-flex min-h-[44px] items-center gap-2 rounded-full px-4 text-[0.85rem] font-bold transition-colors"
+            style={{ backgroundColor: active ? COLOR.ink : "transparent", color: active ? COLOR.canvas : COLOR.inkMuted }}
           >
             {opt.label}
-            {typeof opt.count === "number" && (
-              <span
-                className="nums text-[0.72rem] font-display"
-                style={{ opacity: 0.85 }}
-              >
-                {opt.count}
-              </span>
-            )}
+            {typeof opt.count === "number" && <span className="nums text-[0.75rem]">{opt.count}</span>}
           </button>
         );
       })}
@@ -63,12 +48,8 @@ export function SegmentedTabs<T extends string>({ options, value, onChange }: Se
    ═══════════════════════════════════════════════════════════ */
 type BackLinkProps = { to: string; label: string };
 export const BackLink = ({ to, label }: BackLinkProps) => (
-  <Link
-    to={to}
-    className="inline-flex items-center gap-2 text-[0.74rem] uppercase tracking-[0.2em] no-underline transition-opacity hover:opacity-100 mb-4"
-    style={{ color: COLOR.ink, opacity: 0.55 }}
-  >
-    <ArrowLeft size={13} />
+  <Link to={to} className="inline-flex min-h-[44px] items-center gap-2 text-[0.75rem] font-bold uppercase tracking-[0.12em] no-underline mb-4" style={{ color: COLOR.inkMuted }}>
+    <ArrowLeft size={14} />
     {label}
   </Link>
 );
@@ -92,18 +73,10 @@ export const DataRow = ({ label, value, mono, copyable }: DataRowProps) => {
     });
   };
   return (
-    <div
-      className="grid grid-cols-[1fr_auto] items-baseline gap-4 py-3"
-      style={{ borderTop: `1px solid ${COLOR.line}` }}
-    >
-      <span className="text-[0.74rem] uppercase tracking-[0.18em]" style={{ color: COLOR.ink, opacity: 0.55 }}>
-        {label}
-      </span>
+    <div className="grid grid-cols-[1fr_auto] items-baseline gap-4 py-3" style={{ borderTop: `1px solid ${COLOR.line}` }}>
+      <span className="text-[0.75rem] font-bold uppercase tracking-[0.12em]" style={{ color: COLOR.inkMuted }}>{label}</span>
       <div className="flex items-center gap-2 justify-end">
-        <span
-          className={"text-right " + (mono ? "font-mono text-[0.92rem]" : "text-[0.94rem] font-medium")}
-          style={{ color: COLOR.ink }}
-        >
+        <span className={"text-right " + (mono ? "font-mono text-[0.92rem]" : "nums text-[0.95rem] font-semibold")} style={{ color: COLOR.ink }}>
           {value}
         </span>
         {copyable && (
@@ -111,10 +84,10 @@ export const DataRow = ({ label, value, mono, copyable }: DataRowProps) => {
             type="button"
             onClick={handleCopy}
             aria-label={copied ? "Copiado" : "Copiar"}
-            className="grid h-7 w-7 place-items-center rounded-full bg-transparent border-0 cursor-pointer transition-colors"
+            className="grid h-11 w-11 place-items-center rounded-full bg-transparent border-0 cursor-pointer"
             style={{ color: copied ? COLOR.success : COLOR.accentStrong }}
           >
-            {copied ? <Check size={14} strokeWidth={2.5} /> : <Copy size={13} />}
+            {copied ? <Check size={15} strokeWidth={2.5} /> : <Copy size={14} />}
           </button>
         )}
       </div>
@@ -136,31 +109,23 @@ export function Stepper<T extends string>({ steps, current }: StepperProps<T>) {
       {steps.map((s, i) => {
         const done = i < currentIdx;
         const active = i === currentIdx;
-        const numColor = active ? COLOR.accentStrong : done ? COLOR.success : COLOR.ink;
-        const labelOpacity = active ? 1 : done ? 0.85 : 0.45;
         return (
           <li key={s.id} className="flex items-center gap-2 shrink-0">
             <span
-              className="grid h-7 w-7 place-items-center rounded-full text-[0.7rem] font-display tabular-nums"
+              className="grid h-7 w-7 place-items-center rounded-full text-[0.75rem] font-bold nums"
               style={{
-                backgroundColor: active ? COLOR.ink : done ? COLOR.sunken : "transparent",
-                color: active ? COLOR.canvas : numColor,
-                border: active || done ? "0" : `1px solid ${COLOR.line}`,
+                backgroundColor: active ? COLOR.ink : done ? COLOR.surface : "transparent",
+                color: active ? COLOR.canvas : done ? COLOR.success : COLOR.inkMuted,
+                boxShadow: active ? "none" : `inset 0 0 0 1px ${COLOR.line}`,
               }}
             >
               {done ? <Check size={12} strokeWidth={3} /> : i + 1}
             </span>
-            <span
-              className="text-[0.72rem] uppercase tracking-[0.18em]"
-              style={{ color: COLOR.ink, opacity: labelOpacity }}
-            >
+            <span className="text-[0.75rem] font-bold uppercase tracking-[0.12em]" style={{ color: active ? COLOR.ink : COLOR.inkMuted }}>
               {s.label}
             </span>
             {i < steps.length - 1 && (
-              <span
-                className="hidden sm:inline-block h-px w-6 ml-1"
-                style={{ backgroundColor: done ? COLOR.success : COLOR.line }}
-              />
+              <span className="hidden sm:inline-block h-px w-6 ml-1" style={{ backgroundColor: done ? COLOR.success : COLOR.line }} />
             )}
           </li>
         );
@@ -203,9 +168,9 @@ export const StickyCta = ({ children }: StickyCtaProps) => {
       <div
         className="rounded-3xl p-3 transition-shadow"
         style={{
-          backgroundColor: stuck ? COLOR.canvas : "transparent",
+          backgroundColor: stuck ? COLOR.surface : "transparent",
           border: stuck ? `1px solid ${COLOR.line}` : "0",
-          boxShadow: stuck ? "0 8px 24px rgba(36,27,26,0.08)" : "none",
+          boxShadow: stuck ? "0 8px 24px rgba(17,17,17,0.08)" : "none",
         }}
       >
         {children}
