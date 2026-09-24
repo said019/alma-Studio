@@ -1,4 +1,5 @@
 import { Toaster } from "@/components/ui/toaster";
+import { FEATURES } from "@/config/features";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -96,7 +97,9 @@ const App = () => (
           {/* Auth */}
           <Route path="/auth/login" element={<Login />} />
           <Route path="/auth/register" element={<Register />} />
-          <Route path="/auth/onboarding" element={<Onboarding />} />
+          {FEATURES.onboarding && (
+            <Route path="/auth/onboarding" element={<Onboarding />} />
+          )}
           <Route path="/auth/forgot-password" element={<ForgotPassword />} />
           <Route path="/auth/reset-password" element={<ResetPassword />} />
           {/* Legacy /auth → new login */}
@@ -109,15 +112,25 @@ const App = () => (
           <Route path="/app/bookings" element={<MyBookings />} />
           <Route path="/app/checkout" element={<Checkout />} />
           <Route path="/app/orders" element={<Orders />} />
-          <Route path="/app/orders/:orderId" element={<OrderDetail />} />
+          {FEATURES.orderDetail && (
+            <Route path="/app/orders/:orderId" element={<OrderDetail />} />
+          )}
           <Route path="/app/wallet" element={<Wallet />} />
-          <Route path="/app/wallet/history" element={<WalletHistory />} />
-          <Route path="/app/wallet/rewards" element={<WalletRewards />} />
+          {FEATURES.walletExtras && (
+            <Route path="/app/wallet/history" element={<WalletHistory />} />
+          )}
+          {FEATURES.walletExtras && (
+            <Route path="/app/wallet/rewards" element={<WalletRewards />} />
+          )}
           <Route path="/app/profile" element={<Profile />} />
           <Route path="/app/profile/edit" element={<ProfileEdit />} />
-          <Route path="/app/profile/membership" element={<ProfileMembership />} />
+          {FEATURES.membershipDetail && (
+            <Route path="/app/profile/membership" element={<ProfileMembership />} />
+          )}
           <Route path="/app/profile/preferences" element={<ProfilePreferences />} />
-          <Route path="/app/profile/security" element={<ProfileSecurity />} />
+          {FEATURES.profileSecurity && (
+            <Route path="/app/profile/security" element={<ProfileSecurity />} />
+          )}
           <Route path="/app/profile/responsiva" element={<Responsiva />} />
           <Route path="/app/notifications" element={<Notifications />} />
 
@@ -136,25 +149,42 @@ const App = () => (
           <Route path="/admin/class-generator" element={<GenerateClasses />} />
           <Route path="/admin/classes/types" element={<Navigate to="/admin/class-types" replace />} />
           <Route path="/admin/classes/generate" element={<Navigate to="/admin/class-generator" replace />} />
-          <Route path="/admin/schedules" element={<Navigate to="/admin/classes" replace />} />
+          {FEATURES.scheduleTemplates && (
+            <Route path="/admin/schedules" element={<Navigate to="/admin/classes" replace />} />
+          )}
           <Route path="/admin/bookings" element={<BookingsList />} />
           <Route path="/admin/bookings/waitlist" element={<Waitlist />} />
           <Route path="/admin/staff" element={<InstructorsList />} />
           <Route path="/admin/payments" element={<PaymentsPage />} />
           <Route path="/admin/orders" element={<OrdersVerification />} />
-          <Route path="/admin/pos" element={<POSPage />} />
-          <Route path="/admin/visitas" element={<VisitsList />} />
+          {FEATURES.pos && (
+            <Route path="/admin/pos" element={<POSPage />} />
+          )}
+          {FEATURES.visits && (
+            <Route path="/admin/visitas" element={<VisitsList />} />
+          )}
           <Route path="/admin/pasar-lista" element={<TodayAttendance />} />
           <Route path="/admin/discount-codes" element={<DiscountCodes />} />
-          <Route path="/admin/loyalty" element={<LoyaltyPage />} />
-          <Route path="/admin/whatsapp-templates" element={<WhatsAppTemplatesPage />} />
-          <Route path="/admin/notifications" element={<AdminNotifications />} />
+          {FEATURES.loyalty && (
+            <Route path="/admin/loyalty" element={<LoyaltyPage />} />
+          )}
+          {FEATURES.whatsappTemplates && (
+            <Route path="/admin/whatsapp-templates" element={<WhatsAppTemplatesPage />} />
+          )}
+          {FEATURES.adminInbox && (
+            <Route path="/admin/notifications" element={<AdminNotifications />} />
+          )}
           <Route path="/admin/reports" element={<ReportsPage />} />
-          <Route path="/admin/reviews" element={<AdminReviewsDashboard />} />
+          {FEATURES.reviews && (
+            <Route path="/admin/reviews" element={<AdminReviewsDashboard />} />
+          )}
           <Route path="/admin/settings" element={<SettingsPage />} />
-          <Route path="/admin/settings/platforms" element={<PartnerPlatforms />} />
-          <Route path="/admin/bookings/partners-checkins" element={<PartnerCheckins />} />
-
+          {FEATURES.partnerPlatforms && (
+            <Route path="/admin/settings/platforms" element={<PartnerPlatforms />} />
+          )}
+          {FEATURES.partnerPlatforms && (
+            <Route path="/admin/bookings/partners-checkins" element={<PartnerCheckins />} />
+          )}
           {/* 404 */}
           <Route path="*" element={<NotFound />} />
         </Routes>

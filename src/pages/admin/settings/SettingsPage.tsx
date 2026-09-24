@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { FEATURES } from "@/config/features";
 import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
@@ -909,7 +910,7 @@ const SettingsPage = () => {
         <SectionTabs
           tabs={[
             { label: "Ajustes", to: "/admin/settings" },
-            { label: "Templates WA", to: "/admin/whatsapp-templates" },
+            ...(FEATURES.whatsappTemplates ? [{ label: "Templates WA", to: "/admin/whatsapp-templates" }] : []),
           ]}
         />
         <h1 className="admin-title font-semibold text-alma-ink mb-6">Configuración</h1>

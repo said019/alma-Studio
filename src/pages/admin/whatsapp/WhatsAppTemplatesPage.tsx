@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { FEATURES } from "@/config/features";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { AuthGuard } from "@/components/admin/AuthGuard";
@@ -450,7 +451,7 @@ const WhatsAppTemplatesPage = () => {
           <SectionTabs
             tabs={[
               { label: "Ajustes", to: "/admin/settings" },
-              { label: "Templates WA", to: "/admin/whatsapp-templates" },
+              ...(FEATURES.whatsappTemplates ? [{ label: "Templates WA", to: "/admin/whatsapp-templates" }] : []),
             ]}
           />
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-6">

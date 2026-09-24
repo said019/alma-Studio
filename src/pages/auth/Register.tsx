@@ -1,4 +1,5 @@
 import { useForm } from "react-hook-form";
+import { FEATURES } from "@/config/features";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -94,7 +95,8 @@ const Register = () => {
         acceptsCommunications: data.acceptsCommunications,
         ...(refCode ? { referralCode: refCode } : {}),
       } as any);
-      navigate("/auth/onboarding");
+      // Con el cuestionario apagado (paridad con Velan) se entra directo a la app.
+      navigate(FEATURES.onboarding ? "/auth/onboarding" : "/app");
     } catch {
       // El error del store se muestra en el AuthErrorBanner, único canal de error.
     }

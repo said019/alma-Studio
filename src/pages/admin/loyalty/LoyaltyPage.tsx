@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { FEATURES } from "@/config/features";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -674,7 +675,7 @@ const LoyaltyPage = () => (
         <SectionTabs
           tabs={[
             { label: "Reportes", to: "/admin/reports" },
-            { label: "Lealtad", to: "/admin/loyalty" },
+            ...(FEATURES.loyalty ? [{ label: "Lealtad", to: "/admin/loyalty" }] : []),
             { label: "Descuentos", to: "/admin/discount-codes" },
           ]}
         />
