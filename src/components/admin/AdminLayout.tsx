@@ -12,7 +12,7 @@ import {
   ShoppingCart, BarChart2, Bell, MessageCircle, Award, Percent,
   Settings, ChevronLeft, ChevronRight, ChevronDown, LogOut, Globe, Menu, X,
 } from "lucide-react";
-import almaMark from "@/assets/alma/alma-mark-ink.png";
+import { BrandLogo } from "@/components/brand/BrandLogo";
 
 const NAV_GROUPS = [
   {
@@ -148,7 +148,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
           )}
         >
           {!isCompact && (
-            <img src={almaMark} alt="Alma Movement" className="h-12 w-auto object-contain" />
+            <BrandLogo variant="lockup" size={36} />
           )}
 
           <button

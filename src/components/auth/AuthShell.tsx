@@ -9,7 +9,7 @@ import {
 import { Link } from "react-router-dom";
 import { Eye, EyeOff, Loader2, ArrowRight, Check, AlertCircle, ChevronDown } from "lucide-react";
 
-import almaMarkLight from "@/assets/alma/alma-mark-light.png";
+import { BrandLogo } from "@/components/brand/BrandLogo";
 import { COLOR } from "@/design/tokens";
 
 
@@ -115,7 +115,9 @@ export const AuthShell = ({
         className="relative overflow-hidden lg:min-h-screen"
         style={{ minHeight: "30vh", backgroundColor: COLOR.inverse }}
       >
-        <img src={almaMarkLight} alt="" aria-hidden className="pointer-events-none absolute -right-24 -bottom-24 w-[78%] max-w-[480px] opacity-[0.08]" />
+        <span aria-hidden="true" className="pointer-events-none absolute -right-24 -bottom-24 opacity-[0.08] text-inverse-foreground">
+          <BrandLogo size={480} />
+        </span>
         <div aria-hidden className="absolute inset-0" style={{ background: `radial-gradient(110% 80% at 0% 0%, ${COLOR.accentStrong}59 0%, transparent 55%)` }} />
 
         <div className="relative z-10 flex h-full min-h-[30vh] lg:min-h-screen flex-col justify-between p-6 sm:p-9 lg:p-12">
@@ -124,7 +126,7 @@ export const AuthShell = ({
             className="inline-flex w-fit items-center rounded-md no-underline transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-canvas"
             aria-label="Inicio Alma Movement"
           >
-            <img src={almaMarkLight} alt="Alma Movement" className="h-16 sm:h-20 w-auto object-contain" />
+            <BrandLogo variant="lockup" size={56} className="text-inverse-foreground" />
           </Link>
 
           <div className="max-w-[440px]">

@@ -9,13 +9,15 @@
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "vitest run && npm run test:server",
+    "test": "vitest run && npm run test:server && npm run test:scripts",
     "test:watch": "vitest",
     "start": "node server/index.js",
     "db:local": "node scripts/db-local.cjs",
     "db:schema": "node scripts/db-apply-schema.cjs",
     "test:server": "node --test --test-concurrency=1 \"server/*.test.mjs\" \"server/lib/*.test.js\" \"server/lib/wellhub/*.test.js\"",
-    "test:regression": "node --test --test-concurrency=1 \"server/tests/*.test.mjs\""
+    "test:regression": "node --test --test-concurrency=1 \"server/tests/*.test.mjs\"",
+    "test:scripts": "node --test \"scripts/*.test.mjs\"",
+    "brand:assets": "node scripts/brand-assets.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

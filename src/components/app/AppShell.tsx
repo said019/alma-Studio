@@ -19,7 +19,7 @@ import {
 
 
 import { COLOR, resolveTone, type Tone } from "@/design/tokens";
-import almaMark from "@/assets/alma/alma-mark.png";
+import { BrandLogo } from "@/components/brand/BrandLogo";
 
 /* ═══════════════════════════════════════════════════════════
    AppShell — /app layout: sidebar desktop + bottom-nav mobile
@@ -102,11 +102,7 @@ export const AppShell = ({ children, hideGreeting = false }: AppShellProps) => {
         style={{ borderRight: `1px solid ${COLOR.line}`, backgroundColor: COLOR.canvas }}
       >
         <Link to="/" className="flex items-center no-underline mb-10">
-          <img
-            src={almaMark}
-            alt="Alma Movement"
-            className="h-12 w-auto object-contain"
-          />
+          <BrandLogo variant="lockup" size={40} />
         </Link>
 
         <nav className="flex flex-col gap-1">
@@ -201,7 +197,7 @@ export const AppShell = ({ children, hideGreeting = false }: AppShellProps) => {
           }}
         >
           <Link to="/app" className="flex items-center no-underline">
-            <img src={almaMark} alt="Alma Movement" className="h-10 w-auto object-contain" />
+            <BrandLogo size={34} />
           </Link>
           <div className="flex items-center gap-2">
             <Link
