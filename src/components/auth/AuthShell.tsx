@@ -115,7 +115,7 @@ export const AuthShell = ({
         className="relative overflow-hidden lg:min-h-screen"
         style={{ minHeight: "30vh", backgroundColor: COLOR.inverse }}
       >
-        <span aria-hidden="true" className="pointer-events-none absolute -right-24 -bottom-24 opacity-[0.08] text-inverse-foreground">
+        <span aria-hidden="true" className="pointer-events-none absolute -right-24 -bottom-24 opacity-[0.08] text-accent">
           <BrandLogo size={480} />
         </span>
         <div aria-hidden className="absolute inset-0" style={{ background: `radial-gradient(110% 80% at 0% 0%, ${COLOR.accentStrong}59 0%, transparent 55%)` }} />
@@ -126,7 +126,7 @@ export const AuthShell = ({
             className="inline-flex w-fit items-center rounded-md no-underline transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-canvas"
             aria-label="Inicio Alma Movement"
           >
-            <BrandLogo variant="lockup" size={56} className="text-inverse-foreground" />
+            <BrandLogo variant="lockup" size={56} className="text-accent" />
           </Link>
 
           <div className="max-w-[440px]">
