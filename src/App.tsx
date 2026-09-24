@@ -4,7 +4,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { useAuthStore } from "@/stores/authStore";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
@@ -67,6 +67,9 @@ import Privacidad from "./pages/legal/Privacidad";
 import Terminos from "./pages/legal/Terminos";
 import Cancelacion from "./pages/legal/Cancelacion";
 import UpdateBanner from "./components/UpdateBanner";
+
+// Referencia viva del sistema HIVE (spec §7). Sólo en desarrollo.
+const SistemaPage = import.meta.env.DEV ? lazy(() => import("./pages/dev/SistemaPage")) : null;
 
 const queryClient = new QueryClient();
 
@@ -184,6 +187,9 @@ const App = () => (
           )}
           {FEATURES.partnerPlatforms && (
             <Route path="/admin/bookings/partners-checkins" element={<PartnerCheckins />} />
+          )}
+          {SistemaPage && (
+            <Route path="/sistema" element={<Suspense fallback={null}><SistemaPage /></Suspense>} />
           )}
           {/* 404 */}
           <Route path="*" element={<NotFound />} />
