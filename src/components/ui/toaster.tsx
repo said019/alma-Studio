@@ -1,5 +1,6 @@
 import { useToast } from "@/hooks/use-toast";
 import { Toast, ToastClose, ToastDescription, ToastProvider, ToastTitle, ToastViewport } from "@/components/ui/toast";
+import { COLOR } from "@/design/tokens";
 
 export function Toaster() {
   const { toasts } = useToast();
@@ -15,16 +16,16 @@ export function Toaster() {
               className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-2xl"
               style={{
                 background: isError
-                  ? "linear-gradient(180deg, #c9a227 0%, #a07a10 100%)"
-                  : "linear-gradient(180deg, #9C8E72 0%, #5E643E 100%)",
+                  ? `linear-gradient(180deg, ${COLOR.accent} 0%, ${COLOR.accentStrong} 100%)`
+                  : COLOR.success,
               }}
             />
             {/* Icon */}
             <div
               className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-base ml-2"
               style={{
-                background: isError ? "rgba(201,162,39,0.15)" : "rgba(119,132,85,0.15)",
-                color: isError ? "#c9a227" : "#9C8E72",
+                background: isError ? `${COLOR.accent}26` : `${COLOR.success}26`,
+                color: isError ? COLOR.accentStrong : COLOR.success,
               }}
             >
               {isError ? "⚠" : "✓"}
@@ -33,7 +34,7 @@ export function Toaster() {
               {title && (
                 <ToastTitle
                   className="text-[13px] font-semibold leading-tight"
-                  style={{ color: isError ? "#c9a227" : "#fff" }}
+                  style={{ color: isError ? COLOR.accentStrong : COLOR.onInverse }}
                 >
                   {title}
                 </ToastTitle>

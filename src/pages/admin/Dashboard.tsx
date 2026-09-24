@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 import { ArrowUpRight, Cake, Camera, CheckCircle2, Users } from "lucide-react";
 import { ResponsiveContainer, BarChart, Bar, XAxis, Tooltip, AreaChart, Area, Cell } from "recharts";
 import CheckinScanner from "@/components/admin/CheckinScanner";
+import { COLOR } from "@/design/tokens";
 
 const MONTHS = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
 
@@ -50,17 +51,17 @@ interface Stats {
   pendingOrders: { id: string; userName: string; totalAmount?: number; total_amount?: number; amount?: number; status: string }[];
 }
 
-/* ── Paleta terrosa para recharts (hex de los tokens alma-*) ── */
-const CHART_INK = "#43392F";
-const CHART_SANDSTONE = "#CBB9A4";
-const CHART_AXIS = "rgba(67, 57, 47, 0.55)";
-/* Ramp ink → oat: más oscuro = visita más reciente */
-const DORMANCY_RAMP = ["#43392F", "#6E5A46", "#A48D78", "#CBB9A4", "#E6DAC8"];
+/* ── Paleta para recharts (tokens de src/design/tokens.ts) ── */
+const CHART_INK = COLOR.ink;
+const CHART_SANDSTONE = COLOR.line;
+const CHART_AXIS = `${COLOR.ink}8c`;
+/* Ramp ink → sunken: más oscuro = visita más reciente */
+const DORMANCY_RAMP = [COLOR.ink, COLOR.inkMuted, COLOR.lineStrong, COLOR.line, COLOR.sunken];
 const TOOLTIP_STYLE: CSSProperties = {
   fontSize: 12,
   padding: "6px 10px",
-  backgroundColor: "#FAF9F6",
-  border: "1px solid #E0D5C6",
+  backgroundColor: COLOR.canvas,
+  border: `1px solid ${COLOR.line}`,
   borderRadius: 10,
   color: CHART_INK,
 };
@@ -330,7 +331,7 @@ const Dashboard = () => {
                           formatter={(v: any) => [v, "Clientas"]}
                           contentStyle={TOOLTIP_STYLE}
                           labelStyle={{ color: CHART_INK, fontWeight: 500 }}
-                          cursor={{ fill: "rgba(230, 218, 200, 0.45)" }}
+                          cursor={{ fill: `${COLOR.sunken}73` }}
                         />
                         <Bar dataKey="value" radius={[4, 4, 0, 0]}>
                           {dormantRows.map((_, i) => (

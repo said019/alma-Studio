@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { CreditCard, MoreHorizontal } from "lucide-react";
+import { COLOR } from "@/design/tokens";
 
 const STATUS_OPTIONS = ["active", "pending_payment", "pending_activation", "expired", "cancelled"] as const;
 type MembershipStatus = (typeof STATUS_OPTIONS)[number];
@@ -196,7 +197,7 @@ const MembershipTable = ({
                 type="checkbox"
                 checked={autoEnd}
                 onChange={(e) => setAutoEnd(e.target.checked)}
-                style={{ accentColor: "#6E5A46", width: 16, height: 16 }}
+                style={{ accentColor: COLOR.ink, width: 16, height: 16 }}
               />
               Recalcular el fin con la duración del plan
             </label>

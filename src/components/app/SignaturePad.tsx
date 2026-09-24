@@ -173,7 +173,7 @@ export const SignaturePad = ({ onChange }: SignaturePadProps) => {
           display: "block",
           borderRadius: 16,
           border: `1px solid ${COLOR.line}`,
-          backgroundColor: "#ffffff",
+          backgroundColor: COLOR.surface,
           touchAction: "none",
           cursor: "crosshair",
         }}

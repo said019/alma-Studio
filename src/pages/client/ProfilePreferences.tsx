@@ -12,8 +12,8 @@ import {
 } from "@/components/app/AppShell";
 import { BackLink } from "@/components/app/widgets";
 import { ShieldCheck } from "lucide-react";
-// Switch shadcn ya tematizado: track activo = --primary (#43392F, ink),
-// track inactivo = --input (hairline) y focus ring = --ring (#6E5A46, berry).
+// Switch shadcn ya tematizado: track activo = --primary (ink),
+// track inactivo = --input (lineStrong) y focus ring = --ring (ink).
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { COLOR } from "@/design/tokens";

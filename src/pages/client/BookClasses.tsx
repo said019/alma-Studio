@@ -543,7 +543,7 @@ const ClassRow = ({ cls, state, onPick }: ClassRowProps) => {
         </p>
         <p className="mt-0.5 flex items-center gap-1.5 text-[0.78rem]" style={{ color: COLOR.ink, opacity: 0.65 }}>
           {cls.instructorPhoto && (
-            <img src={cls.instructorPhoto} alt="" className="shrink-0 rounded-full object-cover" style={{ width: 18, height: 18, border: "1px solid #E0D5C6" }} />
+            <img src={cls.instructorPhoto} alt="" className="shrink-0 rounded-full object-cover" style={{ width: 18, height: 18, border: `1px solid ${COLOR.line}` }} />
           )}
           <span className="truncate">{cls.instructor}</span>
         </p>
@@ -572,7 +572,7 @@ const ClassRow = ({ cls, state, onPick }: ClassRowProps) => {
         data-press
         onClick={onPick}
         aria-label={`${cls.name}, ${cls.timeLabel}, ${state.label}`}
-        className="block w-full cursor-pointer border-0 bg-transparent px-1 text-left transition-colors hover:bg-[#F4F1EA]"
+        className="block w-full cursor-pointer border-0 bg-transparent px-1 text-left transition-colors hover:bg-sunken"
         style={{ borderTop: `1px solid ${COLOR.line}` }}
       >
         {inner}
@@ -599,7 +599,7 @@ const ClassCell = ({ cls, state, onPick }: ClassRowProps) => {
         </p>
         <p className="mt-0.5 flex items-center gap-1.5 text-[0.72rem]" style={{ color: COLOR.ink, opacity: 0.65 }}>
           {cls.instructorPhoto && (
-            <img src={cls.instructorPhoto} alt="" className="shrink-0 rounded-full object-cover" style={{ width: 16, height: 16, border: "1px solid #E0D5C6" }} />
+            <img src={cls.instructorPhoto} alt="" className="shrink-0 rounded-full object-cover" style={{ width: 16, height: 16, border: `1px solid ${COLOR.line}` }} />
           )}
           <span className="truncate">{cls.instructor}</span>
         </p>
@@ -623,7 +623,7 @@ const ClassCell = ({ cls, state, onPick }: ClassRowProps) => {
         data-press
         onClick={onPick}
         aria-label={`${cls.name}, ${cls.timeLabel}, ${state.label}`}
-        className="block w-full cursor-pointer border-0 bg-transparent px-1 text-left transition-colors hover:bg-[#F4F1EA]"
+        className="block w-full cursor-pointer border-0 bg-transparent px-1 text-left transition-colors hover:bg-sunken"
         style={{ borderTop: `1px solid ${COLOR.line}` }}
       >
         {inner}

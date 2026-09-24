@@ -225,14 +225,14 @@ const Index = () => {
 
   /* ═══════════════════════════════════════════════════════════ */
   return (
-    <div className="min-h-screen text-[color:var(--ink)] [--ink:#43392F] [--ink-deep:#241B1A] [--cream:#FAF9F6] [--blush:#E6DAC8] [--berry:#6E5A46]" style={{ backgroundColor: COLOR.canvas }}>
+    <div className="min-h-screen text-ink" style={{ backgroundColor: COLOR.canvas }}>
 
       {/* ═════════ NAV ═════════ */}
       <nav
         className={
           "fixed inset-x-0 top-0 z-[100] transition-[background-color,border-color,padding] duration-500 " +
           (navScrolled
-            ? "bg-[#FAF9F6] border-b border-[#E0D5C6] py-3"
+            ? "bg-canvas border-b border-line py-3"
             : "bg-transparent py-5")
         }
       >
@@ -252,7 +252,7 @@ const Index = () => {
               <li key={item.id}>
                 <button
                   onClick={() => scrollTo(item.id)}
-                  className="relative bg-transparent border-0 cursor-pointer text-[0.78rem] uppercase tracking-[0.2em] text-[color:var(--ink)]/68 hover:text-[color:var(--berry)] transition-colors"
+                  className="relative bg-transparent border-0 cursor-pointer text-[0.78rem] uppercase tracking-[0.2em] text-ink/68 hover:text-accent-strong transition-colors"
                 >
                   {item.label}
                 </button>
@@ -264,10 +264,10 @@ const Index = () => {
             {isAuthenticated && user ? (
               <button
                 onClick={() => navigate(["admin", "super_admin", "instructor", "reception"].includes(user.role) ? "/admin/dashboard" : "/app")}
-                className="hidden sm:inline-flex items-center gap-2 rounded-full px-4 py-2 text-[0.78rem] font-medium tracking-wide text-[color:var(--cream)] transition-transform hover:-translate-y-px"
+                className="hidden sm:inline-flex items-center gap-2 rounded-full px-4 py-2 text-[0.78rem] font-medium tracking-wide text-canvas transition-transform hover:-translate-y-px"
                 style={{ backgroundColor: COLOR.ink }}
               >
-                <span className="grid h-6 w-6 place-items-center rounded-full bg-[color:var(--cream)]/22 text-[0.7rem] font-bold uppercase">
+                <span className="grid h-6 w-6 place-items-center rounded-full bg-canvas/22 text-[0.7rem] font-bold uppercase">
                   {user.displayName?.[0] ?? user.email?.[0] ?? "U"}
                 </span>
                 <span className="truncate max-w-[110px]">
@@ -278,7 +278,7 @@ const Index = () => {
               <>
                 <button
                   onClick={() => navigate("/auth/login")}
-                  className="hidden sm:inline-block bg-transparent border-0 cursor-pointer text-[0.78rem] uppercase tracking-[0.18em] text-[color:var(--ink)]/68 hover:text-[color:var(--berry)] transition-colors"
+                  className="hidden sm:inline-block bg-transparent border-0 cursor-pointer text-[0.78rem] uppercase tracking-[0.18em] text-ink/68 hover:text-accent-strong transition-colors"
                 >
                   Entrar
                 </button>
@@ -295,7 +295,7 @@ const Index = () => {
             <button
               onClick={() => setNavOpen((v) => !v)}
               aria-label="Menú"
-              className="lg:hidden grid h-10 w-10 place-items-center rounded-full border border-[#E0D5C6] bg-[#FAF9F6] text-[color:var(--ink)] transition-colors hover:border-[color:var(--berry)]"
+              className="lg:hidden grid h-10 w-10 place-items-center rounded-full border border-line bg-canvas text-ink transition-colors hover:border-accent-strong"
             >
               {navOpen ? <Minus size={16} /> : <Plus size={16} />}
             </button>
@@ -322,7 +322,7 @@ const Index = () => {
                 <li key={item.id}>
                   <button
                     onClick={() => scrollTo(item.id)}
-                    className="flex w-full items-center justify-between bg-transparent border-0 cursor-pointer py-3 text-[0.92rem] tracking-wide text-[color:var(--ink)]/85 hover:text-[color:var(--berry)] transition-colors"
+                    className="flex w-full items-center justify-between bg-transparent border-0 cursor-pointer py-3 text-[0.92rem] tracking-wide text-ink/85 hover:text-accent-strong transition-colors"
                   >
                     {item.label}
                     <ArrowRight size={14} className="opacity-40" />
@@ -357,7 +357,7 @@ const Index = () => {
               <span className="block font-display" style={{ color: COLOR.accentStrong, fontWeight: 360 }}>se vuelve bienestar.</span>
             </h1>
 
-            <p data-stagger-item className="mt-7 max-w-[48ch] text-[1.04rem] leading-[1.75] text-[color:var(--ink)]/76">
+            <p data-stagger-item className="mt-7 max-w-[48ch] text-[1.04rem] leading-[1.75] text-ink/76">
               Pilates Reformer, Tower, Mat, Barre y Sculpt en grupos pequeños. Técnica, alineación y comunidad en un espacio pensado para que el movimiento se sienta como bienestar.
             </p>
 
@@ -384,7 +384,7 @@ const Index = () => {
                 className="group inline-flex items-center gap-3 bg-transparent border-0 cursor-pointer text-[0.8rem] uppercase tracking-[0.2em] transition-colors"
                 style={{ color: COLOR.ink }}
               >
-                <span className="grid h-10 w-10 place-items-center rounded-full transition-colors group-hover:bg-[color:var(--blush)]" style={{ border: `1px solid ${COLOR.line}` }}>
+                <span className="grid h-10 w-10 place-items-center rounded-full transition-colors group-hover:bg-sunken" style={{ border: `1px solid ${COLOR.line}` }}>
                   <ArrowRight size={13} />
                 </span>
                 Ver disciplinas
@@ -413,7 +413,7 @@ const Index = () => {
                 decoding="async"
                 className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 hover:scale-105"
               />
-              <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, transparent 55%, rgba(67,57,47,0.22))" }} />
+              <div className="absolute inset-0" style={{ background: `linear-gradient(to bottom, transparent 55%, ${COLOR.ink}38)` }} />
             </div>
           ))}
         </div>
@@ -455,7 +455,7 @@ const Index = () => {
               Un estudio donde
               <span className="block font-display font-normal" style={{ color: COLOR.inkMuted }}>te conocen por tu nombre.</span>
             </h2>
-            <div className="mt-7 space-y-5 text-[1.02rem] leading-[1.85] text-[color:var(--ink)]/76 max-w-[60ch]">
+            <div className="mt-7 space-y-5 text-[1.02rem] leading-[1.85] text-ink/76 max-w-[60ch]">
               <p>
                 Alma nace de una idea simple: que el movimiento se sienta como bienestar. Grupos pequeños, atención personalizada y técnica cuidada en cada disciplina, para que cada clase te acerque a tu mejor versión.
               </p>
@@ -479,7 +479,7 @@ const Index = () => {
                 >
                   <span className="font-display nums text-[0.92rem] tracking-[0.2em]" style={{ color: COLOR.accentStrong }}>{v.tag}</span>
                   <h3 className="font-display text-[1.65rem] leading-tight mt-1" style={{ color: COLOR.ink }}>{v.word.toUpperCase()}</h3>
-                  <p className="mt-2 text-[0.88rem] leading-[1.65] text-[color:var(--ink)]/65">{v.note}</p>
+                  <p className="mt-2 text-[0.88rem] leading-[1.65] text-ink/65">{v.note}</p>
                 </li>
               ))}
             </ul>
@@ -498,7 +498,7 @@ const Index = () => {
               Evoluciona
               <span className="block font-display font-normal" style={{ color: COLOR.inkMuted }}>en cada clase.</span>
             </h2>
-            <p className="mt-6 max-w-[56ch] text-[1.02rem] leading-[1.75] text-[color:var(--ink)]/72">
+            <p className="mt-6 max-w-[56ch] text-[1.02rem] leading-[1.75] text-ink/72">
               Cada clase trabaja técnica, alineación y control en grupos pequeños. Cupos reducidos: 4 lugares en Reformer y Tower, 8 en Studio.
             </p>
           </div>
@@ -566,10 +566,10 @@ const Index = () => {
                     >
                       <div className="min-h-0 overflow-hidden">
                         <div className="pt-5">
-                          <p className="text-[0.95rem] leading-[1.75] text-[color:var(--ink)]/76 max-w-[60ch]">
+                          <p className="text-[0.95rem] leading-[1.75] text-ink/76 max-w-[60ch]">
                             {c.description}
                           </p>
-                          <dl className="mt-4 flex flex-wrap gap-x-7 gap-y-2 text-[0.74rem] uppercase tracking-[0.18em] text-[color:var(--ink)]/55">
+                          <dl className="mt-4 flex flex-wrap gap-x-7 gap-y-2 text-[0.74rem] uppercase tracking-[0.18em] text-ink/55">
                             <div className="flex items-baseline gap-2"><dt>Duración</dt><dd className="font-display nums text-[0.95rem]" style={{ color: COLOR.ink }}>{c.duration_min} min</dd></div>
                             <div className="flex items-baseline gap-2"><dt>Nivel</dt><dd className="font-display text-[0.95rem]" style={{ color: COLOR.ink }}>{c.level}</dd></div>
                             <div className="flex items-baseline gap-2"><dt>Cupo</dt><dd className="font-display nums text-[0.95rem]" style={{ color: COLOR.ink }}>{c.capacity}</dd></div>
@@ -632,7 +632,7 @@ const Index = () => {
               href={`https://wa.me/${STUDIO.whatsapp}?text=Hola%2C%20me%20interesa%20conocer%20m%C3%A1s%20sobre%20Alma%20Movement`}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-3 rounded-full px-7 py-4 text-[0.84rem] uppercase tracking-[0.18em] no-underline transition-colors hover:bg-[color:var(--cream)]/10"
+              className="inline-flex items-center gap-3 rounded-full px-7 py-4 text-[0.84rem] uppercase tracking-[0.18em] no-underline transition-colors hover:bg-canvas/10"
               style={{ border: `1px solid ${COLOR.canvas}66`, color: COLOR.canvas }}
             >
               <MessageCircle size={16} /> WhatsApp directo
@@ -847,15 +847,15 @@ const PaquetesSection = ({
                   <span className="text-[0.7rem] uppercase tracking-[0.24em]" style={{ color: COLOR.accentStrong }}>Primera vez en Alma</span>
                   <h3 className="font-display mt-2 leading-tight" style={{ color: COLOR.accentStrong, fontSize: "clamp(1.8rem, 3vw, 2.6rem)" }}>{trialPlan.name}</h3>
                 </div>
-                <span className="nums text-[0.78rem] uppercase tracking-[0.18em] text-[color:var(--ink)]/60">{sessionsLabel(trialPlan)} · {trialPlan.durationDays} días</span>
+                <span className="nums text-[0.78rem] uppercase tracking-[0.18em] text-ink/60">{sessionsLabel(trialPlan)} · {trialPlan.durationDays} días</span>
               </div>
               <div className="flex flex-col sm:flex-row sm:items-end gap-5">
                 <div className="flex items-baseline gap-1">
                   <span className="font-display nums leading-none" style={{ color: COLOR.accentStrong, fontSize: "clamp(3.5rem, 7vw, 5.8rem)" }}>${formatPrice(trialPlan)}</span>
-                  <span className="text-[0.8rem] uppercase tracking-[0.18em] text-[color:var(--ink)]/55">MXN</span>
+                  <span className="text-[0.8rem] uppercase tracking-[0.18em] text-ink/55">MXN</span>
                 </div>
                 <div className="flex-1">
-                  <p className="text-[0.92rem] leading-[1.6] text-[color:var(--ink)]/72 max-w-[42ch]">
+                  <p className="text-[0.92rem] leading-[1.6] text-ink/72 max-w-[42ch]">
                     {trialPlan.description || "Tu primera clase en el estudio. Te mostramos el equipo y ajustamos tu técnica sin prisa."}
                   </p>
                 </div>
@@ -935,7 +935,7 @@ const PaquetesSection = ({
                   Todo el estudio
                 </span>
                 <h3 className="font-display mt-3 leading-none" style={{ color: COLOR.ink, fontSize: "clamp(1.9rem, 3.2vw, 2.8rem)" }}>{premiumPlans[0].name}</h3>
-                <p className="text-[0.9rem] leading-[1.6] mt-2 max-w-[36ch] text-[color:var(--ink)]/72">Acceso ilimitado a Studio y Reformer/Tower.</p>
+                <p className="text-[0.9rem] leading-[1.6] mt-2 max-w-[36ch] text-ink/72">Acceso ilimitado a Studio y Reformer/Tower.</p>
               </div>
               <div className="mt-8 flex items-end justify-between">
                 <div className="flex items-baseline gap-2">
@@ -1023,7 +1023,7 @@ const PoliticasSection = () => {
               <span className="block font-display font-normal" style={{ color: COLOR.inkMuted }}>en una página.</span>
             </h2>
           </div>
-          <p className="lg:col-span-7 lg:pl-6 text-[0.96rem] leading-[1.75] text-[color:var(--ink)]/70 max-w-[60ch] self-end">
+          <p className="lg:col-span-7 lg:pl-6 text-[0.96rem] leading-[1.75] text-ink/70 max-w-[60ch] self-end">
             Toca cada punto para abrirlo. Lo que no esté aquí, pregúntanos por WhatsApp; respondemos rápido.
           </p>
         </div>
@@ -1049,7 +1049,7 @@ const PoliticasSection = () => {
                 </button>
                 <div className="grid overflow-hidden transition-[grid-template-rows] duration-500 ease-out" style={{ gridTemplateRows: isOpen ? "1fr" : "0fr" }}>
                   <div className="min-h-0 overflow-hidden">
-                    <p className="pb-7 pl-9 sm:pl-10 pr-2 text-[0.96rem] leading-[1.75] text-[color:var(--ink)]/72 max-w-[64ch]">
+                    <p className="pb-7 pl-9 sm:pl-10 pr-2 text-[0.96rem] leading-[1.75] text-ink/72 max-w-[64ch]">
                       {it.text}
                     </p>
                   </div>
@@ -1112,9 +1112,9 @@ const ContactoSection = () => {
                   {it.icon}
                 </span>
                 <div>
-                  <div className="text-[0.6rem] uppercase tracking-[0.24em] text-[color:var(--ink)]/55">{it.label}</div>
+                  <div className="text-[0.6rem] uppercase tracking-[0.24em] text-ink/55">{it.label}</div>
                   {it.href ? (
-                    <a href={it.href} className="mt-1 block text-[0.98rem] leading-[1.55] no-underline transition-colors hover:text-[color:var(--berry)]" style={{ color: COLOR.ink }}>
+                    <a href={it.href} className="mt-1 block text-[0.98rem] leading-[1.55] no-underline transition-colors hover:text-accent-strong" style={{ color: COLOR.ink }}>
                       {it.value}
                     </a>
                   ) : (
@@ -1125,13 +1125,13 @@ const ContactoSection = () => {
             ))}
           </ul>
           <div className="mt-8 flex items-center gap-3">
-            <a href="https://www.instagram.com/movementalma/" target="_blank" rel="noopener noreferrer" className="grid h-11 w-11 place-items-center rounded-full no-underline transition-colors hover:bg-[color:var(--blush)]" style={{ border: `1px solid ${COLOR.line}`, color: COLOR.accentStrong }}>
+            <a href="https://www.instagram.com/movementalma/" target="_blank" rel="noopener noreferrer" className="grid h-11 w-11 place-items-center rounded-full no-underline transition-colors hover:bg-sunken" style={{ border: `1px solid ${COLOR.line}`, color: COLOR.accentStrong }}>
               <IconInstagram size={16} />
             </a>
-            <a href="https://www.facebook.com/search/top?q=Alma%20Movement%20Quer%C3%A9taro" target="_blank" rel="noopener noreferrer" className="grid h-11 w-11 place-items-center rounded-full no-underline transition-colors hover:bg-[color:var(--blush)]" style={{ border: `1px solid ${COLOR.line}`, color: COLOR.accentStrong }}>
+            <a href="https://www.facebook.com/search/top?q=Alma%20Movement%20Quer%C3%A9taro" target="_blank" rel="noopener noreferrer" className="grid h-11 w-11 place-items-center rounded-full no-underline transition-colors hover:bg-sunken" style={{ border: `1px solid ${COLOR.line}`, color: COLOR.accentStrong }}>
               <IconFacebook size={16} />
             </a>
-            <a href={`https://wa.me/${STUDIO.whatsapp}`} target="_blank" rel="noopener noreferrer" className="grid h-11 w-11 place-items-center rounded-full no-underline transition-colors hover:bg-[color:var(--blush)]" style={{ border: `1px solid ${COLOR.line}`, color: COLOR.accentStrong }}>
+            <a href={`https://wa.me/${STUDIO.whatsapp}`} target="_blank" rel="noopener noreferrer" className="grid h-11 w-11 place-items-center rounded-full no-underline transition-colors hover:bg-sunken" style={{ border: `1px solid ${COLOR.line}`, color: COLOR.accentStrong }}>
               <MessageCircle size={16} />
             </a>
           </div>

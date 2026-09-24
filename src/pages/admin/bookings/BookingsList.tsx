@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { useDebounce } from "@/hooks/use-debounce";
 import VisitAssignDialog from "@/components/admin/VisitAssignDialog";
+import { DEFAULT_CLASS_COLOR } from "@/design/classPalette";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 interface RosterEntry {
@@ -401,7 +402,7 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
                 <span
                   aria-hidden
                   className="h-2.5 w-2.5 shrink-0 rounded-full"
-                  style={{ backgroundColor: classInfo.color || "#CBB9A4" }}
+                  style={{ backgroundColor: classInfo.color || DEFAULT_CLASS_COLOR }}
                 />
                 <h2 className="font-display text-xl text-ink">{classInfo.classTypeName}</h2>
               </div>
@@ -1021,7 +1022,7 @@ const ClassPicker = ({ onSelectClass }: { onSelectClass: (id: string) => void })
                           <span
                             aria-hidden
                             className="h-2.5 w-2.5 shrink-0 rounded-full"
-                            style={{ backgroundColor: cls.class_type_color ?? cls.color ?? "#CBB9A4" }}
+                            style={{ backgroundColor: cls.class_type_color ?? cls.color ?? DEFAULT_CLASS_COLOR }}
                           />
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-sm font-semibold text-ink">

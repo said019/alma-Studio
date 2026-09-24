@@ -23,7 +23,7 @@ const fieldStyle: React.CSSProperties = {
   padding: "0.75rem 0.9rem",
   fontSize: "0.95rem",
   color: COLOR.ink,
-  backgroundColor: "#ffffff",
+  backgroundColor: COLOR.surface,
   border: `1px solid ${COLOR.line}`,
   outline: "none",
   boxSizing: "border-box",
@@ -106,7 +106,7 @@ export const ResponsivaDialog = ({
         position: "fixed",
         inset: 0,
         zIndex: 60,
-        backgroundColor: "rgba(36,27,26,0.55)",
+        backgroundColor: `${COLOR.inverse}8c`,
         backdropFilter: "blur(4px)",
         WebkitBackdropFilter: "blur(4px)",
         display: "flex",
@@ -125,7 +125,7 @@ export const ResponsivaDialog = ({
           backgroundColor: COLOR.canvas,
           borderRadius: "24px 24px 0 0",
           overflowY: "auto",
-          boxShadow: "0 -12px 48px rgba(36,27,26,0.14)",
+          boxShadow: `0 -12px 48px ${COLOR.inverse}24`,
           // Center on desktop
         }}
         // Prevent click propagation so clicking inside doesn't close
@@ -310,7 +310,7 @@ export const ResponsivaDialog = ({
                         padding: "0.6rem 0.8rem",
                         borderRadius: 12,
                         border: `1px solid ${isSelected ? COLOR.accentStrong : COLOR.line}`,
-                        backgroundColor: isSelected ? `${COLOR.ink}18` : "#ffffff",
+                        backgroundColor: isSelected ? `${COLOR.ink}18` : COLOR.surface,
                         color: isSelected ? COLOR.accentStrong : COLOR.ink,
                         fontSize: "0.82rem",
                         fontWeight: isSelected ? 600 : 400,

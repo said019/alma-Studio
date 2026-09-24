@@ -14,6 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { Check, Users, Clock, RotateCcw, UserX } from "lucide-react";
+import { DEFAULT_CLASS_COLOR } from "@/design/classPalette";
 
 interface RosterEntry {
   booking_id: string;
@@ -193,7 +194,7 @@ const TodayAttendance = () => {
                           <span
                             aria-hidden
                             className="h-2 w-2 shrink-0 rounded-full"
-                            style={{ backgroundColor: c.class_type_color || "#CBB9A4" }}
+                            style={{ backgroundColor: c.class_type_color || DEFAULT_CLASS_COLOR }}
                           />
                           <p className="truncate font-display text-lg leading-tight text-ink">
                             <span className="nums">{c.start_time?.slice(0, 5)}</span>

@@ -294,7 +294,7 @@ export default function Schedule() {
                 type="button"
                 onClick={() => setWeekOffset((w) => w + 1)}
                 aria-label="Semana siguiente"
-                className="grid h-9 w-9 place-items-center rounded-full border transition-colors hover:bg-[color:var(--blush)]"
+                className="grid h-9 w-9 place-items-center rounded-full border transition-colors hover:bg-sunken"
                 style={{ borderColor: COLOR.accentStrong, color: COLOR.accentStrong, backgroundColor: "transparent", cursor: "pointer" }}
               >
                 <ChevronRight size={15} />
@@ -459,7 +459,7 @@ export default function Schedule() {
                               src={cls.instructorPhoto}
                               alt=""
                               className="h-5 w-5 shrink-0 rounded-full object-cover"
-                              style={{ border: "1px solid #E0D5C6" }}
+                              style={{ border: `1px solid ${COLOR.line}` }}
                             />
                           )}
                           {cls.instructor}

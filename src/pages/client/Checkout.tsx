@@ -558,7 +558,7 @@ const Checkout = () => {
                       role="radio"
                       aria-checked={sel}
                       onClick={() => setPaymentMethod(opt.id)}
-                      className="w-full grid grid-cols-[auto_1fr_auto] items-center gap-4 px-1 py-4 text-left bg-transparent border-0 cursor-pointer transition-colors hover:bg-[#F4F1EA]"
+                      className="w-full grid grid-cols-[auto_1fr_auto] items-center gap-4 px-1 py-4 text-left bg-transparent border-0 cursor-pointer transition-colors hover:bg-sunken"
                       style={{ borderTop: `1px solid ${COLOR.line}`, color: COLOR.ink }}
                     >
                       <span

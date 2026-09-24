@@ -21,26 +21,21 @@ import {
   TrendingUp, TrendingDown, Minus, Download, Printer, Sparkles,
   AlertTriangle, Star, BarChart3, CalendarDays, Users,
 } from "lucide-react";
+import { COLOR } from "@/design/tokens";
 
 /* ════════════════════════════════════════════════════════════════
    ReportsPage — página patrón del admin (Hero / Secondary / Strip)
    ════════════════════════════════════════════════════════════════ */
 
-// Paleta canónica Alma. Solo para recharts (necesita hex);
-// en el markup se usan las utilidades alma-* de Tailwind.
-const C = {
-  ink: "#43392F",
-  inkSoft: "rgba(67, 57, 47, 0.55)",
-  berry: "#6E5A46",
-  stone: "#A48D78",
-  sandstone: "#CBB9A4",
-  oat: "#E6DAC8",
-  mist: "#F4F1EA",
-  canvas: "#FAF9F6",
-  hairline: "#E0D5C6",
-  olive: "#5F6B4A",
-  destructive: "#B23A48",
-};
+// Paleta para recharts (tokens de src/design/tokens.ts; en el markup se usan
+// las clases de Tailwind del token, p. ej. bg-sunken, border-line).
+// Series ordinarias: principal ink, secundaria inkMuted, terciaria
+// lineStrong. Nunca coral decorativo en una serie (spec §3.2 regla 3).
+const CHART_PRIMARY = COLOR.ink;
+const CHART_SECONDARY = COLOR.inkMuted;
+const CHART_TERTIARY = COLOR.lineStrong;
+const CHART_GRID = COLOR.line;
+const CHART_AXIS = `${COLOR.ink}8c`;
 
 type RangeKey = "this_month" | "30d" | "90d" | "ytd";
 const RANGES: { key: RangeKey; label: string }[] = [
@@ -139,7 +134,7 @@ function HeroKPI({
         )}
         {sparkData && sparkData.length > 0 && (
           <div className="-mx-1 mt-3">
-            <Sparkline data={sparkData} color={sparkColor || C.berry} height={42} />
+            <Sparkline data={sparkData} color={sparkColor || CHART_PRIMARY} height={42} />
           </div>
         )}
       </CardContent>
@@ -271,7 +266,7 @@ function downloadCSV(filename: string, rows: any[], columns: { key: string; labe
 
 /* ═══════════ Chart helpers ═══════════ */
 const ChartSkeleton = () => <Skeleton className="h-[280px] w-full" />;
-const tooltipStyle = { fontSize: 12, borderColor: C.hairline, backgroundColor: C.canvas, borderRadius: 8 };
+const tooltipStyle = { fontSize: 12, borderColor: CHART_GRID, backgroundColor: COLOR.canvas, borderRadius: 8 };
 
 /* ═══════════════════════════════════════════════════════════════
    Main Component
@@ -455,7 +450,7 @@ const ReportsPage = () => {
                     value={formatMXN(o.monthlyRevenue || 0)}
                     delta={deltas.revenue}
                     sparkData={revSparkValues}
-                    sparkColor={C.berry}
+                    sparkColor={CHART_PRIMARY}
                     loading={isLoading}
                   />
                 </div>
@@ -630,13 +625,13 @@ const ReportsPage = () => {
                       </p>
                       <ResponsiveContainer width="100%" height={280}>
                         <BarChart data={revenueData} margin={{ top: 10, right: 5, left: 5, bottom: 0 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke={C.hairline} />
-                          <XAxis dataKey="month" tick={{ fontSize: 11, fill: C.inkSoft }} axisLine={false} tickLine={false} />
-                          <YAxis tick={{ fontSize: 11, fill: C.inkSoft }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
+                          <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} />
+                          <XAxis dataKey="month" tick={{ fontSize: 11, fill: CHART_AXIS }} axisLine={false} tickLine={false} />
+                          <YAxis tick={{ fontSize: 11, fill: CHART_AXIS }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
                           <Tooltip formatter={(v: any) => formatMXN(Number(v))} contentStyle={tooltipStyle} />
                           <Bar dataKey="amount" radius={[6, 6, 0, 0]}>
                             {revenueData.map((_, i) => (
-                              <Cell key={i} fill={i === revenueData.length - 1 ? C.berry : C.stone} fillOpacity={i === revenueData.length - 1 ? 1 : 0.55} />
+                              <Cell key={i} fill={i === revenueData.length - 1 ? CHART_PRIMARY : CHART_SECONDARY} fillOpacity={i === revenueData.length - 1 ? 1 : 0.55} />
                             ))}
                           </Bar>
                         </BarChart>
@@ -666,12 +661,12 @@ const ReportsPage = () => {
                       </p>
                       <ResponsiveContainer width="100%" height={280}>
                         <BarChart data={classesData}>
-                          <CartesianGrid strokeDasharray="3 3" stroke={C.hairline} />
-                          <XAxis dataKey="label" tick={{ fontSize: 11, fill: C.inkSoft }} />
-                          <YAxis tick={{ fontSize: 11, fill: C.inkSoft }} />
+                          <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} />
+                          <XAxis dataKey="label" tick={{ fontSize: 11, fill: CHART_AXIS }} />
+                          <YAxis tick={{ fontSize: 11, fill: CHART_AXIS }} />
                           <Tooltip contentStyle={tooltipStyle} />
-                          <Bar dataKey="bookings" fill={C.berry} radius={[4, 4, 0, 0]} name="Reservas" />
-                          <Bar dataKey="attended" fill={C.sandstone} radius={[4, 4, 0, 0]} name="Asistencias" />
+                          <Bar dataKey="bookings" fill={CHART_PRIMARY} radius={[4, 4, 0, 0]} name="Reservas" />
+                          <Bar dataKey="attended" fill={CHART_TERTIARY} radius={[4, 4, 0, 0]} name="Asistencias" />
                         </BarChart>
                       </ResponsiveContainer>
                     </>
@@ -699,16 +694,16 @@ const ReportsPage = () => {
                       </p>
                       <ResponsiveContainer width="100%" height={280}>
                         <LineChart data={retentionData}>
-                          <CartesianGrid strokeDasharray="3 3" stroke={C.hairline} />
-                          <XAxis dataKey="month" tick={{ fontSize: 11, fill: C.inkSoft }} />
-                          <YAxis tick={{ fontSize: 11, fill: C.inkSoft }} tickFormatter={(v) => `${v}%`} domain={[0, 100]} />
+                          <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} />
+                          <XAxis dataKey="month" tick={{ fontSize: 11, fill: CHART_AXIS }} />
+                          <YAxis tick={{ fontSize: 11, fill: CHART_AXIS }} tickFormatter={(v) => `${v}%`} domain={[0, 100]} />
                           <Tooltip formatter={(v: any) => `${v}%`} contentStyle={tooltipStyle} />
                           <Line
                             type="monotone"
                             dataKey="rate"
-                            stroke={C.berry}
+                            stroke={CHART_PRIMARY}
                             strokeWidth={2.5}
-                            dot={{ fill: C.berry, r: 3 }}
+                            dot={{ fill: CHART_PRIMARY, r: 3 }}
                             activeDot={{ r: 5 }}
                           />
                         </LineChart>

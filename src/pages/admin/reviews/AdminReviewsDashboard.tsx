@@ -21,8 +21,9 @@ import { useConfirm } from "@/components/admin/ConfirmDialog";
 import { ErrorState, EmptyState } from "@/components/app/AppShell";
 import { formatDateTime } from "@/lib/format";
 import { MessageSquare, MoreHorizontal, Pencil, Plus, Star, Tag, X } from "lucide-react";
+import { COLOR } from "@/design/tokens";
 
-const tagSchema = z.object({ name: z.string().min(1), color: z.string().default("#6E5A46") });
+const tagSchema = z.object({ name: z.string().min(1), color: z.string().default(COLOR.ink) });
 type TagFormData = z.infer<typeof tagSchema>;
 interface ReviewTag extends TagFormData { id: string }
 
@@ -36,7 +37,7 @@ const ReviewTagsManager = () => {
   const { data, isError, refetch } = useQuery<{ data: ReviewTag[] }>({ queryKey: ["review-tags"], queryFn: async () => (await api.get("/review-tags")).data });
   const tags = Array.isArray(data?.data) ? data.data : [];
 
-  const form = useForm<TagFormData>({ resolver: zodResolver(tagSchema), defaultValues: { color: "#6E5A46" } });
+  const form = useForm<TagFormData>({ resolver: zodResolver(tagSchema), defaultValues: { color: COLOR.ink } });
 
   const createMutation = useMutation({ mutationFn: (d: TagFormData) => api.post("/review-tags", d), onSuccess: () => { qc.invalidateQueries({ queryKey: ["review-tags"] }); toast({ title: "Tag creado" }); setOpen(false); } });
   const updateMutation = useMutation({ mutationFn: ({ id, ...d }: ReviewTag) => api.put(`/review-tags/${id}`, d), onSuccess: () => { qc.invalidateQueries({ queryKey: ["review-tags"] }); toast({ title: "Tag actualizado" }); setOpen(false); } });
@@ -46,7 +47,7 @@ const ReviewTagsManager = () => {
     <div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
         <h2 className="text-lg font-semibold text-ink">Tags de reseñas</h2>
-        <Button size="sm" onClick={() => { form.reset({ color: "#6E5A46" }); setEditing(null); setOpen(true); }}><Plus size={14} className="mr-1" />Nuevo tag</Button>
+        <Button size="sm" onClick={() => { form.reset({ color: COLOR.ink }); setEditing(null); setOpen(true); }}><Plus size={14} className="mr-1" />Nuevo tag</Button>
       </div>
       {isError ? (
         <ErrorState
@@ -59,7 +60,7 @@ const ReviewTagsManager = () => {
           title="Aún no hay tags"
           description="Sirven para clasificar reseñas (limpieza, instructoras, equipo) y detectar patrones."
           ctaLabel="Nuevo tag"
-          onCta={() => { form.reset({ color: "#6E5A46" }); setEditing(null); setOpen(true); }}
+          onCta={() => { form.reset({ color: COLOR.ink }); setEditing(null); setOpen(true); }}
         />
       ) : (
         <div className="flex flex-wrap gap-2 mb-4">

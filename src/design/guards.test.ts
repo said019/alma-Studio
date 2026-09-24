@@ -39,4 +39,22 @@ describe("guardias contra volver a Alma", () => {
   it("el archivo puente ya no existe", () => {
     expect(fs.existsSync(path.join(root, "src/components/app/tokens.ts"))).toBe(false);
   });
+  it("no hay colores escritos a mano fuera de src/design (spec §3.2 regla 6)", () => {
+    // Excepciones justificadas: colores de marcas ajenas que no pueden cambiar.
+    const PERMITIDOS: Record<string, "*" | string[]> = {
+      "src/lib/wellhubBrand.ts": "*", // identidad oficial de Wellhub
+      // Botones oficiales "Add to Apple/Google Wallet": sus colores son de la marca.
+      "src/pages/client/Wallet.tsx": ["#000000", "#FFFFFF", "#4285F4", "#EA4335", "#FBBC05", "#34A853"],
+    };
+    const malos: string[] = [];
+    for (const f of sourceFiles()) {
+      const r = rel(f);
+      const permitido = PERMITIDOS[r];
+      if (permitido === "*") continue;
+      const hexes = (fs.readFileSync(f, "utf8").match(/#[0-9A-Fa-f]{6}\b/g) ?? []).map((h) => h.toUpperCase());
+      const sobran = hexes.filter((h) => !(permitido ?? []).includes(h));
+      if (sobran.length) malos.push(`${r}: ${[...new Set(sobran)].join(" ")}`);
+    }
+    expect(malos).toEqual([]);
+  });
 });
