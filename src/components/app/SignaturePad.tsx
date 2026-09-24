@@ -1,5 +1,6 @@
 import { useRef, useEffect, useCallback } from "react";
-import { ALMA } from "@/components/app/tokens";
+import { COLOR } from "@/design/tokens";
+
 
 interface SignaturePadProps {
   onChange: (dataUrl: string | null) => void;
@@ -29,7 +30,7 @@ export const SignaturePad = ({ onChange }: SignaturePadProps) => {
     canvas.width = rect.width * dpr;
     canvas.height = rect.height * dpr;
     ctx.scale(dpr, dpr);
-    ctx.strokeStyle = ALMA.ink;
+    ctx.strokeStyle = COLOR.ink;
     ctx.lineWidth = 2;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
@@ -44,7 +45,7 @@ export const SignaturePad = ({ onChange }: SignaturePadProps) => {
   ) => {
     // baseline
     ctx.save();
-    ctx.strokeStyle = ALMA.border;
+    ctx.strokeStyle = COLOR.line;
     ctx.lineWidth = 1;
     ctx.setLineDash([4, 4]);
     ctx.beginPath();
@@ -55,7 +56,7 @@ export const SignaturePad = ({ onChange }: SignaturePadProps) => {
 
     // placeholder text
     ctx.save();
-    ctx.fillStyle = ALMA.ink;
+    ctx.fillStyle = COLOR.ink;
     ctx.globalAlpha = 0.22;
     ctx.font = "13px system-ui, -apple-system, sans-serif";
     ctx.textAlign = "center";
@@ -99,7 +100,7 @@ export const SignaturePad = ({ onChange }: SignaturePadProps) => {
       if (ctx) {
         const dpr = window.devicePixelRatio || 1;
         ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
-        ctx.strokeStyle = ALMA.ink;
+        ctx.strokeStyle = COLOR.ink;
         ctx.lineWidth = 2;
         ctx.lineCap = "round";
         ctx.lineJoin = "round";
@@ -111,7 +112,7 @@ export const SignaturePad = ({ onChange }: SignaturePadProps) => {
     if (!ctx) return;
     ctx.beginPath();
     ctx.arc(x, y, 1, 0, Math.PI * 2);
-    ctx.fillStyle = ALMA.ink;
+    ctx.fillStyle = COLOR.ink;
     ctx.fill();
   };
 
@@ -123,7 +124,7 @@ export const SignaturePad = ({ onChange }: SignaturePadProps) => {
 
     const { x, y } = getCoords(e);
     ctx.beginPath();
-    ctx.strokeStyle = ALMA.ink;
+    ctx.strokeStyle = COLOR.ink;
     ctx.lineWidth = 2;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
@@ -171,7 +172,7 @@ export const SignaturePad = ({ onChange }: SignaturePadProps) => {
           height: 140,
           display: "block",
           borderRadius: 16,
-          border: `1px solid ${ALMA.border}`,
+          border: `1px solid ${COLOR.line}`,
           backgroundColor: "#ffffff",
           touchAction: "none",
           cursor: "crosshair",
@@ -181,7 +182,7 @@ export const SignaturePad = ({ onChange }: SignaturePadProps) => {
         type="button"
         onClick={handleClear}
         className="self-end text-[0.74rem] uppercase tracking-[0.18em] transition-opacity hover:opacity-100"
-        style={{ background: "transparent", border: 0, color: ALMA.ink, opacity: 0.5, cursor: "pointer", padding: "2px 0" }}
+        style={{ background: "transparent", border: 0, color: COLOR.ink, opacity: 0.5, cursor: "pointer", padding: "2px 0" }}
       >
         Borrar
       </button>

@@ -123,11 +123,11 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
   const unreadCount = unreadData?.data?.unread_count ?? 0;
 
   return (
-    <div className="alma-admin flex min-h-screen bg-alma-canvas text-alma-ink">
+    <div className="alma-admin flex min-h-screen bg-canvas text-ink">
       {mobileOpen && (
         <button
           aria-label="Cerrar menú"
-          className="fixed inset-0 z-40 bg-alma-ink/40 lg:hidden"
+          className="fixed inset-0 z-40 bg-ink/40 lg:hidden"
           onClick={() => setMobileOpen(false)}
         />
       )}
@@ -135,7 +135,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
       <aside
         className={cn(
           "fixed inset-y-0 left-0 z-50 flex flex-col transition-transform duration-300 shrink-0",
-          "border-r border-alma-hairline bg-alma-mist",
+          "border-r border-line bg-sunken",
           "w-[88vw] max-w-[300px] -translate-x-full lg:translate-x-0 lg:static",
           mobileOpen && "translate-x-0",
           collapsed ? "lg:w-[72px]" : "lg:w-[240px]",
@@ -143,7 +143,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
       >
         <div
           className={cn(
-            "flex items-center border-b border-alma-hairline shrink-0",
+            "flex items-center border-b border-line shrink-0",
             isCompact ? "justify-center px-3 py-5" : "justify-between px-5 py-5",
           )}
         >
@@ -153,7 +153,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
 
           <button
             onClick={() => setMobileOpen(false)}
-            className="flex lg:hidden items-center justify-center w-8 h-8 rounded-lg text-alma-ink/55 hover:text-alma-ink hover:bg-alma-oat/40"
+            className="flex lg:hidden items-center justify-center w-8 h-8 rounded-lg text-ink/55 hover:text-ink hover:bg-sunken/40"
             aria-label="Cerrar menú"
           >
             <X size={16} />
@@ -163,7 +163,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
             onClick={() => setCollapsed((v) => !v)}
             className={cn(
               "hidden lg:flex items-center justify-center w-7 h-7 rounded-lg transition-colors",
-              "text-alma-ink/45 hover:text-alma-ink hover:bg-alma-oat/40",
+              "text-ink/45 hover:text-ink hover:bg-sunken/40",
             )}
             aria-label="Contraer menú"
           >
@@ -187,7 +187,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
                       <span
                         className={cn(
                           "text-[0.72rem] font-semibold uppercase tracking-[0.14em] transition-colors",
-                          isGroupActive ? "text-alma-ink/70" : "text-alma-ink/45",
+                          isGroupActive ? "text-ink/70" : "text-ink/45",
                         )}
                       >
                         {group.label}
@@ -195,13 +195,13 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
                       <ChevronDown
                         size={11}
                         className={cn(
-                          "text-alma-ink/40 transition-transform duration-200",
+                          "text-ink/40 transition-transform duration-200",
                           isOpen ? "rotate-0" : "-rotate-90",
                         )}
                       />
                     </button>
                   ) : (
-                    <p className="px-5 py-1.5 text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-alma-ink/45">
+                    <p className="px-5 py-1.5 text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-ink/45">
                       {group.label}
                     </p>
                   )
@@ -219,15 +219,15 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
                         "flex items-center gap-3 mx-2 my-0.5 rounded-xl transition-colors duration-200 no-underline",
                         isCompact ? "px-0 justify-center py-2.5" : "px-3 py-2.5",
                         active
-                          ? "bg-alma-oat font-semibold text-alma-ink ring-1 ring-inset ring-alma-sandstone/50"
-                          : "text-alma-ink/70 hover:text-alma-ink hover:bg-alma-oat/40",
+                          ? "bg-sunken font-semibold text-ink ring-1 ring-inset ring-line-strong/50"
+                          : "text-ink/70 hover:text-ink hover:bg-sunken/40",
                       )}
                     >
                       <span className="relative shrink-0 inline-flex">
                         <Icon size={15} />
                         {/* Badge: unread count para 'Bandeja' nav item */}
                         {path === "/admin/notifications" && unreadCount > 0 && (
-                          <span className="nums absolute -top-2 -right-2.5 grid h-4 min-w-[16px] place-items-center rounded-full bg-alma-ink-deep px-1 text-[0.7rem] font-semibold leading-none text-alma-canvas">
+                          <span className="nums absolute -top-2 -right-2.5 grid h-4 min-w-[16px] place-items-center rounded-full bg-inverse px-1 text-[0.7rem] font-semibold leading-none text-canvas">
                             {unreadCount > 9 ? "9+" : unreadCount}
                           </span>
                         )}
@@ -239,19 +239,19 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
                   );
                 })}
 
-                {isCompact && <div className="mx-3 my-1 h-px bg-alma-hairline" />}
+                {isCompact && <div className="mx-3 my-1 h-px bg-line" />}
               </div>
             );
           })}
         </nav>
 
-        <div className="border-t border-alma-hairline pb-3 pt-2 shrink-0">
+        <div className="border-t border-line pb-3 pt-2 shrink-0">
           <Link
             to="/"
             title={isCompact ? "Ver sitio" : undefined}
             className={cn(
               "flex items-center gap-3 mx-2 rounded-xl px-3 py-2 no-underline transition-colors",
-              "text-alma-ink/60 hover:text-alma-ink hover:bg-alma-oat/40",
+              "text-ink/60 hover:text-ink hover:bg-sunken/40",
               isCompact && "justify-center px-0",
             )}
           >
@@ -263,7 +263,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
             title={isCompact ? "Salir" : undefined}
             className={cn(
               "flex items-center gap-3 mx-2 rounded-xl px-3 py-2 w-[calc(100%-16px)] transition-colors",
-              "text-alma-ink/60 hover:text-destructive hover:bg-destructive/10",
+              "text-ink/60 hover:text-destructive hover:bg-destructive/10",
               isCompact && "justify-center px-0",
             )}
           >
@@ -274,39 +274,39 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0 lg:ml-0">
-        <header className="shrink-0 h-14 flex items-center justify-between px-3 sm:px-4 lg:px-6 border-b border-alma-hairline bg-alma-canvas sticky top-0 z-30">
+        <header className="shrink-0 h-14 flex items-center justify-between px-3 sm:px-4 lg:px-6 border-b border-line bg-canvas sticky top-0 z-30">
           <div className="flex items-center gap-2 min-w-0">
             <button
-              className="lg:hidden inline-flex h-8 w-8 items-center justify-center rounded-lg text-alma-ink/60 hover:text-alma-ink hover:bg-alma-oat/40"
+              className="lg:hidden inline-flex h-8 w-8 items-center justify-center rounded-lg text-ink/60 hover:text-ink hover:bg-sunken/40"
               onClick={() => setMobileOpen(true)}
               aria-label="Abrir menú"
             >
               <Menu size={16} />
             </button>
-            <span className="text-alma-ink/50 text-[0.72rem] font-medium tracking-[0.12em] uppercase">Admin</span>
+            <span className="text-ink/50 text-[0.72rem] font-medium tracking-[0.12em] uppercase">Admin</span>
             {currentItem && (
               <>
-                <ChevronRight size={12} className="text-alma-ink/35 shrink-0" />
-                <span className="text-alma-ink text-xs sm:text-sm font-semibold truncate">{currentItem.label}</span>
+                <ChevronRight size={12} className="text-ink/35 shrink-0" />
+                <span className="text-ink text-xs sm:text-sm font-semibold truncate">{currentItem.label}</span>
               </>
             )}
           </div>
           <div className="flex items-center gap-2 min-w-0">
-            <div className="w-7 h-7 rounded-full bg-alma-oat flex items-center justify-center text-[11px] font-semibold text-alma-ink">
+            <div className="w-7 h-7 rounded-full bg-sunken flex items-center justify-center text-[11px] font-semibold text-ink">
               {user?.displayName?.[0]?.toUpperCase() ?? user?.display_name?.[0]?.toUpperCase() ?? user?.email?.[0]?.toUpperCase() ?? "A"}
             </div>
             {!isCompact && (
-              <span className="text-xs text-alma-ink/70 hidden md:block truncate max-w-[180px]">
+              <span className="text-xs text-ink/70 hidden md:block truncate max-w-[180px]">
                 {user?.displayName ?? user?.display_name ?? user?.email ?? "Admin"}
               </span>
             )}
           </div>
         </header>
 
-        <main className="admin-mobile-main flex-1 overflow-auto pb-[88px] lg:pb-0 bg-alma-canvas">{children}</main>
+        <main className="admin-mobile-main flex-1 overflow-auto pb-[88px] lg:pb-0 bg-canvas">{children}</main>
 
         {isMobile && (
-          <nav className="fixed inset-x-2 bottom-2 z-40 rounded-2xl border border-alma-hairline bg-alma-canvas p-1 pb-safe shadow-sm lg:hidden">
+          <nav className="fixed inset-x-2 bottom-2 z-40 rounded-2xl border border-line bg-canvas p-1 pb-safe shadow-sm lg:hidden">
             <ul className="grid grid-cols-5 gap-1">
               {mobileQuickNav.map((item) => {
                 const active = location.pathname === item.path || location.pathname.startsWith(item.path + "/");
@@ -318,8 +318,8 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
                       className={cn(
                         "flex h-12 min-h-[44px] flex-col items-center justify-center rounded-xl text-[11px] font-semibold transition-colors",
                         active
-                          ? "bg-alma-oat text-alma-ink ring-1 ring-inset ring-alma-sandstone/50"
-                          : "text-alma-ink/70 hover:bg-alma-oat/40 hover:text-alma-ink",
+                          ? "bg-sunken text-ink ring-1 ring-inset ring-line-strong/50"
+                          : "text-ink/70 hover:bg-sunken/40 hover:text-ink",
                       )}
                       aria-current={active ? "page" : undefined}
                     >

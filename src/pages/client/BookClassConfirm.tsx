@@ -15,11 +15,11 @@ import {
   PrimaryButton,
   SkeletonRow,
   ErrorState,
-  ALMA,
 } from "@/components/app/AppShell";
 import { BackLink, DataRow, StickyCta } from "@/components/app/widgets";
 import { useToast } from "@/hooks/use-toast";
 import { ResponsivaDialog } from "@/components/app/ResponsivaDialog";
+import { COLOR } from "@/design/tokens";
 
 const KNOW_BEFORE = [
   "Llega 10 minutos antes para acomodarte.",
@@ -98,8 +98,8 @@ const BookClassConfirm = () => {
   const defaultPhone = (user as any)?.phone ?? "";
 
   const hairlines = {
-    borderTop: `1px solid ${ALMA.border}`,
-    borderBottom: `1px solid ${ALMA.border}`,
+    borderTop: `1px solid ${COLOR.line}`,
+    borderBottom: `1px solid ${COLOR.line}`,
   } as const;
 
   return (
@@ -144,12 +144,12 @@ const BookClassConfirm = () => {
         ) : cls ? (
           <>
             <Section>
-              <div className="rounded-3xl p-5 sm:p-7" style={{ backgroundColor: ALMA.blush }}>
+              <div className="rounded-3xl p-5 sm:p-7" style={{ backgroundColor: COLOR.sunken }}>
                 <div className="flex flex-wrap items-center gap-2 mb-4">
                   {isFull ? (
-                    <Tag tint="berry">Lista de espera</Tag>
+                    <Tag tint="accent">Lista de espera</Tag>
                   ) : (
-                    <Tag tint="olive">{remaining} {remaining === 1 ? "lugar" : "lugares"}</Tag>
+                    <Tag tint="success">{remaining} {remaining === 1 ? "lugar" : "lugares"}</Tag>
                   )}
                 </div>
 
@@ -185,20 +185,20 @@ const BookClassConfirm = () => {
               ) : hasActivePkg ? (
                 pkgUnlimited ? (
                   <div className="py-4" style={hairlines}>
-                    <p className="m-0 text-[0.95rem] font-medium leading-snug" style={{ color: ALMA.ink }}>
+                    <p className="m-0 text-[0.95rem] font-medium leading-snug" style={{ color: COLOR.ink }}>
                       Tu paquete no tiene límite de clases.
                     </p>
-                    <p className="m-0 mt-1 text-[0.84rem] leading-[1.5]" style={{ color: ALMA.ink, opacity: 0.6 }}>
+                    <p className="m-0 mt-1 text-[0.84rem] leading-[1.5]" style={{ color: COLOR.ink, opacity: 0.6 }}>
                       Reserva tranquila, {planName} te cubre.
                     </p>
                   </div>
                 ) : Number(pkgRemaining) <= 0 ? (
                   <div className="flex flex-col items-start gap-3 py-4" style={hairlines}>
                     <div>
-                      <p className="m-0 text-[0.95rem] font-medium leading-snug" style={{ color: ALMA.ink }}>
+                      <p className="m-0 text-[0.95rem] font-medium leading-snug" style={{ color: COLOR.ink }}>
                         Ya usaste todas las clases de tu paquete.
                       </p>
-                      <p className="m-0 mt-1 text-[0.84rem] leading-[1.5]" style={{ color: ALMA.ink, opacity: 0.6 }}>
+                      <p className="m-0 mt-1 text-[0.84rem] leading-[1.5]" style={{ color: COLOR.ink, opacity: 0.6 }}>
                         Renueva para confirmar tu lugar en esta clase.
                       </p>
                     </div>
@@ -206,12 +206,12 @@ const BookClassConfirm = () => {
                   </div>
                 ) : (
                   <div className="py-4" style={hairlines}>
-                    <p className="m-0 text-[0.95rem] font-medium leading-snug" style={{ color: ALMA.ink }}>
+                    <p className="m-0 text-[0.95rem] font-medium leading-snug" style={{ color: COLOR.ink }}>
                       {isFull
                         ? <>Se usará <span className="nums">1</span> clase de tu paquete al liberarse tu lugar</>
                         : <>Se usa <span className="nums">1</span> clase de tu paquete</>}
                     </p>
-                    <p className="m-0 mt-1 text-[0.84rem] leading-[1.5]" style={{ color: ALMA.ink, opacity: 0.6 }}>
+                    <p className="m-0 mt-1 text-[0.84rem] leading-[1.5]" style={{ color: COLOR.ink, opacity: 0.6 }}>
                       Te {remainingAfter === 1 ? "quedará" : "quedarán"}{" "}
                       <span className="nums">{remainingAfter}</span>{" "}
                       {remainingAfter === 1 ? "clase" : "clases"} de {planName}.
@@ -221,10 +221,10 @@ const BookClassConfirm = () => {
               ) : (
                 <div className="flex flex-col items-start gap-3 py-4" style={hairlines}>
                   <div>
-                    <p className="m-0 text-[0.95rem] font-medium leading-snug" style={{ color: ALMA.ink }}>
+                    <p className="m-0 text-[0.95rem] font-medium leading-snug" style={{ color: COLOR.ink }}>
                       Aún no tienes un paquete activo.
                     </p>
-                    <p className="m-0 mt-1 text-[0.84rem] leading-[1.5]" style={{ color: ALMA.ink, opacity: 0.6 }}>
+                    <p className="m-0 mt-1 text-[0.84rem] leading-[1.5]" style={{ color: COLOR.ink, opacity: 0.6 }}>
                       Elige uno para confirmar tu lugar en esta clase.
                     </p>
                   </div>
@@ -240,14 +240,14 @@ const BookClassConfirm = () => {
                     key={i}
                     className="grid grid-cols-[auto_1fr] items-baseline gap-4 py-3.5"
                     style={{
-                      borderTop: `1px solid ${ALMA.border}`,
-                      borderBottom: i === arr.length - 1 ? `1px solid ${ALMA.border}` : undefined,
+                      borderTop: `1px solid ${COLOR.line}`,
+                      borderBottom: i === arr.length - 1 ? `1px solid ${COLOR.line}` : undefined,
                     }}
                   >
-                    <span className="nums text-[0.72rem] font-medium tracking-[0.18em]" style={{ color: ALMA.berry }}>
+                    <span className="nums text-[0.72rem] font-medium tracking-[0.18em]" style={{ color: COLOR.accentStrong }}>
                       {String(i + 1).padStart(2, "0")}
                     </span>
-                    <span className="text-[0.92rem] leading-[1.55]" style={{ color: ALMA.ink, opacity: 0.78 }}>
+                    <span className="text-[0.92rem] leading-[1.55]" style={{ color: COLOR.ink, opacity: 0.78 }}>
                       {text}
                     </span>
                   </li>
@@ -256,14 +256,14 @@ const BookClassConfirm = () => {
             </Section>
 
             <Section>
-              <div className="rounded-2xl p-4 sm:p-5" style={{ backgroundColor: ALMA.mist }}>
-                <p className="m-0 text-[0.72rem] font-medium uppercase tracking-[0.2em]" style={{ color: ALMA.berry }}>
+              <div className="rounded-2xl p-4 sm:p-5" style={{ backgroundColor: COLOR.sunken }}>
+                <p className="m-0 text-[0.72rem] font-medium uppercase tracking-[0.2em]" style={{ color: COLOR.accentStrong }}>
                   Cancelaciones
                 </p>
-                <p className="m-0 mt-1.5 text-[0.95rem] leading-[1.55]" style={{ color: ALMA.ink }}>
+                <p className="m-0 mt-1.5 text-[0.95rem] leading-[1.55]" style={{ color: COLOR.ink }}>
                   Cancela hasta <span className="nums">12</span> horas antes y no cuenta como falta.
                 </p>
-                <p className="m-0 mt-1 text-[0.84rem] leading-[1.5]" style={{ color: ALMA.ink, opacity: 0.6 }}>
+                <p className="m-0 mt-1 text-[0.84rem] leading-[1.5]" style={{ color: COLOR.ink, opacity: 0.6 }}>
                   Las cancelaciones tardías cuentan como falta; al juntar 5 se descuentan puntos.
                 </p>
               </div>
@@ -275,7 +275,7 @@ const BookClassConfirm = () => {
                 disabled={bookMutation.isPending}
                 onClick={() => bookMutation.mutate()}
                 className="w-full inline-flex items-center justify-center gap-3 rounded-full px-7 py-4 text-[0.84rem] font-medium uppercase tracking-[0.18em] transition-transform hover:-translate-y-0.5 disabled:opacity-60 disabled:translate-y-0 cursor-pointer"
-                style={{ backgroundColor: ALMA.berry, color: ALMA.cream, border: 0 }}
+                style={{ backgroundColor: COLOR.ink, color: COLOR.canvas, border: 0 }}
               >
                 {bookMutation.isPending
                   ? "Reservando…"

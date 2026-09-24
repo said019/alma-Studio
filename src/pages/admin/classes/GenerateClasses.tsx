@@ -166,7 +166,7 @@ const GenerateClasses = () => {
   const referenceLoading = typesQuery.isLoading || instructorsQuery.isLoading;
 
   const stepBadge = (n: number) => (
-    <span className="nums flex h-6 w-6 items-center justify-center rounded-full bg-alma-oat text-xs font-bold text-alma-ink">
+    <span className="nums flex h-6 w-6 items-center justify-center rounded-full bg-sunken text-xs font-bold text-ink">
       {n}
     </span>
   );
@@ -177,8 +177,8 @@ const GenerateClasses = () => {
         <div className="admin-page max-w-3xl">
           <SectionTabs tabs={CLASSES_SECTION_TABS} />
           <div className="mb-6">
-            <h1 className="admin-title text-alma-ink">Generar clases</h1>
-            <p className="mt-1 text-sm text-alma-ink/55">
+            <h1 className="admin-title text-ink">Generar clases</h1>
+            <p className="mt-1 text-sm text-ink/55">
               Aplica el horario oficial del estudio o crea clases en bloque para un rango de fechas.
             </p>
           </div>
@@ -200,17 +200,17 @@ const GenerateClasses = () => {
           ) : (
             <div className="space-y-5">
               {/* ── Preset: Horario Alma oficial ── */}
-              <section className="space-y-4 rounded-2xl border border-alma-sandstone/60 bg-alma-oat/40 p-5">
+              <section className="space-y-4 rounded-2xl border border-line-strong/60 bg-sunken/40 p-5">
                 <div>
-                  <p className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-alma-berry">Plantilla Alma</p>
-                  <p className="mt-1.5 text-sm font-semibold text-alma-ink">Horario oficial del estudio</p>
-                  <p className="nums mt-0.5 text-xs text-alma-ink/60">
+                  <p className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-ink">Plantilla Alma</p>
+                  <p className="mt-1.5 text-sm font-semibold text-ink">Horario oficial del estudio</p>
+                  <p className="nums mt-0.5 text-xs text-ink/60">
                     Lun a Vie: 7am, 8am, 7pm y 8pm · Sáb: 7am, 8am y 9am · 23 horarios por semana
                   </p>
                 </div>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div className="space-y-1.5">
-                    <Label className="text-xs text-alma-ink/70">Instructora</Label>
+                    <Label className="text-xs text-ink/70">Instructora</Label>
                     <Select value={presetInstructorId} onValueChange={setPresetInstructorId}>
                       <SelectTrigger>
                         <SelectValue placeholder="Seleccionar instructora" />
@@ -223,7 +223,7 @@ const GenerateClasses = () => {
                     </Select>
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-xs text-alma-ink/70">Semanas a generar</Label>
+                    <Label className="text-xs text-ink/70">Semanas a generar</Label>
                     <Select value={String(presetWeeks)} onValueChange={(v) => setPresetWeeks(Number(v))}>
                       <SelectTrigger>
                         <SelectValue />
@@ -252,33 +252,33 @@ const GenerateClasses = () => {
                     onClick={handlePresetTemplateOnly}
                     disabled={resetAlmaMutation.isPending}
                     variant="outline"
-                    className="border-alma-sandstone/70 text-alma-ink"
+                    className="border-line-strong/70 text-ink"
                   >
                     Solo plantilla
                   </Button>
                 </div>
                 {!presetInstructorId && instructors.length === 0 && (
-                  <p className="text-xs text-alma-berry">
+                  <p className="text-xs text-ink">
                     Crea una instructora primero en la sección{" "}
                     <Link to="/admin/staff" className="font-semibold underline">Instructoras</Link>.
                   </p>
                 )}
                 {!presetInstructorId && instructors.length > 0 && (
-                  <p className="text-xs text-alma-ink/55">
+                  <p className="text-xs text-ink/55">
                     Selecciona una instructora arriba para activar el botón.
                   </p>
                 )}
               </section>
 
               {/* ── Step 1: Class type + Instructor ── */}
-              <section className="space-y-4 rounded-2xl border border-alma-hairline bg-alma-mist p-5">
+              <section className="space-y-4 rounded-2xl border border-line bg-sunken p-5">
                 <div className="flex items-center gap-2">
                   {stepBadge(1)}
-                  <span className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-alma-berry">{STEP_LABELS[0]}</span>
+                  <span className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-ink">{STEP_LABELS[0]}</span>
                 </div>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div className="space-y-1.5">
-                    <Label className="text-xs text-alma-ink/70">Tipo de clase</Label>
+                    <Label className="text-xs text-ink/70">Tipo de clase</Label>
                     <Select onValueChange={setClassTypeId}>
                       <SelectTrigger>
                         <SelectValue placeholder="Seleccionar tipo" />
@@ -296,7 +296,7 @@ const GenerateClasses = () => {
                     </Select>
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-xs text-alma-ink/70">Instructora</Label>
+                    <Label className="text-xs text-ink/70">Instructora</Label>
                     <Select onValueChange={setInstructorId}>
                       <SelectTrigger>
                         <SelectValue placeholder="Seleccionar instructora" />
@@ -312,28 +312,28 @@ const GenerateClasses = () => {
               </section>
 
               {/* ── Step 2: Date range ── */}
-              <section className="space-y-4 rounded-2xl border border-alma-hairline bg-alma-mist p-5">
+              <section className="space-y-4 rounded-2xl border border-line bg-sunken p-5">
                 <div className="flex items-center gap-2">
                   {stepBadge(2)}
-                  <span className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-alma-berry">{STEP_LABELS[1]}</span>
+                  <span className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-ink">{STEP_LABELS[1]}</span>
                 </div>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div className="space-y-1.5">
-                    <Label className="text-xs text-alma-ink/70">Fecha inicio</Label>
+                    <Label className="text-xs text-ink/70">Fecha inicio</Label>
                     <DatePicker value={startDate} onChange={setStartDate} placeholder="Desde" />
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-xs text-alma-ink/70">Fecha fin</Label>
+                    <Label className="text-xs text-ink/70">Fecha fin</Label>
                     <DatePicker value={endDate} onChange={setEndDate} placeholder="Hasta" min={startDate} />
                   </div>
                 </div>
               </section>
 
               {/* ── Step 3: Days of week ── */}
-              <section className="space-y-4 rounded-2xl border border-alma-hairline bg-alma-mist p-5">
+              <section className="space-y-4 rounded-2xl border border-line bg-sunken p-5">
                 <div className="flex items-center gap-2">
                   {stepBadge(3)}
-                  <span className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-alma-berry">{STEP_LABELS[2]}</span>
+                  <span className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-ink">{STEP_LABELS[2]}</span>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {GENERATE_DAYS.map((d) => {
@@ -347,8 +347,8 @@ const GenerateClasses = () => {
                         className={cn(
                           "rounded-xl px-5 py-2.5 text-sm font-semibold transition-colors",
                           active
-                            ? "bg-alma-oat text-alma-ink ring-1 ring-inset ring-alma-sandstone"
-                            : "border border-alma-hairline bg-alma-canvas text-alma-ink/55 hover:border-alma-sandstone hover:text-alma-ink",
+                            ? "bg-sunken text-ink ring-1 ring-inset ring-line-strong"
+                            : "border border-line bg-canvas text-ink/55 hover:border-line-strong hover:text-ink",
                         )}
                       >
                         {d.label}
@@ -360,28 +360,28 @@ const GenerateClasses = () => {
                   <button
                     type="button"
                     onClick={() => setSelectedDays([1, 2, 3, 4, 5])}
-                    className="text-xs font-medium text-alma-berry hover:underline"
+                    className="text-xs font-medium text-ink hover:underline"
                   >
                     Lun a Vie
                   </button>
                   <button
                     type="button"
                     onClick={() => setSelectedDays([1, 2, 3, 4, 5, 6])}
-                    className="text-xs font-medium text-alma-berry hover:underline"
+                    className="text-xs font-medium text-ink hover:underline"
                   >
                     Lun a Sáb
                   </button>
                   <button
                     type="button"
                     onClick={() => setSelectedDays([0, 1, 2, 3, 4, 5, 6])}
-                    className="text-xs font-medium text-alma-berry hover:underline"
+                    className="text-xs font-medium text-ink hover:underline"
                   >
                     Todos
                   </button>
                   <button
                     type="button"
                     onClick={() => setSelectedDays([])}
-                    className="text-xs font-medium text-alma-ink/45 hover:underline"
+                    className="text-xs font-medium text-ink/45 hover:underline"
                   >
                     Limpiar
                   </button>
@@ -389,22 +389,22 @@ const GenerateClasses = () => {
               </section>
 
               {/* ── Step 4: Time + Capacity ── */}
-              <section className="space-y-4 rounded-2xl border border-alma-hairline bg-alma-mist p-5">
+              <section className="space-y-4 rounded-2xl border border-line bg-sunken p-5">
                 <div className="flex items-center gap-2">
                   {stepBadge(4)}
-                  <span className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-alma-berry">{STEP_LABELS[3]}</span>
+                  <span className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-ink">{STEP_LABELS[3]}</span>
                 </div>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                   <div className="space-y-1.5">
-                    <Label className="text-xs text-alma-ink/70">Hora inicio</Label>
+                    <Label className="text-xs text-ink/70">Hora inicio</Label>
                     <TimePicker value={startTime} onChange={setStartTime} />
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-xs text-alma-ink/70">Hora fin</Label>
+                    <Label className="text-xs text-ink/70">Hora fin</Label>
                     <TimePicker value={endTime} onChange={setEndTime} />
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-xs text-alma-ink/70">Capacidad máx.</Label>
+                    <Label className="text-xs text-ink/70">Capacidad máx.</Label>
                     <Input
                       type="number"
                       value={maxCapacity}
@@ -417,20 +417,20 @@ const GenerateClasses = () => {
 
               {/* ── Preview ── */}
               {preview.length > 0 && (
-                <section className="space-y-3 rounded-2xl border border-alma-sandstone/50 bg-alma-mist p-5">
+                <section className="space-y-3 rounded-2xl border border-line-strong/50 bg-sunken p-5">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <CalendarDays size={14} className="text-alma-berry" />
-                      <span className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-alma-ink/60">Vista previa</span>
+                      <CalendarDays size={14} className="text-ink" />
+                      <span className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-ink/60">Vista previa</span>
                     </div>
-                    <Badge variant="outline" className="nums border-alma-sandstone text-alma-berry">
+                    <Badge variant="outline" className="nums border-line-strong text-ink">
                       {preview.length} {preview.length === 1 ? "clase" : "clases"}
                     </Badge>
                   </div>
 
                   <div className="hidden grid-cols-7 gap-1.5 sm:grid">
                     {["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map((d) => (
-                      <div key={d} className="text-center text-[10px] font-bold uppercase text-alma-ink/40">{d}</div>
+                      <div key={d} className="text-center text-[10px] font-bold uppercase text-ink/40">{d}</div>
                     ))}
                   </div>
 
@@ -438,15 +438,15 @@ const GenerateClasses = () => {
                     {preview.map((d) => (
                       <div
                         key={d.toISOString()}
-                        className="flex flex-col items-center gap-0.5 rounded-lg border border-alma-hairline bg-alma-canvas px-1 py-2"
+                        className="flex flex-col items-center gap-0.5 rounded-lg border border-line bg-canvas px-1 py-2"
                       >
-                        <span className="text-[10px] text-alma-ink/50">
+                        <span className="text-[10px] text-ink/50">
                           {format(d, "MMM", { locale: es })}
                         </span>
-                        <span className="nums text-sm font-bold text-alma-ink">
+                        <span className="nums text-sm font-bold text-ink">
                           {format(d, "d")}
                         </span>
-                        <span className="nums text-[9px] font-medium text-alma-berry">
+                        <span className="nums text-[9px] font-medium text-ink">
                           {startTime}
                         </span>
                         {selectedType && (
@@ -460,10 +460,10 @@ const GenerateClasses = () => {
                   </div>
 
                   {selectedType && (
-                    <div className="flex items-center gap-3 border-t border-alma-hairline pt-2">
+                    <div className="flex items-center gap-3 border-t border-line pt-2">
                       <span className="h-3 w-3 rounded-full" style={{ backgroundColor: resolveClassColor(selectedType.color) }} />
-                      <span className="text-xs text-alma-ink/65">
-                        <strong className="text-alma-ink">{selectedType.name}</strong>
+                      <span className="text-xs text-ink/65">
+                        <strong className="text-ink">{selectedType.name}</strong>
                         {selectedInstructor && <> · {selectedInstructor.displayName}</>}
                         {" · "}
                         <span className="nums">{startTime} a {endTime}</span> · <span className="nums">{maxCapacity}</span> cupos

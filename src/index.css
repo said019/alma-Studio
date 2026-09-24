@@ -40,9 +40,9 @@
    feel intentional.
    ────────────────────────────────────────────────────────────── */
 :root {
-  --ease-alma-out: cubic-bezier(0.23, 1, 0.32, 1);
-  --ease-alma-in-out: cubic-bezier(0.77, 0, 0.175, 1);
-  --ease-alma-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 /* Press-feedback: any [data-press] gets a subtle scale on :active.
@@ -51,7 +51,7 @@
   transform: scale(0.97);
 }
 [data-press] {
-  transition: transform 160ms var(--ease-alma-out);
+  transition: transform 160ms var(--ease-out);
 }
 
 /* Stagger entrance: any [data-stagger-item] inside [data-stagger]
@@ -69,7 +69,7 @@
 [data-stagger] [data-stagger-item] {
   opacity: 0;
   transform: translateY(8px);
-  animation: alma-fade-up 360ms var(--ease-alma-out) forwards;
+  animation: alma-fade-up 360ms var(--ease-out) forwards;
 }
 [data-stagger] [data-stagger-item]:nth-child(1) { animation-delay: 40ms; }
 [data-stagger] [data-stagger-item]:nth-child(2) { animation-delay: 80ms; }
@@ -84,7 +84,7 @@
 /* Hover-lift: applied to anything with [data-lift]. Cards, list items.
    Per Emil: subtle translateY + shadow shift signals tappable. */
 [data-lift] {
-  transition: transform 280ms var(--ease-alma-out), box-shadow 280ms var(--ease-alma-out);
+  transition: transform 280ms var(--ease-out), box-shadow 280ms var(--ease-out);
   will-change: transform;
 }
 [data-lift]:hover {
@@ -97,7 +97,7 @@
   to   { opacity: 1; transform: scale(1); }
 }
 [data-scale-in] {
-  animation: alma-scale-in 320ms var(--ease-alma-drawer) forwards;
+  animation: alma-scale-in 320ms var(--ease-drawer) forwards;
 }
 
 /* Slide-up: bottom sheets, mobile toasts. */
@@ -106,7 +106,7 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 [data-slide-up] {
-  animation: alma-slide-up 380ms var(--ease-alma-drawer) forwards;
+  animation: alma-slide-up 380ms var(--ease-drawer) forwards;
 }
 
 /* Fade-in simple sin movimiento (para imágenes lazy). */
@@ -115,7 +115,7 @@
   to   { opacity: 1; }
 }
 [data-fade-in] {
-  animation: alma-fade-in 480ms var(--ease-alma-out) forwards;
+  animation: alma-fade-in 480ms var(--ease-out) forwards;
 }
 
 /* IntersectionObserver-friendly: aplica [data-reveal] al element y
@@ -123,7 +123,7 @@
 [data-reveal] {
   opacity: 0;
   transform: translateY(12px);
-  transition: opacity 600ms var(--ease-alma-out), transform 600ms var(--ease-alma-out);
+  transition: opacity 600ms var(--ease-out), transform 600ms var(--ease-out);
 }
 [data-reveal].is-visible {
   opacity: 1;
@@ -135,7 +135,7 @@
    espresso. Se aplica a toda foto de la landing/app. */
 .alma-photo {
   filter: grayscale(0.78) sepia(0.52) saturate(0.82) brightness(0.82) contrast(1.13);
-  transition: filter 700ms var(--ease-alma-out);
+  transition: filter 700ms var(--ease-out);
 }
 /* Capa cálida espresso por encima de la foto (multiply) para profundidad y
    cohesión de color. El contenedor debe ser position:relative + overflow. */

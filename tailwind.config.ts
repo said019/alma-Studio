@@ -46,22 +46,6 @@ export default {
           foreground: COLOR.onInverse,
           muted: COLOR.onInverseMuted,
         },
-
-        /* PUENTE TEMPORAL (spec §6.2): nombres de Alma → valores HIVE.
-           La Tarea 5 lo borra. */
-        alma: {
-          canvas: COLOR.canvas,
-          mist: COLOR.sunken,
-          oat: COLOR.sunken,
-          // borde en 126/131 usos; la migración (Tarea 5) aplica el mapeo por prefijo
-          sandstone: COLOR.lineStrong,
-          stone: COLOR.inkMuted,
-          berry: COLOR.accentStrong,
-          ink: COLOR.ink,
-          "ink-deep": COLOR.inverse,
-          hairline: COLOR.line,
-          olive: COLOR.success,
-        },
       },
       borderRadius: {
         lg: "var(--radius)",

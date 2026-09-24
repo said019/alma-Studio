@@ -65,11 +65,9 @@ describe("tonos", () => {
     expect(resolveTone("accent")).toBe(TONE_STYLE.accent);
   });
 
-  it("acepta los nombres de Alma mientras dura la migración", () => {
-    expect(resolveTone("olive")).toBe(TONE_STYLE.success);
-    expect(resolveTone("berry")).toBe(TONE_STYLE.accent);
-    expect(resolveTone("destructive")).toBe(TONE_STYLE.danger);
-    expect(resolveTone("stone")).toBe(TONE_STYLE.muted);
+  it("ya no acepta nombres de Alma: caen al neutro", () => {
+    expect(resolveTone("olive")).toBe(TONE_STYLE.muted);
+    expect(resolveTone("berry")).toBe(TONE_STYLE.muted);
   });
 
   it("un tono desconocido cae al neutro en vez de romper la pantalla", () => {

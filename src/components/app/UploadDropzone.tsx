@@ -1,6 +1,7 @@
 import { useRef, useState, type ChangeEvent, type DragEvent } from "react";
 import { Check, Upload } from "lucide-react";
-import { ALMA } from "@/components/app/tokens";
+import { COLOR } from "@/design/tokens";
+
 
 /* ═══════════════════════════════════════════════════════════
    UploadDropzone — selector de comprobante de pago.
@@ -58,24 +59,24 @@ export const UploadDropzone = ({
         onDrop={handleDrop}
         className="w-full rounded-3xl p-7 text-center cursor-pointer transition-colors"
         style={{
-          backgroundColor: file ? `${ALMA.olive}10` : dragOver ? ALMA.mist : "transparent",
-          border: `1px dashed ${file ? ALMA.olive : dragOver ? ALMA.berry : ALMA.border}`,
-          color: ALMA.ink,
+          backgroundColor: file ? `${COLOR.success}10` : dragOver ? COLOR.sunken : "transparent",
+          border: `1px dashed ${file ? COLOR.success : dragOver ? COLOR.accentStrong : COLOR.line}`,
+          color: COLOR.ink,
         }}
       >
         <span
           className="grid h-12 w-12 mx-auto place-items-center rounded-full mb-3"
           style={{
-            backgroundColor: file ? ALMA.olive : ALMA.blush,
-            color: file ? ALMA.cream : ALMA.berry,
+            backgroundColor: file ? COLOR.success : COLOR.sunken,
+            color: file ? COLOR.canvas : COLOR.accentStrong,
           }}
         >
           {file ? <Check size={20} strokeWidth={3} /> : <Upload size={18} />}
         </span>
-        <span className="block text-[0.92rem] font-medium" style={{ color: ALMA.ink }}>
+        <span className="block text-[0.92rem] font-medium" style={{ color: COLOR.ink }}>
           {file ? file.name : "Toca aquí o arrastra el archivo"}
         </span>
-        <span className="mt-1 block text-[0.78rem]" style={{ color: ALMA.ink, opacity: 0.55 }}>
+        <span className="mt-1 block text-[0.78rem]" style={{ color: COLOR.ink, opacity: 0.55 }}>
           {hint}
         </span>
       </button>

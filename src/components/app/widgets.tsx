@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { Check, Copy, ArrowLeft } from "lucide-react";
-import { ALMA } from "@/components/app/tokens";
-import { COLOR, resolveTone, type ToneInput } from "@/design/tokens";
+
+import { COLOR, resolveTone, type Tone } from "@/design/tokens";
 
 /* ═══════════════════════════════════════════════════════════
    formatMoneyMX
@@ -25,7 +25,7 @@ export function SegmentedTabs<T extends string>({ options, value, onChange }: Se
     <div
       role="tablist"
       className="inline-flex p-1 rounded-full"
-      style={{ backgroundColor: ALMA.blush }}
+      style={{ backgroundColor: COLOR.sunken }}
     >
       {options.map((opt) => {
         const active = opt.value === value;
@@ -37,8 +37,8 @@ export function SegmentedTabs<T extends string>({ options, value, onChange }: Se
             onClick={() => onChange(opt.value)}
             className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-[0.78rem] font-medium uppercase tracking-[0.16em] transition-colors"
             style={{
-              backgroundColor: active ? ALMA.berry : "transparent",
-              color: active ? ALMA.cream : ALMA.ink,
+              backgroundColor: active ? COLOR.ink : "transparent",
+              color: active ? COLOR.canvas : COLOR.ink,
               opacity: active ? 1 : 0.65,
             }}
           >
@@ -66,7 +66,7 @@ export const BackLink = ({ to, label }: BackLinkProps) => (
   <Link
     to={to}
     className="inline-flex items-center gap-2 text-[0.74rem] uppercase tracking-[0.2em] no-underline transition-opacity hover:opacity-100 mb-4"
-    style={{ color: ALMA.ink, opacity: 0.55 }}
+    style={{ color: COLOR.ink, opacity: 0.55 }}
   >
     <ArrowLeft size={13} />
     {label}
@@ -94,15 +94,15 @@ export const DataRow = ({ label, value, mono, copyable }: DataRowProps) => {
   return (
     <div
       className="grid grid-cols-[1fr_auto] items-baseline gap-4 py-3"
-      style={{ borderTop: `1px solid ${ALMA.border}` }}
+      style={{ borderTop: `1px solid ${COLOR.line}` }}
     >
-      <span className="text-[0.74rem] uppercase tracking-[0.18em]" style={{ color: ALMA.ink, opacity: 0.55 }}>
+      <span className="text-[0.74rem] uppercase tracking-[0.18em]" style={{ color: COLOR.ink, opacity: 0.55 }}>
         {label}
       </span>
       <div className="flex items-center gap-2 justify-end">
         <span
           className={"text-right " + (mono ? "font-mono text-[0.92rem]" : "text-[0.94rem] font-medium")}
-          style={{ color: ALMA.ink }}
+          style={{ color: COLOR.ink }}
         >
           {value}
         </span>
@@ -112,7 +112,7 @@ export const DataRow = ({ label, value, mono, copyable }: DataRowProps) => {
             onClick={handleCopy}
             aria-label={copied ? "Copiado" : "Copiar"}
             className="grid h-7 w-7 place-items-center rounded-full bg-transparent border-0 cursor-pointer transition-colors"
-            style={{ color: copied ? ALMA.olive : ALMA.berry }}
+            style={{ color: copied ? COLOR.success : COLOR.accentStrong }}
           >
             {copied ? <Check size={14} strokeWidth={2.5} /> : <Copy size={13} />}
           </button>
@@ -136,30 +136,30 @@ export function Stepper<T extends string>({ steps, current }: StepperProps<T>) {
       {steps.map((s, i) => {
         const done = i < currentIdx;
         const active = i === currentIdx;
-        const numColor = active ? ALMA.berry : done ? ALMA.olive : ALMA.ink;
+        const numColor = active ? COLOR.accentStrong : done ? COLOR.success : COLOR.ink;
         const labelOpacity = active ? 1 : done ? 0.85 : 0.45;
         return (
           <li key={s.id} className="flex items-center gap-2 shrink-0">
             <span
-              className="grid h-7 w-7 place-items-center rounded-full text-[0.7rem] font-bebas tabular-nums"
+              className="grid h-7 w-7 place-items-center rounded-full text-[0.7rem] font-display tabular-nums"
               style={{
-                backgroundColor: active ? ALMA.berry : done ? ALMA.blush : "transparent",
-                color: active ? ALMA.cream : numColor,
-                border: active || done ? "0" : `1px solid ${ALMA.border}`,
+                backgroundColor: active ? COLOR.ink : done ? COLOR.sunken : "transparent",
+                color: active ? COLOR.canvas : numColor,
+                border: active || done ? "0" : `1px solid ${COLOR.line}`,
               }}
             >
               {done ? <Check size={12} strokeWidth={3} /> : i + 1}
             </span>
             <span
               className="text-[0.72rem] uppercase tracking-[0.18em]"
-              style={{ color: ALMA.ink, opacity: labelOpacity }}
+              style={{ color: COLOR.ink, opacity: labelOpacity }}
             >
               {s.label}
             </span>
             {i < steps.length - 1 && (
               <span
                 className="hidden sm:inline-block h-px w-6 ml-1"
-                style={{ backgroundColor: done ? ALMA.olive : ALMA.border }}
+                style={{ backgroundColor: done ? COLOR.success : COLOR.line }}
               />
             )}
           </li>
@@ -203,8 +203,8 @@ export const StickyCta = ({ children }: StickyCtaProps) => {
       <div
         className="rounded-3xl p-3 transition-shadow"
         style={{
-          backgroundColor: stuck ? ALMA.cream : "transparent",
-          border: stuck ? `1px solid ${ALMA.border}` : "0",
+          backgroundColor: stuck ? COLOR.canvas : "transparent",
+          border: stuck ? `1px solid ${COLOR.line}` : "0",
           boxShadow: stuck ? "0 8px 24px rgba(36,27,26,0.08)" : "none",
         }}
       >
@@ -220,7 +220,7 @@ export const StickyCta = ({ children }: StickyCtaProps) => {
    ═══════════════════════════════════════════════════════════ */
 type StatusPillProps = {
   label: string;
-  tone: ToneInput;
+  tone: Tone;
   variant?: "soft" | "solid";
 };
 export const StatusPill = ({ label, tone, variant = "soft" }: StatusPillProps) => {
@@ -245,7 +245,7 @@ export const StatusPill = ({ label, tone, variant = "soft" }: StatusPillProps) =
    InfoBanner — aviso en línea (no toast)
    ═══════════════════════════════════════════════════════════ */
 type InfoBannerProps = {
-  tone?: ToneInput;
+  tone?: Tone;
   title: string;
   description?: string;
   action?: ReactNode;

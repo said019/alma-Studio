@@ -129,8 +129,8 @@ const TodayAttendance = () => {
           {/* Cabecera de recepción: título + reloj vivo */}
           <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
             <div>
-              <h1 className="admin-title text-alma-ink">Pasar lista</h1>
-              <p className="mt-1 text-sm text-alma-ink/55">
+              <h1 className="admin-title text-ink">Pasar lista</h1>
+              <p className="mt-1 text-sm text-ink/55">
                 Marca asistencia con un tap. Solo las clases de hoy.
               </p>
             </div>
@@ -138,13 +138,13 @@ const TodayAttendance = () => {
               <Button
                 variant="outline"
                 onClick={() => refetch()}
-                className="h-11 border-alma-sandstone/70 bg-transparent text-alma-ink hover:bg-alma-oat/40 hover:text-alma-ink"
+                className="h-11 border-line-strong/70 bg-transparent text-ink hover:bg-sunken/40 hover:text-ink"
               >
                 <RotateCcw size={13} className="mr-1.5" /> Actualizar
               </Button>
               <div className="text-right">
-                <p className="nums font-display text-3xl leading-none text-alma-ink">{formatTime(now)}</p>
-                <p className="mt-1 text-xs capitalize text-alma-ink/55">
+                <p className="nums font-display text-3xl leading-none text-ink">{formatTime(now)}</p>
+                <p className="mt-1 text-xs capitalize text-ink/55">
                   {format(now, "EEEE d 'de' MMMM", { locale: es })}
                 </p>
               </div>
@@ -177,15 +177,15 @@ const TodayAttendance = () => {
                   <section
                     key={c.id}
                     className={cn(
-                      "overflow-hidden rounded-2xl border bg-alma-mist",
-                      live ? "border-alma-sandstone" : "border-alma-hairline",
+                      "overflow-hidden rounded-2xl border bg-sunken",
+                      live ? "border-line-strong" : "border-line",
                     )}
                   >
                     {/* Header de clase: plano, hairline, hora en serif */}
                     <header
                       className={cn(
                         "flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3",
-                        live ? "border-alma-sandstone/60 bg-alma-oat" : "border-alma-hairline",
+                        live ? "border-line-strong/60 bg-sunken" : "border-line",
                       )}
                     >
                       <div className="min-w-0">
@@ -195,28 +195,28 @@ const TodayAttendance = () => {
                             className="h-2 w-2 shrink-0 rounded-full"
                             style={{ backgroundColor: c.class_type_color || "#CBB9A4" }}
                           />
-                          <p className="truncate font-display text-lg leading-tight text-alma-ink">
+                          <p className="truncate font-display text-lg leading-tight text-ink">
                             <span className="nums">{c.start_time?.slice(0, 5)}</span>
                             {" · "}
                             {c.class_type_name}
                           </p>
                           {live && (
-                            <span className="shrink-0 rounded-full bg-alma-ink-deep px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-[0.14em] text-alma-canvas">
+                            <span className="shrink-0 rounded-full bg-inverse px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-[0.14em] text-canvas">
                               En curso
                             </span>
                           )}
                         </div>
-                        <p className="mt-0.5 text-xs text-alma-ink/55">
+                        <p className="mt-0.5 text-xs text-ink/55">
                           {c.instructor_name} · Cupo{" "}
                           <span className="nums">{stats.confirmed + stats.checked_in}/{c.max_capacity}</span>
                         </p>
                       </div>
                       <p className="nums shrink-0 text-xs">
-                        <span className="font-medium text-alma-olive">
+                        <span className="font-medium text-success">
                           {stats.checked_in} asisti{stats.checked_in === 1 ? "ó" : "eron"}
                         </span>
-                        <span className="mx-1.5 text-alma-ink/30">·</span>
-                        <span className="text-alma-ink/55">
+                        <span className="mx-1.5 text-ink/30">·</span>
+                        <span className="text-ink/55">
                           {stats.confirmed} pendiente{stats.confirmed === 1 ? "" : "s"}
                         </span>
                       </p>
@@ -225,11 +225,11 @@ const TodayAttendance = () => {
                     {/* Roster */}
                     {c.roster.length === 0 ? (
                       <div className="px-4 py-6 text-center">
-                        <Users size={18} className="mx-auto mb-1.5 text-alma-ink/30" />
-                        <p className="text-xs text-alma-ink/55">Sin reservas para esta clase.</p>
+                        <Users size={18} className="mx-auto mb-1.5 text-ink/30" />
+                        <p className="text-xs text-ink/55">Sin reservas para esta clase.</p>
                       </div>
                     ) : (
-                      <ul className="divide-y divide-alma-hairline">
+                      <ul className="divide-y divide-line">
                         {c.roster.map((r) => {
                           const isCheckedIn = r.status === "checked_in";
                           const isNoShow = r.status === "no_show";
@@ -241,24 +241,24 @@ const TodayAttendance = () => {
                               key={r.booking_id}
                               className={cn(
                                 "flex items-center justify-between gap-3 px-4 py-3 transition-colors",
-                                isCheckedIn && "bg-alma-olive/[0.08]",
+                                isCheckedIn && "bg-success/[0.08]",
                                 isNoShow && "opacity-60",
                               )}
                             >
                               <div className="min-w-0 flex-1">
-                                <p className="text-sm font-medium text-alma-ink">
+                                <p className="text-sm font-medium text-ink">
                                   {name}
                                   {isGuest(r) && r.host_name && (
-                                    <span className="ml-1.5 text-[11px] font-normal text-alma-ink/55">
+                                    <span className="ml-1.5 text-[11px] font-normal text-ink/55">
                                       (invitada de {r.host_name})
                                     </span>
                                   )}
                                 </p>
-                                <p className="nums text-[11px] text-alma-ink/55">
+                                <p className="nums text-[11px] text-ink/55">
                                   {r.phone ?? "—"}
                                   {isWaitlist && <span className="ml-1.5">· Lista de espera</span>}
                                   {isNoShow && <span className="ml-1.5 text-destructive">· No asistió</span>}
-                                  {isCheckedIn && <span className="ml-1.5 font-medium text-alma-olive">· Asistió</span>}
+                                  {isCheckedIn && <span className="ml-1.5 font-medium text-success">· Asistió</span>}
                                 </p>
                               </div>
                               <div className="flex shrink-0 gap-1.5">
@@ -267,14 +267,14 @@ const TodayAttendance = () => {
                                     size="sm"
                                     onClick={() => checkinMutation.mutate(r.booking_id)}
                                     disabled={isMutating}
-                                    className="h-11 rounded-full bg-alma-ink px-4 text-[0.72rem] font-medium uppercase tracking-[0.14em] text-alma-canvas hover:bg-alma-ink-deep"
+                                    className="h-11 rounded-full bg-ink px-4 text-[0.72rem] font-medium uppercase tracking-[0.14em] text-canvas hover:bg-inverse"
                                   >
                                     <Check size={14} className="mr-1" />
                                     Check-in
                                   </Button>
                                 )}
                                 {isCheckedIn && (
-                                  <span className="inline-flex h-11 items-center gap-1.5 rounded-full bg-alma-olive/15 px-4 text-[0.72rem] font-medium uppercase tracking-[0.14em] text-alma-olive">
+                                  <span className="inline-flex h-11 items-center gap-1.5 rounded-full bg-success/15 px-4 text-[0.72rem] font-medium uppercase tracking-[0.14em] text-success">
                                     <Check size={14} /> Asistió
                                   </span>
                                 )}
@@ -285,7 +285,7 @@ const TodayAttendance = () => {
                                     onClick={() => handleNoShow(r)}
                                     disabled={isMutating}
                                     aria-label={`Marcar a ${name} como no asistió`}
-                                    className="h-11 w-11 rounded-full border-alma-sandstone/70 bg-transparent p-0 text-alma-ink/55 hover:border-destructive/40 hover:bg-destructive/5 hover:text-destructive"
+                                    className="h-11 w-11 rounded-full border-line-strong/70 bg-transparent p-0 text-ink/55 hover:border-destructive/40 hover:bg-destructive/5 hover:text-destructive"
                                   >
                                     <UserX size={15} />
                                   </Button>

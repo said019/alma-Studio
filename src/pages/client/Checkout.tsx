@@ -12,7 +12,6 @@ import {
   GhostButton,
   SkeletonRow,
   ErrorState,
-  ALMA,
 } from "@/components/app/AppShell";
 import {
   Stepper,
@@ -33,6 +32,7 @@ import {
   Tag as TagIcon,
   ArrowLeft,
 } from "lucide-react";
+import { COLOR } from "@/design/tokens";
 
 type Step = "select" | "method" | "bank" | "cash" | "upload" | "done" | "stripe-success" | "stripe-cancelled";
 type PaymentMethod = "transfer" | "cash" | "card";
@@ -119,30 +119,30 @@ const PlanRow = ({
       <div
         className="rounded-2xl p-4 sm:p-5 grid grid-cols-[1fr_auto_auto] items-center gap-4 transition-colors"
         style={{
-          backgroundColor: selected || recommended ? ALMA.blush : ALMA.cream,
-          border: `1px solid ${selected ? ALMA.berry : recommended ? ALMA.sandstone : ALMA.border}`,
-          boxShadow: selected ? `0 0 0 2px ${ALMA.berry}1a` : "none",
+          backgroundColor: selected || recommended ? COLOR.sunken : COLOR.canvas,
+          border: `1px solid ${selected ? COLOR.accentStrong : recommended ? COLOR.lineStrong : COLOR.line}`,
+          boxShadow: selected ? `0 0 0 2px ${COLOR.accentStrong}1a` : "none",
         }}
       >
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2 mb-1">
-            {recommended && <Tag tint="berry">Recomendado</Tag>}
+            {recommended && <Tag tint="accent">Recomendado</Tag>}
             <Tag tint="ink">{CATEGORY_LABEL[category]}</Tag>
             {isUnlimited ? (
-              <span className="text-[0.72rem] uppercase tracking-[0.18em]" style={{ color: ALMA.ink, opacity: 0.55 }}>
+              <span className="text-[0.72rem] uppercase tracking-[0.18em]" style={{ color: COLOR.ink, opacity: 0.55 }}>
                 Ilimitado
               </span>
             ) : Number(classLimit) > 0 ? (
-              <span className="nums text-[0.72rem] uppercase tracking-[0.18em]" style={{ color: ALMA.ink, opacity: 0.55 }}>
+              <span className="nums text-[0.72rem] uppercase tracking-[0.18em]" style={{ color: COLOR.ink, opacity: 0.55 }}>
                 {classLimit} {Number(classLimit) === 1 ? "clase" : "clases"}
               </span>
             ) : null}
           </div>
-          <h3 className="font-display leading-tight" style={{ color: ALMA.ink, fontSize: "clamp(1.1rem, 1.6vw, 1.35rem)" }}>
+          <h3 className="font-display leading-tight" style={{ color: COLOR.ink, fontSize: "clamp(1.1rem, 1.6vw, 1.35rem)" }}>
             {plan.name}
           </h3>
           {durationDays > 0 && (
-            <p className="text-[0.74rem] mt-0.5" style={{ color: ALMA.ink, opacity: 0.55 }}>
+            <p className="text-[0.74rem] mt-0.5" style={{ color: COLOR.ink, opacity: 0.55 }}>
               {durationDays} días de vigencia
               {nonTransferable && " · No transferible"}
               {nonRepeatable && " · No repetible"}
@@ -151,23 +151,23 @@ const PlanRow = ({
         </div>
         <div className="text-right">
           {hasOpening && (
-            <div className="nums text-[0.72rem] line-through" style={{ color: ALMA.ink, opacity: 0.4 }}>
+            <div className="nums text-[0.72rem] line-through" style={{ color: COLOR.ink, opacity: 0.4 }}>
               ${formatMoneyMX(regularPrice)}
             </div>
           )}
-          <div className="font-display nums leading-none" style={{ color: ALMA.berry, fontSize: "clamp(1.4rem, 2.2vw, 1.8rem)" }}>
+          <div className="font-display nums leading-none" style={{ color: COLOR.accentStrong, fontSize: "clamp(1.4rem, 2.2vw, 1.8rem)" }}>
             ${formatMoneyMX(effectivePrice)}
           </div>
           {hasOpening ? (
-            <div className="text-[0.72rem] uppercase tracking-[0.18em] mt-1" style={{ color: ALMA.berry }}>
+            <div className="text-[0.72rem] uppercase tracking-[0.18em] mt-1" style={{ color: COLOR.accentStrong }}>
               apertura
             </div>
           ) : perClass ? (
-            <div className="nums text-[0.72rem] mt-1" style={{ color: ALMA.berry }}>
+            <div className="nums text-[0.72rem] mt-1" style={{ color: COLOR.accentStrong }}>
               ${formatMoneyMX(perClass)} por clase
             </div>
           ) : (
-            <div className="text-[0.72rem] uppercase tracking-[0.18em] mt-1" style={{ color: ALMA.ink, opacity: 0.45 }}>
+            <div className="text-[0.72rem] uppercase tracking-[0.18em] mt-1" style={{ color: COLOR.ink, opacity: 0.45 }}>
               MXN
             </div>
           )}
@@ -175,9 +175,9 @@ const PlanRow = ({
         <span
           className="grid h-9 w-9 place-items-center rounded-full transition-colors"
           style={{
-            backgroundColor: selected ? ALMA.berry : "transparent",
-            color: selected ? ALMA.cream : ALMA.ink,
-            border: selected ? "0" : `1px solid ${ALMA.border}`,
+            backgroundColor: selected ? COLOR.ink : "transparent",
+            color: selected ? COLOR.canvas : COLOR.ink,
+            border: selected ? "0" : `1px solid ${COLOR.line}`,
             opacity: selected ? 1 : 0.5,
           }}
         >
@@ -385,7 +385,7 @@ const Checkout = () => {
                   {[1, 2, 3].map((i) => <SkeletonRow key={i} height={88} />)}
                 </div>
               ) : availableModalities.length === 0 ? (
-                <p className="text-[0.86rem]" style={{ color: ALMA.ink, opacity: 0.55 }}>
+                <p className="text-[0.86rem]" style={{ color: COLOR.ink, opacity: 0.55 }}>
                   Aún no hay paquetes activos. Si esto persiste, escríbenos por WhatsApp.
                 </p>
               ) : (
@@ -403,9 +403,9 @@ const Checkout = () => {
                           onClick={() => setModality(m)}
                           className="rounded-full px-4 py-2 text-[0.8rem] font-medium transition-colors cursor-pointer"
                           style={{
-                            backgroundColor: active ? ALMA.berry : ALMA.cream,
-                            color: active ? ALMA.cream : ALMA.ink,
-                            border: `1px solid ${active ? ALMA.berry : ALMA.border}`,
+                            backgroundColor: active ? COLOR.ink : COLOR.canvas,
+                            color: active ? COLOR.canvas : COLOR.ink,
+                            border: `1px solid ${active ? COLOR.accentStrong : COLOR.line}`,
                           }}
                         >
                           {MODALITY_LABEL[m] ?? m}
@@ -430,7 +430,7 @@ const Checkout = () => {
 
             {visitPacks.length > 0 && (
               <Section title="Paquetes de visita">
-                <p className="text-[0.78rem] mb-3" style={{ color: ALMA.ink, opacity: 0.6 }}>
+                <p className="text-[0.78rem] mb-3" style={{ color: COLOR.ink, opacity: 0.6 }}>
                   Para traer acompañantes a clase. Cada pase descuenta 1 clase del paquete y se asigna desde tu app al reservar.
                 </p>
                 <div className="space-y-3">
@@ -449,12 +449,12 @@ const Checkout = () => {
 
             {selectedPlan && (
               <Section title="Resumen">
-                <div className="rounded-3xl p-5 sm:p-6 space-y-4" style={{ backgroundColor: ALMA.blush }}>
+                <div className="rounded-3xl p-5 sm:p-6 space-y-4" style={{ backgroundColor: COLOR.sunken }}>
                   <div className="flex items-center gap-2">
-                    <span className="grid h-9 w-9 place-items-center rounded-full" style={{ backgroundColor: ALMA.cream, color: ALMA.berry }}>
+                    <span className="grid h-9 w-9 place-items-center rounded-full" style={{ backgroundColor: COLOR.canvas, color: COLOR.accentStrong }}>
                       <TagIcon size={14} />
                     </span>
-                    <span className="text-[0.72rem] uppercase tracking-[0.18em]" style={{ color: ALMA.ink, opacity: 0.6 }}>
+                    <span className="text-[0.72rem] uppercase tracking-[0.18em]" style={{ color: COLOR.ink, opacity: 0.6 }}>
                       Código de descuento
                     </span>
                   </div>
@@ -464,7 +464,7 @@ const Checkout = () => {
                       className="uppercase"
                       value={discountCode}
                       onChange={(e) => setDiscountCode(e.target.value.toUpperCase())}
-                      style={{ backgroundColor: ALMA.cream, borderColor: ALMA.border }}
+                      style={{ backgroundColor: COLOR.canvas, borderColor: COLOR.line }}
                     />
                     <GhostButton
                       onClick={() => validateCodeMutation.mutate()}
@@ -475,18 +475,18 @@ const Checkout = () => {
                     </GhostButton>
                   </div>
                   {discountResult && (
-                    <p className="flex items-center gap-2 text-[0.84rem]" style={{ color: ALMA.olive }}>
+                    <p className="flex items-center gap-2 text-[0.84rem]" style={{ color: COLOR.success }}>
                       <CheckCircle2 size={14} />
                       Descuento ${formatMoneyMX(discountResult.discount_amount)} MXN aplicado
                     </p>
                   )}
 
-                  <div className="flex items-baseline justify-between pt-3" style={{ borderTop: `1px solid ${ALMA.border}` }}>
-                    <span className="text-[0.78rem] uppercase tracking-[0.18em]" style={{ color: ALMA.ink, opacity: 0.6 }}>
+                  <div className="flex items-baseline justify-between pt-3" style={{ borderTop: `1px solid ${COLOR.line}` }}>
+                    <span className="text-[0.78rem] uppercase tracking-[0.18em]" style={{ color: COLOR.ink, opacity: 0.6 }}>
                       Total
                     </span>
-                    <span className="font-display nums" style={{ color: ALMA.ink, fontSize: "clamp(2rem, 3vw, 2.6rem)" }}>
-                      ${formatMoneyMX(finalAmount)} <span className="text-[0.78rem] uppercase tracking-[0.18em]" style={{ color: ALMA.ink, opacity: 0.55 }}>MXN</span>
+                    <span className="font-display nums" style={{ color: COLOR.ink, fontSize: "clamp(2rem, 3vw, 2.6rem)" }}>
+                      ${formatMoneyMX(finalAmount)} <span className="text-[0.78rem] uppercase tracking-[0.18em]" style={{ color: COLOR.ink, opacity: 0.55 }}>MXN</span>
                     </span>
                   </div>
                 </div>
@@ -504,14 +504,14 @@ const Checkout = () => {
           >
             <div
               className="mx-auto flex max-w-[680px] items-center gap-3 rounded-2xl p-3 pl-5"
-              style={{ backgroundColor: ALMA.cream, border: `1px solid ${ALMA.border}`, boxShadow: "0 10px 30px rgba(36,27,26,0.14)" }}
+              style={{ backgroundColor: COLOR.canvas, border: `1px solid ${COLOR.line}`, boxShadow: "0 10px 30px rgba(36,27,26,0.14)" }}
             >
               <div className="min-w-0 flex-1">
-                <p className="truncate text-[0.6rem] uppercase tracking-[0.18em]" style={{ color: ALMA.ink, opacity: 0.55 }}>
+                <p className="truncate text-[0.6rem] uppercase tracking-[0.18em]" style={{ color: COLOR.ink, opacity: 0.55 }}>
                   {selectedPlan.name}
                 </p>
-                <p className="nums font-display leading-none" style={{ color: ALMA.ink, fontSize: "1.35rem" }}>
-                  ${formatMoneyMX(finalAmount)} <span className="text-[0.58rem] uppercase tracking-[0.16em]" style={{ color: ALMA.ink, opacity: 0.5 }}>MXN</span>
+                <p className="nums font-display leading-none" style={{ color: COLOR.ink, fontSize: "1.35rem" }}>
+                  ${formatMoneyMX(finalAmount)} <span className="text-[0.58rem] uppercase tracking-[0.16em]" style={{ color: COLOR.ink, opacity: 0.5 }}>MXN</span>
                 </p>
               </div>
               <PrimaryButton onClick={() => setStep("method")} className="shrink-0">
@@ -528,22 +528,22 @@ const Checkout = () => {
               type="button"
               onClick={() => setStep("select")}
               className="inline-flex items-center gap-2 text-[0.74rem] uppercase tracking-[0.2em] mb-5 bg-transparent border-0 cursor-pointer"
-              style={{ color: ALMA.ink, opacity: 0.55 }}
+              style={{ color: COLOR.ink, opacity: 0.55 }}
             >
               <ArrowLeft size={13} /> Cambiar plan
             </button>
 
             <Section>
-              <div className="rounded-2xl p-4 flex items-center justify-between gap-3" style={{ backgroundColor: ALMA.blush }}>
-                <span className="text-[0.92rem]" style={{ color: ALMA.ink }}>{selectedPlan?.name}</span>
-                <span className="font-display nums" style={{ color: ALMA.berry, fontSize: "1.3rem" }}>
+              <div className="rounded-2xl p-4 flex items-center justify-between gap-3" style={{ backgroundColor: COLOR.sunken }}>
+                <span className="text-[0.92rem]" style={{ color: COLOR.ink }}>{selectedPlan?.name}</span>
+                <span className="font-display nums" style={{ color: COLOR.accentStrong, fontSize: "1.3rem" }}>
                   ${formatMoneyMX(finalAmount)} MXN
                 </span>
               </div>
             </Section>
 
             <Section title="¿Cómo quieres pagar?">
-              <div role="radiogroup" aria-label="Método de pago" style={{ borderBottom: `1px solid ${ALMA.border}` }}>
+              <div role="radiogroup" aria-label="Método de pago" style={{ borderBottom: `1px solid ${COLOR.line}` }}>
                 {[
                   { id: "card" as const, label: "Tarjeta", sub: "Visa, Mastercard — pago seguro con Stripe", icon: CreditCard },
                   { id: "transfer" as const, label: "Transferencia", sub: "Banorte, subes tu comprobante", icon: Building2 },
@@ -559,31 +559,31 @@ const Checkout = () => {
                       aria-checked={sel}
                       onClick={() => setPaymentMethod(opt.id)}
                       className="w-full grid grid-cols-[auto_1fr_auto] items-center gap-4 px-1 py-4 text-left bg-transparent border-0 cursor-pointer transition-colors hover:bg-[#F4F1EA]"
-                      style={{ borderTop: `1px solid ${ALMA.border}`, color: ALMA.ink }}
+                      style={{ borderTop: `1px solid ${COLOR.line}`, color: COLOR.ink }}
                     >
                       <span
                         className="grid h-11 w-11 place-items-center rounded-2xl shrink-0 transition-colors"
                         style={{
-                          backgroundColor: sel ? ALMA.berry : ALMA.blush,
-                          color: sel ? ALMA.cream : ALMA.berry,
+                          backgroundColor: sel ? COLOR.ink : COLOR.sunken,
+                          color: sel ? COLOR.canvas : COLOR.accentStrong,
                         }}
                       >
                         <Icon size={18} strokeWidth={1.8} />
                       </span>
                       <span className="min-w-0">
-                        <span className="block text-[0.94rem] font-medium leading-tight" style={{ color: ALMA.ink }}>
+                        <span className="block text-[0.94rem] font-medium leading-tight" style={{ color: COLOR.ink }}>
                           {opt.label}
                         </span>
-                        <span className="block text-[0.78rem] mt-0.5" style={{ color: ALMA.ink, opacity: 0.6 }}>
+                        <span className="block text-[0.78rem] mt-0.5" style={{ color: COLOR.ink, opacity: 0.6 }}>
                           {opt.sub}
                         </span>
                       </span>
                       <span
                         aria-hidden="true"
                         className="grid h-5 w-5 place-items-center rounded-full shrink-0 transition-colors"
-                        style={{ border: `1.5px solid ${sel ? ALMA.berry : ALMA.sandstone}` }}
+                        style={{ border: `1.5px solid ${sel ? COLOR.accentStrong : COLOR.lineStrong}` }}
                       >
-                        {sel && <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: ALMA.berry }} />}
+                        {sel && <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: COLOR.ink }} />}
                       </span>
                     </button>
                   );
@@ -610,10 +610,10 @@ const Checkout = () => {
         {step === "bank" && bankDetails && (
           <>
             <Section title="Datos para transferencia">
-              <p className="mb-4 text-[0.92rem] leading-[1.6]" style={{ color: ALMA.ink, opacity: 0.7 }}>
+              <p className="mb-4 text-[0.92rem] leading-[1.6]" style={{ color: COLOR.ink, opacity: 0.7 }}>
                 Realiza la transferencia con los datos abajo. Después sube el comprobante para que activemos tu paquete.
               </p>
-              <div className="rounded-3xl p-5 sm:p-7" style={{ backgroundColor: ALMA.cream, border: `1px solid ${ALMA.border}` }}>
+              <div className="rounded-3xl p-5 sm:p-7" style={{ backgroundColor: COLOR.canvas, border: `1px solid ${COLOR.line}` }}>
                 {[
                   { label: "CLABE", value: bankDetails.clabe, mono: true },
                   { label: "Cuenta", value: bankDetails.account_number ?? bankDetails.accountNumber, mono: true },
@@ -642,28 +642,28 @@ const Checkout = () => {
         {/* ── Step 3b: Cash ── */}
         {step === "cash" && (
           <Section>
-            <div className="rounded-3xl p-7 sm:p-10 text-center" style={{ backgroundColor: ALMA.blush }}>
+            <div className="rounded-3xl p-7 sm:p-10 text-center" style={{ backgroundColor: COLOR.sunken }}>
               <span
                 className="grid h-14 w-14 mx-auto place-items-center rounded-2xl mb-4"
-                style={{ backgroundColor: ALMA.berry, color: ALMA.cream }}
+                style={{ backgroundColor: COLOR.ink, color: COLOR.canvas }}
               >
                 <Banknote size={22} />
               </span>
-              <h3 className="font-display leading-tight" style={{ color: ALMA.ink, fontSize: "clamp(1.6rem, 2.6vw, 2.1rem)" }}>
+              <h3 className="font-display leading-tight" style={{ color: COLOR.ink, fontSize: "clamp(1.6rem, 2.6vw, 2.1rem)" }}>
                 Págalo en el estudio
               </h3>
-              <p className="mt-3 text-[0.92rem] leading-[1.6] max-w-[44ch] mx-auto" style={{ color: ALMA.ink, opacity: 0.7 }}>
+              <p className="mt-3 text-[0.92rem] leading-[1.6] max-w-[44ch] mx-auto" style={{ color: COLOR.ink, opacity: 0.7 }}>
                 Acércate a recepción con tu número de orden. Activamos tu paquete cuando confirmemos el pago.
               </p>
               {(orderNumber || orderId) && (
                 <div
                   className="inline-flex flex-col gap-1 px-5 py-3 rounded-2xl mt-5"
-                  style={{ backgroundColor: ALMA.cream, border: `1px solid ${ALMA.border}` }}
+                  style={{ backgroundColor: COLOR.canvas, border: `1px solid ${COLOR.line}` }}
                 >
-                  <span className="text-[0.72rem] uppercase tracking-[0.24em]" style={{ color: ALMA.ink, opacity: 0.55 }}>
+                  <span className="text-[0.72rem] uppercase tracking-[0.24em]" style={{ color: COLOR.ink, opacity: 0.55 }}>
                     Número de orden
                   </span>
-                  <span className="nums font-mono text-[1.1rem] tracking-widest font-medium" style={{ color: ALMA.berry }}>
+                  <span className="nums font-mono text-[1.1rem] tracking-widest font-medium" style={{ color: COLOR.accentStrong }}>
                     {orderNumber ?? orderId}
                   </span>
                 </div>
@@ -703,17 +703,17 @@ const Checkout = () => {
         {/* ── Step 5: Done ── */}
         {step === "done" && (
           <Section>
-            <div className="rounded-3xl p-7 sm:p-10 text-center" style={{ backgroundColor: ALMA.blush }}>
+            <div className="rounded-3xl p-7 sm:p-10 text-center" style={{ backgroundColor: COLOR.sunken }}>
               <span
                 className="grid h-14 w-14 mx-auto place-items-center rounded-2xl mb-4"
-                style={{ backgroundColor: ALMA.olive, color: ALMA.cream }}
+                style={{ backgroundColor: COLOR.success, color: COLOR.canvas }}
               >
                 <CheckCircle2 size={22} />
               </span>
-              <h3 className="font-display leading-tight" style={{ color: ALMA.ink, fontSize: "clamp(1.7rem, 2.8vw, 2.3rem)" }}>
+              <h3 className="font-display leading-tight" style={{ color: COLOR.ink, fontSize: "clamp(1.7rem, 2.8vw, 2.3rem)" }}>
                 Comprobante recibido
               </h3>
-              <p className="mt-3 text-[0.92rem] leading-[1.6] max-w-[44ch] mx-auto" style={{ color: ALMA.ink, opacity: 0.7 }}>
+              <p className="mt-3 text-[0.92rem] leading-[1.6] max-w-[44ch] mx-auto" style={{ color: COLOR.ink, opacity: 0.7 }}>
                 Estamos verificando tu pago. Te avisamos en cuanto tu paquete esté activo.
               </p>
             </div>
@@ -728,17 +728,17 @@ const Checkout = () => {
         {/* ── Stripe return: success ── */}
         {step === "stripe-success" && (
           <Section>
-            <div className="rounded-3xl p-7 sm:p-10 text-center" style={{ backgroundColor: ALMA.blush }}>
+            <div className="rounded-3xl p-7 sm:p-10 text-center" style={{ backgroundColor: COLOR.sunken }}>
               <span
                 className="grid h-14 w-14 mx-auto place-items-center rounded-2xl mb-4"
-                style={{ backgroundColor: ALMA.olive, color: ALMA.cream }}
+                style={{ backgroundColor: COLOR.success, color: COLOR.canvas }}
               >
                 <CheckCircle2 size={22} />
               </span>
-              <h3 className="font-display leading-tight" style={{ color: ALMA.ink, fontSize: "clamp(1.7rem, 2.8vw, 2.3rem)" }}>
+              <h3 className="font-display leading-tight" style={{ color: COLOR.ink, fontSize: "clamp(1.7rem, 2.8vw, 2.3rem)" }}>
                 Pago recibido
               </h3>
-              <p className="mt-3 text-[0.92rem] leading-[1.6] max-w-[44ch] mx-auto" style={{ color: ALMA.ink, opacity: 0.7 }}>
+              <p className="mt-3 text-[0.92rem] leading-[1.6] max-w-[44ch] mx-auto" style={{ color: COLOR.ink, opacity: 0.7 }}>
                 Tu pago fue procesado. Activamos tu paquete en segundos — revisa tus órdenes para confirmar.
               </p>
             </div>
@@ -753,17 +753,17 @@ const Checkout = () => {
         {/* ── Stripe return: cancelled ── */}
         {step === "stripe-cancelled" && (
           <Section>
-            <div className="rounded-3xl p-7 sm:p-10 text-center" style={{ backgroundColor: ALMA.blush }}>
+            <div className="rounded-3xl p-7 sm:p-10 text-center" style={{ backgroundColor: COLOR.sunken }}>
               <span
                 className="grid h-14 w-14 mx-auto place-items-center rounded-2xl mb-4"
-                style={{ backgroundColor: ALMA.sandstone, color: ALMA.cream }}
+                style={{ backgroundColor: COLOR.line, color: COLOR.canvas }}
               >
                 <ArrowLeft size={22} />
               </span>
-              <h3 className="font-display leading-tight" style={{ color: ALMA.ink, fontSize: "clamp(1.7rem, 2.8vw, 2.3rem)" }}>
+              <h3 className="font-display leading-tight" style={{ color: COLOR.ink, fontSize: "clamp(1.7rem, 2.8vw, 2.3rem)" }}>
                 Pago cancelado
               </h3>
-              <p className="mt-3 text-[0.92rem] leading-[1.6] max-w-[44ch] mx-auto" style={{ color: ALMA.ink, opacity: 0.7 }}>
+              <p className="mt-3 text-[0.92rem] leading-[1.6] max-w-[44ch] mx-auto" style={{ color: COLOR.ink, opacity: 0.7 }}>
                 Cancelaste el pago. Tu orden quedó pendiente — puedes intentarlo de nuevo cuando quieras.
               </p>
             </div>
@@ -783,7 +783,7 @@ const Checkout = () => {
         {step === "select" && !plansError && !selectedPlan && (
           <Section>
             <InfoBanner
-              tone="stone"
+              tone="muted"
               title="Selecciona un paquete para continuar."
               description="Si nunca has venido, prueba con la clase muestra desde el sitio principal."
             />

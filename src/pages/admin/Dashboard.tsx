@@ -65,14 +65,14 @@ const TOOLTIP_STYLE: CSSProperties = {
   color: CHART_INK,
 };
 
-const LABEL = "text-[0.72rem] font-medium uppercase tracking-[0.16em] text-alma-ink/55";
+const LABEL = "text-[0.72rem] font-medium uppercase tracking-[0.16em] text-ink/55";
 
 const PILL_BASE = "inline-flex items-center rounded-full px-2.5 py-0.5 text-[0.7rem] font-medium";
 const statusPill = (status: string) => {
-  if (status === "active" || status === "approved") return `${PILL_BASE} bg-alma-oat text-alma-ink`;
+  if (status === "active" || status === "approved") return `${PILL_BASE} bg-sunken text-ink`;
   if (status === "pending_verification" || status === "pending_payment")
-    return `${PILL_BASE} border border-alma-sandstone/60 text-alma-berry`;
-  return `${PILL_BASE} border border-alma-hairline text-alma-ink/55`;
+    return `${PILL_BASE} border border-line-strong/60 text-ink`;
+  return `${PILL_BASE} border border-line text-ink/55`;
 };
 
 /* Superficie de tarjeta; con `to` se vuelve un link real (hover + focus + aria). */
@@ -82,7 +82,7 @@ const CardShell = ({ to, ariaLabel, className, children }: {
   className?: string;
   children: ReactNode;
 }) => {
-  const base = "rounded-xl border border-alma-hairline bg-alma-mist";
+  const base = "rounded-xl border border-line bg-sunken";
   if (to) {
     return (
       <Link
@@ -90,7 +90,7 @@ const CardShell = ({ to, ariaLabel, className, children }: {
         aria-label={ariaLabel}
         className={cn(
           base,
-          "group block no-underline transition-colors hover:border-alma-sandstone focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-alma-sandstone/70",
+          "group block no-underline transition-colors hover:border-line-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-line-strong/70",
           className,
         )}
       >
@@ -196,8 +196,8 @@ const Dashboard = () => {
         <div className="admin-page max-w-6xl">
           <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
             <div>
-              <h1 className="admin-title font-display text-alma-ink">Hoy en el estudio</h1>
-              <p className="mt-1 text-sm text-alma-ink/55">{todayLabel}</p>
+              <h1 className="admin-title font-display text-ink">Hoy en el estudio</h1>
+              <p className="mt-1 text-sm text-ink/55">{todayLabel}</p>
             </div>
             <Button onClick={() => setScanOpen(true)} className="gap-2">
               <Camera size={16} />
@@ -224,14 +224,14 @@ const Dashboard = () => {
               >
                 <div className="flex items-start justify-between gap-3">
                   <p className={LABEL}>Órdenes por verificar</p>
-                  <ArrowUpRight size={16} className="shrink-0 text-alma-ink/40 transition-colors group-hover:text-alma-ink" aria-hidden="true" />
+                  <ArrowUpRight size={16} className="shrink-0 text-ink/40 transition-colors group-hover:text-ink" aria-hidden="true" />
                 </div>
                 {isLoading ? (
-                  <Skeleton className="mt-3 h-11 w-24 bg-alma-oat/60" />
+                  <Skeleton className="mt-3 h-11 w-24 bg-sunken/60" />
                 ) : (
-                  <p className="nums mt-2 font-display text-[2.75rem] leading-none text-alma-ink">{pendingCount}</p>
+                  <p className="nums mt-2 font-display text-[2.75rem] leading-none text-ink">{pendingCount}</p>
                 )}
-                <p className="mt-3 text-sm leading-relaxed text-alma-ink/70">
+                <p className="mt-3 text-sm leading-relaxed text-ink/70">
                   Pagos enviados por clientas que esperan tu confirmación.
                 </p>
                 {!isLoading && (pendingCount > 0 ? (
@@ -239,23 +239,23 @@ const Dashboard = () => {
                     Requiere atención
                   </span>
                 ) : (
-                  <span className="mt-3 inline-flex items-center gap-1.5 text-[0.78rem] font-medium text-alma-olive">
+                  <span className="mt-3 inline-flex items-center gap-1.5 text-[0.78rem] font-medium text-success">
                     <CheckCircle2 size={13} aria-hidden="true" />
                     Todo al día
                   </span>
                 ))}
               </CardShell>
 
-              <div className="grid grid-cols-1 divide-y divide-alma-hairline rounded-xl border border-alma-hairline bg-alma-mist sm:grid-cols-3 sm:divide-x sm:divide-y-0 lg:col-span-7">
+              <div className="grid grid-cols-1 divide-y divide-line rounded-xl border border-line bg-sunken sm:grid-cols-3 sm:divide-x sm:divide-y-0 lg:col-span-7">
                 {secondaryStats.map((s) => (
                   <div key={s.label} className="flex flex-col justify-center p-5">
                     <p className={LABEL}>{s.label}</p>
                     {isLoading ? (
-                      <Skeleton className="mt-2 h-8 w-20 bg-alma-oat/60" />
+                      <Skeleton className="mt-2 h-8 w-20 bg-sunken/60" />
                     ) : (
-                      <p className="nums mt-2 font-display text-[1.9rem] leading-none text-alma-ink">{s.value}</p>
+                      <p className="nums mt-2 font-display text-[1.9rem] leading-none text-ink">{s.value}</p>
                     )}
-                    <p className="mt-2 text-xs text-alma-ink/55">{s.hint}</p>
+                    <p className="mt-2 text-xs text-ink/55">{s.hint}</p>
                   </div>
                 ))}
               </div>
@@ -272,16 +272,16 @@ const Dashboard = () => {
               <div className="flex items-start justify-between gap-3">
                 <p className={LABEL}>Ingresos últimos 6 meses</p>
                 {!revenueError && (
-                  <ArrowUpRight size={16} className="shrink-0 text-alma-ink/40 transition-colors group-hover:text-alma-ink" aria-hidden="true" />
+                  <ArrowUpRight size={16} className="shrink-0 text-ink/40 transition-colors group-hover:text-ink" aria-hidden="true" />
                 )}
               </div>
               <div className="mt-3">
                 {revenueLoading ? (
-                  <Skeleton className="h-[130px] w-full bg-alma-oat/60" />
+                  <Skeleton className="h-[130px] w-full bg-sunken/60" />
                 ) : revenueError ? (
                   <ErrorState title="No pudimos cargar los ingresos" onRetry={() => refetchRevenue()} />
                 ) : revenueRows.length === 0 ? (
-                  <p className="py-10 text-sm text-alma-ink/55">
+                  <p className="py-10 text-sm text-ink/55">
                     Aún no hay ingresos registrados. Aquí verás la curva de los últimos meses.
                   </p>
                 ) : (
@@ -309,16 +309,16 @@ const Dashboard = () => {
               <div className="flex items-start justify-between gap-3">
                 <p className={LABEL}>Clientas por última visita</p>
                 {!dormantError && (
-                  <ArrowUpRight size={16} className="shrink-0 text-alma-ink/40 transition-colors group-hover:text-alma-ink" aria-hidden="true" />
+                  <ArrowUpRight size={16} className="shrink-0 text-ink/40 transition-colors group-hover:text-ink" aria-hidden="true" />
                 )}
               </div>
               <div className="mt-3">
                 {dormantLoading ? (
-                  <Skeleton className="h-[130px] w-full bg-alma-oat/60" />
+                  <Skeleton className="h-[130px] w-full bg-sunken/60" />
                 ) : dormantError ? (
                   <ErrorState title="No pudimos cargar esta gráfica" onRetry={() => refetchDormant()} />
                 ) : dormantRows.length === 0 ? (
-                  <p className="py-10 text-sm text-alma-ink/55">
+                  <p className="py-10 text-sm text-ink/55">
                     Aún no hay visitas registradas para esta gráfica.
                   </p>
                 ) : (
@@ -339,7 +339,7 @@ const Dashboard = () => {
                         </Bar>
                       </BarChart>
                     </ResponsiveContainer>
-                    <p className="mt-2 flex items-center justify-end gap-1 text-[0.72rem] font-medium text-alma-berry">
+                    <p className="mt-2 flex items-center justify-end gap-1 text-[0.72rem] font-medium text-ink">
                       Reactivar por WhatsApp
                       <ArrowUpRight size={12} aria-hidden="true" />
                     </p>
@@ -357,32 +357,32 @@ const Dashboard = () => {
           >
             <div className="flex flex-wrap items-center justify-between gap-3">
               <p className={cn(LABEL, "flex items-center gap-2")}>
-                <Cake size={14} className="text-alma-berry" aria-hidden="true" />
+                <Cake size={14} className="text-ink" aria-hidden="true" />
                 Cumpleaños de {MONTHS[currentMonth - 1]}
                 {!loadingBirthdays && !birthdaysError && (
-                  <span className="nums normal-case tracking-normal text-alma-ink/55">· {birthdays.length}</span>
+                  <span className="nums normal-case tracking-normal text-ink/55">· {birthdays.length}</span>
                 )}
               </p>
               <span className="flex items-center gap-2">
                 {todayBirthdays.length > 0 && (
-                  <span className="nums inline-flex items-center rounded-full bg-alma-oat px-2.5 py-0.5 text-[0.7rem] font-medium text-alma-ink">
+                  <span className="nums inline-flex items-center rounded-full bg-sunken px-2.5 py-0.5 text-[0.7rem] font-medium text-ink">
                     {todayBirthdays.length} {todayBirthdays.length === 1 ? "es hoy" : "son hoy"}
                   </span>
                 )}
                 {!birthdaysError && (
-                  <ArrowUpRight size={16} className="shrink-0 text-alma-ink/40 transition-colors group-hover:text-alma-ink" aria-hidden="true" />
+                  <ArrowUpRight size={16} className="shrink-0 text-ink/40 transition-colors group-hover:text-ink" aria-hidden="true" />
                 )}
               </span>
             </div>
             <div className="mt-4">
               {loadingBirthdays ? (
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                  {[1, 2, 3].map((i) => <Skeleton key={i} className="h-14 w-full bg-alma-oat/60" />)}
+                  {[1, 2, 3].map((i) => <Skeleton key={i} className="h-14 w-full bg-sunken/60" />)}
                 </div>
               ) : birthdaysError ? (
                 <ErrorState title="No pudimos cargar los cumpleaños" onRetry={() => refetchBirthdays()} />
               ) : birthdays.length === 0 ? (
-                <p className="text-sm text-alma-ink/55">
+                <p className="text-sm text-ink/55">
                   Ninguna clienta cumple años en {MONTHS[currentMonth - 1]}.
                 </p>
               ) : (
@@ -394,26 +394,26 @@ const Dashboard = () => {
                         key={b.id}
                         className={cn(
                           "flex items-center gap-3 rounded-xl border px-3 py-2.5",
-                          b.isToday ? "border-alma-sandstone/70 bg-alma-oat/50" : "border-alma-hairline",
+                          b.isToday ? "border-line-strong/70 bg-sunken/50" : "border-line",
                         )}
                       >
-                        <span className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-full bg-alma-oat text-[0.7rem] font-semibold text-alma-berry">
+                        <span className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-full bg-sunken text-[0.7rem] font-semibold text-ink">
                           {b.photoUrl ? (
                             <img src={b.photoUrl} alt="" className="h-full w-full object-cover" />
                           ) : initials || "·"}
                         </span>
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium text-alma-ink">{b.displayName}</p>
+                          <p className="truncate text-sm font-medium text-ink">{b.displayName}</p>
                           {b.phone && (
-                            <p className="nums truncate text-[0.72rem] text-alma-ink/55">{b.phone}</p>
+                            <p className="nums truncate text-[0.72rem] text-ink/55">{b.phone}</p>
                           )}
                         </div>
                         {b.isToday ? (
-                          <span className="rounded-full bg-alma-ink-deep px-2 py-0.5 text-[0.66rem] font-semibold uppercase tracking-[0.08em] text-alma-canvas">
+                          <span className="rounded-full bg-inverse px-2 py-0.5 text-[0.66rem] font-semibold uppercase tracking-[0.08em] text-canvas">
                             Hoy
                           </span>
                         ) : (
-                          <span className="nums rounded-full border border-alma-sandstone/50 px-2 py-0.5 text-[0.7rem] font-medium text-alma-berry">
+                          <span className="nums rounded-full border border-line-strong/50 px-2 py-0.5 text-[0.7rem] font-medium text-ink">
                             {b.day} {MONTHS[b.month - 1].slice(0, 3)}
                           </span>
                         )}
@@ -432,7 +432,7 @@ const Dashboard = () => {
                 <p className={LABEL}>Últimas membresías</p>
                 <Link
                   to="/admin/memberships"
-                  className="text-[0.72rem] font-medium text-alma-berry no-underline transition-colors hover:text-alma-ink"
+                  className="text-[0.72rem] font-medium text-ink no-underline transition-colors hover:text-ink"
                 >
                   Ver todas
                 </Link>
@@ -440,26 +440,26 @@ const Dashboard = () => {
               <div className="mt-3">
                 {memsLoading ? (
                   <div className="space-y-2">
-                    {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-10 w-full bg-alma-oat/60" />)}
+                    {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-10 w-full bg-sunken/60" />)}
                   </div>
                 ) : memsError ? (
                   <ErrorState title="No pudimos cargar las membresías" onRetry={() => refetchMems()} />
                 ) : membershipRows.length === 0 ? (
                   <div className="flex items-center gap-3 py-6">
-                    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-alma-oat text-alma-berry">
+                    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-sunken text-ink">
                       <Users size={17} aria-hidden="true" />
                     </span>
-                    <p className="text-sm text-alma-ink/70">
+                    <p className="text-sm text-ink/70">
                       Aún no hay membresías recientes. Cuando una clienta compre un paquete aparecerá aquí.
                     </p>
                   </div>
                 ) : (
-                  <ul className="m-0 list-none divide-y divide-alma-hairline p-0">
+                  <ul className="m-0 list-none divide-y divide-line p-0">
                     {membershipRows.map((m) => (
                       <li key={m.id} className="flex items-center justify-between gap-3 py-2.5">
                         <div className="min-w-0">
-                          <p className="truncate text-sm font-medium text-alma-ink">{m.userName}</p>
-                          <p className="truncate text-xs text-alma-ink/55">{m.planName}</p>
+                          <p className="truncate text-sm font-medium text-ink">{m.userName}</p>
+                          <p className="truncate text-xs text-ink/55">{m.planName}</p>
                         </div>
                         <span className={statusPill(m.status)}>{STATUS_LABEL[m.status] ?? m.status}</span>
                       </li>
@@ -478,32 +478,32 @@ const Dashboard = () => {
               <div className="flex items-center justify-between gap-3">
                 <p className={LABEL}>Órdenes pendientes</p>
                 {!ordersError && (
-                  <ArrowUpRight size={16} className="shrink-0 text-alma-ink/40 transition-colors group-hover:text-alma-ink" aria-hidden="true" />
+                  <ArrowUpRight size={16} className="shrink-0 text-ink/40 transition-colors group-hover:text-ink" aria-hidden="true" />
                 )}
               </div>
               <div className="mt-3">
                 {ordersLoading ? (
                   <div className="space-y-2">
-                    {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-10 w-full bg-alma-oat/60" />)}
+                    {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-10 w-full bg-sunken/60" />)}
                   </div>
                 ) : ordersError ? (
                   <ErrorState title="No pudimos cargar las órdenes" onRetry={() => refetchOrders()} />
                 ) : orderRows.length === 0 ? (
                   <div className="flex items-center gap-3 py-6">
-                    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-alma-oat text-alma-olive">
+                    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-sunken text-success">
                       <CheckCircle2 size={17} aria-hidden="true" />
                     </span>
-                    <p className="text-sm text-alma-ink/70">
+                    <p className="text-sm text-ink/70">
                       Sin órdenes pendientes. Todos los pagos están verificados.
                     </p>
                   </div>
                 ) : (
-                  <ul className="m-0 list-none divide-y divide-alma-hairline p-0">
+                  <ul className="m-0 list-none divide-y divide-line p-0">
                     {orderRows.map((o) => (
                       <li key={o.id} className="flex items-center justify-between gap-3 py-2.5">
                         <div className="min-w-0">
-                          <p className="truncate text-sm font-medium text-alma-ink">{o.userName}</p>
-                          <p className="nums text-xs text-alma-ink/55">
+                          <p className="truncate text-sm font-medium text-ink">{o.userName}</p>
+                          <p className="nums text-xs text-ink/55">
                             {formatMXN(Number(o.totalAmount ?? o.total_amount ?? o.amount ?? 0))}
                           </p>
                         </div>

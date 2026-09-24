@@ -8,7 +8,8 @@ import {
   type TextareaHTMLAttributes,
 } from "react";
 import { AlertCircle, Check, Eye, EyeOff } from "lucide-react";
-import { ALMA } from "@/components/app/tokens";
+import { COLOR } from "@/design/tokens";
+
 
 /* ═══════════════════════════════════════════════════════════
    Campos de formulario — lenguaje único de la app de clienta.
@@ -19,13 +20,13 @@ import { ALMA } from "@/components/app/tokens";
 
 const CONTROL =
   "w-full rounded-2xl px-4 py-3 text-[0.95rem] outline-none transition-shadow " +
-  "focus-visible:ring-2 focus-visible:ring-alma-berry focus-visible:ring-offset-2 focus-visible:ring-offset-alma-canvas " +
-  "placeholder:text-alma-ink/35 disabled:opacity-60";
+  "focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-offset-2 focus-visible:ring-offset-canvas " +
+  "placeholder:text-ink/35 disabled:opacity-60";
 
 const controlStyle = (hasError?: boolean): CSSProperties => ({
-  backgroundColor: ALMA.cream,
-  color: ALMA.ink,
-  border: `1px solid ${hasError ? ALMA.destructive : ALMA.border}`,
+  backgroundColor: COLOR.canvas,
+  color: COLOR.ink,
+  border: `1px solid ${hasError ? COLOR.danger : COLOR.line}`,
   minHeight: 48,
 });
 
@@ -34,7 +35,7 @@ const idFromLabel = (label: string) =>
 
 export const FieldError = ({ msg }: { msg?: string }) =>
   msg ? (
-    <p className="flex items-center gap-1.5 text-[0.78rem]" style={{ color: ALMA.destructive }}>
+    <p className="flex items-center gap-1.5 text-[0.78rem]" style={{ color: COLOR.danger }}>
       <AlertCircle size={13} />
       {msg}
     </p>
@@ -53,7 +54,7 @@ const FieldShell = ({ label, htmlFor, error, hint, children }: FieldShellProps) 
     <label
       htmlFor={htmlFor}
       className="text-[0.72rem] font-medium uppercase tracking-[0.18em]"
-      style={{ color: ALMA.ink, opacity: 0.62 }}
+      style={{ color: COLOR.ink, opacity: 0.62 }}
     >
       {label}
     </label>
@@ -61,7 +62,7 @@ const FieldShell = ({ label, htmlFor, error, hint, children }: FieldShellProps) 
     {error ? (
       <FieldError msg={error} />
     ) : hint ? (
-      <p className="text-[0.78rem]" style={{ color: ALMA.ink, opacity: 0.55 }}>
+      <p className="text-[0.78rem]" style={{ color: COLOR.ink, opacity: 0.55 }}>
         {hint}
       </p>
     ) : null}
@@ -172,8 +173,8 @@ export const PasswordField = forwardRef<HTMLInputElement, PasswordFieldProps>(
             aria-pressed={show}
             aria-label={show ? "Ocultar contraseña" : "Mostrar contraseña"}
             onClick={() => setShow((v) => !v)}
-            className="absolute right-1 top-1/2 -translate-y-1/2 grid h-11 w-11 place-items-center rounded-full bg-transparent border-0 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-alma-berry"
-            style={{ color: ALMA.ink, opacity: 0.55 }}
+            className="absolute right-1 top-1/2 -translate-y-1/2 grid h-11 w-11 place-items-center rounded-full bg-transparent border-0 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong"
+            style={{ color: COLOR.ink, opacity: 0.55 }}
           >
             {show ? <EyeOff size={16} /> : <Eye size={16} />}
           </button>
@@ -199,14 +200,14 @@ export const PasswordRules = ({ password = "" }: { password?: string }) => {
         <li
           key={r.label}
           className="flex items-center gap-2 text-[0.74rem]"
-          style={{ color: r.ok ? ALMA.olive : ALMA.ink, opacity: r.ok ? 1 : 0.55 }}
+          style={{ color: r.ok ? COLOR.success : COLOR.ink, opacity: r.ok ? 1 : 0.55 }}
         >
           <span
             className="grid h-4 w-4 place-items-center rounded-full transition-colors"
             style={{
-              backgroundColor: r.ok ? ALMA.olive : "transparent",
-              border: `1px solid ${r.ok ? ALMA.olive : ALMA.border}`,
-              color: ALMA.cream,
+              backgroundColor: r.ok ? COLOR.success : "transparent",
+              border: `1px solid ${r.ok ? COLOR.success : COLOR.line}`,
+              color: COLOR.canvas,
             }}
           >
             {r.ok && <Check size={9} strokeWidth={3.5} />}

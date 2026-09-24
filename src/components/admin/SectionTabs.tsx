@@ -24,7 +24,7 @@ const SectionTabs = ({ tabs, className }: SectionTabsProps) => {
   return (
     <div
       className={cn(
-        "mb-6 flex flex-wrap items-center gap-1 rounded-2xl border border-alma-hairline bg-alma-mist p-1 w-fit max-w-full",
+        "mb-6 flex flex-wrap items-center gap-1 rounded-2xl border border-line bg-sunken p-1 w-fit max-w-full",
         className,
       )}
     >
@@ -40,8 +40,8 @@ const SectionTabs = ({ tabs, className }: SectionTabsProps) => {
             className={cn(
               "rounded-xl px-4 py-2 text-[13px] font-semibold no-underline transition-colors duration-200",
               active
-                ? "bg-alma-oat text-alma-ink ring-1 ring-inset ring-alma-sandstone"
-                : "text-alma-ink/70 hover:text-alma-ink hover:bg-alma-oat/40",
+                ? "bg-sunken text-ink ring-1 ring-inset ring-line-strong"
+                : "text-ink/70 hover:text-ink hover:bg-sunken/40",
             )}
           >
             {tab.label}

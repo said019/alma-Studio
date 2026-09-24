@@ -60,33 +60,11 @@ export const TONE_STYLE: Record<Tone, ToneStyle> = {
   danger: { fg: COLOR.danger, softBg: COLOR.surface, softFg: COLOR.danger, solidBg: COLOR.danger, solidFg: COLOR.canvas },
 };
 
-/**
- * Nombres de color de Alma que las pantallas todavía pasan como tono.
- * TEMPORAL: la Tarea 5 migra las llamadas y borra este mapa.
- */
-export const LEGACY_TONE = {
-  berry: "accent",
-  olive: "success",
-  destructive: "danger",
-  stone: "muted",
-  coral: "muted",
-  sandstone: "muted",
-  blush: "muted",
-  mist: "muted",
-  cream: "muted",
-  border: "muted",
-  ink: "ink",
-  inkDeep: "ink",
-} as const satisfies Record<string, Tone>;
-
-export type LegacyTone = keyof typeof LEGACY_TONE;
-export type ToneInput = Tone | LegacyTone;
 
 const isTone = (t: string): t is Tone => (TONES as readonly string[]).includes(t);
 
 /** Estilo de un tono. Un valor desconocido cae a `fallback` en vez de romper la pantalla. */
 export function resolveTone(tone: string | undefined, fallback: Tone = "muted"): ToneStyle {
   if (tone && isTone(tone)) return TONE_STYLE[tone];
-  if (tone && tone in LEGACY_TONE) return TONE_STYLE[LEGACY_TONE[tone as LegacyTone]];
   return TONE_STYLE[fallback];
 }

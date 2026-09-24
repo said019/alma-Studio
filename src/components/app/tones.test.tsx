@@ -13,8 +13,8 @@ describe("piezas con tono", () => {
     expect(screen.getByText("Por verificar")).toHaveStyle({ backgroundColor: COLOR.accentSoft, color: COLOR.ink });
   });
 
-  it("acepta todavía nombres de Alma", () => {
-    wrap(<StatusPill label="Pagado" tone="olive" />);
+  it("el tono success pinta el texto en verde", () => {
+    wrap(<StatusPill label="Pagado" tone="success" />);
     expect(screen.getByText("Pagado")).toHaveStyle({ color: COLOR.success });
   });
 

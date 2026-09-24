@@ -207,21 +207,21 @@ const InstructorsList = () => {
             ]}
           />
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
-            <h1 className="admin-title font-semibold text-alma-ink">Coaches</h1>
-            <Button size="sm" onClick={openCreate} className="bg-alma-ink text-alma-canvas hover:bg-alma-ink-deep">
+            <h1 className="admin-title font-semibold text-ink">Coaches</h1>
+            <Button size="sm" onClick={openCreate} className="bg-ink text-canvas hover:bg-inverse">
               <Plus size={14} className="mr-1" />Nueva coach
             </Button>
           </div>
 
           {magicLink && (
-            <div className="mb-4 rounded-xl border border-alma-hairline bg-alma-mist p-3">
+            <div className="mb-4 rounded-xl border border-line bg-sunken p-3">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-alma-ink/60">
+                  <p className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-ink/60">
                     Magic link · {magicLink.name}
                   </p>
-                  <p className="mt-1 break-all text-xs text-alma-ink/80">{magicLink.link}</p>
-                  <p className="mt-1 text-[11px] text-alma-ink/55">Caduca en 24 horas. Compártelo solo con ella.</p>
+                  <p className="mt-1 break-all text-xs text-ink/80">{magicLink.link}</p>
+                  <p className="mt-1 text-[11px] text-ink/55">Caduca en 24 horas. Compártelo solo con ella.</p>
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
                   <Button type="button" variant="outline" size="sm" onClick={() => copyMagicLink(magicLink.link)}>
@@ -231,7 +231,7 @@ const InstructorsList = () => {
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="h-8 w-8 text-alma-ink/55 hover:text-alma-ink"
+                    className="h-8 w-8 text-ink/55 hover:text-ink"
                     onClick={() => setMagicLink(null)}
                     aria-label="Ocultar magic link"
                   >
@@ -270,7 +270,7 @@ const InstructorsList = () => {
               onCta={openCreate}
             />
           ) : (
-            <div className="rounded-xl border border-alma-hairline overflow-hidden">
+            <div className="rounded-xl border border-line overflow-hidden">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -293,21 +293,21 @@ const InstructorsList = () => {
                           <div className="flex items-center gap-1">
                             {ins.photoUrl
                               ? <img src={ins.photoUrl} className="w-8 h-8 rounded-full object-cover" style={{ objectPosition: `${clampFocus(ins.photoFocusX)}% ${clampFocus(ins.photoFocusY)}%` }} alt="" />
-                              : <div className="w-8 h-8 rounded-full bg-alma-oat flex items-center justify-center text-xs font-bold text-alma-ink">{ins.displayName?.[0]}</div>
+                              : <div className="w-8 h-8 rounded-full bg-sunken flex items-center justify-center text-xs font-bold text-ink">{ins.displayName?.[0]}</div>
                             }
                             {ins.photoUrl_2 && (
-                              <img src={ins.photoUrl_2} className="w-6 h-6 rounded-full object-cover ring-1 ring-alma-sandstone/60" alt="2ª foto" title="2ª foto (hover/click)" />
+                              <img src={ins.photoUrl_2} className="w-6 h-6 rounded-full object-cover ring-1 ring-line-strong/60" alt="2ª foto" title="2ª foto (hover/click)" />
                             )}
                           </div>
                         </TableCell>
-                        <TableCell className="font-medium text-alma-ink">{ins.displayName}</TableCell>
-                        <TableCell className="text-sm text-alma-ink/60">{ins.email ?? <span className="opacity-40">—</span>}</TableCell>
-                        <TableCell className="text-xs text-alma-ink/60">{normalizeSpecialties(ins.specialties).join(", ")}</TableCell>
+                        <TableCell className="font-medium text-ink">{ins.displayName}</TableCell>
+                        <TableCell className="text-sm text-ink/60">{ins.email ?? <span className="opacity-40">—</span>}</TableCell>
+                        <TableCell className="text-xs text-ink/60">{normalizeSpecialties(ins.specialties).join(", ")}</TableCell>
                         <TableCell>
                           {ins.isActive ? (
-                            <Badge variant="outline" className="border-transparent bg-alma-oat text-alma-ink font-medium">Activa</Badge>
+                            <Badge variant="outline" className="border-transparent bg-sunken text-ink font-medium">Activa</Badge>
                           ) : (
-                            <Badge variant="outline" className="border-alma-hairline bg-transparent text-alma-ink/55 font-medium">Inactiva</Badge>
+                            <Badge variant="outline" className="border-line bg-transparent text-ink/55 font-medium">Inactiva</Badge>
                           )}
                         </TableCell>
                         <TableCell>
@@ -347,7 +347,7 @@ const InstructorsList = () => {
               : createMutation.mutate(d))} className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-1"><Label>Nombre</Label><Input {...form.register("displayName")} /></div>
-                <div className="space-y-1"><Label>Email <span className="text-alma-ink/40 font-normal">(opcional)</span></Label><Input type="email" {...form.register("email")} /></div>
+                <div className="space-y-1"><Label>Email <span className="text-ink/40 font-normal">(opcional)</span></Label><Input type="email" {...form.register("email")} /></div>
                 <div className="space-y-1"><Label>Bio</Label><Input {...form.register("bio")} /></div>
                 <div className="space-y-1"><Label>Especialidades (separadas por coma)</Label><Input {...form.register("specialties")} /></div>
               </div>
@@ -357,7 +357,7 @@ const InstructorsList = () => {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <Label>Enfoque horizontal</Label>
-                      <span className="nums text-xs text-alma-ink/60">{focusX}%</span>
+                      <span className="nums text-xs text-ink/60">{focusX}%</span>
                     </div>
                     <Input
                       type="range"
@@ -371,7 +371,7 @@ const InstructorsList = () => {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <Label>Enfoque vertical</Label>
-                      <span className="nums text-xs text-alma-ink/60">{focusY}%</span>
+                      <span className="nums text-xs text-ink/60">{focusY}%</span>
                     </div>
                     <Input
                       type="range"
@@ -392,7 +392,7 @@ const InstructorsList = () => {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between gap-3">
                       <Label>Vista previa y enfoque</Label>
-                      <span className="text-[11px] text-alma-ink/55">Haz clic o arrastra sobre la cara</span>
+                      <span className="text-[11px] text-ink/55">Haz clic o arrastra sobre la cara</span>
                     </div>
                     <button
                       type="button"
@@ -401,7 +401,7 @@ const InstructorsList = () => {
                         if (event.buttons !== 1 && event.pointerType !== "touch") return;
                         applyPreviewFocus(event);
                       }}
-                      className="group relative mx-auto block h-[360px] w-full max-w-[300px] touch-none overflow-hidden rounded-[28px] border border-alma-hairline bg-alma-oat/40 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-alma-berry focus-visible:ring-offset-2"
+                      className="group relative mx-auto block h-[360px] w-full max-w-[300px] touch-none overflow-hidden rounded-[28px] border border-line bg-sunken/40 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2"
                       aria-label="Seleccionar enfoque de la foto"
                     >
                       <img
@@ -411,13 +411,13 @@ const InstructorsList = () => {
                         style={{ objectPosition: `${focusX}% ${focusY}%` }}
                       />
                       <div
-                        className="pointer-events-none absolute h-8 w-8 rounded-full border-2 border-alma-canvas bg-alma-canvas/15 shadow-[0_0_0_1px_rgba(0,0,0,0.25)]"
+                        className="pointer-events-none absolute h-8 w-8 rounded-full border-2 border-canvas bg-canvas/15 shadow-[0_0_0_1px_rgba(0,0,0,0.25)]"
                         style={{ left: `${focusX}%`, top: `${focusY}%`, transform: "translate(-50%, -50%)" }}
                       >
-                        <div className="absolute left-1/2 top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-alma-canvas shadow-[0_0_0_1px_rgba(0,0,0,0.25)]" />
+                        <div className="absolute left-1/2 top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-canvas shadow-[0_0_0_1px_rgba(0,0,0,0.25)]" />
                       </div>
                     </button>
-                    <div className="nums mx-auto flex w-full max-w-[300px] items-center justify-between text-[11px] font-medium text-alma-ink/60">
+                    <div className="nums mx-auto flex w-full max-w-[300px] items-center justify-between text-[11px] font-medium text-ink/60">
                       <span>X {focusX}%</span>
                       <span>Y {focusY}%</span>
                     </div>
@@ -427,7 +427,7 @@ const InstructorsList = () => {
 
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-                <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending} className="bg-alma-ink text-alma-canvas hover:bg-alma-ink-deep">
+                <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending} className="bg-ink text-canvas hover:bg-inverse">
                   {(createMutation.isPending || updateMutation.isPending) && <Loader2 size={14} className="mr-2 animate-spin" />}
                   {editing ? "Actualizar datos" : "Crear"}
                 </Button>
