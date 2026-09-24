@@ -56,3 +56,6 @@ dashboard-*.jpeg
 reservar-*.jpeg
 /*.jpeg
 auditoria-estudio/qa-*/
+
+# Sesiones del visor de brainstorming y referencias descargadas
+.superpowers/
