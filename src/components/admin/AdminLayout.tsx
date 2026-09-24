@@ -65,6 +65,18 @@ const MOBILE_QUICK_NAV = [
   { path: "/admin/payments", label: "Cobros", icon: DollarSign, ownerOnly: true },
 ];
 
+/* Ítem del menú del panel. La sección activa: línea coral a la izquierda
+   sobre canvas (spec §4.5). Coral sólo marca "estás aquí". */
+export function adminNavItemClass(active: boolean, compact: boolean): string {
+  return cn(
+    "flex items-center gap-3 mx-2 my-0.5 rounded-xl transition-colors duration-200 no-underline min-h-[44px]",
+    compact ? "px-0 justify-center py-2.5" : "px-3 py-2.5",
+    active
+      ? "bg-canvas font-semibold text-ink shadow-[inset_3px_0_0_theme(colors.accent.DEFAULT)]"
+      : "text-ink-muted hover:text-ink hover:bg-sunken",
+  );
+}
+
 interface AdminLayoutProps {
   children: React.ReactNode;
 }
@@ -123,7 +135,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
   const unreadCount = unreadData?.data?.unread_count ?? 0;
 
   return (
-    <div className="alma-admin flex min-h-screen bg-canvas text-ink">
+    <div className="flex min-h-screen bg-canvas text-ink">
       {mobileOpen && (
         <button
           aria-label="Cerrar menú"
@@ -135,7 +147,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
       <aside
         className={cn(
           "fixed inset-y-0 left-0 z-50 flex flex-col transition-transform duration-300 shrink-0",
-          "border-r border-line bg-sunken",
+          "border-r border-line bg-surface",
           "w-[88vw] max-w-[300px] -translate-x-full lg:translate-x-0 lg:static",
           mobileOpen && "translate-x-0",
           collapsed ? "lg:w-[72px]" : "lg:w-[240px]",
@@ -153,7 +165,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
 
           <button
             onClick={() => setMobileOpen(false)}
-            className="flex lg:hidden items-center justify-center w-8 h-8 rounded-lg text-ink/55 hover:text-ink hover:bg-sunken/40"
+            className="flex lg:hidden items-center justify-center w-8 h-8 rounded-lg text-ink-muted hover:text-ink hover:bg-sunken/40"
             aria-label="Cerrar menú"
           >
             <X size={16} />
@@ -163,7 +175,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
             onClick={() => setCollapsed((v) => !v)}
             className={cn(
               "hidden lg:flex items-center justify-center w-7 h-7 rounded-lg transition-colors",
-              "text-ink/45 hover:text-ink hover:bg-sunken/40",
+              "text-ink-muted hover:text-ink hover:bg-sunken/40",
             )}
             aria-label="Contraer menú"
           >
@@ -184,24 +196,19 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
                       onClick={() => toggleGroup(group.label)}
                       className="w-full flex items-center justify-between px-5 py-1.5 group"
                     >
-                      <span
-                        className={cn(
-                          "text-[0.72rem] font-semibold uppercase tracking-[0.14em] transition-colors",
-                          isGroupActive ? "text-ink/70" : "text-ink/45",
-                        )}
-                      >
+                      <span className="text-[0.75rem] font-semibold uppercase tracking-[0.14em] text-ink-muted transition-colors">
                         {group.label}
                       </span>
                       <ChevronDown
                         size={11}
                         className={cn(
-                          "text-ink/40 transition-transform duration-200",
+                          "text-ink-muted transition-transform duration-200",
                           isOpen ? "rotate-0" : "-rotate-90",
                         )}
                       />
                     </button>
                   ) : (
-                    <p className="px-5 py-1.5 text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-ink/45">
+                    <p className="px-5 py-1.5 text-[0.75rem] font-semibold uppercase tracking-[0.14em] text-ink-muted">
                       {group.label}
                     </p>
                   )
@@ -215,19 +222,13 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
                       to={path}
                       data-press
                       title={isCompact ? label : undefined}
-                      className={cn(
-                        "flex items-center gap-3 mx-2 my-0.5 rounded-xl transition-colors duration-200 no-underline",
-                        isCompact ? "px-0 justify-center py-2.5" : "px-3 py-2.5",
-                        active
-                          ? "bg-sunken font-semibold text-ink ring-1 ring-inset ring-line-strong/50"
-                          : "text-ink/70 hover:text-ink hover:bg-sunken/40",
-                      )}
+                      className={adminNavItemClass(active, isCompact)}
                     >
                       <span className="relative shrink-0 inline-flex">
                         <Icon size={15} />
                         {/* Badge: unread count para 'Bandeja' nav item */}
                         {path === "/admin/notifications" && unreadCount > 0 && (
-                          <span className="nums absolute -top-2 -right-2.5 grid h-4 min-w-[16px] place-items-center rounded-full bg-inverse px-1 text-[0.7rem] font-semibold leading-none text-canvas">
+                          <span className="nums absolute -top-2 -right-2.5 grid h-4 min-w-[16px] place-items-center rounded-full bg-accent px-1 text-[0.75rem] font-bold leading-none text-ink">
                             {unreadCount > 9 ? "9+" : unreadCount}
                           </span>
                         )}
@@ -251,7 +252,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
             title={isCompact ? "Ver sitio" : undefined}
             className={cn(
               "flex items-center gap-3 mx-2 rounded-xl px-3 py-2 no-underline transition-colors",
-              "text-ink/60 hover:text-ink hover:bg-sunken/40",
+              "text-ink-muted hover:text-ink hover:bg-sunken/40",
               isCompact && "justify-center px-0",
             )}
           >
@@ -263,7 +264,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
             title={isCompact ? "Salir" : undefined}
             className={cn(
               "flex items-center gap-3 mx-2 rounded-xl px-3 py-2 w-[calc(100%-16px)] transition-colors",
-              "text-ink/60 hover:text-destructive hover:bg-destructive/10",
+              "text-ink-muted hover:text-destructive hover:bg-destructive/10",
               isCompact && "justify-center px-0",
             )}
           >
@@ -277,16 +278,16 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
         <header className="shrink-0 h-14 flex items-center justify-between px-3 sm:px-4 lg:px-6 border-b border-line bg-canvas sticky top-0 z-30">
           <div className="flex items-center gap-2 min-w-0">
             <button
-              className="lg:hidden inline-flex h-8 w-8 items-center justify-center rounded-lg text-ink/60 hover:text-ink hover:bg-sunken/40"
+              className="lg:hidden inline-flex h-8 w-8 items-center justify-center rounded-lg text-ink-muted hover:text-ink hover:bg-sunken/40"
               onClick={() => setMobileOpen(true)}
               aria-label="Abrir menú"
             >
               <Menu size={16} />
             </button>
-            <span className="text-ink/50 text-[0.72rem] font-medium tracking-[0.12em] uppercase">Admin</span>
+            <span className="text-ink-muted text-[0.75rem] font-medium tracking-[0.12em] uppercase">Admin</span>
             {currentItem && (
               <>
-                <ChevronRight size={12} className="text-ink/35 shrink-0" />
+                <ChevronRight size={12} className="text-ink-muted shrink-0" />
                 <span className="text-ink text-xs sm:text-sm font-semibold truncate">{currentItem.label}</span>
               </>
             )}
@@ -296,7 +297,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
               {user?.displayName?.[0]?.toUpperCase() ?? user?.display_name?.[0]?.toUpperCase() ?? user?.email?.[0]?.toUpperCase() ?? "A"}
             </div>
             {!isCompact && (
-              <span className="text-xs text-ink/70 hidden md:block truncate max-w-[180px]">
+              <span className="text-xs text-ink-muted hidden md:block truncate max-w-[180px]">
                 {user?.displayName ?? user?.display_name ?? user?.email ?? "Admin"}
               </span>
             )}
@@ -319,7 +320,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
                         "flex h-12 min-h-[44px] flex-col items-center justify-center rounded-xl text-[11px] font-semibold transition-colors",
                         active
                           ? "bg-sunken text-ink ring-1 ring-inset ring-line-strong/50"
-                          : "text-ink/70 hover:bg-sunken/40 hover:text-ink",
+                          : "text-ink-muted hover:bg-sunken/40 hover:text-ink",
                       )}
                       aria-current={active ? "page" : undefined}
                     >

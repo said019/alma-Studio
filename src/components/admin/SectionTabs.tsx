@@ -24,7 +24,7 @@ const SectionTabs = ({ tabs, className }: SectionTabsProps) => {
   return (
     <div
       className={cn(
-        "mb-6 flex flex-wrap items-center gap-1 rounded-2xl border border-line bg-sunken p-1 w-fit max-w-full",
+        "mb-6 flex flex-wrap items-center gap-1 rounded-full border border-line bg-surface p-1 w-fit max-w-full",
         className,
       )}
     >
@@ -38,10 +38,10 @@ const SectionTabs = ({ tabs, className }: SectionTabsProps) => {
             data-press
             aria-current={active ? "page" : undefined}
             className={cn(
-              "rounded-xl px-4 py-2 text-[13px] font-semibold no-underline transition-colors duration-200",
+              "inline-flex min-h-[44px] items-center rounded-full px-4 text-[13px] font-bold no-underline transition-colors duration-200",
               active
-                ? "bg-sunken text-ink ring-1 ring-inset ring-line-strong"
-                : "text-ink/70 hover:text-ink hover:bg-sunken/40",
+                ? "bg-ink text-canvas"
+                : "text-ink-muted hover:text-ink hover:bg-sunken",
             )}
           >
             {tab.label}
