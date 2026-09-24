@@ -55,12 +55,6 @@ export default {
       fontFamily: {
         sans: ['"Manrope"', "system-ui", "sans-serif"],
         display: ['"Unbounded"', "system-ui", "sans-serif"],
-        /* Alias legacy hasta la Tarea 12 (la Tarea 5 migra sus usos). */
-        alilato: ['"Manrope"', "system-ui", "sans-serif"],
-        gulfs: ['"Unbounded"', "system-ui", "sans-serif"],
-        bebas: ['"Unbounded"', "system-ui", "sans-serif"],
-        syne: ['"Manrope"', "system-ui", "sans-serif"],
-        dm: ['"Manrope"', "system-ui", "sans-serif"],
       },
       keyframes: {
         "accordion-down": { from: { height: "0" }, to: { height: "var(--radix-accordion-content-height)" } },

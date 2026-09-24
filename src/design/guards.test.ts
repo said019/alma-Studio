@@ -57,4 +57,30 @@ describe("guardias contra volver a Alma", () => {
     }
     expect(malos).toEqual([]);
   });
+
+  it("CSS, HTML y Tailwind no tienen nada de Alma", () => {
+    const css = fs.readFileSync(path.join(root, "src/index.css"), "utf8");
+    const tw = fs.readFileSync(path.join(root, "tailwind.config.ts"), "utf8");
+    const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
+    for (const [nombre, txt] of [["index.css", css], ["tailwind.config.ts", tw]] as const) {
+      expect(txt, nombre).not.toMatch(/Fraunces|Jost|Alilato|\balma\b|alma-/i);
+    }
+    expect(html).not.toMatch(/Fraunces|Jost/);
+    expect(tw).not.toMatch(/\b(gulfs|bebas|syne|dm|alilato):/);
+  });
+
+  it("ninguna pieza compartida pone texto claro sobre coral", () => {
+    const dirs = ["src/components/app", "src/components/ui", "src/components/admin", "src/components/brand"];
+    const claros = /COLOR\.(canvas|surface|onInverse)|text-(canvas|surface|white|inverse-foreground)/;
+    const malos: string[] = [];
+    for (const d of dirs) {
+      for (const f of fs.readdirSync(path.join(root, d)).filter((x) => /\.tsx$/.test(x) && !/\.test\./.test(x))) {
+        fs.readFileSync(path.join(root, d, f), "utf8").split("\n").forEach((line, i) => {
+          const coral = /COLOR\.accent\b(?!Soft|Strong)|\bbg-accent\b(?!-)/.test(line);
+          if (coral && claros.test(line)) malos.push(`${d}/${f}:${i + 1}`);
+        });
+      }
+    }
+    expect(malos).toEqual([]);
+  });
 });

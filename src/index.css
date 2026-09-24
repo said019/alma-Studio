@@ -1,37 +1,7 @@
-/* ──────────────────────────────────────────────────────────────
-   ALMA MOVEMENT — TIPOGRAFÍAS BASE
-   Fraunces (variable) → display / titulares (font-display, h1-h6)
-   Jost                → body / UI
-   Carga vía <link> con preconnect en index.html (no @import).
-   Alilato (propietaria) queda solo como detalle opcional.
-   ────────────────────────────────────────────────────────────── */
+/* HIVE — base. Tokens: src/design/tokens.ts · Spec: docs/superpowers/specs/2026-09-24-hive-sistema-visual-design.md */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-/* ── font-face: fuente propietaria desde public/fonts/ ── */
-@font-face {
-  font-family: 'Alilato';
-  src: url('/fonts/Alilato-ExtraLight.ttf') format('truetype');
-  font-weight: 200 400;
-  font-style: normal;
-  font-display: swap;
-}
-
-/* ──────────────────────────────────────────────────────────────
-   PALETA ALMA MOVEMENT — canónica (brand kit greige + espresso)
-   canvas    #FAF9F6  Feather White — fondo principal
-   mist      #F4F1EA  Porcelain Mist — superficies suaves
-   oat       #E6DAC8  Creamed Oat — bloques tintados, pills
-   sandstone #CBB9A4  Soft Sandstone — bordes fuertes, detalle
-   stone     #A48D78  Desert Rock — acento decorativo (solo texto grande)
-   berry     #6E5A46  taupe profundo — acento con AA en texto pequeño
-   ink       #43392F  espresso — texto y CTAs sólidos
-   ink-deep  #241B1A  espresso profundo — secciones drenched
-   hairline  #E0D5C6  divisores
-   olive     #5F6B4A  SOLO éxito/confirmación (funcional, no decorativo)
-   destructive #B23A48
-   ────────────────────────────────────────────────────────────── */
 
 /* ──────────────────────────────────────────────────────────────
    EMIL'S EASING CURVES (animations.dev)
@@ -56,7 +26,7 @@
 
 /* Stagger entrance: any [data-stagger-item] inside [data-stagger]
    fades up with cascading delay. CSS-only, hardware-accelerated. */
-@keyframes alma-fade-up {
+@keyframes fade-up {
   from {
     opacity: 0;
     transform: translateY(8px);
@@ -69,7 +39,7 @@
 [data-stagger] [data-stagger-item] {
   opacity: 0;
   transform: translateY(8px);
-  animation: alma-fade-up 360ms var(--ease-out) forwards;
+  animation: fade-up 360ms var(--ease-out) forwards;
 }
 [data-stagger] [data-stagger-item]:nth-child(1) { animation-delay: 40ms; }
 [data-stagger] [data-stagger-item]:nth-child(2) { animation-delay: 80ms; }
@@ -92,30 +62,30 @@
 }
 
 /* Scale-in: dialogs, popovers. Emil-curve. */
-@keyframes alma-scale-in {
+@keyframes scale-in {
   from { opacity: 0; transform: scale(0.96); }
   to   { opacity: 1; transform: scale(1); }
 }
 [data-scale-in] {
-  animation: alma-scale-in 320ms var(--ease-drawer) forwards;
+  animation: scale-in 320ms var(--ease-drawer) forwards;
 }
 
 /* Slide-up: bottom sheets, mobile toasts. */
-@keyframes alma-slide-up {
+@keyframes slide-up {
   from { opacity: 0; transform: translateY(16px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 [data-slide-up] {
-  animation: alma-slide-up 380ms var(--ease-drawer) forwards;
+  animation: slide-up 380ms var(--ease-drawer) forwards;
 }
 
 /* Fade-in simple sin movimiento (para imágenes lazy). */
-@keyframes alma-fade-in {
+@keyframes fade-in {
   from { opacity: 0; }
   to   { opacity: 1; }
 }
 [data-fade-in] {
-  animation: alma-fade-in 480ms var(--ease-out) forwards;
+  animation: fade-in 480ms var(--ease-out) forwards;
 }
 
 /* IntersectionObserver-friendly: aplica [data-reveal] al element y
@@ -128,34 +98,6 @@
 [data-reveal].is-visible {
   opacity: 1;
   transform: translateY(0);
-}
-
-/* Tratamiento fotográfico editorial — unifica fotos casuales/brillantes en
-   un look cálido y moody tipo Frame: menos saturación, más contraste, tinte
-   espresso. Se aplica a toda foto de la landing/app. */
-.alma-photo {
-  filter: grayscale(0.78) sepia(0.52) saturate(0.82) brightness(0.82) contrast(1.13);
-  transition: filter 700ms var(--ease-out);
-}
-/* Capa cálida espresso por encima de la foto (multiply) para profundidad y
-   cohesión de color. El contenedor debe ser position:relative + overflow. */
-.alma-photo-tint::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: #2a1e1b;
-  mix-blend-mode: multiply;
-  opacity: 0.3;
-}
-/* Viñeta sutil para dar foco y peso editorial a fotos grandes. */
-.alma-photo-vignette::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  pointer-events: none;
-  background: radial-gradient(120% 100% at 50% 35%, transparent 55%, rgba(36,27,26,0.34) 100%);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -229,19 +171,10 @@
     letter-spacing: -0.01em;
   }
 
-  /* PUENTE hasta la Tarea 12: clases de fuente de Alma → HIVE. */
-  .font-display,
-  .font-display-italic,
-  .font-bebas,
-  .font-gulfs {
+  .font-display {
     font-family: 'Unbounded', system-ui, sans-serif;
     font-style: normal;
     letter-spacing: -0.01em;
-  }
-  .font-alilato,
-  .font-syne,
-  .font-dm {
-    font-family: 'Manrope', system-ui, sans-serif;
   }
 
   /* Números alineados para precios, cupos, fechas y rankings. */
