@@ -302,7 +302,7 @@ type PageHeaderProps = {
 };
 export const PageHeader = ({ eyebrow, title, titleAccent, subtitle, actions }: PageHeaderProps) => (
   <header
-    className="-mx-5 sm:-mx-7 -mt-4 lg:mx-0 lg:mt-0 mb-7 lg:mb-10 rounded-b-[22px] lg:rounded-[22px] px-5 sm:px-7 lg:px-8 py-6 lg:py-8"
+    className="-mx-5 sm:-mx-7 first:-mt-4 lg:mx-0 lg:first:mt-0 mb-7 lg:mb-10 rounded-b-[22px] lg:rounded-[22px] px-5 sm:px-7 lg:px-8 py-6 lg:py-8"
     style={{ backgroundColor: COLOR.accent, color: COLOR.onAccent }}
   >
     <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">

@@ -27,6 +27,12 @@ describe("PageHeader", () => {
     expect(h1.className).toMatch(/text-\[length:clamp\(/);
     expect(h1.className).toMatch(/break-words/);
   });
+  it("sólo sube con margen negativo cuando es el primer elemento (no se come el mb-4 de BackLink)", () => {
+    wrap(<PageHeader title="Mi perfil" />);
+    const bloque = screen.getByRole("heading", { level: 1 }).closest("header")!;
+    expect(bloque.className).toMatch(/(^|\s)first:-mt-4(\s|$)/);
+    expect(bloque.className).not.toMatch(/(^|\s)-mt-4(\s|$)/);
+  });
 });
 
 describe("botones", () => {
