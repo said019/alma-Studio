@@ -69,15 +69,32 @@ describe("guardias contra volver a Alma", () => {
     expect(tw).not.toMatch(/\b(gulfs|bebas|syne|dm|alilato):/);
   });
 
+  const CORAL = /COLOR\.accent\b|\bbg-accent\b(?!-)/;
+  const LIGHT = /COLOR\.(canvas|surface|onInverse|onInverseMuted)\b|\btext-(canvas|surface|white|inverse-foreground|inverse-muted)\b/;
+  const lightOnCoral = (line: string) => CORAL.test(line) && LIGHT.test(line);
+
+  it("lightOnCoral marca texto claro sobre coral, línea por línea", () => {
+    const casos: [string, boolean][] = [
+      ['className="bg-accent text-inverse-muted"', true],
+      ['className="bg-accent text-canvas"', true],
+      ["style={{ backgroundColor: COLOR.accent, color: COLOR.onInverseMuted }}", true],
+      ['className="bg-accent text-ink"', false],
+      ["style={{ backgroundColor: COLOR.accent, color: COLOR.onAccent }}", false],
+      ['className="bg-accent-soft text-ink"', false],
+      ["color: COLOR.accentStrong", false],
+    ];
+    for (const [line, esperado] of casos) {
+      expect(lightOnCoral(line), line).toBe(esperado);
+    }
+  });
+
   it("ninguna pieza compartida pone texto claro sobre coral", () => {
     const dirs = ["src/components/app", "src/components/ui", "src/components/admin", "src/components/brand"];
-    const claros = /COLOR\.(canvas|surface|onInverse)|text-(canvas|surface|white|inverse-foreground)/;
     const malos: string[] = [];
     for (const d of dirs) {
       for (const f of fs.readdirSync(path.join(root, d)).filter((x) => /\.tsx$/.test(x) && !/\.test\./.test(x))) {
         fs.readFileSync(path.join(root, d, f), "utf8").split("\n").forEach((line, i) => {
-          const coral = /COLOR\.accent\b(?!Soft|Strong)|\bbg-accent\b(?!-)/.test(line);
-          if (coral && claros.test(line)) malos.push(`${d}/${f}:${i + 1}`);
+          if (lightOnCoral(line)) malos.push(`${d}/${f}:${i + 1}`);
         });
       }
     }
