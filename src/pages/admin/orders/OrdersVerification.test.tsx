@@ -57,4 +57,31 @@ describe("Cobros · Verificar", () => {
     const tab = screen.getByRole("link", { name: /Verificar/ });
     expect(within(tab).getByText("3")).toBeInTheDocument();
   });
+
+  it("la pestaña interna 'Por verificar' también lleva contador (M4)", async () => {
+    renderAdmin(<OrdersVerification />, { route: "/admin/orders" });
+    await screen.findByRole("complementary", { name: "Detalle de la orden" });
+    // 2 órdenes por verificar sin contar la de tarjeta (se cobra sola).
+    const porVerificar = screen.getByRole("tab", { name: /Por verificar/ });
+    expect(within(porVerificar).getByText("2")).toBeInTheDocument();
+  });
+
+  it("aprobar y rechazar también refrescan el contador de Cobros (M1)", async () => {
+    renderAdmin(<OrdersVerification />, { route: "/admin/orders" });
+    const detalle = await screen.findByRole("complementary", { name: "Detalle de la orden" });
+    const before = mockApi.get.mock.calls.filter((c) => String(c[0]) === "/admin/stats").length;
+    fireEvent.click(within(detalle).getByRole("button", { name: /Aprobar/ }));
+    await waitFor(() => expect(mockApi.put).toHaveBeenCalledWith("/admin/orders/o1/verify", { notes: "" }));
+    await waitFor(() => {
+      const after = mockApi.get.mock.calls.filter((c) => String(c[0]) === "/admin/stats").length;
+      expect(after).toBeGreaterThan(before);
+    });
+  });
+
+  it("recepción ve Verificar pero no la pestaña Cobrar (I3)", async () => {
+    loginAs("reception");
+    renderAdmin(<OrdersVerification />, { route: "/admin/orders" });
+    expect(await screen.findByRole("link", { name: /Verificar/ })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Cobrar" })).toBeNull();
+  });
 });

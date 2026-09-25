@@ -274,10 +274,19 @@ const OrdersBoard = ({ sources, emptyTitle, emptyDescription, emptyIcon, hideCar
   const detailOrder = orders.find((o) => o.id === selectedId) ?? orders[0] ?? null;
   const closeDetail = () => { setMobileOpen(false); };
 
+  // Aprobar/rechazar cambia lo que "Por verificar" cuenta en la pestaña de
+  // Cobros y en la insignia de Bandeja (AdminLayout), ambos con estas llaves;
+  // sin invalidarlas se quedan con el número viejo hasta 60 s (M1).
+  const invalidateCobrosCounters = () => {
+    qc.invalidateQueries({ queryKey: ["admin-stats"] });
+    qc.invalidateQueries({ queryKey: ["orders-pending"] });
+  };
+
   const approveMutation = useMutation({
     mutationFn: ({ id, notes }: { id: string; notes: string }) => api.put(`/admin/orders/${id}/verify`, { notes }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["orders"] });
+      invalidateCobrosCounters();
       toast({ title: "Orden aprobada" });
       closeDetail();
     },
@@ -289,6 +298,7 @@ const OrdersBoard = ({ sources, emptyTitle, emptyDescription, emptyIcon, hideCar
       api.put(`/admin/orders/${id}/reject`, { notes: reason, reason }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["orders"] });
+      invalidateCobrosCounters();
       toast({ title: "Orden rechazada, clienta notificada" });
       closeDetail();
     },
@@ -398,45 +408,69 @@ const OrdersBoard = ({ sources, emptyTitle, emptyDescription, emptyIcon, hideCar
 const tabTriggerClass =
   "rounded-xl px-4 py-2 text-[13px] font-semibold text-ink/70 data-[state=active]:bg-sunken data-[state=active]:text-ink data-[state=active]:shadow-none data-[state=active]:ring-1 data-[state=active]:ring-inset data-[state=active]:ring-line-strong";
 
-const OrdersVerification = () => (
-  <AuthGuard>
-    <AdminLayout>
-      <AdminPage>
-        <AdminPageHeader
-          kicker="Cobros · transferencias y efectivo"
-          title="Verificar"
-          subtitle="Compara cada monto con su comprobante antes de aprobar."
-          actions={<CobrosTabs />}
-        />
-        <Tabs defaultValue="pending">
-          <TabsList className="h-auto rounded-2xl border border-line bg-sunken p-1">
-            <TabsTrigger value="pending" className={tabTriggerClass}>Por verificar</TabsTrigger>
-            <TabsTrigger value="all" className={tabTriggerClass}>Todas</TabsTrigger>
-          </TabsList>
-          <TabsContent value="pending" className="mt-4">
-            <OrdersBoard
-              sources={[
-                { url: "/admin/orders?status=pending_verification", queryKey: ["orders", "pending_verification"] },
-                { url: "/admin/orders?status=pending_payment", queryKey: ["orders", "pending_payment"] },
-              ]}
-              hideCardOrders
-              emptyIcon={<CheckCircle2 size={20} strokeWidth={1.8} />}
-              emptyTitle="Estás al día"
-              emptyDescription="No hay transferencias ni efectivo esperando verificación. Los pagos con tarjeta se activan solos."
-            />
-          </TabsContent>
-          <TabsContent value="all" className="mt-4">
-            <OrdersBoard
-              sources={[{ url: "/admin/orders", queryKey: ["orders", "all"] }]}
-              emptyIcon={<Inbox size={20} strokeWidth={1.8} />}
-              emptyTitle="Aún no hay órdenes"
-              emptyDescription="Cuando una clienta suba un comprobante de pago, aparecerá aquí."
-            />
-          </TabsContent>
-        </Tabs>
-      </AdminPage>
-    </AdminLayout>
-  </AuthGuard>
-);
+const PENDING_SOURCES = [
+  { url: "/admin/orders?status=pending_verification", queryKey: ["orders", "pending_verification"] },
+  { url: "/admin/orders?status=pending_payment", queryKey: ["orders", "pending_payment"] },
+];
+
+const OrdersVerification = () => {
+  // El mismo par de consultas que arma el tablero "Por verificar" (misma
+  // llave: React Query las comparte, no duplica la petición). Se usa aquí
+  // sólo para el contador de la pestaña (spec §5.9).
+  const pendingResults = useQueries({
+    queries: PENDING_SOURCES.map((s) => ({
+      queryKey: s.queryKey,
+      queryFn: async () => (await api.get(s.url)).data as { data: Order[] },
+    })),
+  });
+  const pendingCount = pendingResults
+    .flatMap((r) => (Array.isArray(r.data?.data) ? r.data!.data : []))
+    .filter((o) => o.paymentMethod !== "card").length;
+
+  return (
+    <AuthGuard>
+      <AdminLayout>
+        <AdminPage>
+          <AdminPageHeader
+            kicker="Cobros · transferencias y efectivo"
+            title="Verificar"
+            subtitle="Compara cada monto con su comprobante antes de aprobar."
+            actions={<CobrosTabs />}
+          />
+          <Tabs defaultValue="pending">
+            <TabsList className="h-auto rounded-2xl border border-line bg-sunken p-1">
+              <TabsTrigger value="pending" className={cn(tabTriggerClass, "gap-2")}>
+                Por verificar
+                {pendingCount > 0 && (
+                  <span className="nums grid h-5 min-w-5 place-items-center rounded-full bg-accent px-1.5 text-[0.75rem] font-extrabold leading-none text-ink">
+                    {pendingCount}
+                  </span>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="all" className={tabTriggerClass}>Todas</TabsTrigger>
+            </TabsList>
+            <TabsContent value="pending" className="mt-4">
+              <OrdersBoard
+                sources={PENDING_SOURCES}
+                hideCardOrders
+                emptyIcon={<CheckCircle2 size={20} strokeWidth={1.8} />}
+                emptyTitle="Estás al día"
+                emptyDescription="No hay transferencias ni efectivo esperando verificación. Los pagos con tarjeta se activan solos."
+              />
+            </TabsContent>
+            <TabsContent value="all" className="mt-4">
+              <OrdersBoard
+                sources={[{ url: "/admin/orders", queryKey: ["orders", "all"] }]}
+                emptyIcon={<Inbox size={20} strokeWidth={1.8} />}
+                emptyTitle="Aún no hay órdenes"
+                emptyDescription="Cuando una clienta suba un comprobante de pago, aparecerá aquí."
+              />
+            </TabsContent>
+          </Tabs>
+        </AdminPage>
+      </AdminLayout>
+    </AuthGuard>
+  );
+};
 
 export default OrdersVerification;
