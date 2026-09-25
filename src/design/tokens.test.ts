@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest";
+import fs from "fs";
+import path from "path";
 import { contrast, luminance } from "./contrast";
 import {
   COLOR, LIGHT, DARK, THEMES, TONES, TONE_STYLE, TONE_CLASS, resolveTone, resolveToneClass,
@@ -83,6 +85,33 @@ describe("cristal sobre resplandor (oscuro)", () => {
   );
   it("inkFaint (íconos) pasa 3:1 sobre la tarjeta translúcida", () => {
     expect(contrast(DARK.inkFaint, card)).toBeGreaterThanOrEqual(CONTROL);
+  });
+});
+
+describe("texto sobre los resplandores (oscuro)", () => {
+  // Las alfas se leen de src/index.css: si alguien sube un resplandor, esta prueba lo ve.
+  const css = fs.readFileSync(path.resolve(__dirname, "..", "index.css"), "utf8");
+  const alfas = (utilidad: string) => {
+    const bloque = new RegExp(`\\.${utilidad}\\s*\\{([^}]*)\\}`).exec(css)?.[1] ?? "";
+    return [...bloque.matchAll(/rgb\(var\(--c-accent-deep\) \/ (\d*\.?\d+)\)/g)].map((m) => Number(m[1]));
+  };
+  const app = alfas("bg-app-glow");
+  const pase = alfas("bg-pass-glow");
+  it("las alfas salen de index.css (dos capas en bg-app-glow, una en bg-pass-glow)", () => {
+    expect(app).toHaveLength(2);
+    expect(pase).toHaveLength(1);
+  });
+  // Resplandor de la app sobre canvas. Sus dos capas no se tocan, pero se miden
+  // como si se sumaran: cota superior de la mezcla más fuerte.
+  const sobreApp = mix(DARK.accentDeep, DARK.canvas, 1 - app.reduce((p, a) => p * (1 - a), 1));
+  // El pase: su fondo es surface al 70 % sobre canvas (bg-surface/70) y el
+  // resplandor, en su centro (arriba a la derecha), encima con su alfa completa.
+  const sobrePase = mix(DARK.accentDeep, mix(DARK.surface, DARK.canvas, 0.7), pase[0]);
+  it.each(["ink", "inkMuted", "accent"] as ColorToken[])("%s sobre bg-app-glow pasa AA", (t) => {
+    expect(contrast(DARK[t], sobreApp)).toBeGreaterThanOrEqual(TEXT);
+  });
+  it.each(["ink", "inkMuted", "accent"] as ColorToken[])("%s sobre bg-pass-glow pasa AA", (t) => {
+    expect(contrast(DARK[t], sobrePase)).toBeGreaterThanOrEqual(TEXT);
   });
 });
 
