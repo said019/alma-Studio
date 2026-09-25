@@ -21,6 +21,13 @@ describe("Wallet en oscuro (spec 2026-09-25 §6.5)", () => {
     expect(src).toMatch(/fgColor=\{DARK\.onInverse\}/);
     expect(src).toMatch(/bgColor=\{DARK\.inverse\}/);
   });
+  it('"Sin paquete" en el pase va en text-ink-muted (AA sobre el resplandor), no en ink-faint', () => {
+    // Wallet monta QR, botones oficiales y varias queries: se afirma sobre la fuente, como el resto del archivo.
+    const estado = src.slice(src.indexOf("<header"), src.indexOf("</header>"));
+    expect(estado).toContain("Sin paquete");
+    expect(estado).toMatch(/metrics\.hasMembership \? "text-success" : "text-ink-muted"/);
+    expect(estado).not.toMatch(/"text-ink-faint"/);
+  });
   it("el archivo del pase conserva su nombre (lo cambia el sub-proyecto A)", () => {
     expect(src).toContain('a.download = "alma-pass.pkpass"');
   });

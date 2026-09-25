@@ -226,7 +226,7 @@ const Wallet = () => {
                 <span
                   className={
                     "inline-flex shrink-0 items-center gap-1.5 pt-1 text-[0.75rem] font-medium uppercase tracking-[0.18em] " +
-                    (metrics.hasMembership ? "text-success" : "text-ink-faint")
+                    (metrics.hasMembership ? "text-success" : "text-ink-muted")
                   }
                 >
                   <span
