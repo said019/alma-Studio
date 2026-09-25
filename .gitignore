@@ -56,6 +56,7 @@ dashboard-*.jpeg
 reservar-*.jpeg
 /*.jpeg
 auditoria-estudio/qa-*/
+auditoria-estudio/hive-panel/
 
 # Sesiones del visor de brainstorming y referencias descargadas
 .superpowers/
