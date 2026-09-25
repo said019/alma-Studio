@@ -38,7 +38,7 @@ Donde este documento y el lienzo no coincidan, manda este documento. Los casos c
 | Buscador global | Sólo clientas por ahora (el endpoint ya existe) |
 | Lista de espera | Pestaña de Reservas que muestra toda la semana; el servidor agrega `waitlist_count` a `GET /api/classes` |
 | Ficha de clienta | Suma "Editar" (el mismo formulario de Clientas) y "Renovar" (abre Cobrar con la clienta elegida) |
-| Lealtad | Se esconde de la ficha mientras `FEATURES.loyalty` esté apagada |
+| Funciones apagadas | Se esconde en el panel todo lo que depende de una función apagada: Lealtad en la ficha (`loyalty`), "Asignar visitante" y "Llevará acompañante" (`visits`), "Sólo guardar plantilla" (`scheduleTemplates`) y el control de Wellhub (`partnerPlatforms`). Vuelven solos al encender su función |
 | Enlaces muertos | Salen los que llevan a plantillas de WhatsApp (función apagada) |
 | Historial de cobros | Pasa a ser pestaña hermana de Cobrar y Verificar |
 | Cobrar | Una sola pantalla con resumen fijo, en vez del asistente de 3 pasos |
@@ -171,7 +171,7 @@ De arriba abajo:
 - **Izquierda:** tira de 7 días con el número de clases de cada uno, y la lista de clases del día elegido, con hora, tipo, coach, N/N o "Llena".
 - **Derecha:** la lista de la clase elegida. Hoy es una segunda vista que reemplaza a la primera; ahora se ven juntas. Contiene:
   - Encabezado con fecha, hora, tipo y coach, y la nota "se actualiza sola cada 15 s".
-  - Botones "Asignar socia" (principal), "Asignar visitante" y un menú "⋯" con "Cancelar clase" y "Actualizar".
+  - Botones "Asignar socia" (principal) y un menú "⋯" con "Cancelar clase" y "Actualizar". "Asignar visitante" sólo aparece si `FEATURES.visits` está encendida.
   - Contadores: Confirmadas, Asistieron, En espera y Faltas.
   - Renglones con avatar (una palomita verde si ya asistió), nombre, plan, clases restantes, teléfono, estado y acciones:
     - "Check-in";
@@ -180,7 +180,7 @@ De arriba abajo:
     - Las mismas reglas por estado que hoy.
   - Pie: el aviso "Cancelar una reserva devuelve el crédito, salvo que elijas lo contrario." y el botón "Cancelar clase" (peligro).
 - **URL:** la clase elegida vive en `?clase=<id>`. Así "Abrir en Reservas" (Lista de espera) y "Gestionar en Reservas" (Calendario) abren esa clase directo; hoy llevan a la semana sin elegir.
-- **Sin cambios:** los diálogos de cancelar reserva, cancelar clase, asignar socia (con acompañante) y asignar visitante conservan sus campos y flujos.
+- **Sin cambios:** los diálogos de cancelar reserva, cancelar clase, asignar socia y asignar visitante conservan sus campos y flujos. La casilla "Llevará acompañante" de Asignar socia sólo aparece si `FEATURES.visits` está encendida.
 
 ### 5.3 Reservas · Pasar lista — `/admin/pasar-lista`
 
@@ -219,6 +219,7 @@ De arriba abajo:
   - La línea de la hora actual cruza la columna de hoy, con la hora marcada en el margen.
 - **Al tocar una clase** se abre el **panel lateral actual**, con la misma información y acciones: cupo con − y +, inscritas, editar, cerrar, reabrir y cancelar.
   - Su encabezado adopta el resumen del lienzo: fecha y hora, tipo en `display-m`, coach, "Llena · N/N", "N en espera" y las iniciales.
+  - El control de Wellhub sólo aparece si `FEATURES.partnerPlatforms` está encendida.
   - "Gestionar en Reservas" abre esa clase (sección 5.2).
 - **Semana vacía:** se mantiene el aviso "Semana sin clases" con "Generar semana", pero **arriba del calendario vacío**, que sigue visible para tocar un día y crear una clase.
 - **Celular:** la tira de días y la lista del día de hoy se mantienen.
@@ -235,7 +236,8 @@ De arriba abajo:
 ### 5.7 Clases · Generar — `/admin/class-generator`
 
 - **Izquierda, arriba — "Horario oficial"** (la plantilla del estudio):
-  - La línea de horarios, "Instructora", "Semanas a generar", "Aplicar y generar" y "Sólo guardar plantilla" (fantasma), con la ayuda "Elige una instructora para activar el botón."
+  - La línea de horarios, "Instructora", "Semanas a generar" y "Aplicar y generar", con la ayuda "Elige una instructora para activar el botón."
+  - "Sólo guardar plantilla" sólo aparece si `FEATURES.scheduleTemplates` está encendida.
 - **Izquierda, abajo — "Crear clases en bloque"**, con los 4 grupos numerados de hoy:
   - Clase e instructora;
   - Rango de fechas;
@@ -444,7 +446,7 @@ Es sólo lo que se muestra: el servidor ya protege esas rutas y no cambia.
 - **Buscador:** el lienzo dice "Buscar clienta, clase o pago"; el texto final es "Buscar clienta" (sección 4.2).
 - **Pie de la barra lateral:** el lienzo muestra sólo "Cerrar sesión"; también va "Ver sitio".
 - **Datos:** los números, nombres y montos del lienzo son de ejemplo.
-- **Funciones apagadas que siguen a la vista:** "Asignar visitante" (visitas), "Sólo guardar plantilla" (plantillas de horario) y el control de Wellhub en el panel de la clase aparecen aunque su función está apagada, igual que hoy. Queda pendiente decidir si se esconden como Lealtad.
+- **Funciones apagadas:** el lienzo de Reservas y Generar ya no muestra "Asignar visitante" ni "Sólo guardar plantilla"; el control de Wellhub y la casilla de acompañante no aparecen en el lienzo.
 
 ---
 
@@ -460,7 +462,7 @@ Es sólo lo que se muestra: el servidor ya protege esas rutas y no cambia.
   - `GET /api/classes` devuelve `waitlist_count` correcto con reservas en espera, confirmadas y canceladas.
   - Cobrar con `?clienta=<id>` deja a la clienta elegida.
   - Recepción no ve Cobros, "Cobrar", ingresos, la pestaña Pagos ni "Editar" en la ficha.
-  - La ficha no muestra Lealtad con la función apagada.
+  - Con las funciones apagadas no aparecen Lealtad, "Asignar visitante", "Llevará acompañante", "Sólo guardar plantilla" ni el control de Wellhub; al encender cada función, vuelven.
   - El buscador abre la ficha elegida y se maneja con teclado.
   - Reservas abre la clase de `?clase=`.
   - Configuración General no borra la media al guardar.
