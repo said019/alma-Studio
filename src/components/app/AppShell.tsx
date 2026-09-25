@@ -17,13 +17,14 @@ import {
   AlertCircle,
 } from "lucide-react";
 
-
-import { COLOR, resolveTone, type Tone } from "@/design/tokens";
+import { resolveToneClass, type Tone } from "@/design/tokens";
 import { BrandLogo } from "@/components/brand/BrandLogo";
+import { HexPedestal } from "@/components/brand/HexPedestal";
 
 /* ═══════════════════════════════════════════════════════════
-   AppShell — /app layout: sidebar desktop + bottom-nav mobile
-   Active state: single accent (coral) tint, no rainbow.
+   AppShell — /app en oscuro (spec 2026-09-25 §5).
+   El color viaja en clases por función (bg-canvas, text-ink…) que leen las
+   variables del tema; nada de color en línea (guardia describeZone, src/design/zoneGuard.ts).
    ═══════════════════════════════════════════════════════════ */
 
 type NavItem = {
@@ -79,6 +80,7 @@ export const AppShell = ({ children, hideGreeting = false }: AppShellProps) => {
     .slice(0, 2)
     .toUpperCase();
   const avatarUrl = user?.photoUrl ?? user?.photo_url ?? null;
+  const avatar = avatarUrl ? <img src={avatarUrl} alt="" className="h-full w-full object-cover" /> : initials;
 
   const handleLogout = () => {
     logout();
@@ -93,15 +95,17 @@ export const AppShell = ({ children, hideGreeting = false }: AppShellProps) => {
     enabled: !!user?.id,
   });
   const unreadCount = unreadData?.data?.unread_count ?? 0;
+  const badge = unreadCount > 9 ? "9+" : String(unreadCount);
+  const notifActive = pathname.startsWith("/app/notifications");
 
   return (
-    <div className="min-h-screen lg:grid lg:grid-cols-[260px_1fr]" style={{ backgroundColor: COLOR.canvas, color: COLOR.ink }}>
+    <div className="relative isolate min-h-screen bg-canvas text-ink lg:grid lg:grid-cols-[260px_1fr]">
+      {/* Resplandor cálido del fondo: sólo en oscuro, fijo detrás de todo (regla 5). */}
+      <div aria-hidden="true" data-app-glow className="pointer-events-none fixed inset-0 -z-10 hidden dark:block bg-app-glow" />
+
       {/* ───────────── Sidebar (desktop) ───────────── */}
-      <aside
-        className="hidden lg:flex sticky top-0 self-start h-screen flex-col px-6 py-7"
-        style={{ borderRight: `1px solid ${COLOR.line}`, backgroundColor: COLOR.surface }}
-      >
-        <Link to="/" className="flex items-center no-underline mb-10">
+      <aside className="hidden lg:flex sticky top-0 self-start h-screen flex-col px-6 py-7 border-r border-line bg-canvas/80">
+        <Link to="/" className="flex items-center no-underline mb-10 text-accent">
           <BrandLogo variant="lockup" size={40} />
         </Link>
 
@@ -114,40 +118,33 @@ export const AppShell = ({ children, hideGreeting = false }: AppShellProps) => {
                 key={item.to}
                 to={item.to}
                 aria-current={active ? "page" : undefined}
-                className="group grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-2xl px-3.5 py-2.5 text-[0.92rem] no-underline transition-colors"
-                style={{
-                  backgroundColor: active ? COLOR.accentSoft : "transparent",
-                  color: COLOR.ink,
-                  fontWeight: active ? 700 : 500,
-                }}
+                className={
+                  "group grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-2xl px-3.5 min-h-[44px] text-[0.92rem] no-underline transition-colors " +
+                  (active ? "bg-accent-soft text-accent-strong font-bold" : "text-ink-muted font-medium hover:bg-surface/70 hover:text-ink")
+                }
               >
                 <Icon size={17} strokeWidth={active ? 2.2 : 1.8} />
                 <span>{item.label}</span>
-                {active && <ChevronRight size={14} style={{ color: COLOR.accentStrong }} />}
+                {active && <ChevronRight size={14} />}
               </Link>
             );
           })}
         </nav>
 
-        <div className="mt-6 pt-6 flex flex-col gap-1" style={{ borderTop: `1px solid ${COLOR.line}` }}>
+        <div className="mt-6 pt-6 flex flex-col gap-1 border-t border-line">
           <Link
             to="/app/notifications"
-            aria-current={pathname.startsWith("/app/notifications") ? "page" : undefined}
-            className="grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-2xl px-3.5 py-2.5 text-[0.88rem] no-underline transition-colors"
-            style={{
-              color: pathname.startsWith("/app/notifications") ? COLOR.accentStrong : COLOR.ink,
-              backgroundColor: pathname.startsWith("/app/notifications") ? COLOR.sunken : "transparent",
-              opacity: pathname.startsWith("/app/notifications") ? 1 : 0.78,
-            }}
+            aria-current={notifActive ? "page" : undefined}
+            className={
+              "grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-2xl px-3.5 min-h-[44px] text-[0.88rem] no-underline transition-colors " +
+              (notifActive ? "bg-accent-soft text-accent-strong font-bold" : "text-ink-muted hover:bg-surface/70 hover:text-ink")
+            }
           >
             <span className="relative inline-flex">
               <Bell size={16} strokeWidth={1.8} />
               {unreadCount > 0 && (
-                <span
-                  className="nums absolute -top-1.5 -right-1.5 grid place-items-center rounded-full text-[0.75rem] font-semibold leading-none px-1 min-w-[16px] h-[16px]"
-                  style={{ backgroundColor: COLOR.accent, color: COLOR.onAccent }}
-                >
-                  {unreadCount > 9 ? "9+" : unreadCount}
+                <span data-unread className="nums absolute -top-1.5 -right-1.5 grid place-items-center rounded-full bg-accent-gradient text-accent-foreground text-[0.75rem] font-bold leading-none px-1 min-w-[16px] h-[16px]">
+                  {badge}
                 </span>
               )}
             </span>
@@ -156,29 +153,19 @@ export const AppShell = ({ children, hideGreeting = false }: AppShellProps) => {
           </Link>
         </div>
 
-        <div className="mt-auto pt-6" style={{ borderTop: `1px solid ${COLOR.line}` }}>
-          <Link
-            to="/app/profile"
-            className="flex items-center gap-3 no-underline group"
-            style={{ color: COLOR.ink }}
-          >
-            <span
-              className="grid h-10 w-10 place-items-center rounded-full overflow-hidden text-[0.78rem] font-bold"
-              style={{ backgroundColor: COLOR.ink, color: COLOR.canvas }}
-            >
-              {avatarUrl ? <img src={avatarUrl} alt="" className="h-full w-full object-cover" /> : initials}
+        <div className="mt-auto pt-6 border-t border-line">
+          <Link to="/app/profile" className="flex items-center gap-3 no-underline text-ink">
+            <span className="grid h-10 w-10 place-items-center rounded-full overflow-hidden bg-inverse text-inverse-foreground text-[0.78rem] font-bold">
+              {avatar}
             </span>
             <div className="min-w-0 flex-1">
-              <p className="text-[0.86rem] font-medium truncate leading-tight">{firstName}</p>
-              <p className="text-[0.75rem] truncate" style={{ opacity: 0.55 }}>
-                {user?.email}
-              </p>
+              <p className="text-[0.86rem] font-semibold truncate leading-tight">{firstName}</p>
+              <p className="text-[0.75rem] truncate text-ink-muted">{user?.email}</p>
             </div>
           </Link>
           <button
             onClick={handleLogout}
-            className="mt-3 w-full grid grid-cols-[auto_1fr] items-center gap-3 rounded-2xl px-3.5 py-2.5 text-[0.84rem] cursor-pointer transition-colors"
-            style={{ background: "transparent", border: 0, color: COLOR.ink, opacity: 0.65 }}
+            className="mt-3 w-full grid grid-cols-[auto_1fr] items-center gap-3 rounded-2xl px-3.5 min-h-[44px] text-[0.84rem] cursor-pointer bg-transparent border-0 text-ink-muted transition-colors hover:text-ink"
           >
             <LogOut size={15} strokeWidth={1.8} />
             <span className="text-left">Cerrar sesión</span>
@@ -188,73 +175,51 @@ export const AppShell = ({ children, hideGreeting = false }: AppShellProps) => {
 
       {/* ───────────── Main column ───────────── */}
       <div className="flex flex-col min-w-0">
-        {/* Mobile top bar */}
-        <header
-          className="lg:hidden sticky top-0 z-30 flex h-16 items-center justify-between px-5"
-          style={{
-            backgroundColor: COLOR.surface,
-            borderBottom: `1px solid ${COLOR.line}`,
-          }}
-        >
-          <Link to="/app" className="flex items-center no-underline">
-            <BrandLogo size={34} />
+        {/* Mobile top bar: logo · campana · avatar */}
+        <header className="lg:hidden sticky top-0 z-30 flex h-16 items-center justify-between px-5 border-b border-line bg-canvas/85 backdrop-blur">
+          <Link to="/app" aria-label="Inicio" className="flex items-center no-underline text-accent">
+            <BrandLogo size={30} />
           </Link>
           <div className="flex items-center gap-2">
             <Link
               to="/app/notifications"
-              className="relative grid h-10 w-10 place-items-center rounded-full no-underline transition-colors"
-              style={{
-                backgroundColor: pathname.startsWith("/app/notifications") ? COLOR.sunken : "transparent",
-                color: COLOR.ink,
-              }}
               aria-label={unreadCount > 0 ? `Notificaciones (${unreadCount} sin leer)` : "Notificaciones"}
+              className={"relative grid h-11 w-11 place-items-center rounded-full no-underline text-ink transition-colors " + (notifActive ? "bg-surface/70" : "hover:bg-surface/70")}
             >
-              <Bell size={17} strokeWidth={1.8} />
+              <Bell size={18} strokeWidth={1.8} />
               {unreadCount > 0 && (
-                <span
-                  className="nums absolute top-0.5 right-0.5 grid place-items-center rounded-full text-[0.75rem] font-semibold leading-none px-1 min-w-[18px] h-[18px]"
-                  style={{ backgroundColor: COLOR.accent, color: COLOR.onAccent }}
-                >
-                  {unreadCount > 9 ? "9+" : unreadCount}
+                <span data-unread className="nums absolute top-1 right-1 grid place-items-center rounded-full bg-accent-gradient text-accent-foreground text-[0.75rem] font-bold leading-none px-1 min-w-[18px] h-[18px]">
+                  {badge}
                 </span>
               )}
             </Link>
             <Link
               to="/app/profile"
-              className="grid h-10 w-10 place-items-center rounded-full overflow-hidden text-[0.75rem] font-bold no-underline"
-              style={{ backgroundColor: COLOR.ink, color: COLOR.canvas }}
               aria-label="Perfil"
+              className="grid h-10 w-10 place-items-center rounded-full overflow-hidden bg-inverse text-inverse-foreground text-[0.75rem] font-bold no-underline"
             >
-              {avatarUrl ? <img src={avatarUrl} alt="" className="h-full w-full object-cover" /> : initials}
+              {avatar}
             </Link>
           </div>
         </header>
 
         {/* Greeting strip (hideable per page) */}
         {!hideGreeting && (
-          <div className="px-5 sm:px-7 lg:px-12 pt-7 lg:pt-12 pb-1">
-            <p className="text-[0.75rem] uppercase tracking-[0.24em]" style={{ color: COLOR.ink, opacity: 0.55 }}>
+          <div className="px-5 sm:px-7 lg:px-12 pt-6 lg:pt-12 pb-1">
+            <p className="text-[0.75rem] font-bold uppercase tracking-[0.2em] text-ink-muted">
               {greetByHour(today)}, {firstName}
             </p>
           </div>
         )}
 
-        <main
-          className="flex-1 px-5 sm:px-7 lg:px-12 pt-4 lg:pt-6 pb-[calc(7rem+env(safe-area-inset-bottom))] lg:pb-16"
-        >
+        <main className="flex-1 px-5 sm:px-7 lg:px-12 pt-4 lg:pt-6 pb-[calc(7rem+env(safe-area-inset-bottom))] lg:pb-16">
           {children}
         </main>
 
-        {/* Mobile bottom nav */}
+        {/* Mobile bottom nav: las cinco pestañas reales */}
         <nav
           data-bottom-nav
-          className="lg:hidden fixed inset-x-0 bottom-0 z-40 grid grid-cols-5"
-          style={{
-            backgroundColor: COLOR.surface,
-            borderTop: `1px solid ${COLOR.line}`,
-            paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))",
-            paddingTop: "0.5rem",
-          }}
+          className="lg:hidden fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-line bg-canvas/90 backdrop-blur pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]"
         >
           {NAV.map((item) => {
             const active = isActive(pathname, item.to, item.exact);
@@ -264,19 +229,16 @@ export const AppShell = ({ children, hideGreeting = false }: AppShellProps) => {
                 key={item.to}
                 to={item.to}
                 data-press
-                className="flex flex-col items-center justify-center gap-1 py-1 no-underline"
                 aria-current={active ? "page" : undefined}
+                className="flex min-h-[44px] flex-col items-center justify-center gap-1 py-1 no-underline"
               >
                 <span
                   data-nav-icon
-                  className="grid h-9 w-11 place-items-center rounded-full transition-colors"
-                  style={{ backgroundColor: active ? COLOR.accent : "transparent", color: active ? COLOR.onAccent : COLOR.inkMuted }}
+                  className={"grid h-8 w-11 place-items-center rounded-2xl transition-colors " + (active ? "bg-accent-gradient text-accent-foreground shadow-accent-glow" : "text-ink-faint")}
                 >
                   <Icon size={18} strokeWidth={active ? 2.2 : 1.8} />
                 </span>
-                <span className="text-[0.75rem]" style={{ color: active ? COLOR.ink : COLOR.inkMuted, fontWeight: active ? 700 : 500 }}>
-                  {item.label}
-                </span>
+                <span className={"text-[0.75rem] " + (active ? "text-ink font-bold" : "text-ink-faint font-medium")}>{item.label}</span>
               </Link>
             );
           })}
@@ -287,12 +249,11 @@ export const AppShell = ({ children, hideGreeting = false }: AppShellProps) => {
 };
 
 /* ═══════════════════════════════════════════════════════════
-   Primitives
+   Primitives — funcionan en los dos temas (el panel usa algunas).
    ═══════════════════════════════════════════════════════════ */
 
-/* ── PageHeader ── la firma de la app: un bloque coral por pantalla (spec §4.3).
-   En móvil llega a los bordes (cancela el padding de <main>) con las esquinas
-   inferiores redondeadas; en escritorio es una tarjeta. */
+/* ── PageHeader ── encabezado de la app: etiqueta, título en mayúsculas y
+   segunda línea terracota sobre el resplandor (spec 2026-09-25 §5). */
 type PageHeaderProps = {
   eyebrow?: string;
   title: ReactNode;
@@ -301,28 +262,25 @@ type PageHeaderProps = {
   actions?: ReactNode;
 };
 export const PageHeader = ({ eyebrow, title, titleAccent, subtitle, actions }: PageHeaderProps) => (
-  <header
-    className="-mx-5 sm:-mx-7 first:-mt-4 lg:mx-0 lg:first:mt-0 mb-7 lg:mb-10 rounded-b-[22px] lg:rounded-[22px] px-5 sm:px-7 lg:px-8 py-6 lg:py-8"
-    style={{ backgroundColor: COLOR.accent, color: COLOR.onAccent }}
-  >
+  <header className="mb-7 lg:mb-10">
     <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
       <div className="min-w-0">
-        {eyebrow && <p className="text-[0.75rem] font-bold uppercase tracking-[0.14em]">{eyebrow}</p>}
+        {eyebrow && <p className="text-[0.75rem] font-bold uppercase tracking-[0.16em] text-ink-muted">{eyebrow}</p>}
         <h1
           lang="es"
-          className={"font-display font-extrabold uppercase leading-[1.02] tracking-[-0.01em] break-words hyphens-auto text-[length:clamp(1.5rem,7.2vw,1.75rem)] " + (eyebrow ? "mt-2" : "")}
+          className={"font-display font-extrabold uppercase leading-[1.02] tracking-[-0.01em] break-words hyphens-auto text-ink text-[length:clamp(1.5rem,7.2vw,1.75rem)] " + (eyebrow ? "mt-2" : "")}
           /* display-l: 28 px desde 390 px */
         >
           {title}
           {titleAccent && (
-            <span className="block mt-1 font-semibold normal-case tracking-normal" style={{ fontSize: "0.62em" }}>
+            <span className="block mt-1 font-semibold normal-case tracking-normal text-[0.62em] text-accent-strong dark:text-accent">
               {titleAccent}
             </span>
           )}
         </h1>
-        {subtitle && <p className="mt-2 text-[0.95rem] font-semibold leading-[1.5] max-w-[60ch]">{subtitle}</p>}
+        {subtitle && <p className="mt-2 text-[0.95rem] leading-[1.5] text-ink-muted max-w-[60ch]">{subtitle}</p>}
       </div>
-      {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
+      {actions && <div className="flex flex-wrap items-center gap-2 shrink-0">{actions}</div>}
     </div>
   </header>
 );
@@ -337,12 +295,8 @@ type SectionProps = {
 export const Section = ({ title, trailing, children, className }: SectionProps) => (
   <section className={"mt-8 lg:mt-10 " + (className ?? "")}>
     {(title || trailing) && (
-      <div className="flex items-end justify-between gap-3 pb-3 mb-4" style={{ borderBottom: `1px solid ${COLOR.line}` }}>
-        {title && (
-          <h2 className="font-sans text-[0.75rem] font-bold uppercase tracking-[0.12em]" style={{ color: COLOR.inkMuted }}>
-            {title}
-          </h2>
-        )}
+      <div className="flex items-end justify-between gap-3 pb-3 mb-4 border-b border-line">
+        {title && <h2 className="font-sans text-[0.75rem] font-bold uppercase tracking-[0.12em] text-ink-muted">{title}</h2>}
         {trailing && <div className="text-[0.8125rem]">{trailing}</div>}
       </div>
     )}
@@ -363,67 +317,50 @@ type ListRowProps = {
   asButton?: boolean;
 };
 export const ListRow = ({ to, onClick, icon, iconTint = "accent", title, description, trailing, destructive, asButton }: ListRowProps) => {
-  const t = resolveTone(destructive ? "danger" : iconTint);
+  const t = resolveToneClass(destructive ? "danger" : iconTint);
   const inner = (
     <div className="grid grid-cols-[auto_1fr_auto] items-center gap-4 py-4">
       {icon ? (
-        <span
-          className="grid h-10 w-10 place-items-center rounded-xl shrink-0"
-          style={{ backgroundColor: t.softBg, color: t.fg, boxShadow: `inset 0 0 0 1px ${COLOR.line}` }}
-        >
+        <span data-row-icon className={`grid h-10 w-10 place-items-center rounded-xl shrink-0 ring-1 ring-inset ring-line ${t.softBg} ${t.fg}`}>
           {icon}
         </span>
       ) : (
         <span aria-hidden="true" />
       )}
       <div className="min-w-0">
-        <div className="text-[0.95rem] font-semibold leading-tight truncate" style={{ color: destructive ? COLOR.danger : COLOR.ink }}>
-          {title}
-        </div>
-        {description && (
-          <div className="text-[0.8125rem] mt-0.5 truncate" style={{ color: COLOR.inkMuted }}>
-            {description}
-          </div>
-        )}
+        <div className={"text-[0.95rem] font-semibold leading-tight truncate " + (destructive ? "text-danger" : "text-ink")}>{title}</div>
+        {description && <div className="text-[0.8125rem] mt-0.5 truncate text-ink-muted">{description}</div>}
       </div>
-      <div className="flex items-center gap-2 shrink-0" style={{ color: COLOR.inkMuted }}>
+      <div className="flex items-center gap-2 shrink-0 text-ink-muted">
         {trailing}
-        {(to || onClick) && <ChevronRight size={15} />}
+        {(to || onClick) && <ChevronRight size={15} className="text-ink-faint" />}
       </div>
     </div>
   );
 
-  const sharedClass = "block w-full text-left no-underline transition-colors";
-  const interactiveClass = sharedClass + " hover:bg-canvas";
-  const sharedStyle = { color: COLOR.ink, borderTop: `1px solid ${COLOR.line}` };
+  const sharedClass = "block w-full text-left no-underline transition-colors text-ink border-t border-line px-4";
+  const interactiveClass = sharedClass + " hover:bg-ink/5";
 
   if (asButton || (onClick && !to)) {
     return (
-      <button onClick={onClick} className={interactiveClass + " bg-transparent border-0 cursor-pointer px-4"} style={sharedStyle}>
+      <button onClick={onClick} className={interactiveClass + " bg-transparent border-x-0 border-b-0 cursor-pointer"}>
         {inner}
       </button>
     );
   }
   if (to) {
     return (
-      <Link to={to} onClick={onClick} className={interactiveClass + " px-4"} style={sharedStyle}>
+      <Link to={to} onClick={onClick} className={interactiveClass}>
         {inner}
       </Link>
     );
   }
-  return (
-    <div className={sharedClass + " px-4"} style={sharedStyle}>
-      {inner}
-    </div>
-  );
+  return <div className={sharedClass}>{inner}</div>;
 };
 
-/* ── ListGroup ── tarjeta blanca que agrupa ListRows */
+/* ── ListGroup ── tarjeta que agrupa ListRows; translúcida en oscuro */
 export const ListGroup = ({ children }: { children: ReactNode }) => (
-  <div
-    className="rounded-2xl overflow-hidden [&>*:first-child]:!border-t-0"
-    style={{ backgroundColor: COLOR.surface, boxShadow: `inset 0 0 0 1px ${COLOR.line}` }}
-  >
+  <div className="rounded-[20px] overflow-hidden border border-line bg-surface dark:bg-surface/70 [&>*:first-child]:!border-t-0">
     {children}
   </div>
 );
@@ -435,41 +372,29 @@ type StatProps = {
   tint?: Tone;
 };
 export const Stat = ({ value, label, tint = "ink" }: StatProps) => (
-  <div className="pt-3" style={{ borderTop: `1px solid ${COLOR.line}` }}>
-    <div className="font-display font-semibold text-2xl leading-none" style={{ color: resolveTone(tint).fg }}>
-      {value}
-    </div>
-    <div className="text-[0.75rem] font-bold uppercase tracking-[0.12em] mt-1.5" style={{ color: COLOR.inkMuted }}>
-      {label}
-    </div>
+  <div className="pt-3 border-t border-line">
+    <div className={`font-display font-semibold text-2xl leading-none ${resolveToneClass(tint).fg}`}>{value}</div>
+    <div className="text-[0.75rem] font-bold uppercase tracking-[0.12em] mt-1.5 text-ink-muted">{label}</div>
   </div>
 );
 
-/* ── Tag ── pill; sólida para disponibilidad (coral = hay lugar) */
+/* ── Tag ── pill; sólida para disponibilidad (terracota = hay lugar) */
 type TagProps = {
   children: ReactNode;
   tint?: Tone;
   variant?: "soft" | "solid";
 };
 export const Tag = ({ children, tint = "accent", variant = "soft" }: TagProps) => {
-  const t = resolveTone(tint);
-  const soft = variant === "soft";
+  const t = resolveToneClass(tint);
+  const tone = variant === "soft"
+    ? `${t.softBg} ${t.softFg} ring-1 ring-inset ${t.ring}`
+    : `${t.solidBg} ${t.solidFg}` + (tint === "accent" ? " dark:bg-accent-gradient" : "");
   return (
-    <span
-      className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[0.75rem] font-bold leading-none"
-      style={
-        soft
-          ? { backgroundColor: t.softBg, color: t.softFg, boxShadow: `inset 0 0 0 1px ${COLOR.line}` }
-          : { backgroundColor: t.solidBg, color: t.solidFg }
-      }
-    >
+    <span className={"inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[0.75rem] font-bold leading-none " + tone}>
       {children}
     </span>
   );
 };
-
-/* ── Hexágono de marca para estados (spec §4.6) ── */
-const HEX_CLIP = "polygon(25% 3%, 75% 3%, 100% 50%, 75% 97%, 25% 97%, 0 50%)";
 
 /* ── EmptyState ── */
 type EmptyStateProps = {
@@ -482,28 +407,17 @@ type EmptyStateProps = {
 };
 export const EmptyState = ({ title, description, ctaLabel, ctaTo, onCta, icon }: EmptyStateProps) => (
   <div className="flex flex-col items-start gap-4 py-10">
-    <span
-      aria-hidden="true"
-      className="grid h-12 w-[52px] place-items-center"
-      style={{ backgroundColor: COLOR.accentSoft, color: COLOR.accentStrong, clipPath: HEX_CLIP }}
-    >
-      {icon}
-    </span>
+    <HexPedestal icon={icon} />
     <div>
-      <h3 className="font-display font-extrabold uppercase text-[1.25rem] leading-tight" style={{ color: COLOR.ink }}>{title}</h3>
-      {description && (
-        <p className="mt-2 text-[0.95rem] leading-[1.6] max-w-[44ch]" style={{ color: COLOR.inkMuted }}>
-          {description}
-        </p>
-      )}
+      <h3 className="font-display font-extrabold uppercase text-[1.25rem] leading-tight text-ink">{title}</h3>
+      {description && <p className="mt-2 text-[0.95rem] leading-[1.6] max-w-[44ch] text-ink-muted">{description}</p>}
     </div>
     {ctaLabel && (ctaTo ? <PrimaryButton to={ctaTo}>{ctaLabel}</PrimaryButton> : <PrimaryButton onClick={onCta}>{ctaLabel}</PrimaryButton>)}
   </div>
 );
 
-/* ── Botones ── primary negro en todas partes; accent coral sólo para la
-   acción que genera ingreso, una por pantalla y nunca dentro de un bloque
-   coral (spec §4.1). Todos ≥44 px. */
+/* ── Botones ── primary en tinta en el panel y en degradado terracota en la
+   app (spec 2026-09-25 §5). Todos ≥44 px. */
 type CommonBtnProps = {
   children: ReactNode;
   loading?: boolean;
@@ -519,34 +433,34 @@ type CommonBtnProps = {
 
 export const PrimaryButton = ({ children, loading, loadingLabel, size = "md", to, onClick, disabled, type = "button", className: extra, variant = "primary" }: CommonBtnProps) => {
   const sizeClass = size === "sm" ? "min-h-[44px] px-5 text-[0.85rem]" : "min-h-[48px] px-6 text-[0.9rem]";
-  const className = `group inline-flex items-center justify-center gap-2 rounded-full font-bold no-underline transition-transform motion-safe:hover:-translate-y-px disabled:translate-y-0 ${sizeClass} ${extra ?? ""}`;
-  // Deshabilitado (spec §4.1): fondo sunken, texto lineStrong. Cargando conserva su color.
-  const style = disabled && !loading
-    ? { backgroundColor: COLOR.sunken, color: COLOR.lineStrong }
+  // Deshabilitado: fondo sunken y tinta tenue. Cargando conserva su color.
+  const tone = disabled && !loading
+    ? "bg-sunken text-ink-faint"
     : variant === "accent"
-      ? { backgroundColor: COLOR.accent, color: COLOR.onAccent }
-      : { backgroundColor: COLOR.ink, color: COLOR.canvas };
+      ? "bg-accent text-accent-foreground dark:bg-accent-gradient dark:shadow-accent-glow"
+      : "bg-ink text-canvas dark:bg-accent-gradient dark:text-accent-foreground dark:shadow-accent-glow";
+  const className = `group inline-flex items-center justify-center gap-2 rounded-full font-bold no-underline transition-transform motion-safe:hover:-translate-y-px disabled:translate-y-0 ${sizeClass} ${tone} ${extra ?? ""}`;
   const inner = loading ? <>{loadingLabel ?? "Cargando…"}</> : (
     <>
       {children}
       <ArrowRight size={15} className="transition-transform motion-safe:group-hover:translate-x-0.5" />
     </>
   );
-  if (to) return <Link to={to} data-press className={className} style={style} onClick={onClick}>{inner}</Link>;
+  if (to) return <Link to={to} data-press className={className} onClick={onClick}>{inner}</Link>;
   return (
-    <button type={type} data-press className={className} style={style} onClick={onClick} disabled={disabled || loading}>
+    <button type={type} data-press className={className} onClick={onClick} disabled={disabled || loading}>
       {inner}
     </button>
   );
 };
 
-export const GhostButton = ({ children, to, onClick, disabled, type = "button", className: extra }: CommonBtnProps) => {
-  // F7 — el fondo va en la clase (bg-surface), no en línea: un backgroundColor
-  // en style anulaba el hover:bg-sunken (el style attribute siempre gana).
-  const className = `inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full bg-surface px-5 text-[0.85rem] font-bold no-underline transition-colors hover:bg-sunken ${extra ?? ""}`;
-  const style = { boxShadow: `inset 0 0 0 1.5px ${COLOR.lineStrong}`, color: COLOR.ink };
-  if (to) return <Link to={to} data-press className={className} style={style} onClick={onClick}>{children}</Link>;
-  return <button type={type} data-press className={className} style={style} onClick={onClick} disabled={disabled}>{children}</button>;
+type GhostButtonProps = CommonBtnProps & { tone?: "default" | "danger" };
+
+export const GhostButton = ({ children, to, onClick, disabled, type = "button", className: extra, tone = "default" }: GhostButtonProps) => {
+  const toneClass = tone === "danger" ? "text-danger ring-danger/60" : "text-ink ring-line-strong";
+  const className = `inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full bg-surface dark:bg-surface/70 px-5 text-[0.85rem] font-bold no-underline ring-[1.5px] ring-inset transition-colors hover:bg-sunken ${toneClass} ${extra ?? ""}`;
+  if (to) return <Link to={to} data-press className={className} onClick={onClick}>{children}</Link>;
+  return <button type={type} data-press className={className} onClick={onClick} disabled={disabled}>{children}</button>;
 };
 
 /* ── ActionRow ── tarjeta de acción amplia (p. ej. "tu próxima clase") */
@@ -560,38 +474,20 @@ type ActionRowProps = {
   tint?: Tone;
 };
 export const ActionRow = ({ to, onClick, eyebrow, title, meta, rightLabel, tint = "accent" }: ActionRowProps) => {
-  const t = resolveTone(tint);
+  const t = resolveToneClass(tint);
+  const arrow = tint === "accent"
+    ? "bg-accent text-accent-foreground dark:bg-accent-gradient dark:shadow-accent-glow"
+    : `${t.solidBg} ${t.solidFg}`;
   const inner = (
-    <div
-      className="grid grid-cols-[1fr_auto] items-center gap-5 px-5 py-5 sm:px-6 sm:py-6 rounded-2xl transition-transform motion-safe:hover:-translate-y-px"
-      style={{ backgroundColor: COLOR.surface, boxShadow: `inset 0 0 0 1px ${COLOR.line}` }}
-    >
+    <div className="grid grid-cols-[1fr_auto] items-center gap-5 px-5 py-5 sm:px-6 sm:py-6 rounded-[20px] border border-line bg-surface dark:bg-surface/70 transition-transform motion-safe:hover:-translate-y-px">
       <div className="min-w-0">
-        {eyebrow && (
-          <p className="text-[0.75rem] font-bold uppercase tracking-[0.12em]" style={{ color: t.fg }}>
-            {eyebrow}
-          </p>
-        )}
-        <div className="font-display font-semibold text-[1.25rem] sm:text-[1.5rem] leading-tight mt-1" style={{ color: COLOR.ink }}>
-          {title}
-        </div>
-        {meta && (
-          <p className="text-[0.875rem] mt-1" style={{ color: COLOR.inkMuted }}>
-            {meta}
-          </p>
-        )}
+        {eyebrow && <p className={`text-[0.75rem] font-bold uppercase tracking-[0.12em] ${t.fg}`}>{eyebrow}</p>}
+        <div className="font-display font-semibold text-[1.25rem] sm:text-[1.5rem] leading-tight mt-1 text-ink">{title}</div>
+        {meta && <p className="text-[0.875rem] mt-1 text-ink-muted">{meta}</p>}
       </div>
       <div className="flex items-center gap-3 shrink-0">
-        {rightLabel && (
-          <span className="hidden sm:inline-block text-[0.75rem] font-bold uppercase tracking-[0.12em]" style={{ color: t.fg }}>
-            {rightLabel}
-          </span>
-        )}
-        <span
-          data-testid="action-row-arrow"
-          className="grid h-11 w-11 place-items-center rounded-full"
-          style={{ backgroundColor: t.solidBg, color: t.solidFg }}
-        >
+        {rightLabel && <span className={`hidden sm:inline-block text-[0.75rem] font-bold uppercase tracking-[0.12em] ${t.fg}`}>{rightLabel}</span>}
+        <span data-testid="action-row-arrow" className={`grid h-11 w-11 place-items-center rounded-full ${arrow}`}>
           <ArrowUpRight size={16} />
         </span>
       </div>
@@ -607,14 +503,14 @@ export const ActionRow = ({ to, onClick, eyebrow, title, meta, rightLabel, tint 
   );
 };
 
-/* ── SkeletonRow ── visible sobre canvas y sobre surface */
+/* ── SkeletonRow ── visible sobre canvas y sobre surface en los dos temas */
 export const SkeletonRow = ({ height = 64 }: { height?: number }) => (
-  <div aria-hidden="true" className="rounded-2xl overflow-hidden relative" style={{ backgroundColor: COLOR.line, height }}>
-    <span className="absolute inset-0 motion-safe:animate-pulse" style={{ backgroundColor: COLOR.sunken }} />
+  <div aria-hidden="true" className="rounded-2xl overflow-hidden relative bg-line" style={{ height }}>
+    <span className="absolute inset-0 motion-safe:animate-pulse bg-sunken" />
   </div>
 );
 
-/* ── ErrorState ── honesto, con reintento (spec §4.6) */
+/* ── ErrorState ── honesto, con reintento */
 type ErrorStateProps = {
   title?: string;
   description?: string;
@@ -628,12 +524,10 @@ export const ErrorState = ({
   retryLabel = "Reintentar",
 }: ErrorStateProps) => (
   <div role="alert" className="flex flex-col items-start gap-4 py-10">
-    <span aria-hidden="true" className="grid h-12 w-[52px] place-items-center" style={{ backgroundColor: COLOR.sunken, color: COLOR.danger, clipPath: HEX_CLIP }}>
-      <AlertCircle size={20} strokeWidth={1.8} />
-    </span>
+    <HexPedestal tone="danger" icon={<AlertCircle size={20} strokeWidth={1.8} />} />
     <div>
-      <h3 className="font-display font-extrabold uppercase text-[1.25rem] leading-tight" style={{ color: COLOR.ink }}>{title}</h3>
-      <p className="mt-2 text-[0.95rem] leading-[1.6] max-w-[44ch]" style={{ color: COLOR.inkMuted }}>{description}</p>
+      <h3 className="font-display font-extrabold uppercase text-[1.25rem] leading-tight text-ink">{title}</h3>
+      <p className="mt-2 text-[0.95rem] leading-[1.6] max-w-[44ch] text-ink-muted">{description}</p>
     </div>
     {onRetry && <GhostButton onClick={onRetry}>{retryLabel}</GhostButton>}
   </div>
