@@ -30,6 +30,8 @@ describe("Reportes", () => {
     loginAs("reception");
     renderAdmin(<ReportsPage />, { route: "/admin/reports" });
     await waitFor(() => expect(screen.getByTestId("location").textContent).toBe("/app"));
+    // Sin 403 en la consola: la pantalla no pide reportes antes de redirigir.
+    expect(mockApi.get.mock.calls.map(([u]) => String(u)).filter((u) => u.startsWith("/reports"))).toEqual([]);
   });
 
   it("usa todo el ancho, sin el tope de max-w-6xl (M6)", async () => {

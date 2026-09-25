@@ -226,7 +226,14 @@ const tooltipStyle = { fontSize: 12, borderColor: CHART_GRID, backgroundColor: C
    ═══════════════════════════════════════════════════════════════ */
 type TabKey = "revenue" | "classes" | "retention" | "top" | "instructors";
 
-const ReportsPage = () => {
+/* El guardia va por fuera para que recepción no dispare /reports/* (403). */
+const ReportsPage = () => (
+  <AuthGuard requiredRoles={["admin", "super_admin"]}>
+    <ReportsContent />
+  </AuthGuard>
+);
+
+const ReportsContent = () => {
   const navigate = useNavigate();
   const [rangeKey, setRangeKey] = useState<RangeKey>("this_month");
   const [tab, setTab] = useState<TabKey>("revenue");
@@ -333,421 +340,419 @@ const ReportsPage = () => {
   };
 
   return (
-    <AuthGuard requiredRoles={["admin", "super_admin"]}>
-      <AdminLayout>
-        <AdminPage>
-          <AdminPageHeader
-            kicker={`Análisis · actualizado ${format(new Date(), "HH:mm")}`}
-            title="Reportes"
-            actions={
-              <>
-                <Tabs value={rangeKey} onValueChange={(v) => setRangeKey(v as RangeKey)}>
-                  <TabsList>
-                    {RANGES.map((r) => (
-                      <TabsTrigger key={r.key} value={r.key}>{r.label}</TabsTrigger>
-                    ))}
-                  </TabsList>
-                </Tabs>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => window.print()}
-                  data-press
-                  className="hidden border-line-strong sm:inline-flex"
-                >
-                  <Printer size={13} className="mr-1.5" /> Imprimir
-                </Button>
-              </>
-            }
-          />
+    <AdminLayout>
+      <AdminPage>
+        <AdminPageHeader
+          kicker={`Análisis · actualizado ${format(new Date(), "HH:mm")}`}
+          title="Reportes"
+          actions={
+            <>
+              <Tabs value={rangeKey} onValueChange={(v) => setRangeKey(v as RangeKey)}>
+                <TabsList>
+                  {RANGES.map((r) => (
+                    <TabsTrigger key={r.key} value={r.key}>{r.label}</TabsTrigger>
+                  ))}
+                </TabsList>
+              </Tabs>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => window.print()}
+                data-press
+                className="hidden border-line-strong sm:inline-flex"
+              >
+                <Printer size={13} className="mr-1.5" /> Imprimir
+              </Button>
+            </>
+          }
+        />
 
-          {/* ═════ Action panel (sugerencia de win-back) ═════ */}
-          <ActionPanel dorm={dorm} navigate={navigate} />
+        {/* ═════ Action panel (sugerencia de win-back) ═════ */}
+        <ActionPanel dorm={dorm} navigate={navigate} />
 
-          {overviewError ? (
-            <Card className="mb-6 border-line bg-sunken">
+        {overviewError ? (
+          <Card className="mb-6 border-line bg-sunken">
+            <CardContent className="px-5">
+              <ErrorState
+                title="No pudimos cargar el resumen"
+                description="Los indicadores del período no están disponibles ahora mismo."
+                onRetry={() => refetchOverview()}
+              />
+            </CardContent>
+          </Card>
+        ) : (
+          <>
+            {/* ═════ KPI Layout: 1 Hero + 3 Secondary + 5 Strip ═════ */}
+            <div className="mb-5 grid grid-cols-1 gap-3 lg:grid-cols-12" data-stagger>
+              {/* Hero: ingresos */}
+              <div className="lg:col-span-6">
+                <HeroKPI
+                  label="Ingresos del período"
+                  value={formatMXN(o.monthlyRevenue || 0)}
+                  delta={deltas.revenue}
+                  sparkData={revSparkValues}
+                  sparkColor={CHART_PRIMARY}
+                  loading={isLoading}
+                />
+              </div>
+              {/* 3 secondary */}
+              <div className="lg:col-span-2">
+                <SecondaryKPI
+                  label="Miembros activos"
+                  value={String(o.activeMembers ?? "—")}
+                  loading={isLoading}
+                />
+              </div>
+              <div className="lg:col-span-2">
+                <SecondaryKPI
+                  label="Ocupación"
+                  value={fmtPct(o.classOccupancyRate || 0)}
+                  delta={deltas.occupancy}
+                  loading={isLoading}
+                />
+              </div>
+              <div className="lg:col-span-2">
+                <SecondaryKPI
+                  label="Churn 30d"
+                  value={fmtPct(o.churnRate || 0)}
+                  loading={isLoading}
+                />
+              </div>
+            </div>
+
+            {/* Strip de stats compactos */}
+            <div className="flex flex-wrap gap-x-6 gap-y-4 border-y border-line py-3.5" data-stagger>
+              <StripStat label="Reservas" value={String(o.monthlyBookings ?? 0)} />
+              <StripStat
+                label="Canceladas"
+                value={`${o.cancelledBookings ?? 0} · ${(o.cancelRate ?? 0).toFixed(1)}%`}
+              />
+              <StripStat label="Nuevos miembros" value={String(o.newMembersThisMonth ?? 0)} />
+              <StripStat label="Reseñas" value={String(o.reviewsTotal ?? 0)} />
+              <StripStat
+                label="Promedio"
+                value={
+                  <span className="inline-flex items-center gap-1">
+                    {o.reviewsAverage ? Number(o.reviewsAverage).toFixed(1) : "—"}
+                    <Star size={13} className="text-ink" fill="currentColor" strokeWidth={0} />
+                  </span>
+                }
+              />
+            </div>
+          </>
+        )}
+
+        {/* ═════ Conversión + dormant cohorts (side-by-side cuando aplica) ═════ */}
+        <div className="mb-6 grid grid-cols-1 gap-3 lg:grid-cols-2">
+          {conversionError ? (
+            <Card className="border-line bg-sunken" data-stagger-item>
               <CardContent className="px-5">
                 <ErrorState
-                  title="No pudimos cargar el resumen"
-                  description="Los indicadores del período no están disponibles ahora mismo."
-                  onRetry={() => refetchOverview()}
+                  title="Conversión no disponible"
+                  description="No pudimos calcular la conversión de muestras."
+                  onRetry={() => refetchConversion()}
                 />
               </CardContent>
             </Card>
-          ) : (
-            <>
-              {/* ═════ KPI Layout: 1 Hero + 3 Secondary + 5 Strip ═════ */}
-              <div className="mb-5 grid grid-cols-1 gap-3 lg:grid-cols-12" data-stagger>
-                {/* Hero: ingresos */}
-                <div className="lg:col-span-6">
-                  <HeroKPI
-                    label="Ingresos del período"
-                    value={formatMXN(o.monthlyRevenue || 0)}
-                    delta={deltas.revenue}
-                    sparkData={revSparkValues}
-                    sparkColor={CHART_PRIMARY}
-                    loading={isLoading}
+          ) : conv && (
+            <Card className="border-line bg-sunken" data-stagger-item>
+              <CardContent className="p-5">
+                <p className="mb-3 text-[0.72rem] font-medium uppercase tracking-[0.14em] text-ink/55">
+                  Conversión muestra a paquete
+                </p>
+                <div className="flex items-baseline gap-3">
+                  <span className="font-display nums leading-none text-ink" style={{ fontSize: "2.5rem" }}>
+                    {conv.conversion_rate ?? 0}%
+                  </span>
+                  <span className="nums text-[12px] text-ink/55">
+                    {conv.converted_total ?? 0} de {conv.muestras_total ?? 0} muestras
+                  </span>
+                </div>
+                <div className="mt-4 h-2 overflow-hidden rounded-full bg-sunken">
+                  <div
+                    className="h-full rounded-full bg-ink transition-[width] duration-700"
+                    style={{ width: `${conv.conversion_rate || 0}%` }}
                   />
                 </div>
-                {/* 3 secondary */}
-                <div className="lg:col-span-2">
-                  <SecondaryKPI
-                    label="Miembros activos"
-                    value={String(o.activeMembers ?? "—")}
-                    loading={isLoading}
-                  />
-                </div>
-                <div className="lg:col-span-2">
-                  <SecondaryKPI
-                    label="Ocupación"
-                    value={fmtPct(o.classOccupancyRate || 0)}
-                    delta={deltas.occupancy}
-                    loading={isLoading}
-                  />
-                </div>
-                <div className="lg:col-span-2">
-                  <SecondaryKPI
-                    label="Churn 30d"
-                    value={fmtPct(o.churnRate || 0)}
-                    loading={isLoading}
-                  />
-                </div>
-              </div>
-
-              {/* Strip de stats compactos */}
-              <div className="flex flex-wrap gap-x-6 gap-y-4 border-y border-line py-3.5" data-stagger>
-                <StripStat label="Reservas" value={String(o.monthlyBookings ?? 0)} />
-                <StripStat
-                  label="Canceladas"
-                  value={`${o.cancelledBookings ?? 0} · ${(o.cancelRate ?? 0).toFixed(1)}%`}
-                />
-                <StripStat label="Nuevos miembros" value={String(o.newMembersThisMonth ?? 0)} />
-                <StripStat label="Reseñas" value={String(o.reviewsTotal ?? 0)} />
-                <StripStat
-                  label="Promedio"
-                  value={
-                    <span className="inline-flex items-center gap-1">
-                      {o.reviewsAverage ? Number(o.reviewsAverage).toFixed(1) : "—"}
-                      <Star size={13} className="text-ink" fill="currentColor" strokeWidth={0} />
-                    </span>
-                  }
-                />
-              </div>
-            </>
+              </CardContent>
+            </Card>
           )}
+          {dormantError ? (
+            <Card className="border-line bg-sunken" data-stagger-item>
+              <CardContent className="px-5">
+                <ErrorState
+                  title="Cohortes no disponibles"
+                  description="No pudimos cargar el desglose por última visita."
+                  onRetry={() => refetchDormant()}
+                />
+              </CardContent>
+            </Card>
+          ) : dorm && (
+            <Card className="border-line bg-sunken" data-stagger-item>
+              <CardContent className="p-5">
+                <p className="mb-3 text-[0.72rem] font-medium uppercase tracking-[0.14em] text-ink/55">
+                  Por última visita
+                </p>
+                <div className="grid grid-cols-5 gap-1 text-center">
+                  {[
+                    { l: "≤7d", v: dorm.active_7d },
+                    { l: "8-14", v: dorm.dormant_8_14d },
+                    { l: "15-30", v: dorm.dormant_15_30d },
+                    { l: "31-60", v: dorm.dormant_31_60d },
+                    { l: "60+", v: dorm.lost_60d },
+                  ].map((b) => (
+                    <div key={b.l}>
+                      <p className="font-display nums leading-none text-ink" style={{ fontSize: "1.5rem" }}>{b.v ?? 0}</p>
+                      <p className="mt-1 text-[0.72rem] uppercase tracking-[0.1em] text-ink/55">{b.l}</p>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
 
-          {/* ═════ Conversión + dormant cohorts (side-by-side cuando aplica) ═════ */}
-          <div className="mb-6 grid grid-cols-1 gap-3 lg:grid-cols-2">
-            {conversionError ? (
-              <Card className="border-line bg-sunken" data-stagger-item>
-                <CardContent className="px-5">
-                  <ErrorState
-                    title="Conversión no disponible"
-                    description="No pudimos calcular la conversión de muestras."
-                    onRetry={() => refetchConversion()}
-                  />
-                </CardContent>
-              </Card>
-            ) : conv && (
-              <Card className="border-line bg-sunken" data-stagger-item>
-                <CardContent className="p-5">
-                  <p className="mb-3 text-[0.72rem] font-medium uppercase tracking-[0.14em] text-ink/55">
-                    Conversión muestra a paquete
-                  </p>
-                  <div className="flex items-baseline gap-3">
-                    <span className="font-display nums leading-none text-ink" style={{ fontSize: "2.5rem" }}>
-                      {conv.conversion_rate ?? 0}%
-                    </span>
-                    <span className="nums text-[12px] text-ink/55">
-                      {conv.converted_total ?? 0} de {conv.muestras_total ?? 0} muestras
-                    </span>
-                  </div>
-                  <div className="mt-4 h-2 overflow-hidden rounded-full bg-sunken">
-                    <div
-                      className="h-full rounded-full bg-ink transition-[width] duration-700"
-                      style={{ width: `${conv.conversion_rate || 0}%` }}
-                    />
-                  </div>
-                </CardContent>
-              </Card>
+        {/* ═════ Tabs de detalle (shadcn) ═════ */}
+        <Tabs value={tab} onValueChange={(v) => setTab(v as TabKey)}>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <TabsList>
+              <TabsTrigger value="revenue">Ingresos</TabsTrigger>
+              <TabsTrigger value="classes">Clases</TabsTrigger>
+              <TabsTrigger value="retention">Retención</TabsTrigger>
+              <TabsTrigger value="top">Top alumnas</TabsTrigger>
+              <TabsTrigger value="instructors">Instructoras</TabsTrigger>
+            </TabsList>
+            {/* Export CSV button changes per tab */}
+            {tab === "revenue" && revenueData.length > 0 && (
+              <Button size="sm" variant="outline" onClick={exportRevenueCsv} data-press className="border-line-strong">
+                <Download size={13} className="mr-1.5" /> Exportar CSV
+              </Button>
             )}
-            {dormantError ? (
-              <Card className="border-line bg-sunken" data-stagger-item>
-                <CardContent className="px-5">
-                  <ErrorState
-                    title="Cohortes no disponibles"
-                    description="No pudimos cargar el desglose por última visita."
-                    onRetry={() => refetchDormant()}
-                  />
-                </CardContent>
-              </Card>
-            ) : dorm && (
-              <Card className="border-line bg-sunken" data-stagger-item>
-                <CardContent className="p-5">
-                  <p className="mb-3 text-[0.72rem] font-medium uppercase tracking-[0.14em] text-ink/55">
-                    Por última visita
-                  </p>
-                  <div className="grid grid-cols-5 gap-1 text-center">
-                    {[
-                      { l: "≤7d", v: dorm.active_7d },
-                      { l: "8-14", v: dorm.dormant_8_14d },
-                      { l: "15-30", v: dorm.dormant_15_30d },
-                      { l: "31-60", v: dorm.dormant_31_60d },
-                      { l: "60+", v: dorm.lost_60d },
-                    ].map((b) => (
-                      <div key={b.l}>
-                        <p className="font-display nums leading-none text-ink" style={{ fontSize: "1.5rem" }}>{b.v ?? 0}</p>
-                        <p className="mt-1 text-[0.72rem] uppercase tracking-[0.1em] text-ink/55">{b.l}</p>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
+            {tab === "top" && topAttendanceData.length > 0 && (
+              <Button size="sm" variant="outline" onClick={exportTopCsv} data-press className="border-line-strong">
+                <Download size={13} className="mr-1.5" /> Exportar CSV
+              </Button>
+            )}
+            {tab === "retention" && retentionData.length > 0 && (
+              <Button size="sm" variant="outline" onClick={exportRetentionCsv} data-press className="border-line-strong">
+                <Download size={13} className="mr-1.5" /> Exportar CSV
+              </Button>
             )}
           </div>
 
-          {/* ═════ Tabs de detalle (shadcn) ═════ */}
-          <Tabs value={tab} onValueChange={(v) => setTab(v as TabKey)}>
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <TabsList>
-                <TabsTrigger value="revenue">Ingresos</TabsTrigger>
-                <TabsTrigger value="classes">Clases</TabsTrigger>
-                <TabsTrigger value="retention">Retención</TabsTrigger>
-                <TabsTrigger value="top">Top alumnas</TabsTrigger>
-                <TabsTrigger value="instructors">Instructoras</TabsTrigger>
-              </TabsList>
-              {/* Export CSV button changes per tab */}
-              {tab === "revenue" && revenueData.length > 0 && (
-                <Button size="sm" variant="outline" onClick={exportRevenueCsv} data-press className="border-line-strong">
-                  <Download size={13} className="mr-1.5" /> Exportar CSV
-                </Button>
+          {/* ═════ Tab content ═════ */}
+          <Card className="border-line bg-sunken">
+            <CardContent className="p-5">
+              <p className="mb-3 text-[13px] text-ink-muted">No depende del periodo elegido arriba.</p>
+              {tab === "revenue" && (
+                revenueError ? (
+                  <ErrorState
+                    title="No pudimos cargar los ingresos"
+                    onRetry={() => refetchRevenue()}
+                  />
+                ) : revenueLoading ? (
+                  <ChartSkeleton />
+                ) : revenueData.length === 0 ? (
+                  <EmptyState
+                    icon={<BarChart3 size={20} />}
+                    title="Aún no hay órdenes en este período"
+                    description="Cuando se registren cobros, aquí verás los ingresos mes a mes."
+                    ctaLabel="Ver órdenes"
+                    onCta={() => navigate("/admin/orders")}
+                  />
+                ) : (
+                  <>
+                    <p className="mb-3 text-[0.72rem] font-medium uppercase tracking-[0.14em] text-ink/55">
+                      Ingresos mensuales · últimos 12 meses
+                    </p>
+                    <ResponsiveContainer width="100%" height={280}>
+                      <BarChart data={revenueData} margin={{ top: 10, right: 5, left: 5, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} />
+                        <XAxis dataKey="month" tick={{ fontSize: 11, fill: CHART_AXIS }} axisLine={false} tickLine={false} />
+                        <YAxis tick={{ fontSize: 11, fill: CHART_AXIS }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
+                        <Tooltip formatter={(v: any) => formatMXN(Number(v))} contentStyle={tooltipStyle} />
+                        <Bar dataKey="amount" radius={[6, 6, 0, 0]}>
+                          {revenueData.map((_, i) => (
+                            <Cell key={i} fill={i === revenueData.length - 1 ? CHART_PRIMARY : CHART_SECONDARY} fillOpacity={i === revenueData.length - 1 ? 1 : 0.55} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </>
+                )
               )}
-              {tab === "top" && topAttendanceData.length > 0 && (
-                <Button size="sm" variant="outline" onClick={exportTopCsv} data-press className="border-line-strong">
-                  <Download size={13} className="mr-1.5" /> Exportar CSV
-                </Button>
+
+              {tab === "classes" && (
+                classesError ? (
+                  <ErrorState
+                    title="No pudimos cargar las clases"
+                    onRetry={() => refetchClasses()}
+                  />
+                ) : classesLoading ? (
+                  <ChartSkeleton />
+                ) : classesData.length === 0 ? (
+                  <EmptyState
+                    icon={<CalendarDays size={20} />}
+                    title="Aún no hay clases con reservas"
+                    description="En cuanto las alumnas reserven, aquí comparas reservas contra asistencias por tipo de clase."
+                  />
+                ) : (
+                  <>
+                    <p className="mb-3 text-[0.72rem] font-medium uppercase tracking-[0.14em] text-ink/55">
+                      Reservas vs asistencias por tipo
+                    </p>
+                    <ResponsiveContainer width="100%" height={280}>
+                      <BarChart data={classesData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} />
+                        <XAxis dataKey="label" tick={{ fontSize: 11, fill: CHART_AXIS }} />
+                        <YAxis tick={{ fontSize: 11, fill: CHART_AXIS }} />
+                        <Tooltip contentStyle={tooltipStyle} />
+                        <Bar dataKey="bookings" fill={CHART_PRIMARY} radius={[4, 4, 0, 0]} name="Reservas" />
+                        <Bar dataKey="attended" fill={CHART_TERTIARY} radius={[4, 4, 0, 0]} name="Asistencias" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </>
+                )
               )}
-              {tab === "retention" && retentionData.length > 0 && (
-                <Button size="sm" variant="outline" onClick={exportRetentionCsv} data-press className="border-line-strong">
-                  <Download size={13} className="mr-1.5" /> Exportar CSV
-                </Button>
+
+              {tab === "retention" && (
+                retentionError ? (
+                  <ErrorState
+                    title="No pudimos cargar la retención"
+                    onRetry={() => refetchRetention()}
+                  />
+                ) : retentionLoading ? (
+                  <ChartSkeleton />
+                ) : retentionData.length === 0 ? (
+                  <EmptyState
+                    icon={<TrendingUp size={20} />}
+                    title="Sin datos de retención todavía"
+                    description="Se calcula con la asistencia mes a mes; necesita al menos dos meses de actividad."
+                  />
+                ) : (
+                  <>
+                    <p className="mb-3 text-[0.72rem] font-medium uppercase tracking-[0.14em] text-ink/55">
+                      Tasa de retención mensual · 12 meses
+                    </p>
+                    <ResponsiveContainer width="100%" height={280}>
+                      <LineChart data={retentionData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} />
+                        <XAxis dataKey="month" tick={{ fontSize: 11, fill: CHART_AXIS }} />
+                        <YAxis tick={{ fontSize: 11, fill: CHART_AXIS }} tickFormatter={(v) => `${v}%`} domain={[0, 100]} />
+                        <Tooltip formatter={(v: any) => `${v}%`} contentStyle={tooltipStyle} />
+                        <Line
+                          type="monotone"
+                          dataKey="rate"
+                          stroke={CHART_PRIMARY}
+                          strokeWidth={2.5}
+                          dot={{ fill: CHART_PRIMARY, r: 3 }}
+                          activeDot={{ r: 5 }}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </>
+                )
               )}
-            </div>
 
-            {/* ═════ Tab content ═════ */}
-            <Card className="border-line bg-sunken">
-              <CardContent className="p-5">
-                <p className="mb-3 text-[13px] text-ink-muted">No depende del periodo elegido arriba.</p>
-                {tab === "revenue" && (
-                  revenueError ? (
-                    <ErrorState
-                      title="No pudimos cargar los ingresos"
-                      onRetry={() => refetchRevenue()}
-                    />
-                  ) : revenueLoading ? (
-                    <ChartSkeleton />
-                  ) : revenueData.length === 0 ? (
-                    <EmptyState
-                      icon={<BarChart3 size={20} />}
-                      title="Aún no hay órdenes en este período"
-                      description="Cuando se registren cobros, aquí verás los ingresos mes a mes."
-                      ctaLabel="Ver órdenes"
-                      onCta={() => navigate("/admin/orders")}
-                    />
-                  ) : (
-                    <>
-                      <p className="mb-3 text-[0.72rem] font-medium uppercase tracking-[0.14em] text-ink/55">
-                        Ingresos mensuales · últimos 12 meses
-                      </p>
-                      <ResponsiveContainer width="100%" height={280}>
-                        <BarChart data={revenueData} margin={{ top: 10, right: 5, left: 5, bottom: 0 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} />
-                          <XAxis dataKey="month" tick={{ fontSize: 11, fill: CHART_AXIS }} axisLine={false} tickLine={false} />
-                          <YAxis tick={{ fontSize: 11, fill: CHART_AXIS }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
-                          <Tooltip formatter={(v: any) => formatMXN(Number(v))} contentStyle={tooltipStyle} />
-                          <Bar dataKey="amount" radius={[6, 6, 0, 0]}>
-                            {revenueData.map((_, i) => (
-                              <Cell key={i} fill={i === revenueData.length - 1 ? CHART_PRIMARY : CHART_SECONDARY} fillOpacity={i === revenueData.length - 1 ? 1 : 0.55} />
-                            ))}
-                          </Bar>
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </>
-                  )
-                )}
-
-                {tab === "classes" && (
-                  classesError ? (
-                    <ErrorState
-                      title="No pudimos cargar las clases"
-                      onRetry={() => refetchClasses()}
-                    />
-                  ) : classesLoading ? (
-                    <ChartSkeleton />
-                  ) : classesData.length === 0 ? (
-                    <EmptyState
-                      icon={<CalendarDays size={20} />}
-                      title="Aún no hay clases con reservas"
-                      description="En cuanto las alumnas reserven, aquí comparas reservas contra asistencias por tipo de clase."
-                    />
-                  ) : (
-                    <>
-                      <p className="mb-3 text-[0.72rem] font-medium uppercase tracking-[0.14em] text-ink/55">
-                        Reservas vs asistencias por tipo
-                      </p>
-                      <ResponsiveContainer width="100%" height={280}>
-                        <BarChart data={classesData}>
-                          <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} />
-                          <XAxis dataKey="label" tick={{ fontSize: 11, fill: CHART_AXIS }} />
-                          <YAxis tick={{ fontSize: 11, fill: CHART_AXIS }} />
-                          <Tooltip contentStyle={tooltipStyle} />
-                          <Bar dataKey="bookings" fill={CHART_PRIMARY} radius={[4, 4, 0, 0]} name="Reservas" />
-                          <Bar dataKey="attended" fill={CHART_TERTIARY} radius={[4, 4, 0, 0]} name="Asistencias" />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </>
-                  )
-                )}
-
-                {tab === "retention" && (
-                  retentionError ? (
-                    <ErrorState
-                      title="No pudimos cargar la retención"
-                      onRetry={() => refetchRetention()}
-                    />
-                  ) : retentionLoading ? (
-                    <ChartSkeleton />
-                  ) : retentionData.length === 0 ? (
-                    <EmptyState
-                      icon={<TrendingUp size={20} />}
-                      title="Sin datos de retención todavía"
-                      description="Se calcula con la asistencia mes a mes; necesita al menos dos meses de actividad."
-                    />
-                  ) : (
-                    <>
-                      <p className="mb-3 text-[0.72rem] font-medium uppercase tracking-[0.14em] text-ink/55">
-                        Tasa de retención mensual · 12 meses
-                      </p>
-                      <ResponsiveContainer width="100%" height={280}>
-                        <LineChart data={retentionData}>
-                          <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} />
-                          <XAxis dataKey="month" tick={{ fontSize: 11, fill: CHART_AXIS }} />
-                          <YAxis tick={{ fontSize: 11, fill: CHART_AXIS }} tickFormatter={(v) => `${v}%`} domain={[0, 100]} />
-                          <Tooltip formatter={(v: any) => `${v}%`} contentStyle={tooltipStyle} />
-                          <Line
-                            type="monotone"
-                            dataKey="rate"
-                            stroke={CHART_PRIMARY}
-                            strokeWidth={2.5}
-                            dot={{ fill: CHART_PRIMARY, r: 3 }}
-                            activeDot={{ r: 5 }}
-                          />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    </>
-                  )
-                )}
-
-                {tab === "top" && (
-                  topError ? (
-                    <ErrorState
-                      title="No pudimos cargar el ranking"
-                      onRetry={() => refetchTop()}
-                    />
-                  ) : topLoading ? (
-                    <div className="space-y-3">
-                      {[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-12 w-full" />)}
-                    </div>
-                  ) : topAttendanceData.length === 0 ? (
-                    <EmptyState
-                      icon={<Users size={20} />}
-                      title="Aún no hay asistencias registradas"
-                      description="Cuando pases lista en las clases, aquí aparece el ranking de alumnas más constantes."
-                    />
-                  ) : (
-                    <div className="space-y-2">
-                      {topAttendanceData.map((u: any, idx: number) => {
-                        const maxLifetime = Math.max(...topAttendanceData.map((x: any) => Number(x.lifetime || 0)));
-                        const pct = maxLifetime > 0 ? (Number(u.lifetime || 0) / maxLifetime) * 100 : 0;
-                        return (
-                          <div
-                            key={u.id}
+              {tab === "top" && (
+                topError ? (
+                  <ErrorState
+                    title="No pudimos cargar el ranking"
+                    onRetry={() => refetchTop()}
+                  />
+                ) : topLoading ? (
+                  <div className="space-y-3">
+                    {[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-12 w-full" />)}
+                  </div>
+                ) : topAttendanceData.length === 0 ? (
+                  <EmptyState
+                    icon={<Users size={20} />}
+                    title="Aún no hay asistencias registradas"
+                    description="Cuando pases lista en las clases, aquí aparece el ranking de alumnas más constantes."
+                  />
+                ) : (
+                  <div className="space-y-2">
+                    {topAttendanceData.map((u: any, idx: number) => {
+                      const maxLifetime = Math.max(...topAttendanceData.map((x: any) => Number(x.lifetime || 0)));
+                      const pct = maxLifetime > 0 ? (Number(u.lifetime || 0) / maxLifetime) * 100 : 0;
+                      return (
+                        <div
+                          key={u.id}
+                          className={cn(
+                            "flex items-center gap-3 py-2",
+                            idx < topAttendanceData.length - 1 && "border-b border-line",
+                          )}
+                        >
+                          <span
                             className={cn(
-                              "flex items-center gap-3 py-2",
-                              idx < topAttendanceData.length - 1 && "border-b border-line",
+                              "nums grid h-8 w-8 shrink-0 place-items-center rounded-full text-[11px] font-bold",
+                              idx < 3 ? "bg-ink text-canvas" : "bg-sunken text-ink",
                             )}
                           >
-                            <span
-                              className={cn(
-                                "nums grid h-8 w-8 shrink-0 place-items-center rounded-full text-[11px] font-bold",
-                                idx < 3 ? "bg-ink text-canvas" : "bg-sunken text-ink",
-                              )}
-                            >
-                              {idx + 1}
-                            </span>
-                            <div className="min-w-0 flex-1">
-                              <p className="truncate text-[14px] font-medium text-ink">{u.display_name}</p>
-                              <p className="nums mt-0.5 text-[11px] text-ink/55">
-                                {u.this_month} este mes · última {u.last_visit ? formatDate(u.last_visit) : "—"}
-                              </p>
-                            </div>
-                            <div className="hidden h-1.5 w-32 overflow-hidden rounded-full bg-sunken sm:block">
+                            {idx + 1}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-[14px] font-medium text-ink">{u.display_name}</p>
+                            <p className="nums mt-0.5 text-[11px] text-ink/55">
+                              {u.this_month} este mes · última {u.last_visit ? formatDate(u.last_visit) : "—"}
+                            </p>
+                          </div>
+                          <div className="hidden h-1.5 w-32 overflow-hidden rounded-full bg-sunken sm:block">
+                            <div className="h-full rounded-full bg-ink" style={{ width: `${pct}%` }} />
+                          </div>
+                          <span className="nums shrink-0 rounded-full bg-inverse px-2.5 py-0.5 text-[12px] font-semibold text-canvas">
+                            {u.lifetime}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )
+              )}
+
+              {tab === "instructors" && (
+                instructorsError ? (
+                  <ErrorState
+                    title="No pudimos cargar a las instructoras"
+                    onRetry={() => refetchInstructors()}
+                  />
+                ) : instructorsLoading ? (
+                  <div className="space-y-3">
+                    {[1, 2, 3].map((i) => <Skeleton key={i} className="h-8 w-full" />)}
+                  </div>
+                ) : instructorsData.length === 0 ? (
+                  <EmptyState
+                    icon={<Users size={20} />}
+                    title="Aún no hay instructoras con clases"
+                    ctaLabel="Crear instructora"
+                    onCta={() => navigate("/admin/staff")}
+                  />
+                ) : (
+                  <div className="space-y-3">
+                    {instructorsData.map((ins: any) => {
+                      const max = Math.max(...instructorsData.map((x: any) => Number(x.classCount || x.class_count || 0)));
+                      const count = Number(ins.classCount || ins.class_count || 0);
+                      const pct = max > 0 ? (count / max) * 100 : 0;
+                      return (
+                        <div key={ins.id} className="flex items-center justify-between gap-3 text-sm">
+                          <span className="flex-1 truncate font-medium text-ink">{ins.name || ins.display_name}</span>
+                          <div className="flex items-center gap-3">
+                            <div className="h-2 w-40 overflow-hidden rounded-full bg-sunken">
                               <div className="h-full rounded-full bg-ink" style={{ width: `${pct}%` }} />
                             </div>
-                            <span className="nums shrink-0 rounded-full bg-inverse px-2.5 py-0.5 text-[12px] font-semibold text-canvas">
-                              {u.lifetime}
-                            </span>
+                            <span className="font-display nums w-8 text-right text-ink">{count}</span>
                           </div>
-                        );
-                      })}
-                    </div>
-                  )
-                )}
-
-                {tab === "instructors" && (
-                  instructorsError ? (
-                    <ErrorState
-                      title="No pudimos cargar a las instructoras"
-                      onRetry={() => refetchInstructors()}
-                    />
-                  ) : instructorsLoading ? (
-                    <div className="space-y-3">
-                      {[1, 2, 3].map((i) => <Skeleton key={i} className="h-8 w-full" />)}
-                    </div>
-                  ) : instructorsData.length === 0 ? (
-                    <EmptyState
-                      icon={<Users size={20} />}
-                      title="Aún no hay instructoras con clases"
-                      ctaLabel="Crear instructora"
-                      onCta={() => navigate("/admin/staff")}
-                    />
-                  ) : (
-                    <div className="space-y-3">
-                      {instructorsData.map((ins: any) => {
-                        const max = Math.max(...instructorsData.map((x: any) => Number(x.classCount || x.class_count || 0)));
-                        const count = Number(ins.classCount || ins.class_count || 0);
-                        const pct = max > 0 ? (count / max) * 100 : 0;
-                        return (
-                          <div key={ins.id} className="flex items-center justify-between gap-3 text-sm">
-                            <span className="flex-1 truncate font-medium text-ink">{ins.name || ins.display_name}</span>
-                            <div className="flex items-center gap-3">
-                              <div className="h-2 w-40 overflow-hidden rounded-full bg-sunken">
-                                <div className="h-full rounded-full bg-ink" style={{ width: `${pct}%` }} />
-                              </div>
-                              <span className="font-display nums w-8 text-right text-ink">{count}</span>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )
-                )}
-              </CardContent>
-            </Card>
-          </Tabs>
-        </AdminPage>
-      </AdminLayout>
-    </AuthGuard>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )
+              )}
+            </CardContent>
+          </Card>
+        </Tabs>
+      </AdminPage>
+    </AdminLayout>
   );
 };
 

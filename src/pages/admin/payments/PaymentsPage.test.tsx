@@ -96,4 +96,11 @@ describe("Cobros · Historial", () => {
     expect(within(tabs).getByRole("link", { name: "Historial" })).toHaveAttribute("aria-current", "page");
     expect(within(tabs).getByRole("link", { name: "Cobrar" })).not.toHaveAttribute("aria-current");
   });
+
+  it("recepción no entra ni pide los pagos (sin 403 en la consola)", async () => {
+    loginAs("reception");
+    renderAdmin(<PaymentsHistoryPage />, { route: "/admin/payments/historial" });
+    await waitFor(() => expect(screen.getByTestId("location").textContent).toBe("/app"));
+    expect(mockApi.get.mock.calls.map(([u]) => String(u)).filter((u) => u.startsWith("/payments"))).toEqual([]);
+  });
 });
