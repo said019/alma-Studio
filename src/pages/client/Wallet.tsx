@@ -191,8 +191,43 @@ const Wallet = () => {
   const passStats = [
     { label: "Por usar", value: metrics.isUnlimited ? "∞" : String(metrics.remaining) },
     { label: "Vence", value: formatShortDate(wallet?.membership?.end_date) },
-    { label: "Puntos", value: (wallet?.points ?? 0).toLocaleString("es-MX") },
+    ...(FEATURES.loyalty ? [{ label: "Puntos", value: (wallet?.points ?? 0).toLocaleString("es-MX") }] : []),
   ];
+
+  /* QR de check-in: va dentro del pase si la tarjeta está encendida, o solo. */
+  const qrBlock = wallet?.qr_code ? (
+    <div className={"flex items-center gap-5 px-6 py-5 sm:px-7" + (FEATURES.walletPassCard ? " border-t border-line" : "")}>
+      <div className="shrink-0 rounded-xl bg-inverse p-2">
+        <QRCodeSVG
+          value={wallet.qr_code}
+          size={96}
+          bgColor={DARK.inverse}
+          fgColor={DARK.onInverse}
+        />
+      </div>
+      <div className="min-w-0">
+        <p className="flex items-center gap-1.5 text-[0.75rem] font-medium uppercase tracking-[0.2em] text-accent-strong">
+          <ScanQrCode size={13} />
+          Check-in en recepción
+        </p>
+        <p className="mt-1.5 text-[0.82rem] leading-[1.5] text-ink-muted">
+          Muéstralo al llegar. Si te lo piden por chat, cópialo y mándalo.
+        </p>
+        <button
+          type="button"
+          onClick={handleCopyCode}
+          className={
+            "mt-3 inline-flex min-h-[44px] cursor-pointer items-center gap-2 rounded-full border-0 px-4 text-[0.75rem] font-medium uppercase tracking-[0.16em] transition-colors " +
+            (codeCopied ? "bg-success text-canvas" : "bg-ink text-canvas")
+          }
+        >
+          {codeCopied
+            ? <><Check size={13} /> Copiado</>
+            : <><Copy size={13} /> Copiar código</>}
+        </button>
+      </div>
+    </div>
+  ) : null;
 
   return (
     <ClientAuthGuard requiredRoles={["client"]}>
@@ -201,7 +236,9 @@ const Wallet = () => {
           eyebrow="Tu pase"
           title={<>Tu pase</>}
           titleAccent="del estudio."
-          subtitle="Tu membresía y un QR para hacer check-in al llegar al estudio."
+          subtitle={FEATURES.walletPassCard
+            ? "Tu membresía y un QR para hacer check-in al llegar al estudio."
+            : "Tu QR para hacer check-in al llegar al estudio."}
         />
 
         {isLoading ? (
@@ -215,6 +252,16 @@ const Wallet = () => {
               description="No pudimos traer tu pase del estudio. Revisa tu conexión y vuelve a intentarlo."
               onRetry={() => refetch()}
             />
+          </Section>
+        ) : !FEATURES.walletPassCard ? (
+          <Section>
+            {qrBlock ? (
+              <article className="overflow-hidden rounded-[22px] border border-line bg-surface/70 bg-pass-glow">{qrBlock}</article>
+            ) : (
+              <p className="text-[0.84rem] leading-[1.6] text-ink-muted">
+                Tu código de check-in aún no está listo. Pídelo en recepción.
+              </p>
+            )}
           </Section>
         ) : (
           <Section>
@@ -247,7 +294,7 @@ const Wallet = () => {
               </div>
 
               {/* Datos del pase: número + label, hairlines internas */}
-              <div className="grid grid-cols-3 border-t border-line px-6 sm:px-7">
+              <div className={"grid border-t border-line px-6 sm:px-7 " + (passStats.length === 3 ? "grid-cols-3" : "grid-cols-2")}>
                 {passStats.map((s, i) => (
                   <div key={s.label} className={"min-w-0 py-4 " + (i > 0 ? "border-l border-line pl-4" : "")}>
                     <p className="text-[0.75rem] uppercase tracking-[0.18em] text-ink-muted">{s.label}</p>
@@ -277,39 +324,7 @@ const Wallet = () => {
               )}
 
               {/* QR sobre baldosa clara para que se lea, con margen dentro del pase oscuro */}
-              {wallet?.qr_code && (
-                <div className="flex items-center gap-5 border-t border-line px-6 py-5 sm:px-7">
-                  <div className="shrink-0 rounded-xl bg-inverse p-2">
-                    <QRCodeSVG
-                      value={wallet.qr_code}
-                      size={96}
-                      bgColor={DARK.inverse}
-                      fgColor={DARK.onInverse}
-                    />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="flex items-center gap-1.5 text-[0.75rem] font-medium uppercase tracking-[0.2em] text-accent-strong">
-                      <ScanQrCode size={13} />
-                      Check-in en recepción
-                    </p>
-                    <p className="mt-1.5 text-[0.82rem] leading-[1.5] text-ink-muted">
-                      Muéstralo al llegar. Si te lo piden por chat, cópialo y mándalo.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={handleCopyCode}
-                      className={
-                        "mt-3 inline-flex min-h-[44px] cursor-pointer items-center gap-2 rounded-full border-0 px-4 text-[0.75rem] font-medium uppercase tracking-[0.16em] transition-colors " +
-                        (codeCopied ? "bg-success text-canvas" : "bg-ink text-canvas")
-                      }
-                    >
-                      {codeCopied
-                        ? <><Check size={13} /> Copiado</>
-                        : <><Copy size={13} /> Copiar código</>}
-                    </button>
-                  </div>
-                </div>
-              )}
+              {qrBlock}
             </article>
           </Section>
         )}
@@ -358,7 +373,7 @@ const Wallet = () => {
         </Section>
 
         {/* Accesos: lista editorial, no pills */}
-        <Section title="Tus puntos y reservas">
+        <Section title={FEATURES.loyalty ? "Tus puntos y reservas" : "Tus reservas"}>
           <ListGroup>
             {FEATURES.walletExtras && (
               <ListRow

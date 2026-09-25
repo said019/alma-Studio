@@ -44,6 +44,9 @@ export const FEATURES = {
   // ── App de la clienta ────────────────────────────────────────────────────
   /** Historial y recompensas del monedero. `/app/wallet/history`, `/app/wallet/rewards` */
   walletExtras: false,
+  /** Tarjeta del pase en `/app/wallet` (titular, créditos, vencimiento, próxima
+   *  clase). Apagada, la pantalla deja sólo el QR y los botones de Wallet. */
+  walletPassCard: false,
   /** Detalle de un pedido. `/app/orders/:orderId` */
   orderDetail: false,
   /** Detalle de la membresía. `/app/profile/membership` */

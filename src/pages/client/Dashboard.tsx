@@ -28,6 +28,7 @@ import {
   ClipboardList,
   ShoppingBag,
   Wallet as WalletIcon,
+  ScanQrCode,
 } from "lucide-react";
 import type { ClientMembership } from "@/types/membership";
 import type { BookingClient } from "@/types/booking";
@@ -119,6 +120,8 @@ const Dashboard = () => {
     queryKey: ["wallet-pass"],
     queryFn: async () => (await api.get("/wallet/pass")).data,
     retry: false,
+    // Sólo trae los puntos; sin lealtad no se pide.
+    enabled: FEATURES.loyalty,
   });
 
   const {
@@ -157,7 +160,9 @@ const Dashboard = () => {
           eyebrow={`Hoy · ${format(new Date(), "EEEE d MMM", { locale: es })}`}
           title="Tu semana"
           titleAccent="en HIVE."
-          subtitle="Tu próxima clase, tu membresía y tus recompensas, en un solo lugar."
+          subtitle={FEATURES.loyalty
+            ? "Tu próxima clase, tu membresía y tus recompensas, en un solo lugar."
+            : "Tu próxima clase y tu membresía, en un solo lugar."}
         />
 
         {/* ── Próxima clase, la acción principal ── */}
@@ -313,7 +318,26 @@ const Dashboard = () => {
               )}
             </div>
 
-            {walletError ? (
+            {!FEATURES.loyalty ? (
+              <Link
+                to="/app/wallet"
+                data-lift
+                className="lg:col-span-5 rounded-[20px] border border-line bg-surface dark:bg-surface/70 p-5 sm:p-6 no-underline flex flex-col justify-between gap-5 text-ink"
+              >
+                <div>
+                  <span className="text-[0.75rem] font-medium uppercase tracking-[0.24em] text-accent-strong">
+                    Tu pase
+                  </span>
+                  <p className="mt-2 text-[0.92rem] leading-[1.6] text-ink-muted">
+                    Muestra tu QR en recepción al llegar.
+                  </p>
+                </div>
+                <div className="flex items-center justify-between text-[0.75rem] text-accent-strong">
+                  <span className="uppercase tracking-[0.18em]">Ver mi QR</span>
+                  <ScanQrCode size={16} strokeWidth={1.8} />
+                </div>
+              </Link>
+            ) : walletError ? (
               <div className="lg:col-span-5 rounded-[20px] border border-line bg-surface dark:bg-surface/70 p-5 sm:p-6 flex flex-col justify-between gap-5">
                 <div>
                   <span className="text-[0.75rem] font-medium uppercase tracking-[0.24em] text-accent-strong">
