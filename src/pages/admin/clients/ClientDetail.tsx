@@ -1,14 +1,20 @@
 import { useState, useRef, type ComponentType, type ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
 import api from "@/lib/api";
 import { AuthGuard } from "@/components/admin/AuthGuard";
 import AdminLayout from "@/components/admin/AdminLayout";
+import { AdminPage } from "@/components/admin/AdminPage";
+import { Panel } from "@/components/admin/Panel";
+import StatusDot from "@/components/admin/StatusDot";
+import ClientEditSheet from "@/components/admin/ClientEditSheet";
 import { ErrorState } from "@/components/app/AppShell";
 import { formatMXN, formatDate, formatDateTime } from "@/lib/format";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -18,6 +24,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { useCanSeeFinance } from "@/lib/roles";
+import { FEATURES } from "@/config/features";
+import { waLink } from "@/lib/phone";
 import {
   ArrowLeft, CalendarDays, Camera, ChevronLeft, ChevronRight, CreditCard,
   MessageCircle, Pencil, Phone, Receipt, RefreshCw, type LucideProps,
@@ -84,8 +93,6 @@ const fieldCls = "bg-canvas border-line-strong/60 text-ink placeholder:text-ink/
 const outlineBtnCls = "border-line-strong/70 bg-transparent text-ink hover:bg-sunken hover:text-ink";
 const primaryBtnCls = "bg-inverse text-canvas hover:bg-ink";
 const headCls = "text-ink/55 font-semibold text-xs uppercase tracking-wider";
-const quickActionCls =
-  "inline-flex items-center gap-1.5 rounded-full border border-line-strong/70 px-3.5 py-2 text-xs font-medium text-ink no-underline transition-colors hover:bg-sunken";
 
 const EmptyBlock = ({ Icon, title, description }: {
   Icon: ComponentType<LucideProps>;
@@ -139,10 +146,98 @@ const TableCard = ({ children }: { children: ReactNode }) => (
   <div className="rounded-xl border border-line overflow-hidden bg-canvas">{children}</div>
 );
 
+// ── Columna derecha: membresía y próximas clases ────────────────────────────────
+function MembershipCard({ mem, clientId, showFinance, onEdit }: { mem: any; clientId: string; showFinance: boolean; onEdit: () => void }) {
+  if (!mem) {
+    return (
+      <Panel aria-label="Membresía" className="flex flex-col gap-3 p-5">
+        <p className="text-[0.75rem] font-bold uppercase tracking-[0.12em] text-ink-muted">Membresía</p>
+        <p className="text-sm font-bold">Sin membresía activa</p>
+        {showFinance && (
+          <Link to={`/admin/payments?clienta=${clientId}`} className={cn(buttonVariants(), "no-underline")}>Vender plan</Link>
+        )}
+      </Panel>
+    );
+  }
+  const unlimited = isUnlimited(mem.classesRemaining);
+  const limit = Number(mem.classLimit ?? mem.class_limit) || null;
+  const left = Number(mem.classesRemaining) || 0;
+  const end = mem.endDate ? new Date(mem.endDate) : null;
+  const daysLeft = end ? Math.ceil((end.getTime() - Date.now()) / 86_400_000) : null;
+  return (
+    <Panel aria-label="Membresía" className="flex flex-col gap-3 p-5">
+      <div className="flex items-center justify-between">
+        <p className="text-[0.75rem] font-bold uppercase tracking-[0.12em] text-ink-muted">Membresía</p>
+        <StatusDot tone="success">Activa</StatusDot>
+      </div>
+      <p className="text-base font-extrabold">{mem.planName}</p>
+      {unlimited ? (
+        <p className="font-display text-xl font-semibold">Clases ilimitadas</p>
+      ) : (
+        <>
+          <p className="flex items-baseline gap-2">
+            <span className="nums font-display text-[2.5rem] font-semibold leading-none">{left}</span>
+            <span className="text-sm text-ink-muted">{limit ? `de ${limit} clases restantes` : "clases restantes"}</span>
+          </p>
+          {limit && (
+            <span role="img" aria-label={`Quedan ${left} de ${limit} clases`} className="block h-2 overflow-hidden rounded-full bg-line">
+              <span className="block h-full rounded-full bg-ink" style={{ width: `${Math.min(100, Math.round((left / limit) * 100))}%` }} />
+            </span>
+          )}
+        </>
+      )}
+      {end && (
+        <p className="text-[13px] text-ink-muted">
+          Vence el {format(end, "d 'de' MMMM", { locale: es })}
+          {daysLeft != null && daysLeft >= 0 ? ` · en ${daysLeft} ${daysLeft === 1 ? "día" : "días"}` : ""}
+        </p>
+      )}
+      <div className="grid grid-cols-2 gap-2">
+        <Button variant="outline" onClick={onEdit}><Pencil size={16} aria-hidden="true" />Editar</Button>
+        {showFinance && (
+          <Link to={`/admin/payments?clienta=${clientId}`} className={cn(buttonVariants(), "no-underline")}>Renovar</Link>
+        )}
+      </div>
+    </Panel>
+  );
+}
+
+function UpcomingCard({ bookings }: { bookings: any[] }) {
+  const now = Date.now();
+  const next = bookings
+    .filter((b) => (b.status === "confirmed" || b.status === "waitlist") && b.startTime && new Date(b.startTime).getTime() >= now)
+    .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
+    .slice(0, 3);
+  return (
+    <Panel aria-label="Próximas clases" className="px-5 py-4">
+      <div className="mb-1 flex items-center justify-between">
+        <h2 className="text-[15px] font-extrabold">Próximas clases</h2>
+      </div>
+      {next.length === 0 ? (
+        <p className="py-2 text-[13px] text-ink-muted">No tiene clases próximas.</p>
+      ) : (
+        <ul>
+          {next.map((b) => (
+            <li key={b.id} className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-t border-line py-2.5 first:border-t-0">
+              <span className="nums w-[76px] text-[13px] font-extrabold">{format(new Date(b.startTime), "EEE HH:mm", { locale: es })}</span>
+              <span className="truncate text-sm font-semibold">{b.className ?? "Clase"}</span>
+              {b.status === "waitlist"
+                ? <span className="rounded-full bg-sunken px-2 py-0.5 text-[0.75rem] font-extrabold">En espera</span>
+                : <StatusDot tone="success">Confirmada</StatusDot>}
+            </li>
+          ))}
+        </ul>
+      )}
+    </Panel>
+  );
+}
+
 const ClientDetail = () => {
   const { id } = useParams<{ id: string }>();
   const { toast } = useToast();
   const qc = useQueryClient();
+  const showFinance = useCanSeeFinance();
+  const [editOpen, setEditOpen] = useState(false);
   const [adjPoints, setAdjPoints] = useState("");
   const [adjReason, setAdjReason] = useState("");
 
@@ -192,7 +287,7 @@ const ClientDetail = () => {
   const { data: payments, isError: paymentsError, refetch: refetchPayments } = useQuery({
     queryKey: ["client-payments", id],
     queryFn: async () => (await api.get(`/payments?userId=${id}`)).data,
-    enabled: !!id,
+    enabled: !!id && showFinance,
   });
 
   const { data: loyalty, isError: loyaltyError, refetch: refetchLoyalty } = useQuery({
@@ -277,13 +372,10 @@ const ClientDetail = () => {
   const activeMem = membershipRows.find((m) => m.status === "active");
   const loyaltyBalance = (loyalty as any)?.data?.balance ?? (loyalty as any)?.balance ?? (loyalty as any)?.points ?? 0;
 
-  const phoneDigits = String(u?.phone ?? "").replace(/\D/g, "");
-  const waNumber = phoneDigits.length === 10 ? `52${phoneDigits}` : phoneDigits;
-
   return (
     <AuthGuard>
       <AdminLayout>
-        <div className="admin-page max-w-5xl">
+        <AdminPage>
           <Link
             to="/admin/clients"
             className="mb-4 inline-flex items-center gap-1.5 text-xs font-medium uppercase tracking-[0.14em] text-ink/55 no-underline transition-colors hover:text-ink"
@@ -308,78 +400,73 @@ const ClientDetail = () => {
                   </div>
                 </div>
               ) : (
-                <div className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="flex items-start gap-4">
-                    <div className="relative shrink-0">
-                      {u?.photoUrl ? (
-                        <ZoomableImage src={u.photoUrl} alt={u.displayName ?? "Cliente"} overlayLabel="Ver" className="h-14 w-14 overflow-hidden rounded-full" />
-                      ) : (
-                        <span className="grid h-14 w-14 place-items-center rounded-full bg-sunken font-display text-lg text-ink">
-                          {initialsOf(u?.displayName)}
-                        </span>
-                      )}
-                      <button type="button" onClick={() => photoInputRef.current?.click()}
-                        className="absolute -bottom-1 -right-1 grid h-6 w-6 place-items-center rounded-full bg-ink text-canvas shadow-sm hover:bg-inverse"
-                        aria-label="Cambiar foto">
-                        <Camera size={12} />
-                      </button>
-                      <input ref={photoInputRef} type="file" accept="image/*" className="hidden"
-                        onChange={(e) => { const f = e.target.files?.[0]; if (f) photoMutation.mutate(f); e.target.value = ""; }} />
-                    </div>
-                    <div>
-                      <h1 className="admin-title font-display text-ink">{u?.displayName}</h1>
-                      <p className="mt-0.5 text-sm text-ink/55">
-                        {u?.email}
-                        {u?.phone ? <span className="nums"> · {u.phone}</span> : null}
-                      </p>
-                      <div className="mt-2.5 flex flex-wrap items-center gap-2">
-                        {activeMem ? (
-                          <>
-                            <Badge className={memStatusCls("active")}>{activeMem.planName} · Activa</Badge>
-                            <Badge variant="outline" className="border-line-strong/70 text-ink hover:bg-transparent">
-                              {isUnlimited(activeMem.classesRemaining)
-                                ? "Clases ilimitadas"
-                                : <><span className="nums">{activeMem.classesRemaining}</span>&nbsp;clases restantes</>}
-                            </Badge>
-                            {activeMem.classCategory === "mixto" && !isUnlimited(activeMem.classesRemaining) && (
-                              <Badge variant="outline" className="border-line-strong/70 text-ink hover:bg-transparent">
-                                Studio&nbsp;<span className="nums">{activeMem.studioRemaining ?? 0}</span>&nbsp;· R/T&nbsp;<span className="nums">{activeMem.rtRemaining ?? 0}</span>
-                              </Badge>
-                            )}
-                          </>
-                        ) : (
-                          <Badge variant="outline" className="border-line text-ink/55 hover:bg-transparent">
-                            Sin membresía activa
+                <div className="mb-7 flex flex-col gap-5 lg:flex-row lg:items-center">
+                  <div className="relative shrink-0">
+                    {u?.photoUrl ? (
+                      <ZoomableImage src={u.photoUrl} alt={u.displayName ?? "Cliente"} overlayLabel="Ver" className="h-[88px] w-[88px] overflow-hidden rounded-full" />
+                    ) : (
+                      <span className="grid h-[88px] w-[88px] place-items-center rounded-full bg-sunken font-display text-2xl text-ink">
+                        {initialsOf(u?.displayName)}
+                      </span>
+                    )}
+                    <button type="button" onClick={() => photoInputRef.current?.click()}
+                      className="absolute -bottom-1 -right-1 grid h-7 w-7 place-items-center rounded-full bg-ink text-canvas shadow-sm hover:bg-inverse"
+                      aria-label="Cambiar foto">
+                      <Camera size={14} />
+                    </button>
+                    <input ref={photoInputRef} type="file" accept="image/*" className="hidden"
+                      onChange={(e) => { const f = e.target.files?.[0]; if (f) photoMutation.mutate(f); e.target.value = ""; }} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[0.75rem] font-bold uppercase tracking-[0.12em] text-ink-muted">
+                      {u?.createdAt ? `Clienta desde ${format(new Date(u.createdAt), "MMMM yyyy", { locale: es })}` : "Clienta"}
+                    </p>
+                    <h1 className="mt-2 break-words font-display text-[1.5rem] font-extrabold uppercase leading-[1.05] lg:text-[1.75rem]">{u?.displayName ?? u?.display_name}</h1>
+                    <p className="mt-1.5 text-sm text-ink-muted">{[u?.email, u?.phone].filter(Boolean).join(" · ")}</p>
+                    <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                      {activeMem ? (
+                        <>
+                          <Badge variant="secondary">{activeMem.planName} · Activa</Badge>
+                          <Badge variant="secondary">
+                            {isUnlimited(activeMem.classesRemaining)
+                              ? "Clases ilimitadas"
+                              : <><span className="nums">{activeMem.classesRemaining}</span>&nbsp;clases restantes</>}
                           </Badge>
-                        )}
-                      </div>
+                          {activeMem.classCategory === "mixto" && !isUnlimited(activeMem.classesRemaining) && (
+                            <Badge variant="secondary">
+                              Studio&nbsp;<span className="nums">{activeMem.studioRemaining ?? 0}</span>&nbsp;· R/T&nbsp;<span className="nums">{activeMem.rtRemaining ?? 0}</span>
+                            </Badge>
+                          )}
+                        </>
+                      ) : (
+                        <Badge variant="secondary">Sin membresía activa</Badge>
+                      )}
                     </div>
                   </div>
-                  {u?.phone && (
-                    <div className="flex shrink-0 items-center gap-2">
-                      <a href={`tel:${u.phone}`} className={quickActionCls}>
-                        <Phone size={13} /> Llamar
-                      </a>
-                      <a
-                        href={`https://wa.me/${waNumber}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className={quickActionCls}
-                      >
-                        <MessageCircle size={13} /> WhatsApp
-                      </a>
-                    </div>
-                  )}
+                  <div className="flex flex-wrap gap-2">
+                    {u?.phone && (
+                      <>
+                        <Button asChild variant="outline"><a href={`tel:${u.phone}`}><Phone size={16} aria-hidden="true" />Llamar</a></Button>
+                        {waLink(u.phone) && (
+                          <Button asChild variant="outline"><a href={waLink(u.phone)!} target="_blank" rel="noreferrer"><MessageCircle size={16} aria-hidden="true" />WhatsApp</a></Button>
+                        )}
+                      </>
+                    )}
+                    {showFinance && (
+                      <Button onClick={() => setEditOpen(true)}><Pencil size={16} aria-hidden="true" />Editar datos</Button>
+                    )}
+                  </div>
                 </div>
               )}
 
-              <Tabs defaultValue="profile">
+              <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+              <Tabs defaultValue="profile" className="min-w-0">
                 <TabsList>
                   <TabsTrigger value="profile">Perfil</TabsTrigger>
-                  <TabsTrigger value="memberships">Membresías</TabsTrigger>
-                  <TabsTrigger value="bookings">Reservas</TabsTrigger>
-                  <TabsTrigger value="payments">Pagos</TabsTrigger>
-                  <TabsTrigger value="loyalty">Lealtad</TabsTrigger>
+                  <TabsTrigger value="memberships">Membresías <span className="nums ml-1 text-ink-muted">{membershipRows.length}</span></TabsTrigger>
+                  <TabsTrigger value="bookings">Reservas <span className="nums ml-1 text-ink-muted">{bookingRows.length}</span></TabsTrigger>
+                  {showFinance && <TabsTrigger value="payments">Pagos <span className="nums ml-1 text-ink-muted">{paymentRows.length}</span></TabsTrigger>}
+                  {FEATURES.loyalty && <TabsTrigger value="loyalty">Lealtad</TabsTrigger>}
                   <TabsTrigger value="waiver">Responsiva</TabsTrigger>
                 </TabsList>
 
@@ -537,6 +624,7 @@ const ClientDetail = () => {
                 </TabsContent>
 
                 {/* ── Pagos ── */}
+                {showFinance && (
                 <TabsContent value="payments" className="mt-4">
                   {paymentsError ? (
                     <ErrorState title="No pudimos cargar los pagos" onRetry={() => refetchPayments()} />
@@ -579,8 +667,10 @@ const ClientDetail = () => {
                     </TableCard>
                   )}
                 </TabsContent>
+                )}
 
                 {/* ── Lealtad ── */}
+                {FEATURES.loyalty && (
                 <TabsContent value="loyalty" className="mt-4 space-y-6">
                   {loyaltyError ? (
                     <ErrorState title="No pudimos cargar los puntos de lealtad" onRetry={() => refetchLoyalty()} />
@@ -647,6 +737,7 @@ const ClientDetail = () => {
                     </>
                   )}
                 </TabsContent>
+                )}
 
                 {/* ── Responsiva ── */}
                 <TabsContent value="waiver" className="mt-4">
@@ -711,9 +802,22 @@ const ClientDetail = () => {
                   )}
                 </TabsContent>
               </Tabs>
+
+              <aside className="flex flex-col gap-4">
+                <MembershipCard mem={activeMem} clientId={id!} showFinance={showFinance} onEdit={() => activeMem && openEditMem(activeMem)} />
+                <UpcomingCard bookings={bookingRows} />
+                <Panel aria-label="Responsiva" className="flex items-center justify-between px-5 py-4">
+                  <span className="text-sm font-bold">Responsiva</span>
+                  {waiver
+                    ? <StatusDot tone="success">Firmada{(waiver.signedAt ?? waiver.signed_at) ? ` ${format(new Date(waiver.signedAt ?? waiver.signed_at), "d MMM", { locale: es })}` : ""}</StatusDot>
+                    : <StatusDot tone="muted">Pendiente</StatusDot>}
+                </Panel>
+              </aside>
+              </div>
+              <ClientEditSheet clientId={id ?? null} open={editOpen} onOpenChange={setEditOpen} />
             </>
           )}
-        </div>
+        </AdminPage>
 
         {/* ── Editar membresía (créditos / estado / vencimiento) ── */}
         <Dialog open={!!editMem} onOpenChange={(v) => !v && setEditMem(null)}>
