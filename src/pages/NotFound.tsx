@@ -1,7 +1,9 @@
 import { useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { COLOR } from "@/design/tokens";
 import { useTheme } from "@/design/theme";
+import { BrandLogo } from "@/components/brand/BrandLogo";
+import { HexPedestal } from "@/components/brand/HexPedestal";
+import { PrimaryButton } from "@/components/app/AppShell";
 
 
 // 404 editorial: tipografía sola (numeral gigante + serif cálido),
@@ -15,48 +17,42 @@ const NotFound = () => {
   }, [location.pathname]);
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ backgroundColor: COLOR.canvas, color: COLOR.ink }}>
-      {/* Nav mínima: wordmark serif → inicio. Cream sólido, sin blur. */}
-      <nav className="px-6 lg:px-[60px] py-4" style={{ borderBottom: `1px solid ${COLOR.line}` }}>
+    <div className="min-h-screen flex flex-col bg-canvas text-ink">
+      {/* Nav mínima: símbolo HIVE → inicio. */}
+      <nav className="px-6 lg:px-[60px] py-4 border-b border-line">
         <Link
           to="/"
-          className="font-display text-[1.15rem] tracking-tight no-underline transition-opacity hover:opacity-75"
-          style={{ color: COLOR.ink, fontWeight: 420 }}
+          aria-label="Inicio HIVE Pilates Studio"
+          className="inline-flex items-center no-underline transition-opacity hover:opacity-75 text-accent"
         >
-          Alma Movement
+          <BrandLogo size={32} />
         </Link>
       </nav>
 
       <main className="flex flex-1 items-center justify-center px-6 py-16">
-        <div className="max-w-xl text-center">
-          <p className="text-[0.75rem] uppercase tracking-[0.32em] font-medium mb-2" style={{ color: COLOR.accentStrong }}>
-            Estudio de Pilates · Juriquilla
+        <div className="max-w-xl flex flex-col items-center text-center">
+          <p className="text-[0.75rem] uppercase tracking-[0.32em] font-medium mb-2 text-accent-strong">
+            HIVE Pilates Studio
           </p>
+          <HexPedestal size="lg" />
           <p
             aria-hidden="true"
-            className="font-display nums leading-none select-none m-0"
-            style={{ fontSize: "clamp(7rem, 26vw, 13rem)", fontWeight: 360, letterSpacing: "-0.03em", color: COLOR.ink }}
+            className="font-display nums leading-none select-none m-0 mt-2 text-ink"
+            style={{ fontSize: "clamp(7rem, 26vw, 13rem)", fontWeight: 360, letterSpacing: "-0.03em" }}
           >
             404
           </p>
           <h1 className="font-display leading-snug mt-5 mb-3" style={{ fontSize: "clamp(1.5rem, 3.4vw, 2.1rem)", fontWeight: 420 }}>
             Esta página se nos <span className="font-display">escapó</span> del horario.
           </h1>
-          <p className="text-[0.95rem] leading-[1.7] mb-9" style={{ color: COLOR.accentStrong }}>
+          <p className="text-[0.95rem] leading-[1.7] mb-9 text-ink-muted">
             La dirección que buscas no existe o cambió de lugar. Respira hondo y vuelve al estudio.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-5">
-            <Link
-              to="/"
-              className="inline-flex items-center rounded-full px-7 py-3 text-[0.78rem] font-medium uppercase tracking-[0.16em] no-underline transition-transform hover:-translate-y-px"
-              style={{ backgroundColor: COLOR.ink, color: COLOR.canvas }}
-            >
-              Volver al inicio
-            </Link>
+            <PrimaryButton to="/">Volver al inicio</PrimaryButton>
             <Link
               to="/auth/register"
-              className="text-[0.84rem] font-medium underline underline-offset-4 transition-opacity hover:opacity-75"
-              style={{ color: COLOR.accentStrong }}
+              className="text-[0.84rem] font-medium underline underline-offset-4 transition-opacity hover:opacity-75 text-accent-strong"
             >
               Reservar una clase
             </Link>

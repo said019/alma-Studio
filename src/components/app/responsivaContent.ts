@@ -1,15 +1,15 @@
 export const RESPONSIVA_VERSION = "v1";
-export const RESPONSIVA_TITLE = "Alma Movement — Responsiva y Consentimiento Informado";
+export const RESPONSIVA_TITLE = "HIVE Pilates Studio — Responsiva y Consentimiento Informado";
 export const RESPONSIVA_SECTIONS = [
   {
     n: "1",
     title: "Aceptación de riesgo",
-    body: "Participo de forma voluntaria en las clases, entrenamientos y actividades de Alma Movement (Pilates Reformer, Tower, Mat, Barre y Sculpt), entendiendo que la práctica de ejercicio físico implica riesgos inherentes, incluyendo lesiones musculares, articulares o caídas. Asumo la responsabilidad por cualquier lesión, accidente o daño físico que pudiera ocurrir durante o después de las clases, y libero de toda responsabilidad a Alma Movement, sus coaches, personal y representantes por cualquier incidente derivado de mi participación.",
+    body: "Participo de forma voluntaria en las clases, entrenamientos y actividades de HIVE Pilates Studio (Pilates Reformer, Tower, Mat, Barre y Sculpt), entendiendo que la práctica de ejercicio físico implica riesgos inherentes, incluyendo lesiones musculares, articulares o caídas. Asumo la responsabilidad por cualquier lesión, accidente o daño físico que pudiera ocurrir durante o después de las clases, y libero de toda responsabilidad a HIVE Pilates Studio, sus coaches, personal y representantes por cualquier incidente derivado de mi participación.",
   },
   {
     n: "2",
     title: "Condición física y lesiones",
-    body: "Declaro encontrarme en condiciones físicas adecuadas para realizar actividad física. Es mi responsabilidad informar previamente a las coaches o al personal sobre cualquier lesión, molestia, condición médica, embarazo u otra situación que pueda afectar mi práctica. Alma Movement no se hace responsable por lesiones agravadas por falta de comunicación de mi parte.",
+    body: "Declaro encontrarme en condiciones físicas adecuadas para realizar actividad física. Es mi responsabilidad informar previamente a las coaches o al personal sobre cualquier lesión, molestia, condición médica, embarazo u otra situación que pueda afectar mi práctica. HIVE Pilates Studio no se hace responsable por lesiones agravadas por falta de comunicación de mi parte.",
   },
   {
     n: "3",
@@ -19,11 +19,11 @@ export const RESPONSIVA_SECTIONS = [
   {
     n: "4",
     title: "Uso de imagen",
-    body: "Autorizo a Alma Movement a utilizar fotografías o videos tomados durante las clases para fines promocionales, redes sociales y material de comunicación, sin derecho a compensación económica. Esta autorización es opcional y la indico abajo.",
+    body: "Autorizo a HIVE Pilates Studio a utilizar fotografías o videos tomados durante las clases para fines promocionales, redes sociales y material de comunicación, sin derecho a compensación económica. Esta autorización es opcional y la indico abajo.",
   },
   {
     n: "5",
     title: "Firma de conformidad",
-    body: "Declaro haber leído y comprendido completamente este documento. Al firmar, acepto los términos aquí descritos y libero de toda responsabilidad a Alma Movement por cualquier lesión o daño derivado de mi participación.",
+    body: "Declaro haber leído y comprendido completamente este documento. Al firmar, acepto los términos aquí descritos y libero de toda responsabilidad a HIVE Pilates Studio por cualquier lesión o daño derivado de mi participación.",
   },
 ] as const;
