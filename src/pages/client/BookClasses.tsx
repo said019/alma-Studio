@@ -14,7 +14,7 @@ import {
 } from "date-fns";
 import { es } from "date-fns/locale";
 import api from "@/lib/api";
-import { safeParse } from "@/lib/utils";
+import { cn, safeParse } from "@/lib/utils";
 import { ClientAuthGuard } from "@/components/layout/ClientAuthGuard";
 import {
   AppShell,
@@ -525,38 +525,50 @@ type ClassRowProps = {
   onPick: () => void;
 };
 
+/* Lo que comparten ClassRow y ClassCell: qué acción lleva la clase, su
+   disponibilidad en texto y la atenuación. La atenuación va sólo en la
+   información (hora, clase, meta, disponibilidad); botones y pills quedan a
+   opacidad completa, y el texto secundario sigue en text-ink-muted. */
+const classCta = (cls: DecoratedClass, state: RowState) => {
+  const isFull = state.interactive && state.label === "Lista de espera";
+  const showReservarBtn = state.interactive && !isFull && state.label !== "Reservada";
+  const noCta = state.interactive && !isFull && !showReservarBtn;
+  const meta = cls.instructor + (cls.durationMin ? ` · ${cls.durationMin} min` : "");
+  const dim = isFull ? "opacity-60" : state.dimmed ? "opacity-55" : undefined;
+  const availability = isFull ? "Llena" : showReservarBtn ? `${cls.remaining} de ${cls.capacity} lugares` : state.label;
+  const availabilityClass = isFull ? "text-ink-muted" : showReservarBtn ? "text-accent-strong" : state.toneClass;
+  return { isFull, showReservarBtn, noCta, meta, dim, availability, availabilityClass };
+};
+
 /* Fila editorial móvil: hora grande, clase, instructora, cupos y estado en texto,
    como tarjeta con la acción (Reservar / Lista de espera) a un costado. Las filas
    interactivas sin acción propia (p. ej. "Reservada") vuelven a ser el botón de
    toda la fila, como antes de este rediseño: sin botón anidado dentro. */
 const ClassRow = ({ cls, state, onPick }: ClassRowProps) => {
-  const isFull = state.interactive && state.label === "Lista de espera";
-  const showReservarBtn = state.interactive && !isFull && state.label !== "Reservada";
-  const noCta = state.interactive && !isFull && !showReservarBtn;
-  const meta = cls.instructor + (cls.durationMin ? ` · ${cls.durationMin} min` : "");
-
+  const { isFull, showReservarBtn, noCta, meta, dim, availability, availabilityClass } = classCta(cls, state);
   const cardClass =
-    "grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-[18px] border border-line bg-surface dark:bg-surface/70 p-4 " +
-    (isFull ? "opacity-50" : state.dimmed ? "opacity-55" : "");
+    "grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-[18px] border border-line bg-surface dark:bg-surface/70 p-4";
 
   const content = (
     <>
-      <div className="w-[3.2rem]">
+      <div className={cn("w-[3.2rem]", dim)}>
         <p className="nums font-display text-[1.1rem] leading-none text-ink">{cls.timeLabel}</p>
         {cls.endLabel && <p className="nums mt-1 text-[0.75rem] leading-none text-ink-muted">{cls.endLabel}</p>}
       </div>
       <div className="min-w-0">
-        <p className="text-[0.94rem] font-medium leading-tight truncate text-ink">{cls.name}</p>
-        <p className="mt-0.5 flex items-center gap-1.5 text-[0.78rem] text-ink-muted">
-          {cls.instructorPhoto && (
-            <img src={cls.instructorPhoto} alt="" className="shrink-0 rounded-full object-cover w-[18px] h-[18px] border border-line" />
-          )}
-          <span className="truncate">{meta}</span>
-        </p>
+        <div className={dim}>
+          <p className="text-[0.94rem] font-medium leading-tight truncate text-ink">{cls.name}</p>
+          <p className="mt-0.5 flex items-center gap-1.5 text-[0.78rem] text-ink-muted">
+            {cls.instructorPhoto && (
+              <img src={cls.instructorPhoto} alt="" className="shrink-0 rounded-full object-cover w-[18px] h-[18px] border border-line" />
+            )}
+            <span className="truncate">{meta}</span>
+          </p>
+        </div>
         <div className="mt-1.5 flex flex-wrap items-center gap-2">
           <Tag>{CAT_LABEL[cls.classCat]}</Tag>
-          <span className={"nums text-[0.75rem] font-medium " + (isFull ? "text-ink-muted" : showReservarBtn ? "text-accent-strong" : state.toneClass)}>
-            {isFull ? "Llena" : showReservarBtn ? `${cls.remaining} de ${cls.capacity} lugares` : state.label}
+          <span className={cn("nums text-[0.75rem] font-medium", availabilityClass, dim)}>
+            {availability}
           </span>
         </div>
       </div>
@@ -597,31 +609,27 @@ const ClassRow = ({ cls, state, onPick }: ClassRowProps) => {
 /* Fila compacta para las columnas de la semana en desktop: mismo lenguaje, como tarjeta.
    Igual que ClassRow: sin acción propia, toda la celda vuelve a ser el botón. */
 const ClassCell = ({ cls, state, onPick }: ClassRowProps) => {
-  const isFull = state.interactive && state.label === "Lista de espera";
-  const showReservarBtn = state.interactive && !isFull && state.label !== "Reservada";
-  const noCta = state.interactive && !isFull && !showReservarBtn;
-  const meta = cls.instructor + (cls.durationMin ? ` · ${cls.durationMin} min` : "");
-
-  const cardClass =
-    "rounded-[18px] border border-line bg-surface dark:bg-surface/70 p-3 " +
-    (isFull ? "opacity-50" : state.dimmed ? "opacity-55" : "");
+  const { isFull, showReservarBtn, noCta, meta, dim, availability, availabilityClass } = classCta(cls, state);
+  const cardClass = "rounded-[18px] border border-line bg-surface dark:bg-surface/70 p-3";
 
   const content = (
     <>
-      <p className="nums font-display text-[0.95rem] leading-none text-ink">{cls.timeLabel}</p>
-      <p className="mt-1 text-[0.82rem] font-medium leading-snug text-ink">{cls.name}</p>
-      <p className="mt-0.5 flex items-center gap-1.5 text-[0.75rem] text-ink-muted">
-        {cls.instructorPhoto && (
-          <img src={cls.instructorPhoto} alt="" className="shrink-0 rounded-full object-cover w-4 h-4 border border-line" />
-        )}
-        <span className="truncate">{meta}</span>
-      </p>
-      <p className="mt-1 text-[0.75rem] uppercase tracking-[0.12em] text-accent-strong">
-        {CAT_LABEL[cls.classCat]}
-      </p>
-      <p className={"nums mt-1.5 text-[0.75rem] font-medium " + (isFull ? "text-ink-muted" : showReservarBtn ? "text-accent-strong" : state.toneClass)}>
-        {isFull ? "Llena" : showReservarBtn ? `${cls.remaining} de ${cls.capacity} lugares` : state.label}
-      </p>
+      <div className={dim}>
+        <p className="nums font-display text-[0.95rem] leading-none text-ink">{cls.timeLabel}</p>
+        <p className="mt-1 text-[0.82rem] font-medium leading-snug text-ink">{cls.name}</p>
+        <p className="mt-0.5 flex items-center gap-1.5 text-[0.75rem] text-ink-muted">
+          {cls.instructorPhoto && (
+            <img src={cls.instructorPhoto} alt="" className="shrink-0 rounded-full object-cover w-4 h-4 border border-line" />
+          )}
+          <span className="truncate">{meta}</span>
+        </p>
+        <p className="mt-1 text-[0.75rem] uppercase tracking-[0.12em] text-accent-strong">
+          {CAT_LABEL[cls.classCat]}
+        </p>
+        <p className={cn("nums mt-1.5 text-[0.75rem] font-medium", availabilityClass)}>
+          {availability}
+        </p>
+      </div>
       {(isFull || showReservarBtn) && (
         <div className="mt-2">
           {isFull ? (

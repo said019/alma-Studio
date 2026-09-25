@@ -163,10 +163,13 @@ const MyBookings = () => {
     const isCancellable = b.status === "confirmed" && !isPast;
     const canReview = isPast && b.status === "checked_in" && !hasReview;
     const hasActions = isCancellable || canReview || hasReview;
+    // Pasadas atenuadas (spec §6.4): sólo la información de la fila; la pill,
+    // "Dejar reseña" y el conmutador de canceladas quedan a opacidad completa.
+    const dimInfo = tab === "past";
     return (
       <div key={b.id} className="px-1 py-4 border-t border-line">
         <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
+          <div className={"min-w-0 flex-1" + (dimInfo ? " opacity-60" : "")}>
             <div className="text-[0.95rem] font-medium leading-snug text-ink">
               {b.class_type_name ?? "Clase"}
             </div>
@@ -249,15 +252,13 @@ const MyBookings = () => {
                   />
                 )
               ) : (
-                <div className={tab === "past" ? "opacity-60" : undefined}>
-                  <ListGroup>
-                    {list.map(renderBookingRow)}
-                  </ListGroup>
-                </div>
+                <ListGroup>
+                  {list.map(renderBookingRow)}
+                </ListGroup>
               )}
 
               {tab === "past" && cancelled.length > 0 && (
-                <div className="mt-10 opacity-60">
+                <div className="mt-10">
                   <button
                     type="button"
                     onClick={() => setShowCancelled((v) => !v)}
