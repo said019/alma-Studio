@@ -197,8 +197,10 @@ const Dashboard = () => {
           )}
         </div>
 
-        {/* ── Próximo milestone (recompensa por asistencia) ── */}
-        {milestonesError ? (
+        {/* ── Próximo milestone (recompensa por asistencia) ──
+            Todo el bloque, incluido su error, vive detrás de FEATURES.walletExtras:
+            con la bandera apagada no queda un título sin contenido. */}
+        {FEATURES.walletExtras && (milestonesError ? (
           <Section title="Tu próximo logro">
             <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 py-4 px-1 border-b border-line">
               <p className="text-[0.92rem] leading-[1.6] text-ink-muted">
@@ -211,42 +213,38 @@ const Dashboard = () => {
           <Section
             title="Tu próximo logro"
             trailing={
-              FEATURES.walletExtras && (
-                <Link to="/app/wallet/rewards" className="no-underline text-accent-strong">
-                  Ver todos
-                </Link>
-              )
+              <Link to="/app/wallet/rewards" className="no-underline text-accent-strong">
+                Ver todos
+              </Link>
             }
           >
-            {FEATURES.walletExtras && (
-              <Link
-                to="/app/wallet/rewards"
-                data-lift
-                className="flex items-center gap-4 no-underline rounded-[20px] border border-line bg-surface dark:bg-surface/70 p-5 sm:p-6"
-              >
-                <MilestoneRing value={ms.lifetime_classes} max={ms.next_milestone.classes_required} />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-baseline justify-between gap-2 flex-wrap">
-                    <h3 className="font-display leading-tight text-ink text-[1.25rem]">
-                      {ms.next_milestone.name}
-                    </h3>
-                    <span className="nums text-[0.75rem] font-medium uppercase tracking-[0.18em] text-accent-strong">
-                      +{ms.next_milestone.award_points} pts
-                    </span>
-                  </div>
-                  <div className="mt-2 flex items-center justify-between gap-3 text-[0.75rem]">
-                    <span className="nums text-ink-muted">
-                      <strong className="text-accent-strong">{ms.lifetime_classes}</strong> de {ms.next_milestone.classes_required} clases
-                    </span>
-                    <span className="nums font-medium text-accent-strong">
-                      Te faltan {ms.next_remaining ?? 0}
-                    </span>
-                  </div>
+            <Link
+              to="/app/wallet/rewards"
+              data-lift
+              className="flex items-center gap-4 no-underline rounded-[20px] border border-line bg-surface dark:bg-surface/70 p-5 sm:p-6"
+            >
+              <MilestoneRing value={ms.lifetime_classes} max={ms.next_milestone.classes_required} />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-baseline justify-between gap-2 flex-wrap">
+                  <h3 className="font-display leading-tight text-ink text-[1.25rem]">
+                    {ms.next_milestone.name}
+                  </h3>
+                  <span className="nums text-[0.75rem] font-medium uppercase tracking-[0.18em] text-accent-strong">
+                    +{ms.next_milestone.award_points} pts
+                  </span>
                 </div>
-              </Link>
-            )}
+                <div className="mt-2 flex items-center justify-between gap-3 text-[0.75rem]">
+                  <span className="nums text-ink-muted">
+                    <strong className="text-accent-strong">{ms.lifetime_classes}</strong> de {ms.next_milestone.classes_required} clases
+                  </span>
+                  <span className="nums font-medium text-accent-strong">
+                    Te faltan {ms.next_remaining ?? 0}
+                  </span>
+                </div>
+              </div>
+            </Link>
           </Section>
-        ) : null}
+        ) : null)}
 
         {/* ── Membresía + wallet: pieza editorial y fila secundaria ── */}
         <Section title="Tu cuenta">
