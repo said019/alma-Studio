@@ -15,17 +15,23 @@ import { COLOR } from "@/design/tokens";
 
 type Tint = "berry" | "coral" | "olive";
 
-/* ── Micro-sistema de campos: label uppercase ≥0.72rem en berry (AA),
-   input cream con hairline y focus ring de marca. ── */
-const LABEL_CLASS = "text-[0.72rem] font-medium uppercase tracking-[0.22em]";
+/* ── Campos alineados con src/components/app/fields.tsx (Tarea 9, ruling
+   F6): fondo surface, borde 1.5px lineStrong (3:1), radio 12px, alto
+   ≥48px, foco ink + halo accent-soft, etiqueta 12px/inkMuted, placeholder
+   inkMuted, error en danger. Spec §4.4. ── */
+const LABEL_CLASS = "text-[0.75rem] font-bold uppercase tracking-[0.12em]";
 
 const INPUT_CLASS =
-  "w-full rounded-2xl px-4 py-3.5 text-[0.95rem] outline-none transition-all duration-200 placeholder:text-ink-muted focus-visible:ring-2 focus-visible:ring-accent-strong";
+  "w-full rounded-xl px-4 py-3.5 text-[0.95rem] outline-none transition-shadow " +
+  "focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-0 " +
+  "focus-visible:shadow-[0_0_0_5px_theme(colors.accent.soft)] " +
+  "placeholder:text-ink-muted";
 
 const inputStyle = (error?: string) => ({
-  backgroundColor: COLOR.canvas,
+  backgroundColor: COLOR.surface,
   color: COLOR.ink,
-  border: `1px solid ${error ? COLOR.danger : COLOR.line}`,
+  border: `1.5px solid ${error ? COLOR.danger : COLOR.lineStrong}`,
+  minHeight: 48,
 });
 
 type FieldFeedbackProps = {
@@ -253,7 +259,7 @@ export const AuthField = forwardRef<HTMLInputElement, AuthFieldProps>(
     return (
       <div className="flex flex-col gap-1.5">
         <div className="flex items-center justify-between gap-2">
-          <label htmlFor={inputId} className={LABEL_CLASS} style={{ color: COLOR.accentStrong }}>
+          <label htmlFor={inputId} className={LABEL_CLASS} style={{ color: COLOR.inkMuted }}>
             {label}
           </label>
           {rightSlot}
@@ -290,7 +296,7 @@ export const AuthPasswordField = forwardRef<HTMLInputElement, AuthPasswordFieldP
     return (
       <div className="flex flex-col gap-1.5">
         <div className="flex items-center justify-between gap-2">
-          <label htmlFor={inputId} className={LABEL_CLASS} style={{ color: COLOR.accentStrong }}>
+          <label htmlFor={inputId} className={LABEL_CLASS} style={{ color: COLOR.inkMuted }}>
             {label}
           </label>
           {forgotLink && (
@@ -349,7 +355,7 @@ export const AuthSelect = forwardRef<HTMLSelectElement, AuthSelectProps>(
     const errorId = `${inputId}-error`;
     return (
       <div className="flex flex-col gap-1.5">
-        <label htmlFor={inputId} className={LABEL_CLASS} style={{ color: COLOR.accentStrong }}>
+        <label htmlFor={inputId} className={LABEL_CLASS} style={{ color: COLOR.inkMuted }}>
           {label}
         </label>
         <div className="relative">
@@ -394,7 +400,7 @@ export const AuthTextarea = forwardRef<HTMLTextAreaElement, AuthTextareaProps>(
     const errorId = `${inputId}-error`;
     return (
       <div className="flex flex-col gap-1.5">
-        <label htmlFor={inputId} className={LABEL_CLASS} style={{ color: COLOR.accentStrong }}>
+        <label htmlFor={inputId} className={LABEL_CLASS} style={{ color: COLOR.inkMuted }}>
           {label}
         </label>
         <textarea
