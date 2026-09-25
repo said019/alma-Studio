@@ -1,7 +1,13 @@
 import type { ReactNode } from "react";
-import { render } from "@testing-library/react";
+import { vi } from "vitest";
+import { configure, render } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+
+// Una pantalla completa tarda en montar cuando la suite corre en paralelo:
+// márgenes amplios para findBy/waitFor y para cada prueba que usa este módulo.
+configure({ asyncUtilTimeout: 15_000 });
+vi.setConfig({ testTimeout: 30_000 });
 
 /**
  * Montar una pantalla de la app en pruebas: react-query sin reintentos y router

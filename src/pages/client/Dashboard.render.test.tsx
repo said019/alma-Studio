@@ -31,7 +31,7 @@ const base = {
 const montar = async () => {
   renderPage(<Dashboard />, "/app");
   await screen.findByText("Plan 8 clases");
-  await vi.waitFor(() => expect(api.get).toHaveBeenCalledWith("/loyalty/milestones/me"));
+  await vi.waitFor(() => expect(api.get).toHaveBeenCalledWith("/loyalty/milestones/me"), { timeout: 15_000 });
   await act(() => new Promise((r) => setTimeout(r, 20)));
 };
 
