@@ -333,9 +333,9 @@ const ReportsPage = () => {
   };
 
   return (
-    <AuthGuard>
+    <AuthGuard requiredRoles={["admin", "super_admin"]}>
       <AdminLayout>
-        <AdminPage className="max-w-6xl">
+        <AdminPage>
           <AdminPageHeader
             kicker={`Análisis · actualizado ${format(new Date(), "HH:mm")}`}
             title="Reportes"

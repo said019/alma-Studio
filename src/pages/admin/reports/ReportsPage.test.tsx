@@ -26,6 +26,18 @@ beforeEach(() => {
 });
 
 describe("Reportes", () => {
+  it("recepción no entra a Reportes por URL directa (I3)", async () => {
+    loginAs("reception");
+    renderAdmin(<ReportsPage />, { route: "/admin/reports" });
+    await waitFor(() => expect(screen.getByTestId("location").textContent).toBe("/app"));
+  });
+
+  it("usa todo el ancho, sin el tope de max-w-6xl (M6)", async () => {
+    renderAdmin(<ReportsPage />, { route: "/admin/reports" });
+    await screen.findByText("29 alumnas llevan más de 60 días sin venir");
+    expect(document.querySelector(".max-w-6xl")).toBeNull();
+  });
+
   it("sólo sugiere lo que lleva a una pantalla que existe", async () => {
     renderAdmin(<ReportsPage />, { route: "/admin/reports" });
     expect(await screen.findByText("29 alumnas llevan más de 60 días sin venir")).toBeInTheDocument();
