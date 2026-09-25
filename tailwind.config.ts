@@ -14,6 +14,8 @@ export default {
       screens: { "2xl": "1400px" },
     },
     extend: {
+      /* Tailwind 3 sólo genera los pasos de 5 en 5; /8 sale de la tabla de conversión (#…14). */
+      opacity: { 8: "0.08" },
       colors: {
         /* shadcn: leen las variables de src/index.css (valores HIVE). */
         border: "hsl(var(--border))",

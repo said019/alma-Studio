@@ -18,6 +18,16 @@ export const FIJOS = /\b(?:bg|text|border|ring|from|to|via)-(?:white|black)\b|#(
 /** Color en estilo en línea: jsdom no lo ve y no sigue al tema. */
 export const COLOR_EN_LINEA = /style=\{\{[^}]*\b(?:color|backgroundColor|background|borderColor|border|boxShadow|fill|stroke)\s*:/;
 
+/** Opacidades que Tailwind genera: pasos de 5 más /8 (tailwind.config.ts). Otra cifra no produce CSS. */
+export const OPACIDADES = new Set([...Array.from({ length: 21 }, (_, i) => i * 5), 8]);
+const OPACIDAD = /\b(?:bg|text|border|ring|from|to|via|fill|stroke|outline|divide|shadow|decoration|placeholder|caret)-([a-z][\w-]*)\/(\d+)\b/g;
+const TALLAS_DE_TEXTO = /^(?:xs|sm|base|lg|\d?xl)$/;
+/** Opacidades de color que Tailwind no genera (la clase queda sin efecto y ninguna prueba lo ve). */
+export const opacidadesSinCss = (l: string) =>
+  [...l.matchAll(OPACIDAD)]
+    .filter(([c, nombre, n]) => !(c.startsWith("text-") && TALLAS_DE_TEXTO.test(nombre)) && !OPACIDADES.has(Number(n)))
+    .map(([c]) => c);
+
 export const lineasCon = (src: string, pred: (l: string) => boolean) =>
   src.split("\n").map((l, i) => [l, i + 1] as const).filter(([l]) => pred(l)).map(([, n]) => n);
 
@@ -34,6 +44,9 @@ export function describeZone(files: string[], opciones: { permitir?: RegExp } = 
     });
     it("no usa blancos ni negros fijos", () => {
       expect(lineasCon(src, (l) => libre(l) && FIJOS.test(l))).toEqual([]);
+    });
+    it("sólo usa opacidades que Tailwind genera", () => {
+      expect(lineasCon(src, (l) => opacidadesSinCss(l).length > 0)).toEqual([]);
     });
     it("nunca pone text-ink sobre un fondo terracota", () => {
       expect(lineasCon(src, (l) => FONDO_TERRACOTA.test(l) && TINTA.test(l))).toEqual([]);
