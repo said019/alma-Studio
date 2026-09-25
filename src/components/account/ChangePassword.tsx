@@ -108,7 +108,7 @@ export const ChangePassword = ({
       {serverError && (
         <div
           role="alert"
-          className="flex items-start gap-3 rounded-2xl px-4 py-3 text-[0.86rem] bg-danger/6 border border-danger/19 text-danger"
+          className="flex items-start gap-3 rounded-2xl px-4 py-3 text-[0.86rem] bg-danger/5 border border-danger/20 text-danger"
         >
           <AlertCircle size={16} className="mt-0.5 shrink-0" />
           <span className="leading-[1.5]">{serverError}</span>
