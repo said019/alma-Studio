@@ -1,25 +1,25 @@
 import { useState, useMemo } from "react";
-import { FEATURES } from "@/config/features";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { AuthGuard } from "@/components/admin/AuthGuard";
 import AdminLayout from "@/components/admin/AdminLayout";
-import SectionTabs from "@/components/admin/SectionTabs";
+import { AdminPage, AdminPageHeader } from "@/components/admin/AdminPage";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ErrorState, EmptyState } from "@/components/app/AppShell";
-import { formatMXN, formatDate, formatDateTime } from "@/lib/format";
+import { formatMXN, formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, LineChart, Line, Area, AreaChart, Cell,
 } from "recharts";
 import { useNavigate } from "react-router-dom";
+import { format } from "date-fns";
 import {
   TrendingUp, TrendingDown, Minus, Download, Printer, Sparkles,
-  AlertTriangle, Star, BarChart3, CalendarDays, Users,
+  Star, BarChart3, CalendarDays, Users,
 } from "lucide-react";
 import { COLOR } from "@/design/tokens";
 
@@ -117,28 +117,26 @@ function HeroKPI({
   loading?: boolean;
 }) {
   return (
-    <Card className="h-full border-line-strong/70 bg-sunken" data-stagger-item>
-      <CardContent className="p-5 sm:p-6">
-        <div className="mb-2 flex items-start justify-between gap-3">
-          <p className="text-[0.72rem] font-medium uppercase tracking-[0.16em] text-ink/55">
-            {label}
-          </p>
-          <Delta pct={delta} suffix={deltaSuffix} />
+    <div className="h-full rounded-2xl border border-line bg-surface p-6" data-stagger-item>
+      <div className="mb-2 flex items-start justify-between gap-3">
+        <p className="text-[0.72rem] font-medium uppercase tracking-[0.16em] text-ink/55">
+          {label}
+        </p>
+        <Delta pct={delta} suffix={deltaSuffix} />
+      </div>
+      {loading ? (
+        <Skeleton className="h-10 w-32" />
+      ) : (
+        <p className="nums font-display font-semibold leading-none text-ink" style={{ fontSize: "clamp(2.2rem, 4vw, 3rem)" }}>
+          {value}
+        </p>
+      )}
+      {sparkData && sparkData.length > 0 && (
+        <div className="-mx-1 mt-3">
+          <Sparkline data={sparkData} color={sparkColor || CHART_PRIMARY} height={42} />
         </div>
-        {loading ? (
-          <Skeleton className="h-10 w-32" />
-        ) : (
-          <p className="font-display nums leading-none text-ink" style={{ fontSize: "clamp(2.2rem, 4vw, 3rem)" }}>
-            {value}
-          </p>
-        )}
-        {sparkData && sparkData.length > 0 && (
-          <div className="-mx-1 mt-3">
-            <Sparkline data={sparkData} color={sparkColor || CHART_PRIMARY} height={42} />
-          </div>
-        )}
-      </CardContent>
-    </Card>
+      )}
+    </div>
   );
 }
 
@@ -153,23 +151,21 @@ function SecondaryKPI({
   loading?: boolean;
 }) {
   return (
-    <Card className="h-full border-line bg-sunken" data-stagger-item>
-      <CardContent className="p-4">
-        <p className="mb-1.5 text-[0.72rem] font-medium uppercase tracking-[0.14em] text-ink/55">
-          {label}
-        </p>
-        {loading ? (
-          <Skeleton className="h-7 w-20" />
-        ) : (
-          <p className="font-display nums leading-none text-ink" style={{ fontSize: "1.7rem" }}>{value}</p>
-        )}
-        {delta !== undefined && (
-          <div className="mt-1.5">
-            <Delta pct={delta} suffix={deltaSuffix} />
-          </div>
-        )}
-      </CardContent>
-    </Card>
+    <div className="h-full rounded-2xl border border-line bg-surface p-6" data-stagger-item>
+      <p className="mb-1.5 text-[0.72rem] font-medium uppercase tracking-[0.14em] text-ink/55">
+        {label}
+      </p>
+      {loading ? (
+        <Skeleton className="h-7 w-20" />
+      ) : (
+        <p className="nums font-display font-semibold leading-none text-ink" style={{ fontSize: "1.7rem" }}>{value}</p>
+      )}
+      {delta !== undefined && (
+        <div className="mt-1.5">
+          <Delta pct={delta} suffix={deltaSuffix} />
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -183,62 +179,19 @@ function StripStat({ label, value }: { label: string; value: React.ReactNode }) 
   );
 }
 
-/* ═══════════ Action panel — sugerencias contextuales ═══════════ */
-function ActionPanel({ dorm, conv, cancelRate, cancelled, navigate }: { dorm: any; conv: any; cancelRate?: number; cancelled?: number; navigate: (p: string) => void }) {
-  const actions: { icon: any; label: string; cta: string; link: string; urgent?: boolean }[] = [];
-  if (cancelRate !== undefined && cancelRate >= 15 && (cancelled ?? 0) >= 3) {
-    actions.push({
-      icon: AlertTriangle,
-      label: `Cancelaciones altas: ${cancelRate.toFixed(1)}% (${cancelled} canceladas)`,
-      cta: "Revisar política",
-      link: "/admin/whatsapp-templates",
-      urgent: true,
-    });
-  }
-  if (dorm) {
-    const r60 = Number(dorm.lost_60d || 0);
-    if (r60 >= 3) {
-      actions.push({
-        icon: AlertTriangle,
-        label: `${r60} alumnas perdidas (60+ días)`,
-        cta: "Win-back con descuento",
-        link: "/admin/discount-codes",
-      });
-    }
-  }
-  if (conv && Number(conv.muestras_total || 0) > 0 && Number(conv.conversion_rate || 0) < 30) {
-    actions.push({
-      icon: Sparkles,
-      label: `Conversión muestra a paquete: ${conv.conversion_rate}%`,
-      cta: "Revisar follow-up post-muestra",
-      link: "/admin/whatsapp-templates",
-    });
-  }
-  if (actions.length === 0) return null;
+/* ═══════════ Action panel — sugerencia contextual ═══════════ */
+function ActionPanel({ dorm, navigate }: { dorm: any; navigate: (to: string) => void }) {
+  const lost = Number(dorm?.lost_60d ?? 0);
+  if (lost < 3) return null;
   return (
-    <Card className="mb-6 border-line bg-sunken/50">
-      <CardContent className="p-4">
-        <p className="mb-3 text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-ink">
-          Acciones sugeridas
-        </p>
-        <div className="space-y-2">
-          {actions.map((a, i) => {
-            const Icon = a.icon;
-            return (
-              <div key={i} className="flex items-center justify-between gap-3 rounded-lg border border-line bg-canvas p-2.5">
-                <div className="flex min-w-0 items-center gap-2.5">
-                  <Icon size={15} className={a.urgent ? "shrink-0 text-destructive" : "shrink-0 text-ink"} />
-                  <span className="truncate text-[13px] text-ink">{a.label}</span>
-                </div>
-                <Button size="sm" onClick={() => navigate(a.link)} data-press className="shrink-0">
-                  {a.cta}
-                </Button>
-              </div>
-            );
-          })}
-        </div>
-      </CardContent>
-    </Card>
+    <section aria-label="Sugerencia" className="flex flex-wrap items-center gap-3.5 rounded-2xl bg-accent-soft px-5 py-4">
+      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-surface"><Sparkles size={18} aria-hidden="true" /></span>
+      <div className="min-w-0 flex-1 leading-snug">
+        <p className="text-sm font-extrabold">{lost} alumnas llevan más de 60 días sin venir</p>
+        <p className="text-[13px] text-ink-muted">Un código de regreso suele ser el empujón que falta.</p>
+      </div>
+      <Button onClick={() => navigate("/admin/discount-codes")}>Crear código de regreso</Button>
+    </section>
   );
 }
 
@@ -382,52 +335,34 @@ const ReportsPage = () => {
   return (
     <AuthGuard>
       <AdminLayout>
-        <div className="admin-page max-w-6xl">
-          <SectionTabs
-            tabs={[
-              { label: "Reportes", to: "/admin/reports" },
-              ...(FEATURES.loyalty ? [{ label: "Lealtad", to: "/admin/loyalty" }] : []),
-              { label: "Descuentos", to: "/admin/discount-codes" },
-            ]}
+        <AdminPage className="max-w-6xl">
+          <AdminPageHeader
+            kicker={`Análisis · actualizado ${format(new Date(), "HH:mm")}`}
+            title="Reportes"
+            actions={
+              <>
+                <Tabs value={rangeKey} onValueChange={(v) => setRangeKey(v as RangeKey)}>
+                  <TabsList>
+                    {RANGES.map((r) => (
+                      <TabsTrigger key={r.key} value={r.key}>{r.label}</TabsTrigger>
+                    ))}
+                  </TabsList>
+                </Tabs>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => window.print()}
+                  data-press
+                  className="hidden border-line-strong sm:inline-flex"
+                >
+                  <Printer size={13} className="mr-1.5" /> Imprimir
+                </Button>
+              </>
+            }
           />
-          {/* ═════ Header con range picker ═════ */}
-          <div className="mb-7 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <h1 className="admin-title font-display mb-1 leading-none text-ink">
-                Reportes
-              </h1>
-              <p className="text-[13px] text-ink/55">
-                Última actualización · <span className="nums">{formatDateTime(new Date())}</span>
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Tabs value={rangeKey} onValueChange={(v) => setRangeKey(v as RangeKey)}>
-                <TabsList>
-                  {RANGES.map((r) => (
-                    <TabsTrigger key={r.key} value={r.key}>{r.label}</TabsTrigger>
-                  ))}
-                </TabsList>
-              </Tabs>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => window.print()}
-                data-press
-                className="hidden border-line-strong sm:inline-flex"
-              >
-                <Printer size={13} className="mr-1.5" /> Imprimir
-              </Button>
-            </div>
-          </div>
 
-          {/* ═════ Action panel (top-priority CTAs) ═════ */}
-          <ActionPanel
-            dorm={dorm}
-            conv={conv}
-            cancelRate={o.cancelRate}
-            cancelled={o.cancelledBookings}
-            navigate={navigate}
-          />
+          {/* ═════ Action panel (sugerencia de win-back) ═════ */}
+          <ActionPanel dorm={dorm} navigate={navigate} />
 
           {overviewError ? (
             <Card className="mb-6 border-line bg-sunken">
@@ -480,7 +415,7 @@ const ReportsPage = () => {
               </div>
 
               {/* Strip de stats compactos */}
-              <div className="mb-6 grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-5" data-stagger>
+              <div className="flex flex-wrap gap-x-6 gap-y-4 border-y border-line py-3.5" data-stagger>
                 <StripStat label="Reservas" value={String(o.monthlyBookings ?? 0)} />
                 <StripStat
                   label="Canceladas"
@@ -602,6 +537,7 @@ const ReportsPage = () => {
             {/* ═════ Tab content ═════ */}
             <Card className="border-line bg-sunken">
               <CardContent className="p-5">
+                <p className="mb-3 text-[13px] text-ink-muted">No depende del periodo elegido arriba.</p>
                 {tab === "revenue" && (
                   revenueError ? (
                     <ErrorState
@@ -809,7 +745,7 @@ const ReportsPage = () => {
               </CardContent>
             </Card>
           </Tabs>
-        </div>
+        </AdminPage>
       </AdminLayout>
     </AuthGuard>
   );

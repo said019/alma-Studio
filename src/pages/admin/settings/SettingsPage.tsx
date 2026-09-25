@@ -1,11 +1,14 @@
 import { useState, useEffect, useRef } from "react";
 import { FEATURES } from "@/config/features";
-import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { AuthGuard } from "@/components/admin/AuthGuard";
 import AdminLayout from "@/components/admin/AdminLayout";
+import { AdminPage, AdminPageHeader } from "@/components/admin/AdminPage";
+import { Panel } from "@/components/admin/Panel";
+import SaveBar from "@/components/admin/SaveBar";
 import SectionTabs from "@/components/admin/SectionTabs";
+import { useSearchParamState } from "@/hooks/use-search-param-state";
 import { ErrorState } from "@/components/app/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +22,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { formatDateTime } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import {
   Loader2,
   Send,
@@ -41,6 +45,10 @@ import {
   Bell,
   UserPlus,
   KeyRound,
+  Store,
+  FileText,
+  MessageCircle,
+  Shield,
   type LucideIcon,
 } from "lucide-react";
 import { ChangePassword } from "@/components/account/ChangePassword";
@@ -74,33 +82,47 @@ function inferVenueMediaType(url: string, explicitType?: string): "image" | "vid
 // Etiqueta pequeña de sección (uppercase, tracking amplio)
 const sectionLabelClass = "text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-ink/60";
 
-// Generic settings section — reads { data: <value_object> } from server
-const SettingsSection = ({ settingKey, fields }: { settingKey: string; fields: { key: string; label: string; type?: string; multiline?: boolean }[] }) => {
+type SettingField = { key: string; label: string; type?: string; multiline?: boolean; help?: string };
+type SettingGroup = { title: string; keys: string[] };
+
+// Sección de configuración genérica — lee { data: <objeto guardado> } del servidor.
+function SettingsSection({ settingKey, fields, groups }: { settingKey: string; fields: SettingField[]; groups?: SettingGroup[] }) {
   const { toast } = useToast();
   const qc = useQueryClient();
   const [values, setValues] = useState<Record<string, any>>({});
+  const [original, setOriginal] = useState<Record<string, any>>({});
   const [loaded, setLoaded] = useState(false);
-
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["settings", settingKey],
     queryFn: async () => (await api.get(`/settings/${settingKey}`)).data,
-    staleTime: Infinity, // don't re-fetch unless explicitly invalidated
+    staleTime: Infinity,
   });
-
+  const unwrap = (d: any) => d?.data ?? d?.value ?? d?.data?.value;
   useEffect(() => {
-    // Server returns { data: <value_object> } where <value_object> is the saved JSON
-    const raw = data?.data ?? data?.value ?? data?.data?.value;
+    const raw = unwrap(data);
     if (raw && typeof raw === "object" && !loaded) {
       setValues(raw);
+      setOriginal(raw);
       setLoaded(true);
     }
   }, [data, loaded]);
 
+  const keys = fields.map((f) => f.key);
+  const dirty = keys.some((k) => (values[k] ?? "") !== (original[k] ?? ""));
+
   const updateMutation = useMutation({
-    mutationFn: () => api.put(`/settings/${settingKey}`, { value: values }),
+    // Relee lo guardado y sólo pisa los campos de este formulario: así no se
+    // deshace lo que otra parte de la pantalla (la media del lugar) guardó
+    // después de abrirlo. El servidor reemplaza el objeto completo.
+    mutationFn: async () => {
+      const latest = unwrap((await api.get(`/settings/${settingKey}`)).data);
+      const base = latest && typeof latest === "object" ? latest : {};
+      const patch = Object.fromEntries(keys.map((k) => [k, values[k]]));
+      return api.put(`/settings/${settingKey}`, { value: { ...base, ...patch } });
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["settings", settingKey] });
-      setLoaded(false); // allow re-sync after save
+      setLoaded(false);
       toast({ title: "Configuración guardada" });
     },
     onError: () => toast({ title: "Error al guardar", variant: "destructive" }),
@@ -130,26 +152,39 @@ const SettingsSection = ({ settingKey, fields }: { settingKey: string; fields: {
     );
   }
 
+  const renderField = (f: SettingField) =>
+    f.type === "boolean" ? (
+      <div key={f.key} className="flex items-start justify-between gap-4 border-t border-line py-3.5 first:border-t-0 sm:col-span-2">
+        <Label htmlFor={`s-${f.key}`} className="leading-snug">
+          <span className="block text-sm font-bold">{f.label}</span>
+          {f.help && <span className="mt-0.5 block text-[13px] font-normal text-ink-muted">{f.help}</span>}
+        </Label>
+        <Switch id={`s-${f.key}`} checked={!!values[f.key]} onCheckedChange={(v) => setValues((p) => ({ ...p, [f.key]: v }))} />
+      </div>
+    ) : (
+      <div key={f.key} className={cn("flex flex-col gap-1.5", f.multiline && "sm:col-span-2")}>
+        <Label htmlFor={`s-${f.key}`}>{f.label}</Label>
+        {f.multiline ? (
+          <Textarea id={`s-${f.key}`} rows={5} value={values[f.key] ?? ""} onChange={(e) => setValues((p) => ({ ...p, [f.key]: e.target.value }))} />
+        ) : (
+          <Input id={`s-${f.key}`} value={values[f.key] ?? ""} onChange={(e) => setValues((p) => ({ ...p, [f.key]: e.target.value }))} />
+        )}
+      </div>
+    );
+
+  const sections = groups ?? [{ title: "", keys }];
   return (
-    <div className="space-y-4 max-w-md">
-      {fields.map((f) => (
-        <div key={f.key} className="space-y-1">
-          <Label>{f.label}</Label>
-          {f.type === "boolean"
-            ? <div className="flex items-center gap-3"><Switch checked={!!values[f.key]} onCheckedChange={(v) => setValues((p) => ({ ...p, [f.key]: v }))} /></div>
-            : f.multiline
-              ? <Textarea rows={5} value={values[f.key] ?? ""} onChange={(e) => setValues((p) => ({ ...p, [f.key]: e.target.value }))} />
-              : <Input type={f.type ?? "text"} value={values[f.key] ?? ""} onChange={(e) => setValues((p) => ({ ...p, [f.key]: e.target.value }))} />
-          }
-        </div>
+    <div className="flex flex-col gap-4">
+      {sections.map((g) => (
+        <Panel key={g.title || "campos"} className="p-6">
+          {g.title && <h2 className="mb-4 text-base font-extrabold">{g.title}</h2>}
+          <div className="grid gap-4 sm:grid-cols-2">{fields.filter((f) => g.keys.includes(f.key)).map(renderField)}</div>
+        </Panel>
       ))}
-      <Button onClick={() => updateMutation.mutate()} disabled={updateMutation.isPending} className="bg-ink text-canvas hover:bg-inverse">
-        {updateMutation.isPending ? <Loader2 className="animate-spin mr-2" size={14} /> : null}
-        Guardar cambios
-      </Button>
+      <SaveBar dirty={dirty} saving={updateMutation.isPending} onSave={() => updateMutation.mutate()} onDiscard={() => setValues(original)} />
     </div>
   );
-};
+}
 
 // ── Datos de transferencia SPEI (editables) ──────────────────────────────────
 const BankInfoSettings = () => {
@@ -504,17 +539,11 @@ const NotificationTemplates = () => {
 
   return (
     <div className="space-y-6 max-w-xl">
-      {/* Alcance: sistema vs Templates de WhatsApp */}
+      {/* Alcance de esta sección */}
       <div className="flex items-start gap-2.5 rounded-xl border border-line bg-sunken/40 px-3.5 py-3">
         <Info size={15} className="mt-0.5 shrink-0 text-ink" />
         <p className="text-xs leading-relaxed text-ink/80">
-          Estos son los mensajes del sistema. Para las plantillas de WhatsApp ve a{" "}
-          <Link
-            to="/admin/whatsapp-templates"
-            className="font-medium text-ink underline underline-offset-2 hover:text-ink"
-          >
-            Templates de WhatsApp
-          </Link>.
+          Estos son los mensajes del sistema.
         </p>
       </div>
 
@@ -901,85 +930,99 @@ const VenueMediaSettings = () => {
   );
 };
 
+const SETTINGS_TABS = [
+  { value: "general", label: "General", icon: Store },
+  { value: "payments", label: "Pagos", icon: CreditCard },
+  { value: "notifications", label: "Notificaciones", icon: Bell },
+  { value: "policies", label: "Políticas", icon: FileText },
+  { value: "whatsapp", label: "WhatsApp", icon: MessageCircle },
+  { value: "security", label: "Seguridad", icon: Shield },
+] as const;
+
 const SettingsPage = () => {
-  const defaultTab = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "").get("tab") ?? "general";
+  const [tabParam, setTab] = useSearchParamState("tab");
+  const tab = SETTINGS_TABS.some((t) => t.value === tabParam) ? tabParam! : "general";
   return (
-  <AuthGuard>
-    <AdminLayout>
-      <div className="admin-page max-w-3xl">
-        <SectionTabs
-          tabs={[
-            { label: "Ajustes", to: "/admin/settings" },
-            ...(FEATURES.whatsappTemplates ? [{ label: "Templates WA", to: "/admin/whatsapp-templates" }] : []),
-          ]}
-        />
-        <h1 className="admin-title font-semibold text-ink mb-6">Configuración</h1>
-        <Tabs defaultValue={defaultTab}>
-          <TabsList className="flex-wrap h-auto gap-1 mb-6">
-            <TabsTrigger value="general">General</TabsTrigger>
-            <TabsTrigger value="payments">Pagos</TabsTrigger>
-            <TabsTrigger value="notifications">Notificaciones</TabsTrigger>
-            <TabsTrigger value="policies">Políticas</TabsTrigger>
-            <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>
-            <TabsTrigger value="security">Seguridad</TabsTrigger>
-          </TabsList>
+    <AuthGuard>
+      <AdminLayout>
+        <AdminPage>
+          <AdminPageHeader
+            kicker="Sistema"
+            title="Configuración"
+            actions={FEATURES.whatsappTemplates ? <SectionTabs tabs={[{ label: "Ajustes", to: "/admin/settings" }, { label: "Templates WA", to: "/admin/whatsapp-templates" }]} /> : undefined}
+          />
+          <Tabs value={tab} onValueChange={(v) => setTab(v === "general" ? null : v)} orientation="vertical" className="grid items-start gap-7 lg:grid-cols-[220px_minmax(0,1fr)]">
+            <TabsList className="flex h-auto flex-wrap justify-start gap-1 bg-transparent p-0 lg:flex-col lg:items-stretch">
+              {SETTINGS_TABS.map(({ value, label, icon: Icon }) => (
+                <TabsTrigger key={value} value={value} className="justify-start gap-3 rounded-xl px-3.5 data-[state=active]:border data-[state=active]:border-line data-[state=active]:bg-surface data-[state=active]:text-ink">
+                  <Icon size={18} aria-hidden="true" />
+                  {label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+            <div className="min-w-0 max-w-[760px]">
+              <TabsContent value="general">
+                <div className="space-y-6">
+                  <SettingsSection
+                    settingKey="general_settings"
+                    fields={[
+                      { key: "studio_name", label: "Nombre del estudio" },
+                      { key: "phone", label: "Teléfono de contacto" },
+                      { key: "address", label: "Dirección" },
+                      { key: "instagram", label: "Instagram (@usuario)" },
+                      { key: "facebook", label: "Facebook (URL o usuario)" },
+                      { key: "timezone", label: "Zona horaria (ej: America/Mexico_City)" },
+                      { key: "currency", label: "Moneda (ej: MXN)" },
+                      { key: "opening_pricing_active", label: "Precios de apertura activos", type: "boolean", help: "Si está activo, los planes con precio de apertura se cobran a ese precio." },
+                      { key: "maintenance_mode", label: "Modo mantenimiento", type: "boolean", help: "Por ahora sólo se guarda: todavía no cambia nada en la app." },
+                    ]}
+                    groups={[
+                      { title: "Datos del estudio", keys: ["studio_name", "phone", "address", "instagram", "facebook"] },
+                      { title: "Región", keys: ["timezone", "currency"] },
+                      { title: "Interruptores", keys: ["opening_pricing_active", "maintenance_mode"] },
+                    ]}
+                  />
+                  <VenueMediaSettings />
+                </div>
+              </TabsContent>
 
-          <TabsContent value="general">
-            <div className="space-y-6">
-              <SettingsSection
-                settingKey="general_settings"
-                fields={[
-                  { key: "studio_name", label: "Nombre del estudio" },
-                  { key: "address", label: "Dirección" },
-                  { key: "phone", label: "Teléfono de contacto" },
-                  { key: "instagram", label: "Instagram (@usuario)" },
-                  { key: "facebook", label: "Facebook (URL o usuario)" },
-                  { key: "timezone", label: "Zona horaria (ej: America/Mexico_City)" },
-                  { key: "currency", label: "Moneda (ej: MXN)" },
-                  { key: "opening_pricing_active", label: "Precios de apertura activos", type: "boolean" },
-                  { key: "maintenance_mode", label: "Modo mantenimiento", type: "boolean" },
-                ]}
-              />
-              <VenueMediaSettings />
+              <TabsContent value="payments">
+                <BankInfoSettings />
+              </TabsContent>
+
+              <TabsContent value="notifications">
+                <NotificationTemplates />
+              </TabsContent>
+
+              <TabsContent value="policies">
+                <SettingsSection
+                  settingKey="policies_settings"
+                  fields={[
+                    { key: "cancellation_policy", label: "Política de cancelación", multiline: true },
+                    { key: "terms_of_service", label: "Términos de servicio", multiline: true },
+                    { key: "privacy_policy", label: "Política de privacidad", multiline: true },
+                  ]}
+                />
+              </TabsContent>
+
+              <TabsContent value="whatsapp">
+                <WhatsAppSettings />
+              </TabsContent>
+
+              <TabsContent value="security">
+                <div className="max-w-md">
+                  <h2 className="text-lg font-semibold text-ink mb-1">Cambiar mi contraseña</h2>
+                  <p className="text-sm text-ink/70 mb-6">
+                    Cambia la contraseña de tu cuenta de administradora. Por seguridad cerraremos tu sesión al terminar.
+                  </p>
+                  <ChangePassword logoutAfter />
+                </div>
+              </TabsContent>
             </div>
-          </TabsContent>
-
-          <TabsContent value="payments">
-            <BankInfoSettings />
-          </TabsContent>
-
-          <TabsContent value="notifications">
-            <NotificationTemplates />
-          </TabsContent>
-
-          <TabsContent value="policies">
-            <SettingsSection
-              settingKey="policies_settings"
-              fields={[
-                { key: "cancellation_policy", label: "Política de cancelación", multiline: true },
-                { key: "terms_of_service", label: "Términos de servicio", multiline: true },
-                { key: "privacy_policy", label: "Política de privacidad", multiline: true },
-              ]}
-            />
-          </TabsContent>
-
-          <TabsContent value="whatsapp">
-            <WhatsAppSettings />
-          </TabsContent>
-
-          <TabsContent value="security">
-            <div className="max-w-md">
-              <h2 className="text-lg font-semibold text-ink mb-1">Cambiar mi contraseña</h2>
-              <p className="text-sm text-ink/70 mb-6">
-                Cambia la contraseña de tu cuenta de administradora. Por seguridad cerraremos tu sesión al terminar.
-              </p>
-              <ChangePassword logoutAfter />
-            </div>
-          </TabsContent>
-        </Tabs>
-      </div>
-    </AdminLayout>
-  </AuthGuard>
+          </Tabs>
+        </AdminPage>
+      </AdminLayout>
+    </AuthGuard>
   );
 };
 
