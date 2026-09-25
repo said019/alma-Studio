@@ -43,6 +43,15 @@ describe("Lista de espera", () => {
     expect(within(detalle).queryByRole("link", { name: "WhatsApp a Paula Herrera" })).toBeNull();
     expect(within(detalle).getByRole("link", { name: /Abrir en Reservas/ })).toHaveAttribute("href", "/admin/bookings?clase=c11");
     expect(screen.getByTestId("location").textContent).toBe("/admin/bookings/waitlist?clase=c11");
+
+    const posicion1 = within(detalle).getByLabelText("Posición 1");
+    const liRegina = posicion1.closest("li")!;
+    expect(within(liRegina).getByText("Regina López")).toBeInTheDocument();
+
+    const posicion2 = within(detalle).getByLabelText("Posición 2");
+    const liPaula = posicion2.closest("li")!;
+    expect(within(liPaula).getByText("Paula Herrera")).toBeInTheDocument();
+    expect(within(liPaula).getAllByText("Paquete 4 · 1 clases").length).toBeGreaterThan(0);
   });
 
   it("sin espera en la semana lo dice", async () => {

@@ -121,13 +121,15 @@ const Waitlist = () => {
           {people.map((p, i) => {
             const wa = waLink(p.phone);
             const unlimited = p.classesRemaining == null || p.classesRemaining >= 9999;
+            const planText = p.planName ? `${p.planName} · ${unlimited ? "Ilimitado" : `${p.classesRemaining} clases`}` : "Sin plan";
             return (
               <li key={p.bookingId} className="grid grid-cols-[48px_minmax(0,1fr)_auto] items-center gap-4 border-t border-line px-5 py-4 lg:grid-cols-[56px_minmax(0,1fr)_200px_auto] lg:px-6">
                 <span className="nums text-center font-display text-[1.75rem] font-semibold leading-none" aria-label={`Posición ${i + 1}`}>{i + 1}</span>
-                <PersonCell name={p.displayName} sub={[p.email, p.phone].filter(Boolean).join(" · ")} size={40} />
-                <span className="hidden text-[13px] text-ink-muted lg:block">
-                  {p.planName ? `${p.planName} · ${unlimited ? "Ilimitado" : `${p.classesRemaining} clases`}` : "Sin plan"}
-                </span>
+                <div className="min-w-0">
+                  <PersonCell name={p.displayName} sub={[p.email, p.phone].filter(Boolean).join(" · ")} size={40} />
+                  <span className="mt-0.5 block text-xs text-ink-muted lg:hidden">{planText}</span>
+                </div>
+                <span className="hidden text-[13px] text-ink-muted lg:block">{planText}</span>
                 {wa ? (
                   <a href={wa} target="_blank" rel="noreferrer" aria-label={`WhatsApp a ${p.displayName}`} className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-line-strong text-ink">
                     <MessageCircle size={18} aria-hidden="true" />
