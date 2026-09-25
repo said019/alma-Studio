@@ -95,6 +95,33 @@ describe("Inicio", () => {
     expect(await within(hero).findByText("Mañana abre Reformer Básico a las 07:00.")).toBeInTheDocument();
   });
 
+  it("si falla el cálculo del monto no inventa $0 y ofrece reintentar", async () => {
+    loginAs("admin");
+    routeApi(mockApi, tabla({
+      "/admin/orders?status=pending_verification": new Error("falló verificar"),
+    }));
+    renderAdmin(<Dashboard />, { route: "/admin/dashboard" });
+    const pendientes = await screen.findByRole("region", { name: "Por atender" });
+    expect(await within(pendientes).findByText("No pudimos calcular el monto")).toBeInTheDocument();
+    expect(within(pendientes).queryByText(/por confirmar/)).toBeNull();
+    expect(within(pendientes).getByRole("button", { name: "Reintentar" })).toBeInTheDocument();
+  });
+
+  it("si fallan los cumpleaños, avisa y no dice Todo al día", async () => {
+    loginAs("admin");
+    routeApi(mockApi, tabla({
+      "/admin/stats": { classesToday: 1, activeMembers: 10, monthlyRevenue: 0, pendingAlerts: 0 },
+      "/admin/today-roster": { data: [DIA[2]] },
+      "/memberships?status=expiring": { data: [] },
+      "/admin/orders?status=pending_verification": { data: [] },
+      "/admin/birthdays": new Error("falló cumpleaños"),
+    }));
+    renderAdmin(<Dashboard />, { route: "/admin/dashboard" });
+    const pendientes = await screen.findByRole("region", { name: "Por atender" });
+    expect(await within(pendientes).findByText("No pudimos cargar todo lo pendiente.")).toBeInTheDocument();
+    expect(within(pendientes).queryByText("Todo al día")).toBeNull();
+  });
+
   it("sin nada pendiente dice Todo al día", async () => {
     loginAs("admin");
     routeApi(mockApi, tabla({

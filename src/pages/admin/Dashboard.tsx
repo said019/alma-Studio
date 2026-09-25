@@ -272,7 +272,7 @@ const Dashboard = () => {
     {
       label: "Membresías activas",
       value: stats?.activeMembers != null ? String(stats.activeMembers) : "—",
-      hint: expiringCount ? `${expiringCount} vencen esta semana` : "clientas con paquete vigente",
+      hint: expiringCount ? `${expiringCount} vencen en 7 días` : "clientas con paquete vigente",
     },
   ];
 
@@ -298,7 +298,19 @@ const Dashboard = () => {
       to: "/admin/clients?birthday=month",
     });
   }
-  const nothingPending = !statsQ.isLoading && pendingCount === 0 && todos.length === 0;
+  // Fallos silenciosos: si alguna de estas se cae, la fila desaparece sin
+  // avisar (F1 revisión). Se juntan aquí para mostrar un aviso único y
+  // reintentar sólo las que fallaron.
+  const todoErrors = [
+    { key: "today" as const, isError: todayQ.isError, refetch: () => todayQ.refetch() },
+    { key: "expiring" as const, isError: expiringQ.isError, refetch: () => expiringQ.refetch() },
+    { key: "birthdays" as const, isError: birthdaysQ.isError, refetch: () => birthdaysQ.refetch() },
+  ].filter((q) => q.isError);
+  // "Todo al día" sólo cuando las 4 fuentes ya contestaron; si no, se puede
+  // decir "nada pendiente" mientras en realidad faltan datos por llegar.
+  const pendingQueriesLoading = statsQ.isLoading || todayQ.isLoading || expiringQ.isLoading || birthdaysQ.isLoading;
+  const allPendingLoaded = statsQ.isSuccess && todayQ.isSuccess && expiringQ.isSuccess && birthdaysQ.isSuccess;
+  const nothingPending = allPendingLoaded && pendingCount === 0 && todos.length === 0;
 
   const revenueRows = (Array.isArray(revenueQ.data?.data) ? revenueQ.data!.data : [])
     .slice(-6)
@@ -363,13 +375,44 @@ const Dashboard = () => {
                       <span className="nums font-display text-[2rem] font-semibold leading-none text-accent-strong">{pendingCount}</span>
                       <span className="min-w-0 flex-1 leading-snug">
                         <span className="block text-sm font-extrabold">Pagos por verificar</span>
-                        <span className="block text-[13px] text-ink-muted">{formatMXN(pendingAmount)} por confirmar</span>
+                        {ordersQ.isError ? (
+                          <span className="mt-0.5 flex flex-wrap items-center gap-2">
+                            <span className="text-[13px] text-ink-muted">No pudimos calcular el monto</span>
+                            <button
+                              type="button"
+                              onClick={() => ordersQ.refetch()}
+                              className="inline-flex min-h-[44px] items-center text-[13px] font-bold text-ink underline-offset-2 hover:underline"
+                            >
+                              Reintentar
+                            </button>
+                          </span>
+                        ) : (
+                          <span className="block text-[13px] text-ink-muted">
+                            {ordersQ.isSuccess ? `${formatMXN(pendingAmount)} por confirmar` : "Calculando el monto…"}
+                          </span>
+                        )}
                       </span>
                       <Link to="/admin/orders" className={cn(buttonVariants(), "no-underline")}>Revisar</Link>
                     </div>
                   )}
                   {todos.length > 0 && <ul>{todos.map((t) => <TodoRow key={t.to} item={t} />)}</ul>}
-                  {nothingPending && <p className="py-3 text-sm font-bold text-success">Todo al día</p>}
+                  {todoErrors.length > 0 && (
+                    <p className="flex flex-wrap items-center gap-2 border-t border-line py-3 text-[13px] text-danger first:border-t-0">
+                      <span>No pudimos cargar todo lo pendiente.</span>
+                      <button
+                        type="button"
+                        onClick={() => todoErrors.forEach((q) => q.refetch())}
+                        className="inline-flex min-h-[44px] items-center text-[13px] font-bold text-danger underline-offset-2 hover:underline"
+                      >
+                        Reintentar
+                      </button>
+                    </p>
+                  )}
+                  {pendingQueriesLoading ? (
+                    <SkeletonRow />
+                  ) : nothingPending ? (
+                    <p className="py-3 text-sm font-bold text-success">Todo al día</p>
+                  ) : null}
                 </div>
               </Panel>
 
