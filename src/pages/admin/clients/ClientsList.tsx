@@ -1,15 +1,21 @@
 import { useState, type ComponentType, type ReactNode } from "react";
-import { FEATURES } from "@/config/features";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
+import { es } from "date-fns/locale";
 import api from "@/lib/api";
 import { AuthGuard } from "@/components/admin/AuthGuard";
 import AdminLayout from "@/components/admin/AdminLayout";
-import SectionTabs from "@/components/admin/SectionTabs";
+import { AdminPage, AdminPageHeader } from "@/components/admin/AdminPage";
+import { Panel } from "@/components/admin/Panel";
+import PersonCell from "@/components/admin/PersonCell";
+import ClientEditSheet from "@/components/admin/ClientEditSheet";
+import PersonasTabs from "./PersonasTabs";
+import { useSearchParamState } from "@/hooks/use-search-param-state";
+import { waLink } from "@/lib/phone";
 import { useConfirm } from "@/components/admin/ConfirmDialog";
 import { ErrorState } from "@/components/app/AppShell";
 import { formatMXN, formatDate } from "@/lib/format";
@@ -22,23 +28,12 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { MoreHorizontal, Search, SearchX, UserPlus, UsersRound, CreditCard, Banknote, Building2, type LucideProps } from "lucide-react";
+import { MessageCircle, Cake, MoreHorizontal, Search, SearchX, UserPlus, UsersRound, CreditCard, Banknote, Building2, type LucideProps } from "lucide-react";
 import { useDebounce } from "@/hooks/use-debounce";
 import { cn } from "@/lib/utils";
 import { DatePicker } from "@/components/ui/date-picker";
 
 // ── Schemas ────────────────────────────────────────────────────────────────────
-const editSchema = z.object({
-  email: z.string().email(),
-  phone: z.string().optional(),
-  displayName: z.string().min(1),
-  dateOfBirth: z.string().optional(),
-  emergencyContactName: z.string().optional(),
-  emergencyContactPhone: z.string().optional(),
-  healthNotes: z.string().optional(),
-  acceptsCommunications: z.boolean().default(true),
-});
-
 const manualSchema = z.object({
   displayName: z.string().min(1, "Nombre requerido"),
   email: z.string().email("Email inválido"),
@@ -54,14 +49,9 @@ const manualSchema = z.object({
   discountCode: z.string().optional(),
 });
 
-type EditFormData = z.infer<typeof editSchema>;
 type ManualFormData = z.infer<typeof manualSchema>;
 
-interface Client extends EditFormData {
-  id: string;
-  role: string;
-  createdAt?: string;
-}
+type Client = { id: string; displayName: string; email?: string | null; phone?: string | null; role?: string; createdAt?: string };
 
 interface Plan { id: string; name: string; price: number; category: string; }
 
@@ -107,22 +97,35 @@ const ClientsList = () => {
   const { confirm, dialog } = useConfirm();
 
   // Edit sheet
-  const [editOpen, setEditOpen] = useState(false);
-  const [editing, setEditing]   = useState<Client | null>(null);
+  const [editId, setEditId] = useState<string | null>(null);
   // Manual registration sheet
   const [manualOpen, setManualOpen] = useState(false);
 
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 300);
 
+  // Birthdays filter (?birthday=month, enlace desde Inicio)
+  const [birthday, setBirthday] = useSearchParamState("birthday");
+  const month = new Date().getMonth() + 1;
+  const monthName = format(new Date(), "MMMM", { locale: es });
+  const birthdaysQ = useQuery<{ data: { id: string; displayName: string; email?: string | null; phone?: string | null; day: number; month: number }[] }>({
+    queryKey: ["admin-birthdays", month],
+    queryFn: async () => (await api.get(`/admin/birthdays?month=${month}`)).data,
+    enabled: birthday === "month",
+  });
+
   // Clients list
   const { data, isLoading, isError, refetch } = useQuery<{ data: Client[] }>({
     queryKey: ["clients", debouncedSearch],
-    queryFn: async () => (await api.get(`/users?role=client&search=${debouncedSearch}`)).data,
+    queryFn: async () => (await api.get(`/users?role=client&search=${encodeURIComponent(debouncedSearch)}`)).data,
   });
   const clients = Array.isArray(data?.data) ? data.data : [];
 
   const filteredClients = clients;
+
+  const rows: (Client & { sub?: string })[] = birthday === "month"
+    ? (birthdaysQ.data?.data ?? []).map((b) => ({ id: b.id, displayName: b.displayName, email: b.email, phone: b.phone, sub: `Cumple el ${b.day} de ${monthName}` }))
+    : filteredClients;
 
   // Plans for the manual sheet
   const { data: plansData, isError: plansError, refetch: refetchPlans } = useQuery<{ data: Plan[] }>({
@@ -132,30 +135,15 @@ const ClientsList = () => {
   });
   const plans: Plan[] = Array.isArray(plansData?.data) ? plansData.data : [];
 
-  // ── Edit form ──────────────────────────────────────────────────────────────
-  const editForm = useForm<EditFormData>({ resolver: zodResolver(editSchema) });
-
-  const updateMutation = useMutation({
-    mutationFn: ({ id, ...d }: Client) => api.put(`/users/${id}`, d),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["clients"] });
-      toast({ title: "Clienta actualizada" });
-      setEditOpen(false);
-    },
-  });
-
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/users/${id}`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["clients"] });
       toast({ title: "Clienta eliminada" });
     },
+    onError: (e: any) =>
+      toast({ title: "No se pudo eliminar", description: e?.response?.data?.message ?? "Revisa si tiene membresías o reservas activas.", variant: "destructive" }),
   });
-
-  const openEdit = (c: Client) => { editForm.reset(c); setEditing(c); setEditOpen(true); };
-  const onEditSubmit = (d: EditFormData) => {
-    if (editing) updateMutation.mutate({ ...d, id: editing.id, role: "client" });
-  };
 
   const askDelete = async (c: Client) => {
     const ok = await confirm({
@@ -190,7 +178,7 @@ const ClientsList = () => {
     onError: (err: any) => {
       toast({
         title: "Error al registrar",
-        description: err?.response?.data?.error ?? "Revisa los datos e intenta de nuevo",
+        description: err?.response?.data?.message ?? err?.response?.data?.error ?? "Revisa los datos e intenta de nuevo",
         variant: "destructive",
       });
     },
@@ -204,40 +192,40 @@ const ClientsList = () => {
   return (
     <AuthGuard>
       <AdminLayout>
-        <div className="admin-page max-w-6xl">
-          <SectionTabs
-            tabs={[
-              { label: "Clientas", to: "/admin/clients" },
-              ...(FEATURES.visits ? [{ label: "Visitas", to: "/admin/visitas" }] : []),
-              { label: "Coaches", to: "/admin/staff" },
-            ]}
+        <AdminPage>
+          <AdminPageHeader
+            kicker="Personas"
+            title="Clientas"
+            actions={
+              <>
+                <PersonasTabs />
+                <Button onClick={() => setManualOpen(true)}>
+                  <UserPlus size={16} aria-hidden="true" />
+                  Nueva clienta
+                </Button>
+              </>
+            }
           />
-          {/* Header */}
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-7">
-            <div>
-              <h1 className="admin-title font-display text-ink mb-1">Clientas</h1>
-              <p className="text-sm text-ink/55">
-                <span className="nums">{clients.length}</span> clientas registradas
-              </p>
-            </div>
-            <Button onClick={() => setManualOpen(true)} className={cn(primaryBtnCls, "gap-2 rounded-xl")}>
-              <UserPlus size={15} /> Nueva clienta
-            </Button>
-          </div>
 
           {/* Search */}
-          <div className="relative mb-5 max-w-sm">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink/40" />
-            <Input
-              className={cn(fieldCls, "pl-8")}
-              placeholder="Buscar clienta..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="relative w-full max-w-[480px]">
+              <Label htmlFor="clients-search" className="sr-only">Buscar por nombre, email o teléfono</Label>
+              <Search size={18} aria-hidden="true" className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-muted" />
+              <Input id="clients-search" type="search" className="h-12 pl-10" placeholder="Buscar por nombre, email o teléfono" value={search} onChange={(e) => setSearch(e.target.value)} />
+            </div>
+            <span className="text-sm text-ink-muted"><span className="nums font-extrabold text-ink">{clients.length}</span> clientas registradas</span>
           </div>
+          {birthday === "month" && (
+            <Panel className="flex flex-wrap items-center gap-3 px-5 py-3">
+              <Cake size={18} aria-hidden="true" />
+              <span className="flex-1 text-sm font-bold">Cumpleañeras de {monthName}</span>
+              <Button variant="ghost" onClick={() => setBirthday(null)}>Quitar filtro</Button>
+            </Panel>
+          )}
 
           {/* Table */}
-          <div className="rounded-2xl border border-line overflow-hidden bg-canvas">
+          <Panel className="overflow-hidden">
             {isError ? (
               <div className="px-6">
                 <ErrorState
@@ -245,7 +233,7 @@ const ClientsList = () => {
                   onRetry={() => refetch()}
                 />
               </div>
-            ) : !isLoading && filteredClients.length === 0 ? (
+            ) : !isLoading && rows.length === 0 ? (
               search.trim() ? (
                 <EmptyBlock
                   Icon={SearchX}
@@ -291,37 +279,45 @@ const ClientsList = () => {
                         ))}
                       </TableRow>
                     ))
-                    : filteredClients.map((c) => (
+                    : rows.map((c) => (
                       <TableRow
                         key={c.id}
                         onClick={() => navigate(`/admin/clients/${c.id}`)}
                         className="border-line cursor-pointer transition-colors hover:bg-sunken"
                       >
                         <TableCell className="font-semibold text-ink">
-                          <span>{c.displayName}</span>
+                          <PersonCell name={c.displayName} sub={c.sub} />
                         </TableCell>
-                        <TableCell className="text-sm text-ink/60 hidden md:table-cell">{c.email}</TableCell>
-                        <TableCell className="text-sm text-ink/60 nums">{c.phone ?? "—"}</TableCell>
-                        <TableCell className="text-sm text-ink/60 nums hidden lg:table-cell">
+                        <TableCell className="hidden md:table-cell text-ink-muted">{c.email}</TableCell>
+                        <TableCell className="nums">{c.phone ?? "—"}</TableCell>
+                        <TableCell className="hidden lg:table-cell text-ink-muted">
                           {c.createdAt ? formatDate(c.createdAt) : "—"}
                         </TableCell>
-                        <TableCell onClick={(e) => e.stopPropagation()}>
-                          <div className="flex items-center justify-end">
+                        <TableCell>
+                          <div className="flex justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+                            {waLink(c.phone) && (
+                              <a
+                                href={waLink(c.phone)!}
+                                target="_blank"
+                                rel="noreferrer"
+                                aria-label={`WhatsApp a ${c.displayName}`}
+                                className="inline-flex h-11 w-11 items-center justify-center rounded-full text-ink-muted hover:bg-sunken hover:text-ink"
+                              >
+                                <MessageCircle size={18} />
+                              </a>
+                            )}
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="text-ink/45 hover:text-ink hover:bg-sunken/60">
-                                  <MoreHorizontal size={14} />
+                                <Button variant="ghost" size="icon" aria-label={`Acciones de ${c.displayName}`}>
+                                  <MoreHorizontal size={18} />
                                 </Button>
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent className="bg-canvas border-line">
-                                <DropdownMenuItem
-                                  className="text-ink/80 focus:text-ink focus:bg-sunken"
-                                  onClick={() => openEdit(c)}
-                                >
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => setEditId(c.id)}>
                                   Editar
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
-                                  className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                                  className="text-danger focus:text-danger"
                                   onClick={() => askDelete(c)}
                                 >
                                   Eliminar
@@ -335,76 +331,8 @@ const ClientsList = () => {
                 </TableBody>
               </Table>
             )}
-          </div>
-        </div>
-
-        {/* ── Edit sheet ───────────────────────────────────────────────────── */}
-        <Sheet open={editOpen} onOpenChange={setEditOpen}>
-          <SheetContent className="w-full sm:max-w-md overflow-y-auto bg-canvas border-line text-ink">
-            <SheetHeader>
-              <SheetTitle className="font-display text-xl text-ink">Editar clienta</SheetTitle>
-              <SheetDescription className="text-ink/55">
-                Actualiza los datos del expediente de {editing?.displayName ?? "la clienta"}.
-              </SheetDescription>
-            </SheetHeader>
-            <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="mt-6 space-y-6">
-              <div>
-                <SectionLabel>Datos</SectionLabel>
-                <div className="space-y-3">
-                  <div className="space-y-1">
-                    <Label className="text-ink/70 text-xs">Nombre</Label>
-                    <Input className={fieldCls} {...editForm.register("displayName")} />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-ink/70 text-xs">Fecha de nacimiento</Label>
-                    <DatePicker value={editForm.watch("dateOfBirth")} onChange={(v) => editForm.setValue("dateOfBirth", v)} />
-                  </div>
-                </div>
-              </div>
-
-              <div className="border-t border-line pt-5">
-                <SectionLabel>Contacto</SectionLabel>
-                <div className="space-y-3">
-                  <div className="space-y-1">
-                    <Label className="text-ink/70 text-xs">Email</Label>
-                    <Input type="email" className={fieldCls} {...editForm.register("email")} />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-ink/70 text-xs">Teléfono</Label>
-                    <Input className={fieldCls} {...editForm.register("phone")} />
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <Label className="text-ink/70 text-xs">Contacto de emergencia</Label>
-                      <Input className={fieldCls} placeholder="Nombre" {...editForm.register("emergencyContactName")} />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-ink/70 text-xs">Teléfono emergencia</Label>
-                      <Input className={fieldCls} {...editForm.register("emergencyContactPhone")} />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="border-t border-line pt-5">
-                <SectionLabel>Salud</SectionLabel>
-                <div className="space-y-1">
-                  <Label className="text-ink/70 text-xs">Notas de salud</Label>
-                  <Input className={fieldCls} placeholder="Lesiones, condiciones..." {...editForm.register("healthNotes")} />
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-2 border-t border-line pt-4">
-                <Button type="button" variant="outline" className={outlineBtnCls} onClick={() => setEditOpen(false)}>
-                  Cancelar
-                </Button>
-                <Button type="submit" disabled={updateMutation.isPending} className={primaryBtnCls}>
-                  {updateMutation.isPending ? "Guardando…" : "Actualizar"}
-                </Button>
-              </div>
-            </form>
-          </SheetContent>
-        </Sheet>
+          </Panel>
+        </AdminPage>
 
         {/* ── Manual registration sheet ────────────────────────────────────── */}
         <Sheet open={manualOpen} onOpenChange={(v) => { setManualOpen(v); if (!v) manualForm.reset({ startDate: format(new Date(), "yyyy-MM-dd") }); }}>
@@ -581,6 +509,8 @@ const ClientsList = () => {
             </form>
           </SheetContent>
         </Sheet>
+
+        <ClientEditSheet clientId={editId} open={!!editId} onOpenChange={(o) => { if (!o) setEditId(null); }} />
 
         {dialog}
       </AdminLayout>
