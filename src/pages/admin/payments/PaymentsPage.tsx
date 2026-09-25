@@ -1,32 +1,29 @@
-import { useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { format, addDays } from "date-fns";
+import { es } from "date-fns/locale";
 import api from "@/lib/api";
 import { AuthGuard } from "@/components/admin/AuthGuard";
 import AdminLayout from "@/components/admin/AdminLayout";
-import SectionTabs from "@/components/admin/SectionTabs";
+import { AdminPage, AdminPageHeader } from "@/components/admin/AdminPage";
+import { Panel } from "@/components/admin/Panel";
+import PersonCell from "@/components/admin/PersonCell";
+import ClientSearch from "@/components/admin/ClientSearch";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { ErrorState, EmptyState } from "@/components/app/AppShell";
-import { formatMXN, formatDate } from "@/lib/format";
-import { Loader2, Search, User, Package, CheckCircle2, CreditCard, Banknote, ArrowRight, ChevronLeft, History, Check, Receipt } from "lucide-react";
-import { useDebounce } from "@/hooks/use-debounce";
+import { formatMXN } from "@/lib/format";
+import { CreditCard, Banknote, ArrowRight, Check } from "lucide-react";
+import { useSearchParamState } from "@/hooks/use-search-param-state";
 import { cn } from "@/lib/utils";
+import CobrosTabs from "./CobrosTabs";
 
 // ── Helpers ──────────────────────────────────────────────
 const PAYMENT_METHODS = [
   { value: "cash", label: "Efectivo", icon: Banknote },
   { value: "card", label: "Tarjeta", icon: CreditCard },
   { value: "transfer", label: "Transferencia", icon: ArrowRight },
-];
-
-const STEP_META = [
-  { label: "Buscar clienta", icon: User },
-  { label: "Elegir plan", icon: Package },
-  { label: "Confirmar", icon: CheckCircle2 },
 ];
 
 // ── Agrupación de planes por categoría (taxonomía única) ──
@@ -53,438 +50,216 @@ function groupPlans(plans: any[]) {
   return groups;
 }
 
-// ── Indicador de pasos ────────────────────────────────────
-const StepBar = ({ step }: { step: number }) => (
-  <div className="flex flex-wrap items-center gap-y-2 mb-8">
-    {STEP_META.map((s, i) => {
-      const done = step > i + 1;
-      const active = step === i + 1;
-      return (
-        <div key={i} className="flex items-center">
-          <div
-            className={cn(
-              "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold transition-colors",
-              active && "bg-sunken text-ink ring-1 ring-inset ring-line-strong",
-              done && "bg-sunken text-ink/70 border border-line",
-              !done && !active && "border border-line text-ink/55",
-            )}
-          >
-            <span
-              className={cn(
-                "w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold nums",
-                active && "bg-inverse text-canvas",
-                done && "bg-sunken text-ink",
-                !done && !active && "bg-sunken text-ink/55",
-              )}
-            >
-              {done ? <Check size={11} strokeWidth={3} /> : i + 1}
-            </span>
-            {s.label}
-          </div>
-          {i < 2 && <div className={cn("w-8 h-px mx-1", done ? "bg-line" : "bg-line")} />}
-        </div>
-      );
-    })}
-  </div>
-);
-
 // ── Wizard de cobro en mostrador ─────────────────────────
-const CashAssignment = () => {
+type SelectedUser = { id: string; displayName: string; email?: string | null; phone?: string | null };
+type SelectedPlan = { id: string; name: string; price: number; durationDays?: number | null };
+
+function StepTitle({ n, done, children }: { n: number; done: boolean; children: ReactNode }) {
+  return (
+    <div className="flex items-center gap-2.5">
+      {done ? (
+        <span className="grid h-7 w-7 place-items-center rounded-full bg-ink text-canvas"><Check size={14} aria-hidden="true" /></span>
+      ) : (
+        <span className="nums grid h-7 w-7 place-items-center rounded-full border border-line-strong text-[13px] font-extrabold">{n}</span>
+      )}
+      <h2 className="text-base font-extrabold">{children}</h2>
+    </div>
+  );
+}
+
+function CashAssignment() {
   const { toast } = useToast();
   const qc = useQueryClient();
-  const [step, setStep] = useState(1);
-  const [search, setSearch] = useState("");
-  const debouncedSearch = useDebounce(search, 300);
-  const [selectedUser, setSelectedUser] = useState<{ id: string; displayName: string; email?: string; phone?: string | null } | null>(null);
-  const [selectedPlan, setSelectedPlan] = useState<{ id: string; name: string; price: number } | null>(null);
+  const [clientParam, setClientParam] = useSearchParamState("clienta");
+  const [selectedUser, setSelectedUser] = useState<SelectedUser | null>(null);
+  const [selectedPlan, setSelectedPlan] = useState<SelectedPlan | null>(null);
   const [paymentMethod, setPaymentMethod] = useState("cash");
 
-  const { data: usersData, isLoading: usersLoading, isError: usersError, refetch: refetchUsers } = useQuery<{ data: { id: string; displayName: string; email: string; phone?: string | null }[] }>({
-    queryKey: ["users-search", debouncedSearch],
-    queryFn: async () => (
-      await api.get(`/users?role=client${debouncedSearch ? `&search=${encodeURIComponent(debouncedSearch)}` : ""}`)
-    ).data,
+  // "Renovar" desde la ficha: /admin/payments?clienta=<id>. Misma llave que la ficha.
+  const preselectQ = useQuery<Record<string, any>>({
+    queryKey: ["client", clientParam],
+    queryFn: async () => (await api.get(`/users/${clientParam}`)).data,
+    enabled: !!clientParam && !selectedUser,
+    retry: false,
   });
+  useEffect(() => {
+    const u = preselectQ.data?.data ?? preselectQ.data;
+    if (u?.id && !selectedUser) {
+      setSelectedUser({ id: u.id, displayName: u.displayName ?? u.display_name ?? "Clienta", email: u.email, phone: u.phone });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preselectQ.data]);
 
-  const filteredUsers = Array.isArray(usersData?.data) ? usersData.data : [];
-
-  const { data: plansData, isLoading: plansLoading, isError: plansError, refetch: refetchPlans } = useQuery<{ data: { id: string; name: string; price: number; classLimit?: number | null; durationDays?: number; classCategory?: string }[] }>({
+  // Consulta de planes: la misma de hoy y el mismo filtro de activos.
+  const { data: plansData, isLoading: plansLoading, isError: plansError, refetch: refetchPlans } = useQuery<{ data: any[] }>({
     queryKey: ["plans"],
     queryFn: async () => (await api.get("/plans")).data,
   });
-
-  const assignMutation = useMutation({
-    mutationFn: () => api.post("/memberships", {
-      userId: selectedUser?.id,
-      planId: selectedPlan?.id,
-      paymentMethod,
-      startDate: new Date().toISOString().split("T")[0],
-    }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["memberships"] });
-      toast({ title: "Membresía activada" });
-      setStep(1); setSelectedUser(null); setSelectedPlan(null); setSearch("");
-    },
-    onError: (e: any) => toast({ title: e?.response?.data?.message ?? "Error al asignar", variant: "destructive" }),
-  });
-
-  const plans = (Array.isArray(plansData?.data) ? plansData.data : []).filter((p) => (p as any).isActive !== false && (p as any).is_active !== false);
+  const plans = (Array.isArray(plansData?.data) ? plansData!.data : []).filter((p) => p.isActive !== false && p.is_active !== false);
   const planGroups = groupPlans(plans);
 
+  const assignMutation = useMutation({
+    mutationFn: () =>
+      api.post("/memberships", {
+        userId: selectedUser!.id,
+        planId: selectedPlan!.id,
+        paymentMethod,
+        startDate: format(new Date(), "yyyy-MM-dd"),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["memberships"] });
+      qc.invalidateQueries({ queryKey: ["payments"] });
+      toast({ title: "Membresía activada" });
+      setSelectedUser(null);
+      setSelectedPlan(null);
+      setPaymentMethod("cash");
+      setClientParam(null);
+    },
+    onError: (e: any) =>
+      toast({ title: e?.response?.data?.message ?? "Error al asignar", variant: "destructive" }),
+  });
+
+  const today = new Date();
+  const vigencia = selectedPlan?.durationDays
+    ? `${format(today, "d MMM", { locale: es })} – ${format(addDays(today, selectedPlan.durationDays), "d MMM", { locale: es })}`
+    : selectedPlan ? "Desde hoy" : "—";
+  const methodLabel = PAYMENT_METHODS.find((m) => m.value === paymentMethod)?.label ?? "—";
+  const row = (k: string, v: ReactNode) => (
+    <div className="flex justify-between gap-3 border-t border-line py-3 first:border-t-0">
+      <dt className="text-sm text-ink-muted">{k}</dt>
+      <dd className="nums text-right text-sm font-bold">{v}</dd>
+    </div>
+  );
+
   return (
-    <div className="max-w-2xl mx-auto">
-      <StepBar step={step} />
-
-      {/* ── Paso 1: Buscar clienta ─────────────────────────── */}
-      {step === 1 && (
-        <div className="space-y-4">
-          <div className="rounded-2xl border border-line bg-sunken p-5">
-            <h3 className="text-[0.72rem] font-semibold text-ink/70 uppercase tracking-[0.14em] mb-4">Buscar clienta</h3>
-            <div className="relative">
-              <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink/55" />
-              <Input
-                className="pl-9 rounded-xl"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
+    <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="flex min-w-0 flex-col gap-4">
+        <Panel aria-label="Clienta" className="flex flex-col gap-3.5 p-5 lg:p-6">
+          <StepTitle n={1} done={!!selectedUser}>Clienta</StepTitle>
+          {selectedUser ? (
+            <div className="flex items-center gap-3.5 rounded-xl bg-canvas px-3.5 py-3">
+              <PersonCell name={selectedUser.displayName} sub={[selectedUser.email, selectedUser.phone].filter(Boolean).join(" · ")} size={40} />
+              <Button variant="ghost" className="ml-auto" onClick={() => { setSelectedUser(null); setClientParam(null); }}>Cambiar</Button>
+            </div>
+          ) : (
+            <>
+              {preselectQ.isError && <p className="text-[13px] font-bold text-danger">No encontramos a esa clienta. Búscala abajo.</p>}
+              <ClientSearch
+                label="Buscar clienta para cobrar"
                 placeholder="Nombre, email o teléfono…"
-                autoFocus
+                onSelect={(c) => setSelectedUser({ id: c.id, displayName: c.displayName, email: c.email, phone: c.phone })}
               />
-            </div>
-          </div>
-
-          {usersLoading && (
-            <div className="space-y-2">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <Skeleton key={i} className="h-[68px] w-full rounded-2xl" />
-              ))}
-            </div>
+            </>
           )}
+        </Panel>
 
-          {usersError && !usersLoading && (
-            <ErrorState
-              title="No pudimos buscar clientas"
-              description="Revisa tu conexión y vuelve a intentarlo."
-              onRetry={() => refetchUsers()}
-            />
-          )}
-
-          {!usersLoading && !usersError && (
-            <div className="space-y-2">
-              {filteredUsers.map((u) => (
-                <button
-                  key={u.id}
-                  className="w-full flex items-center gap-4 p-4 rounded-2xl border border-line bg-sunken hover:bg-sunken/40 hover:border-line-strong transition-colors group text-left"
-                  onClick={() => { setSelectedUser(u); setStep(2); }}
-                >
-                  <div className="w-9 h-9 rounded-full bg-sunken ring-1 ring-inset ring-line-strong/50 flex items-center justify-center text-sm font-bold text-ink shrink-0">
-                    {u.displayName?.[0]?.toUpperCase() ?? "?"}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-sm text-ink truncate">{u.displayName}</p>
-                    <p className="text-xs text-ink/55 truncate">
-                      {u.email}
-                      {u.phone ? ` · ${u.phone}` : ""}
-                    </p>
-                  </div>
-                  <ArrowRight size={14} className="text-ink/30 group-hover:text-ink transition-colors shrink-0" />
-                </button>
-              ))}
-              {filteredUsers.length === 0 && (
-                <p className="text-center py-6 text-ink/55 text-sm">
-                  {debouncedSearch
-                    ? "No encontramos a nadie con esos datos."
-                    : "Escribe un nombre, email o teléfono para buscar."}
-                </p>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── Paso 2: Elegir plan ────────────────────────────── */}
-      {step === 2 && (
-        <div className="space-y-5">
-          {/* Clienta seleccionada */}
-          <div className="flex items-center gap-3 p-3 rounded-xl bg-sunken/50 border border-line-strong/50">
-            <div className="w-8 h-8 rounded-full bg-sunken ring-1 ring-inset ring-line-strong flex items-center justify-center text-xs font-bold text-ink">
-              {selectedUser?.displayName?.[0]?.toUpperCase()}
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-ink">{selectedUser?.displayName}</p>
-              <p className="text-xs text-ink/55">{selectedUser?.email}</p>
-            </div>
-            <Button variant="ghost" size="sm" className="ml-auto text-ink/70 hover:text-ink text-xs" onClick={() => setStep(1)}>
-              <ChevronLeft size={12} className="mr-1" /> Cambiar
-            </Button>
-          </div>
-
-          {plansLoading && (
-            <div className="space-y-2">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <Skeleton key={i} className="h-16 w-full rounded-xl" />
-              ))}
-            </div>
-          )}
-
-          {plansError && !plansLoading && (
-            <ErrorState
-              title="No pudimos cargar los planes"
-              description="Revisa tu conexión y vuelve a intentarlo."
-              onRetry={() => refetchPlans()}
-            />
-          )}
-
-          {!plansLoading && !plansError && plans.length === 0 && (
+        <Panel aria-label="Plan" className="flex flex-col gap-4 p-5 lg:p-6">
+          <StepTitle n={2} done={!!selectedPlan}>Plan</StepTitle>
+          {plansLoading ? (
+            <div className="space-y-2"><Skeleton className="h-20 w-full" /><Skeleton className="h-20 w-full" /></div>
+          ) : plansError ? (
+            <ErrorState title="No pudimos cargar los planes" description="Revisa tu conexión y vuelve a intentarlo." onRetry={() => refetchPlans()} />
+          ) : plans.length === 0 ? (
             <EmptyState
-              icon={<Package size={20} strokeWidth={1.8} />}
               title="Sin planes activos"
               description="Crea un plan en la sección de Planes para poder cobrarlo en mostrador."
               ctaLabel="Ir a Planes"
               ctaTo="/admin/plans"
             />
-          )}
-
-          {/* Grupos de planes */}
-          {!plansLoading && !plansError && Object.entries(planGroups).map(([group, items]) => {
-            if (!items.length) return null;
-            return (
-              <div key={group}>
-                <p className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-ink mb-2 px-1">
-                  {GROUP_LABELS[group] ?? group}
-                </p>
-                <div className="grid grid-cols-1 gap-2">
-                  {items.map((p) => {
-                    const isSelected = selectedPlan?.id === p.id;
-                    return (
-                      <button
-                        key={p.id}
-                        aria-pressed={isSelected}
-                        className={cn(
-                          "w-full flex items-center justify-between gap-3 p-3.5 rounded-xl border transition-colors text-left group",
-                          isSelected
-                            ? "border-line-strong bg-sunken ring-1 ring-inset ring-line-strong"
-                            : "border-line bg-sunken hover:border-line-strong hover:bg-sunken/40",
-                        )}
-                        onClick={() => setSelectedPlan(p)}
-                      >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <span
-                            className={cn(
-                              "w-5 h-5 rounded-full flex items-center justify-center shrink-0 transition-colors",
-                              isSelected ? "bg-inverse text-canvas" : "border border-line-strong/60",
-                            )}
-                          >
-                            {isSelected && <Check size={11} strokeWidth={3} />}
+          ) : (
+            Object.entries(planGroups)
+              .filter(([, list]) => list.length > 0)
+              .map(([key, list]) => (
+                <div key={key} className="flex flex-col gap-2.5">
+                  <p className="text-[0.75rem] font-bold uppercase tracking-[0.12em] text-ink-muted">{GROUP_LABELS[key]}</p>
+                  <div role="radiogroup" aria-label={GROUP_LABELS[key]} className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
+                    {list.map((p: any) => {
+                      const sel = selectedPlan?.id === p.id;
+                      const limit = p.classLimit ?? p.class_limit;
+                      const days = p.durationDays ?? p.duration_days;
+                      return (
+                        <button
+                          key={p.id}
+                          type="button"
+                          role="radio"
+                          aria-checked={sel}
+                          onClick={() => setSelectedPlan({ id: p.id, name: p.name, price: Number(p.price), durationDays: days })}
+                          className={cn("flex min-h-[88px] items-start gap-3 rounded-xl bg-surface p-4 text-left", sel ? "border-2 border-ink" : "border border-line hover:border-line-strong")}
+                        >
+                          <span aria-hidden="true" className={cn("mt-0.5 h-5 w-5 shrink-0 rounded-full", sel ? "border-[6px] border-ink" : "border border-line-strong")} />
+                          <span className="flex min-w-0 flex-col gap-0.5">
+                            <span className="text-sm font-extrabold">{p.name}</span>
+                            <span className="text-[13px] text-ink-muted">
+                              {limit == null ? "Ilimitado" : `${limit} ${Number(limit) === 1 ? "clase" : "clases"}`}
+                              {days ? ` · ${days} días` : ""}
+                            </span>
+                            <span className="nums mt-1.5 text-base font-extrabold">{formatMXN(Number(p.price))}</span>
                           </span>
-                          <div className="min-w-0">
-                            <p className="text-sm font-semibold text-ink truncate">{p.name}</p>
-                            <p className="text-xs text-ink/55 nums">
-                              {p.classLimit === null ? "Ilimitado" : `${p.classLimit} clases`}
-                              {p.durationDays ? ` · ${p.durationDays} días` : ""}
-                            </p>
-                          </div>
-                        </div>
-                        <span className="text-base font-semibold text-ink nums shrink-0">
-                          {formatMXN(Number(p.price))}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
-
-          <div className="flex gap-3 pt-2">
-            <Button variant="outline" className="border-line-strong text-ink hover:bg-sunken" onClick={() => setStep(1)}>
-              <ChevronLeft size={14} className="mr-1" /> Volver
-            </Button>
-            <Button
-              className="flex-1 bg-inverse text-canvas hover:bg-ink font-semibold"
-              disabled={!selectedPlan}
-              onClick={() => setStep(3)}
-            >
-              Continuar <ArrowRight size={14} className="ml-2" />
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* ── Paso 3: Confirmar ─────────────────────────────── */}
-      {step === 3 && (
-        <div className="space-y-5">
-          {/* Resumen */}
-          <div className="rounded-2xl border border-line bg-sunken overflow-hidden">
-            <div className="px-5 py-3 border-b border-line flex items-center gap-2">
-              <Receipt size={14} className="text-ink" />
-              <span className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-ink/70">Resumen de la membresía</span>
-            </div>
-            <div className="p-5 space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-ink/70">Clienta</span>
-                <div className="flex items-center gap-2">
-                  <div className="w-5 h-5 rounded-full bg-sunken ring-1 ring-inset ring-line-strong flex items-center justify-center text-[9px] font-bold text-ink">
-                    {selectedUser?.displayName?.[0]?.toUpperCase()}
+                        </button>
+                      );
+                    })}
                   </div>
-                  <span className="text-sm font-semibold text-ink">{selectedUser?.displayName}</span>
                 </div>
-              </div>
-              <div className="h-px bg-line" />
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-ink/70">Plan</span>
-                <span className="text-sm font-semibold text-ink">{selectedPlan?.name}</span>
-              </div>
-              <div className="h-px bg-line" />
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-ink/70">Total</span>
-                <span className="text-lg font-semibold text-ink nums">{formatMXN(Number(selectedPlan?.price ?? 0))}</span>
-              </div>
-            </div>
-          </div>
+              ))
+          )}
+        </Panel>
 
-          {/* Método de pago */}
-          <div className="rounded-2xl border border-line bg-sunken p-5">
-            <Label className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-ink/70 mb-3 block">Método de pago</Label>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              {PAYMENT_METHODS.map(({ value, label, icon: Icon }) => (
+        <Panel aria-label="Método de pago" className="flex flex-col gap-3.5 p-5 lg:p-6">
+          <StepTitle n={3} done={false}>Método de pago</StepTitle>
+          <div role="radiogroup" aria-label="Método de pago" className="grid gap-2.5 sm:grid-cols-3">
+            {PAYMENT_METHODS.map((m) => {
+              const sel = paymentMethod === m.value;
+              const Icon = m.icon;
+              return (
                 <button
-                  key={value}
-                  aria-pressed={paymentMethod === value}
-                  className={cn(
-                    "flex flex-col items-center gap-2 p-3 rounded-xl border transition-colors",
-                    paymentMethod === value
-                      ? "border-line-strong bg-sunken text-ink ring-1 ring-inset ring-line-strong"
-                      : "border-line bg-canvas text-ink/55 hover:border-line-strong hover:text-ink",
-                  )}
-                  onClick={() => setPaymentMethod(value)}
+                  key={m.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={sel}
+                  onClick={() => setPaymentMethod(m.value)}
+                  className={cn("flex min-h-[56px] items-center gap-2.5 rounded-xl bg-surface px-4 text-sm font-bold", sel ? "border-2 border-ink" : "border border-line")}
                 >
-                  <Icon size={16} />
-                  <span className="text-xs font-medium">{label}</span>
+                  <Icon size={18} aria-hidden="true" />
+                  {m.label}
                 </button>
-              ))}
-            </div>
+              );
+            })}
           </div>
-
-          <div className="flex gap-3">
-            <Button variant="outline" className="border-line-strong text-ink hover:bg-sunken" onClick={() => setStep(2)}>
-              <ChevronLeft size={14} className="mr-1" /> Volver
-            </Button>
-            <Button
-              className="flex-1 bg-inverse text-canvas hover:bg-ink font-semibold h-11"
-              onClick={() => assignMutation.mutate()}
-              disabled={assignMutation.isPending}
-            >
-              {assignMutation.isPending
-                ? <><Loader2 className="animate-spin mr-2" size={14} /> Activando…</>
-                : <><CheckCircle2 size={15} className="mr-2" /> Confirmar y activar membresía</>
-              }
-            </Button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-// ── Historial de pagos ────────────────────────────────────
-const PaymentsHistory = () => {
-  const { data, isLoading, isError, refetch } = useQuery<{ data: any[] }>({
-    queryKey: ["payments"],
-    queryFn: async () => (await api.get("/payments")).data,
-  });
-  const payments = Array.isArray(data?.data) ? data.data : [];
-
-  const methodLabels: Record<string, string> = { cash: "Efectivo", card: "Tarjeta", transfer: "Transferencia" };
-
-  if (isLoading) {
-    return (
-      <div className="space-y-2">
-        {Array.from({ length: 5 }).map((_, i) => (
-          <Skeleton key={i} className="h-[68px] w-full rounded-xl" />
-        ))}
+        </Panel>
       </div>
-    );
-  }
 
-  if (isError) {
-    return (
-      <ErrorState
-        title="No pudimos cargar el historial"
-        description="Revisa tu conexión y vuelve a intentarlo."
-        onRetry={() => refetch()}
-      />
-    );
-  }
-
-  if (!payments.length) {
-    return (
-      <EmptyState
-        icon={<History size={20} strokeWidth={1.8} />}
-        title="Sin pagos registrados aún"
-        description="Cuando cobres una membresía en mostrador, aparecerá aquí."
-      />
-    );
-  }
-
-  return (
-    <div className="space-y-2">
-      {payments.map((p: any) => (
-        <div key={p.id} className="flex items-center gap-4 p-4 rounded-xl border border-line bg-sunken hover:bg-sunken/30 transition-colors">
-          <div className="w-8 h-8 rounded-full bg-sunken ring-1 ring-inset ring-line-strong/50 flex items-center justify-center shrink-0">
-            <CreditCard size={13} className="text-ink" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-ink truncate">{p.userName ?? p.userId ?? "—"}</p>
-            <p className="text-xs text-ink/55 nums">{p.createdAt ? formatDate(p.createdAt) : "—"}</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full border border-line bg-canvas text-ink/70">
-              {methodLabels[p.method] ?? p.method ?? "—"}
-            </span>
-            <span className="text-sm font-semibold text-ink nums">{formatMXN(Number(p.total_amount ?? p.amount ?? 0))}</span>
-          </div>
+      <aside aria-label="Resumen de la membresía" className="flex flex-col gap-1.5 rounded-2xl border border-line bg-surface p-6 lg:sticky lg:top-24">
+        <p className="text-[0.75rem] font-bold uppercase tracking-[0.12em] text-ink-muted">Resumen de la membresía</p>
+        <dl className="mt-2">
+          {row("Clienta", selectedUser?.displayName ?? "—")}
+          {row("Plan", selectedPlan?.name ?? "—")}
+          {row("Vigencia", vigencia)}
+          {row("Método", methodLabel)}
+        </dl>
+        <div className="flex items-baseline justify-between border-t-2 border-ink pb-2 pt-4">
+          <span className="text-[15px] font-bold">Total</span>
+          <span className="nums font-display text-[2rem] font-semibold">{selectedPlan ? formatMXN(selectedPlan.price) : "—"}</span>
         </div>
-      ))}
+        <Button size="lg" className="w-full" disabled={!selectedUser || !selectedPlan || assignMutation.isPending} onClick={() => assignMutation.mutate()}>
+          {assignMutation.isPending ? "Activando…" : "Confirmar y activar membresía"}
+        </Button>
+        <p className="mt-1.5 text-center text-[0.75rem] text-ink-muted">La membresía se activa hoy y la clienta recibe su confirmación.</p>
+      </aside>
     </div>
   );
-};
+}
 
 // ── Página principal de pagos ─────────────────────────────
+// Cobrar es sólo de quien ve dinero (spec §8, I3): el servidor no lo protege
+// (POST /memberships acepta recepción y coach), así que aquí es el único
+// control.
 const PaymentsPage = () => (
-  <AuthGuard>
+  <AuthGuard requiredRoles={["admin", "super_admin"]}>
     <AdminLayout>
-      <div className="admin-page max-w-3xl">
-        <SectionTabs
-          tabs={[
-            { label: "Cobrar", to: "/admin/payments" },
-            { label: "Verificar", to: "/admin/orders" },
-          ]}
-        />
-        {/* Header */}
-        <div className="mb-6">
-          <h1 className="admin-title text-ink mb-1">Pagos</h1>
-          <p className="text-sm text-ink/55">Asigna membresías en mostrador y consulta el historial</p>
-        </div>
-
-        <Tabs defaultValue="cash">
-          <TabsList className="h-auto rounded-2xl border border-line bg-sunken p-1 mb-6">
-            <TabsTrigger
-              value="cash"
-              className="rounded-xl px-4 py-2 text-[13px] font-semibold text-ink/70 data-[state=active]:bg-sunken data-[state=active]:text-ink data-[state=active]:shadow-none data-[state=active]:ring-1 data-[state=active]:ring-inset data-[state=active]:ring-line-strong"
-            >
-              Cobro en mostrador
-            </TabsTrigger>
-            <TabsTrigger
-              value="history"
-              className="rounded-xl px-4 py-2 text-[13px] font-semibold text-ink/70 data-[state=active]:bg-sunken data-[state=active]:text-ink data-[state=active]:shadow-none data-[state=active]:ring-1 data-[state=active]:ring-inset data-[state=active]:ring-line-strong"
-            >
-              Historial
-            </TabsTrigger>
-          </TabsList>
-          <TabsContent value="cash"><CashAssignment /></TabsContent>
-          <TabsContent value="history"><PaymentsHistory /></TabsContent>
-        </Tabs>
-      </div>
+      <AdminPage>
+        <AdminPageHeader kicker="Cobros · mostrador" title="Cobrar" subtitle="Asigna una membresía y cóbrala en el momento." actions={<CobrosTabs />} />
+        <CashAssignment />
+      </AdminPage>
     </AdminLayout>
   </AuthGuard>
 );

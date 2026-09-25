@@ -5,39 +5,120 @@ import { es } from "date-fns/locale";
 import api from "@/lib/api";
 import { AuthGuard } from "@/components/admin/AuthGuard";
 import AdminLayout from "@/components/admin/AdminLayout";
-import SectionTabs from "@/components/admin/SectionTabs";
+import { AdminPage, AdminPageHeader } from "@/components/admin/AdminPage";
+import { Panel } from "@/components/admin/Panel";
+import { Avatar } from "@/components/admin/PersonCell";
 import { useConfirm } from "@/components/admin/ConfirmDialog";
 import { ErrorState, EmptyState } from "@/components/app/AppShell";
-import { formatTime } from "@/lib/format";
+import ReservasTabs from "@/pages/admin/bookings/ReservasTabs";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { Check, Users, Clock, RotateCcw, UserX } from "lucide-react";
-import { DEFAULT_CLASS_COLOR } from "@/design/classPalette";
+import { Camera, Check, ChevronDown, RotateCcw, UserX } from "lucide-react";
+import CheckinScanner from "@/components/admin/CheckinScanner";
+import { hhmm, minutesUntil, splitDay, summarize, type TodayClass, type TodayRosterEntry } from "@/lib/today-roster";
 
-interface RosterEntry {
-  booking_id: string;
-  class_id: string;
-  status: string;
-  checked_in_at: string | null;
-  guest_profile_id: string | null;
-  user_id: string | null;
-  display_name: string | null;
-  phone: string | null;
-  guest_name: string | null;
-  host_name: string | null;
-}
+type ClassCardProps = {
+  cls: TodayClass;
+  clock: string;
+  open: boolean;
+  onToggle?: () => void;
+  current?: boolean;
+  past?: boolean;
+  mutating: boolean;
+  labelOf: (r: TodayRosterEntry) => string;
+  isGuest: (r: TodayRosterEntry) => boolean;
+  onCheckin: (bookingId: string) => void;
+  onNoShow: (r: TodayRosterEntry) => void;
+};
 
-interface ClassRow {
-  id: string;
-  start_time: string;
-  end_time: string;
-  max_capacity: number;
-  class_type_name: string;
-  class_type_color: string;
-  instructor_name: string;
-  roster: RosterEntry[];
+function ClassCard({ cls, clock, open, onToggle, current = false, past = false, mutating, labelOf, isGuest, onCheckin, onNoShow }: ClassCardProps) {
+  const s = summarize(cls);
+  const mins = minutesUntil(hhmm(cls.start_time), clock);
+  const name = cls.class_type_name;
+  return (
+    <section
+      aria-label={`${name} ${hhmm(cls.start_time)}`}
+      className={cn("rounded-2xl bg-surface", current ? "border-2 border-ink" : "border border-line", past && "opacity-70")}
+    >
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-4 lg:px-6">
+        <span className="nums w-[76px] font-display text-[1.5rem] font-semibold leading-none">{hhmm(cls.start_time)}</span>
+        <div className="min-w-0 flex-1 leading-tight">
+          <p className="truncate text-base font-extrabold">{name}</p>
+          <p className="text-[13px] text-ink-muted">con {cls.instructor_name} · cupo {s.booked}/{cls.max_capacity}</p>
+        </div>
+        {current && (
+          <span className="rounded-full bg-ink px-2.5 py-1 text-[0.75rem] font-extrabold text-canvas">
+            {mins <= 0 ? "En curso" : `Empieza en ${mins} min`}
+          </span>
+        )}
+        {!past && s.full && <Badge variant="attention">Llena</Badge>}
+        <span className="nums text-sm font-extrabold">
+          {current ? (
+            <>
+              {s.attended} {s.attended === 1 ? "asistió" : "asistieron"} ·{" "}
+              <span className={s.pending > 0 ? "text-accent-strong" : undefined}>{s.pending} {s.pending === 1 ? "pendiente" : "pendientes"}</span>
+            </>
+          ) : past ? (
+            <>
+              {s.attended} {s.attended === 1 ? "asistió" : "asistieron"}
+              {s.noShow > 0 ? ` · ${s.noShow} ${s.noShow === 1 ? "falta" : "faltas"}` : ""}
+            </>
+          ) : (
+            <span className={s.pending > 0 ? "text-accent-strong" : undefined}>{s.pending} {s.pending === 1 ? "pendiente" : "pendientes"}</span>
+          )}
+        </span>
+        {onToggle && (
+          <Button variant="outline" size="icon" aria-expanded={open} aria-label={open ? `Cerrar lista de ${name}` : `Abrir lista de ${name}`} onClick={onToggle}>
+            <ChevronDown size={16} className={cn("transition-transform", open && "rotate-180")} />
+          </Button>
+        )}
+      </div>
+      {open && (
+        cls.roster.length === 0 ? (
+          <p className="border-t border-line px-6 py-4 text-sm text-ink-muted">Sin reservas para esta clase.</p>
+        ) : (
+          <ul className="grid border-t border-line px-5 lg:grid-cols-2 lg:gap-x-8 lg:px-6">
+            {cls.roster.map((r) => (
+              <li key={r.booking_id} className="flex items-center gap-3 border-b border-line py-2.5 last:border-b-0">
+                <Avatar name={labelOf(r)} size={40} />
+                <span className="min-w-0 flex-1 leading-snug">
+                  <span className="block truncate text-[15px] font-extrabold">
+                    {labelOf(r)}
+                    {isGuest(r) && r.host_name ? <span className="font-normal text-ink-muted"> (invitada de {r.host_name})</span> : null}
+                  </span>
+                  <span className="block truncate text-xs text-ink-muted">
+                    {r.phone ?? "—"}
+                    {r.status === "no_show" && <span className="text-danger"> · No asistió</span>}
+                  </span>
+                </span>
+                {r.status === "checked_in" ? (
+                  <span className="inline-flex h-11 items-center gap-1.5 rounded-full bg-success px-4 text-sm font-extrabold text-canvas">
+                    <Check size={16} aria-hidden="true" />Asistió
+                  </span>
+                ) : r.status === "waitlist" ? (
+                  <span className="text-[13px] text-ink-muted">Lista de espera</span>
+                ) : (
+                  <span className="flex gap-1.5">
+                    {r.status !== "no_show" && (
+                      <Button variant="ghost" size="icon" aria-label={`Marcar falta de ${labelOf(r)}`} onClick={() => onNoShow(r)} disabled={mutating}>
+                        <UserX size={18} />
+                      </Button>
+                    )}
+                    <Button aria-label={`Check-in de ${labelOf(r)}`} onClick={() => onCheckin(r.booking_id)} disabled={mutating}>
+                      <Check size={16} aria-hidden="true" />Check-in
+                    </Button>
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        )
+      )}
+    </section>
+  );
 }
 
 const TodayAttendance = () => {
@@ -47,13 +128,21 @@ const TodayAttendance = () => {
 
   // Reloj de recepción: se actualiza cada 30 s, también marca la clase en curso.
   const [now, setNow] = useState(() => new Date());
+  const [scanOpen, setScanOpen] = useState(false);
+  const [openIds, setOpenIds] = useState<Set<string>>(() => new Set());
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 30_000);
     return () => clearInterval(t);
   }, []);
-  const nowHHMM = format(now, "HH:mm");
 
-  const { data, isLoading, isError, refetch } = useQuery<{ data: ClassRow[] }>({
+  const toggle = (id: string) =>
+    setOpenIds((prev) => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+
+  const { data, isLoading, isError, refetch } = useQuery<{ data: TodayClass[] }>({
     queryKey: ["today-roster"],
     queryFn: async () => (await api.get("/admin/today-roster")).data,
     refetchInterval: 30000,
@@ -87,25 +176,12 @@ const TodayAttendance = () => {
     }),
   });
 
-  const labelOf = (r: RosterEntry) =>
+  const labelOf = (r: TodayRosterEntry) =>
     r.guest_name ?? r.display_name ?? "—";
 
-  const isGuest = (r: RosterEntry) => Boolean(r.guest_profile_id);
+  const isGuest = (r: TodayRosterEntry) => Boolean(r.guest_profile_id);
 
-  const counts = (roster: RosterEntry[]) => ({
-    confirmed: roster.filter((r) => r.status === "confirmed").length,
-    checked_in: roster.filter((r) => r.status === "checked_in").length,
-    no_show: roster.filter((r) => r.status === "no_show").length,
-    waitlist: roster.filter((r) => r.status === "waitlist").length,
-  });
-
-  const isLive = (c: ClassRow) => {
-    const start = c.start_time?.slice(0, 5);
-    const end = c.end_time?.slice(0, 5);
-    return Boolean(start && end && nowHHMM >= start && nowHHMM < end);
-  };
-
-  const handleNoShow = async (r: RosterEntry) => {
+  const handleNoShow = async (r: TodayRosterEntry) => {
     const name = labelOf(r);
     const ok = await confirm({
       title: `¿Marcar a ${name} como no asistió?`,
@@ -116,194 +192,75 @@ const TodayAttendance = () => {
     if (ok) noShowMutation.mutate(r.booking_id);
   };
 
+  const clock = format(now, "HH:mm");
+  const { past, next, later } = splitDay(classes, clock);
+
+  const mutating = checkinMutation.isPending || noShowMutation.isPending;
+  const cardProps = {
+    clock, mutating, labelOf, isGuest,
+    onCheckin: (id: string) => checkinMutation.mutate(id),
+    onNoShow: handleNoShow,
+  };
+
   return (
     <AuthGuard>
       <AdminLayout>
-        <div className="admin-page max-w-4xl">
-          <SectionTabs
-            tabs={[
-              { label: "Semana", to: "/admin/bookings" },
-              { label: "Hoy · pasar lista", to: "/admin/pasar-lista" },
-            ]}
+        <AdminPage>
+          <AdminPageHeader
+            kicker="Reservas · hoy"
+            title="Pasar lista"
+            subtitle="Marca asistencia con un tap. Se actualiza cada 30 segundos."
+            actions={<ReservasTabs />}
           />
-
-          {/* Cabecera de recepción: título + reloj vivo */}
-          <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-            <div>
-              <h1 className="admin-title text-ink">Pasar lista</h1>
-              <p className="mt-1 text-sm text-ink/55">
-                Marca asistencia con un tap. Solo las clases de hoy.
-              </p>
-            </div>
-            <div className="flex items-center gap-4">
-              <Button
-                variant="outline"
-                onClick={() => refetch()}
-                className="h-11 border-line-strong/70 bg-transparent text-ink hover:bg-sunken/40 hover:text-ink"
-              >
-                <RotateCcw size={13} className="mr-1.5" /> Actualizar
-              </Button>
-              <div className="text-right">
-                <p className="nums font-display text-3xl leading-none text-ink">{formatTime(now)}</p>
-                <p className="mt-1 text-xs capitalize text-ink/55">
-                  {format(now, "EEEE d 'de' MMMM", { locale: es })}
-                </p>
-              </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button size="lg" onClick={() => setScanOpen(true)}>
+              <Camera size={16} aria-hidden="true" />
+              Escanear QR del pase
+            </Button>
+            <Button variant="ghost" onClick={() => refetch()}>
+              <RotateCcw size={16} aria-hidden="true" />
+              Actualizar
+            </Button>
+            <div className="ml-auto text-right leading-tight">
+              <p className="nums font-display text-[1.75rem] font-semibold">{clock}</p>
+              <p className="text-[0.75rem] text-ink-muted">{format(now, "EEEE d 'de' MMMM", { locale: es })}</p>
             </div>
           </div>
 
           {isError ? (
-            <ErrorState
-              title="No pudimos cargar las clases de hoy"
-              onRetry={() => refetch()}
-            />
+            <ErrorState title="No pudimos cargar las clases de hoy" onRetry={() => refetch()} />
           ) : isLoading ? (
-            <div className="space-y-4">
-              {[1, 2, 3].map((i) => <Skeleton key={i} className="h-32 rounded-2xl" />)}
-            </div>
+            <div className="space-y-3"><Skeleton className="h-40 w-full" /><Skeleton className="h-20 w-full" /><Skeleton className="h-20 w-full" /></div>
           ) : classes.length === 0 ? (
             <EmptyState
-              icon={<Clock size={20} strokeWidth={1.8} />}
               title="Hoy no hay clases"
               description="Cuando haya clases programadas para hoy, aquí podrás pasar lista con un tap."
               ctaLabel="Ver calendario de clases"
               ctaTo="/admin/classes"
             />
           ) : (
-            <div className="space-y-5">
-              {classes.map((c) => {
-                const stats = counts(c.roster);
-                const live = isLive(c);
-                return (
-                  <section
-                    key={c.id}
-                    className={cn(
-                      "overflow-hidden rounded-2xl border bg-sunken",
-                      live ? "border-line-strong" : "border-line",
-                    )}
-                  >
-                    {/* Header de clase: plano, hairline, hora en serif */}
-                    <header
-                      className={cn(
-                        "flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3",
-                        live ? "border-line-strong/60 bg-sunken" : "border-line",
-                      )}
-                    >
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span
-                            aria-hidden
-                            className="h-2 w-2 shrink-0 rounded-full"
-                            style={{ backgroundColor: c.class_type_color || DEFAULT_CLASS_COLOR }}
-                          />
-                          <p className="truncate font-display text-lg leading-tight text-ink">
-                            <span className="nums">{c.start_time?.slice(0, 5)}</span>
-                            {" · "}
-                            {c.class_type_name}
-                          </p>
-                          {live && (
-                            <span className="shrink-0 rounded-full bg-inverse px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-[0.14em] text-canvas">
-                              En curso
-                            </span>
-                          )}
-                        </div>
-                        <p className="mt-0.5 text-xs text-ink/55">
-                          {c.instructor_name} · Cupo{" "}
-                          <span className="nums">{stats.confirmed + stats.checked_in}/{c.max_capacity}</span>
-                        </p>
-                      </div>
-                      <p className="nums shrink-0 text-xs">
-                        <span className="font-medium text-success">
-                          {stats.checked_in} asisti{stats.checked_in === 1 ? "ó" : "eron"}
-                        </span>
-                        <span className="mx-1.5 text-ink/30">·</span>
-                        <span className="text-ink/55">
-                          {stats.confirmed} pendiente{stats.confirmed === 1 ? "" : "s"}
-                        </span>
-                      </p>
-                    </header>
-
-                    {/* Roster */}
-                    {c.roster.length === 0 ? (
-                      <div className="px-4 py-6 text-center">
-                        <Users size={18} className="mx-auto mb-1.5 text-ink/30" />
-                        <p className="text-xs text-ink/55">Sin reservas para esta clase.</p>
-                      </div>
-                    ) : (
-                      <ul className="divide-y divide-line">
-                        {c.roster.map((r) => {
-                          const isCheckedIn = r.status === "checked_in";
-                          const isNoShow = r.status === "no_show";
-                          const isWaitlist = r.status === "waitlist";
-                          const name = labelOf(r);
-                          const isMutating = checkinMutation.isPending || noShowMutation.isPending;
-                          return (
-                            <li
-                              key={r.booking_id}
-                              className={cn(
-                                "flex items-center justify-between gap-3 px-4 py-3 transition-colors",
-                                isCheckedIn && "bg-success/[0.08]",
-                                isNoShow && "opacity-60",
-                              )}
-                            >
-                              <div className="min-w-0 flex-1">
-                                <p className="text-sm font-medium text-ink">
-                                  {name}
-                                  {isGuest(r) && r.host_name && (
-                                    <span className="ml-1.5 text-[11px] font-normal text-ink/55">
-                                      (invitada de {r.host_name})
-                                    </span>
-                                  )}
-                                </p>
-                                <p className="nums text-[11px] text-ink/55">
-                                  {r.phone ?? "—"}
-                                  {isWaitlist && <span className="ml-1.5">· Lista de espera</span>}
-                                  {isNoShow && <span className="ml-1.5 text-destructive">· No asistió</span>}
-                                  {isCheckedIn && <span className="ml-1.5 font-medium text-success">· Asistió</span>}
-                                </p>
-                              </div>
-                              <div className="flex shrink-0 gap-1.5">
-                                {!isCheckedIn && !isWaitlist && (
-                                  <Button
-                                    size="sm"
-                                    onClick={() => checkinMutation.mutate(r.booking_id)}
-                                    disabled={isMutating}
-                                    className="h-11 rounded-full bg-ink px-4 text-[0.72rem] font-medium uppercase tracking-[0.14em] text-canvas hover:bg-inverse"
-                                  >
-                                    <Check size={14} className="mr-1" />
-                                    Check-in
-                                  </Button>
-                                )}
-                                {isCheckedIn && (
-                                  <span className="inline-flex h-11 items-center gap-1.5 rounded-full bg-success/15 px-4 text-[0.72rem] font-medium uppercase tracking-[0.14em] text-success">
-                                    <Check size={14} /> Asistió
-                                  </span>
-                                )}
-                                {!isCheckedIn && !isNoShow && !isWaitlist && (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => handleNoShow(r)}
-                                    disabled={isMutating}
-                                    aria-label={`Marcar a ${name} como no asistió`}
-                                    className="h-11 w-11 rounded-full border-line-strong/70 bg-transparent p-0 text-ink/55 hover:border-destructive/40 hover:bg-destructive/5 hover:text-destructive"
-                                  >
-                                    <UserX size={15} />
-                                  </Button>
-                                )}
-                              </div>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    )}
-                  </section>
-                );
-              })}
-            </div>
+            <>
+              {next ? (
+                <ClassCard cls={next} open current {...cardProps} />
+              ) : (
+                <Panel className="px-6 py-5"><p className="text-sm font-bold">Ya terminaron las clases de hoy.</p></Panel>
+              )}
+              {later.map((c) => (
+                <ClassCard key={c.id} cls={c} open={openIds.has(c.id)} onToggle={() => toggle(c.id)} {...cardProps} />
+              ))}
+              {past.length > 0 && (
+                <section aria-label="Ya terminaron" className="flex flex-col gap-2.5">
+                  <h2 className="text-[0.75rem] font-bold uppercase tracking-[0.12em] text-ink-muted">Ya terminaron</h2>
+                  {past.map((c) => (
+                    <ClassCard key={c.id} cls={c} past open={openIds.has(c.id)} onToggle={() => toggle(c.id)} {...cardProps} />
+                  ))}
+                </section>
+              )}
+            </>
           )}
-        </div>
-        {dialog}
+          <CheckinScanner open={scanOpen} onOpenChange={setScanOpen} />
+          {dialog}
+        </AdminPage>
       </AdminLayout>
     </AuthGuard>
   );

@@ -48,6 +48,7 @@ import GenerateClasses from "./pages/admin/classes/GenerateClasses";
 import BookingsList from "./pages/admin/bookings/BookingsList";
 import Waitlist from "./pages/admin/bookings/Waitlist";
 import PaymentsPage from "./pages/admin/payments/PaymentsPage";
+import PaymentsHistoryPage from "./pages/admin/payments/PaymentsHistory";
 import OrdersVerification from "./pages/admin/orders/OrdersVerification";
 import POSPage from "./pages/admin/pos/POSPage";
 import VisitsList from "./pages/admin/visits/VisitsList";
@@ -161,6 +162,7 @@ const App = () => (
           <Route path="/admin/bookings/waitlist" element={<Waitlist />} />
           <Route path="/admin/staff" element={<InstructorsList />} />
           <Route path="/admin/payments" element={<PaymentsPage />} />
+          <Route path="/admin/payments/historial" element={<PaymentsHistoryPage />} />
           <Route path="/admin/orders" element={<OrdersVerification />} />
           {FEATURES.pos && (
             <Route path="/admin/pos" element={<POSPage />} />

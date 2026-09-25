@@ -1,5 +1,4 @@
 import { useState, useRef } from "react";
-import { FEATURES } from "@/config/features";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -7,20 +6,22 @@ import { z } from "zod";
 import api from "@/lib/api";
 import { AuthGuard } from "@/components/admin/AuthGuard";
 import AdminLayout from "@/components/admin/AdminLayout";
-import SectionTabs from "@/components/admin/SectionTabs";
+import { AdminPage, AdminPageHeader } from "@/components/admin/AdminPage";
+import { initials } from "@/components/admin/PersonCell";
+import StatusDot from "@/components/admin/StatusDot";
+import PersonasTabs from "../clients/PersonasTabs";
 import { useConfirm } from "@/components/admin/ConfirmDialog";
 import { EmptyState, ErrorState } from "@/components/app/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { Copy, Loader2, MoreHorizontal, Plus, Users, X } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const instructorSchema = z.object({
   displayName: z.string().min(1),
@@ -198,23 +199,23 @@ const InstructorsList = () => {
   return (
     <AuthGuard>
       <AdminLayout>
-        <div className="admin-page max-w-5xl">
-          <SectionTabs
-            tabs={[
-              { label: "Clientas", to: "/admin/clients" },
-              ...(FEATURES.visits ? [{ label: "Visitas", to: "/admin/visitas" }] : []),
-              { label: "Coaches", to: "/admin/staff" },
-            ]}
+        <AdminPage>
+          <AdminPageHeader
+            kicker="Personas"
+            title="Coaches"
+            actions={
+              <>
+                <PersonasTabs />
+                <Button onClick={openCreate}>
+                  <Plus size={16} aria-hidden="true" />
+                  Nueva coach
+                </Button>
+              </>
+            }
           />
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
-            <h1 className="admin-title font-semibold text-ink">Coaches</h1>
-            <Button size="sm" onClick={openCreate} className="bg-ink text-canvas hover:bg-inverse">
-              <Plus size={14} className="mr-1" />Nueva coach
-            </Button>
-          </div>
 
           {magicLink && (
-            <div className="mb-4 rounded-xl border border-line bg-sunken p-3">
+            <div className="rounded-2xl border border-line bg-surface px-5 py-3.5">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-ink/60">
@@ -270,65 +271,54 @@ const InstructorsList = () => {
               onCta={openCreate}
             />
           ) : (
-            <div className="rounded-xl border border-line overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Foto</TableHead>
-                    <TableHead>Nombre</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Especialidades</TableHead>
-                    <TableHead>Estado</TableHead>
-                    <TableHead />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {isLoading
-                    ? Array(4).fill(0).map((_, i) => (
-                      <TableRow key={i}>{Array(6).fill(0).map((_, j) => <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>)}</TableRow>
-                    ))
-                    : instructors.map((ins) => (
-                      <TableRow key={ins.id}>
-                        <TableCell>
-                          <div className="flex items-center gap-1">
-                            {ins.photoUrl
-                              ? <img src={ins.photoUrl} className="w-8 h-8 rounded-full object-cover" style={{ objectPosition: `${clampFocus(ins.photoFocusX)}% ${clampFocus(ins.photoFocusY)}%` }} alt="" />
-                              : <div className="w-8 h-8 rounded-full bg-sunken flex items-center justify-center text-xs font-bold text-ink">{ins.displayName?.[0]}</div>
-                            }
-                            {ins.photoUrl_2 && (
-                              <img src={ins.photoUrl_2} className="w-6 h-6 rounded-full object-cover ring-1 ring-line-strong/60" alt="2ª foto" title="2ª foto (hover/click)" />
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="font-medium text-ink">{ins.displayName}</TableCell>
-                        <TableCell className="text-sm text-ink/60">{ins.email ?? <span className="opacity-40">—</span>}</TableCell>
-                        <TableCell className="text-xs text-ink/60">{normalizeSpecialties(ins.specialties).join(", ")}</TableCell>
-                        <TableCell>
-                          {ins.isActive ? (
-                            <Badge variant="outline" className="border-transparent bg-sunken text-ink font-medium">Activa</Badge>
+            <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
+              {isLoading
+                ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-[300px] rounded-2xl" />)
+                : instructors.map((ins: Instructor) => {
+                    const specs = normalizeSpecialties(ins.specialties);
+                    return (
+                      <article key={ins.id} className={cn("overflow-hidden rounded-2xl border border-line bg-surface", ins.isActive === false && "opacity-70")}>
+                        <div className="relative h-[200px] bg-sunken">
+                          {ins.photoUrl ? (
+                            <img src={ins.photoUrl} alt="" className="h-full w-full object-cover" style={{ objectPosition: `${clampFocus(ins.photoFocusX)}% ${clampFocus(ins.photoFocusY)}%` }} />
                           ) : (
-                            <Badge variant="outline" className="border-line bg-transparent text-ink/55 font-medium">Inactiva</Badge>
+                            <span aria-hidden="true" className="grid h-full place-items-center font-display text-[2.75rem] font-extrabold text-line-strong">
+                              {initials(ins.displayName)}
+                            </span>
                           )}
-                        </TableCell>
-                        <TableCell>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal size={14} /></Button></DropdownMenuTrigger>
-                            <DropdownMenuContent>
-                              <DropdownMenuItem onClick={() => openEdit(ins)}>Editar</DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => { setUploadSlot(1); setUploadTargetId(ins.id); setTimeout(() => fileRef.current?.click(), 0); }}>Subir foto principal</DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => { setUploadSlot(2); setUploadTargetId(ins.id); setTimeout(() => fileRef.current?.click(), 0); }}>Subir 2ª foto (hover)</DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => magicLinkMutation.mutate(ins)}>Magic link</DropdownMenuItem>
-                              <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(ins)}>Eliminar</DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                </TableBody>
-              </Table>
+                          <div className="absolute right-2 top-2">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="outline" size="icon" className="bg-surface" aria-label={`Acciones de ${ins.displayName}`}>
+                                  <MoreHorizontal size={18} />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => openEdit(ins)}>Editar</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => { setUploadSlot(1); setUploadTargetId(ins.id); setTimeout(() => fileRef.current?.click(), 0); }}>Subir foto principal</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => { setUploadSlot(2); setUploadTargetId(ins.id); setTimeout(() => fileRef.current?.click(), 0); }}>Subir 2ª foto (hover)</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => magicLinkMutation.mutate(ins)}>Magic link</DropdownMenuItem>
+                                <DropdownMenuItem className="text-danger focus:text-danger" onClick={() => handleDelete(ins)}>Eliminar</DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                        </div>
+                        <div className="flex flex-col gap-2.5 p-4">
+                          <div className="flex items-center justify-between gap-2">
+                            <h2 className="truncate text-base font-extrabold">{ins.displayName}</h2>
+                            {ins.isActive === false ? <StatusDot tone="muted">Inactiva</StatusDot> : <StatusDot tone="success">Activa</StatusDot>}
+                          </div>
+                          <p className="truncate text-[13px] text-ink-muted">{ins.email || "Sin email"}</p>
+                          <div className="flex min-h-[24px] flex-wrap gap-1.5">
+                            {specs.map((s) => <span key={s} className="rounded-full bg-sunken px-2.5 py-1 text-[0.75rem] font-extrabold">{s}</span>)}
+                          </div>
+                        </div>
+                      </article>
+                    );
+                  })}
             </div>
           )}
-        </div>
+        </AdminPage>
 
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogContent className="max-w-2xl max-h-[90dvh] overflow-y-auto">

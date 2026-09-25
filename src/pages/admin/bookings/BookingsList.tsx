@@ -1,31 +1,38 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState, useEffect } from "react";
-import { format, startOfWeek, endOfWeek, addWeeks, subWeeks } from "date-fns";
+import { useCallback, useEffect, useState } from "react";
+import { addDays, format, getISOWeek, parseISO, startOfWeek } from "date-fns";
 import { es } from "date-fns/locale";
 import api from "@/lib/api";
 import { AuthGuard } from "@/components/admin/AuthGuard";
 import AdminLayout from "@/components/admin/AdminLayout";
-import SectionTabs from "@/components/admin/SectionTabs";
-import { Skeleton } from "@/components/ui/skeleton";
+import { FEATURES } from "@/config/features";
+import { useSearchParamState } from "@/hooks/use-search-param-state";
+import { AdminPage, AdminPageHeader } from "@/components/admin/AdminPage";
+import { Panel } from "@/components/admin/Panel";
+import MasterDetail from "@/components/admin/MasterDetail";
+import WeekNav from "@/components/admin/WeekNav";
+import DayStrip from "@/components/admin/DayStrip";
+import StatusDot from "@/components/admin/StatusDot";
+import { Avatar } from "@/components/admin/PersonCell";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useConfirm } from "@/components/admin/ConfirmDialog";
-import { ErrorState } from "@/components/app/AppShell";
+import { ErrorState, SkeletonRow } from "@/components/app/AppShell";
 import { formatMXN } from "@/lib/format";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import {
-  ChevronLeft, ChevronRight, Users, CheckCircle2,
-  RotateCcw, ArrowLeft, UserCheck, UserX, Calendar, Plus, Search, XCircle, Ban, UserPlus,
-} from "lucide-react";
+import { Check, MoreHorizontal, Search, UserPlus, UserX } from "lucide-react";
 import { useDebounce } from "@/hooks/use-debounce";
 import VisitAssignDialog from "@/components/admin/VisitAssignDialog";
-import { DEFAULT_CLASS_COLOR } from "@/design/classPalette";
+import { hhmm } from "@/lib/today-roster";
+import ReservasTabs from "./ReservasTabs";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 interface RosterEntry {
@@ -46,15 +53,6 @@ interface ClientOption {
   email?: string;
   phone?: string | null;
 }
-
-// ── Status config ──────────────────────────────────────────────────────────────
-const statusConfig: Record<string, { label: string; className: string }> = {
-  confirmed:  { label: "Confirmada",      className: "text-ink border-line-strong/60 bg-sunken/40" },
-  checked_in: { label: "Asistió",         className: "text-success border-success/40 bg-success/10 font-semibold" },
-  waitlist:   { label: "Lista de espera", className: "text-ink/55 border-line bg-canvas" },
-  no_show:    { label: "No asistió",      className: "text-destructive border-destructive/30 bg-destructive/5" },
-  cancelled:  { label: "Cancelada",       className: "text-ink/40 border-line bg-transparent" },
-};
 
 // ── Diálogo de cancelar reserva: muestra la ventana (a tiempo/tarde) y deja
 // elegir si devolver el crédito. Default: devolver (la admin desmarca si no). ──
@@ -149,8 +147,16 @@ const CancelBookingDialog = ({
   );
 };
 
+function RosterStatus({ status }: { status: string }) {
+  if (status === "checked_in") return <StatusDot tone="success">Asistió</StatusDot>;
+  if (status === "no_show") return <StatusDot tone="danger">No asistió</StatusDot>;
+  if (status === "cancelled") return <StatusDot tone="muted">Cancelada</StatusDot>;
+  if (status === "waitlist") return <span className="rounded-full bg-sunken px-2.5 py-1 text-[0.75rem] font-extrabold text-ink">Lista de espera</span>;
+  return <StatusDot tone="ink">Confirmada</StatusDot>;
+}
+
 // ── Class Roster panel ─────────────────────────────────────────────────────────
-const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void }) => {
+const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: string; onBack: () => void; onClassLoaded?: (date: string) => void }) => {
   const { toast } = useToast();
   const qc = useQueryClient();
   const { confirm, promptText, dialog } = useConfirm();
@@ -225,6 +231,13 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
 
   const classInfo = data?.data?.class ?? null;
   const roster: RosterEntry[] = data?.data?.roster ?? [];
+
+  useEffect(() => {
+    const d = classInfo?.date ? String(classInfo.date).slice(0, 10) : null;
+    if (d) onClassLoaded?.(d);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [classInfo?.date]);
+
   const { data: usersData, isFetching: searchingUsers } = useQuery<{ data: ClientOption[] }>({
     queryKey: ["booking-assign-users", classId, debouncedMemberSearch],
     enabled: assignOpen,
@@ -234,10 +247,16 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
   });
   const userOptions = Array.isArray(usersData?.data) ? usersData.data : [];
 
+  // Las acciones de abajo cambian cupo/lista de espera, que la lista de la
+  // semana (panel izquierdo) también muestra — sin esto se queda con números
+  // viejos hasta que la ventana recupera el foco (M1).
+  const invalidateWeek = () => qc.invalidateQueries({ queryKey: ["admin-classes-week"] });
+
   const checkinMutation = useMutation({
     mutationFn: (id: string) => api.put(`/bookings/${id}/check-in`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["roster", classId] });
+      invalidateWeek();
       toast({ title: "Check-in registrado" });
     },
     onError: () => toast({ title: "Error al hacer check-in", variant: "destructive" }),
@@ -247,6 +266,7 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
     mutationFn: (id: string) => api.put(`/bookings/${id}/no-show`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["roster", classId] });
+      invalidateWeek();
       toast({ title: "Marcada como no asistió" });
     },
     onError: () => toast({ title: "Error", variant: "destructive" }),
@@ -259,6 +279,7 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
     onSuccess: (res: any) => {
       qc.invalidateQueries({ queryKey: ["roster", classId] });
       qc.invalidateQueries({ queryKey: ["my-bookings"] });
+      invalidateWeek();
       const restored = res?.data?.data?.credit_restored;
       toast({
         title: "Reserva cancelada",
@@ -280,6 +301,7 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
     onSuccess: (res: any) => {
       qc.invalidateQueries({ queryKey: ["roster", classId] });
       qc.invalidateQueries({ queryKey: ["classes"] });
+      invalidateWeek();
       const d = res?.data?.data || {};
       toast({
         title: "Clase cancelada",
@@ -303,6 +325,7 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
       }),
     onSuccess: (res: any) => {
       qc.invalidateQueries({ queryKey: ["roster", classId] });
+      invalidateWeek();
       const msg = res?.data?.message ?? "Reserva asignada";
       toast({ title: msg });
       setAssignOpen(false);
@@ -366,216 +389,124 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
     setCancelTarget(entry);
   };
 
-  const backButton = (
-    <button
-      onClick={onBack}
-      className="flex items-center gap-2 text-sm text-ink/55 transition-colors hover:text-ink"
-    >
-      <ArrowLeft size={14} /> Volver al calendario
-    </button>
-  );
-
   if (isError) {
     return (
-      <div className="space-y-5">
-        {backButton}
-        <ErrorState
-          title="No pudimos cargar la clase"
-          onRetry={() => refetch()}
-        />
-      </div>
+      <Panel className="p-6">
+        <ErrorState title="No pudimos cargar la clase" description="Puede que la hayan borrado o que el enlace sea viejo." onRetry={() => refetch()} />
+        <Button variant="outline" onClick={onBack}>Elegir otra clase</Button>
+      </Panel>
     );
   }
 
   return (
     <div className="space-y-5">
-      {backButton}
-
-      {/* Class header */}
-      {isLoading ? (
-        <Skeleton className="h-28 rounded-2xl" />
-      ) : classInfo && (
-        <div className="rounded-2xl border border-line bg-sunken p-5">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <div className="mb-1 flex items-center gap-2">
-                <span
-                  aria-hidden
-                  className="h-2.5 w-2.5 shrink-0 rounded-full"
-                  style={{ backgroundColor: classInfo.color || DEFAULT_CLASS_COLOR }}
-                />
-                <h2 className="font-display text-xl text-ink">{classInfo.classTypeName}</h2>
-              </div>
-              <p className="nums text-sm capitalize text-ink/60">
-                {classInfo.startsAt
-                  ? format(new Date(classInfo.startsAt), "EEEE d 'de' MMMM · HH:mm", { locale: es })
-                  : classInfo.date ?? "—"}
+      <Panel aria-label="Lista de la clase" className="overflow-hidden">
+        {isLoading ? (
+          <div className="p-6"><SkeletonRow height={72} /></div>
+        ) : (
+          <div className="flex flex-col gap-4 p-5 lg:flex-row lg:items-start lg:justify-between lg:p-6">
+            <div className="min-w-0">
+              <p className="text-[0.75rem] font-bold uppercase tracking-[0.12em] text-ink-muted">
+                {classInfo?.startsAt ? format(new Date(classInfo.startsAt), "EEEE d 'de' MMMM · HH:mm", { locale: es }) : classInfo?.date ?? "—"}
               </p>
-              <p className="mt-0.5 text-xs text-ink/45">Instructora: {classInfo.instructorName}</p>
+              <h2 className="mt-2 font-display text-[1.375rem] font-semibold leading-tight text-ink">{classInfo?.classTypeName ?? "Clase"}</h2>
+              <p className="mt-1 text-[13px] text-ink-muted">con {classInfo?.instructorName ?? "—"} · se actualiza sola cada 15 s</p>
             </div>
-            <button
-              onClick={() => refetch()}
-              className="flex items-center gap-1 text-xs text-ink/70 transition-colors hover:text-ink"
-            >
-              <RotateCcw size={11} /> Actualizar
-            </button>
-          </div>
-
-          <div className="mt-3 flex flex-wrap gap-2">
-            <Button
-              size="sm"
-              onClick={() => setAssignOpen(true)}
-              data-press
-              className="bg-ink text-canvas hover:bg-inverse"
-            >
-              <Plus size={14} className="mr-1" /> Asignar socia
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setVisitOpen(true)}
-              data-press
-              className="border-line-strong/70 bg-transparent text-ink hover:bg-sunken/40 hover:text-ink"
-            >
-              <UserPlus size={14} className="mr-1" /> Asignar visitante
-            </Button>
-            {(confirmed > 0 || waitlist > 0) && (
-              <Button
-                size="sm"
-                variant="outline"
-                data-press
-                onClick={handleCancelClass}
-                disabled={cancelClassMutation.isPending}
-                className="border-destructive/40 bg-transparent text-destructive hover:bg-destructive/5 hover:text-destructive"
-              >
-                <Ban size={14} className="mr-1" /> Cancelar clase
+            <div className="flex flex-wrap items-center gap-2">
+              <Button onClick={() => setAssignOpen(true)}>
+                <UserPlus size={16} aria-hidden="true" />
+                Asignar socia
               </Button>
-            )}
-          </div>
-
-          {/* Contadores del roster: fila editorial con hairlines */}
-          <dl className="mt-5 grid grid-cols-4 divide-x divide-line border-t border-line">
-            {[
-              { label: "Confirmadas", value: confirmed },
-              { label: "Asistieron",  value: checkedIn, accent: "text-success" },
-              { label: "En espera",   value: waitlist },
-              { label: "Faltas",      value: noShow },
-            ].map((s) => (
-              <div key={s.label} className="px-3 py-3 first:pl-0">
-                <dt className="truncate text-[0.72rem] uppercase tracking-[0.12em] text-ink/55">{s.label}</dt>
-                <dd className={cn("nums mt-1 font-display text-xl leading-none", s.accent ?? "text-ink")}>
-                  {s.value}
-                </dd>
-              </div>
-            ))}
-          </dl>
-        </div>
-      )}
-
-      {/* Roster list */}
-      <div className="space-y-2">
-        {isLoading
-          ? Array(4).fill(0).map((_, i) => <Skeleton key={i} className="h-16 rounded-xl" />)
-          : roster.length === 0
-            ? (
-              <div className="py-12 text-center text-sm text-ink/55">
-                <Users size={28} className="mx-auto mb-2 text-ink/30" />
-                No hay reservas para esta clase
-              </div>
-            )
-            : roster.map((entry) => {
-              const sc = statusConfig[entry.status] ?? statusConfig.confirmed;
-              const canCheckin = entry.status === "confirmed" || entry.status === "waitlist";
-              const canNoShow  = entry.status === "confirmed";
-              const canCancel  = entry.status === "confirmed" || entry.status === "waitlist";
-              return (
-                <div
-                  key={entry.bookingId}
-                  className={cn(
-                    "flex items-center gap-4 rounded-xl border p-4 transition-colors",
-                    entry.status === "checked_in"
-                      ? "border-success/30 bg-success/[0.07]"
-                      : entry.status === "no_show"
-                        ? "border-line bg-sunken opacity-60"
-                        : "border-line bg-sunken hover:bg-sunken/30"
+              {FEATURES.visits && (
+                <Button variant="outline" onClick={() => setVisitOpen(true)}>Asignar visitante</Button>
+              )}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="icon" aria-label="Más acciones de la clase"><MoreHorizontal size={18} /></Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => refetch()}>Actualizar</DropdownMenuItem>
+                  {confirmed + waitlist > 0 && (
+                    <DropdownMenuItem className="text-danger" onClick={handleCancelClass}>Cancelar clase</DropdownMenuItem>
                   )}
-                >
-                  {/* Avatar */}
-                  <div className={cn(
-                    "flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold",
-                    entry.status === "checked_in"
-                      ? "border border-success/30 bg-success/15 text-success"
-                      : "border border-line-strong/50 bg-sunken text-ink"
-                  )}>
-                    {entry.status === "checked_in"
-                      ? <UserCheck size={16} />
-                      : entry.displayName?.[0]?.toUpperCase() ?? "?"}
-                  </div>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </div>
+        )}
 
-                  {/* Info */}
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold text-ink">{entry.displayName}</p>
-                    <div className="mt-0.5 flex flex-wrap items-center gap-2">
-                      <span className="truncate text-xs text-ink/50">{entry.email}</span>
-                      {entry.phone && <span className="nums text-xs text-ink/40">{entry.phone}</span>}
-                    </div>
-                    {entry.planName && (
-                      <p className="nums mt-0.5 text-[10px] text-ink/80">
-                        {entry.planName}
-                        {entry.classesRemaining !== null
-                          ? ` · ${entry.classesRemaining} clases restantes`
-                          : " · Ilimitado"}
-                      </p>
-                    )}
-                  </div>
+        <dl className="grid grid-cols-2 border-t border-line lg:grid-cols-4">
+          {([["Confirmadas", confirmed], ["Asistieron", checkedIn], ["En espera", waitlist], ["Faltas", noShow]] as const).map(([label, value], i) => (
+            <div key={label} className={cn("px-5 py-3.5", i % 2 === 1 && "border-l border-line", i >= 2 && "border-t border-line lg:border-t-0", i > 0 && "lg:border-l")}>
+              <dt className="text-[0.75rem] font-bold uppercase tracking-[0.12em] text-ink-muted">{label}</dt>
+              <dd className="nums mt-1.5 font-display text-[1.375rem] font-semibold">{value}</dd>
+            </div>
+          ))}
+        </dl>
 
-                  {/* Status badge */}
-                  <span className={cn("shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-semibold", sc.className)}>
-                    {sc.label}
+        {isLoading ? (
+          <div className="space-y-2 border-t border-line p-5"><SkeletonRow /><SkeletonRow /><SkeletonRow /><SkeletonRow /></div>
+        ) : roster.length === 0 ? (
+          <p className="border-t border-line px-6 py-8 text-sm text-ink-muted">No hay reservas para esta clase</p>
+        ) : (
+          <ul>
+            {roster.map((entry: RosterEntry) => {
+              const canCheckin = entry.status === "confirmed" || entry.status === "waitlist";
+              const canNoShow = entry.status === "confirmed";
+              const canCancel = entry.status === "confirmed" || entry.status === "waitlist";
+              const unlimited = entry.classesRemaining == null || entry.classesRemaining >= 9999;
+              const plan = entry.planName
+                ? `${entry.planName} · ${unlimited ? "Ilimitado" : `${entry.classesRemaining} ${entry.classesRemaining === 1 ? "restante" : "restantes"}`}`
+                : "Sin plan";
+              return (
+                <li key={entry.bookingId} className="grid grid-cols-[40px_minmax(0,1fr)] items-center gap-3 border-t border-line px-5 py-3 lg:grid-cols-[40px_minmax(0,1fr)_150px_auto] lg:gap-4 lg:px-6">
+                  {entry.status === "checked_in" ? (
+                    <span aria-hidden="true" className="grid h-10 w-10 place-items-center rounded-full bg-success text-canvas"><Check size={18} /></span>
+                  ) : (
+                    <Avatar name={entry.displayName} size={40} />
+                  )}
+                  <span className="min-w-0 leading-snug">
+                    <span className="block truncate text-sm font-extrabold">{entry.displayName}</span>
+                    <span className="block truncate text-xs text-ink-muted">{[plan, entry.phone].filter(Boolean).join(" · ")}</span>
                   </span>
-
-                  {/* Actions */}
-                  <div className="flex shrink-0 items-center gap-2">
+                  <span className="col-start-2 lg:col-start-auto"><RosterStatus status={entry.status} /></span>
+                  <span className="col-span-2 flex flex-wrap justify-end gap-1.5 lg:col-span-1">
                     {canCheckin && (
-                      <button
-                        onClick={() => checkinMutation.mutate(entry.bookingId)}
-                        disabled={checkinMutation.isPending}
-                        title="Check-in"
-                        aria-label={`Check-in de ${entry.displayName}`}
-                        className="flex h-10 w-10 items-center justify-center rounded-lg border border-success/40 bg-success/10 text-success transition-colors hover:bg-success/20 disabled:opacity-40"
-                      >
-                        <CheckCircle2 size={15} />
-                      </button>
+                      <Button variant="outline" aria-label={`Check-in de ${entry.displayName}`} onClick={() => checkinMutation.mutate(entry.bookingId)} disabled={checkinMutation.isPending}>
+                        <Check size={16} aria-hidden="true" />
+                        Check-in
+                      </Button>
                     )}
                     {canNoShow && (
-                      <button
-                        onClick={() => noShowMutation.mutate(entry.bookingId)}
-                        disabled={noShowMutation.isPending}
-                        title="No asistió"
-                        aria-label={`Marcar a ${entry.displayName} como no asistió`}
-                        className="flex h-10 w-10 items-center justify-center rounded-lg border border-line bg-transparent text-ink/50 transition-colors hover:border-destructive/40 hover:bg-destructive/5 hover:text-destructive disabled:opacity-40"
-                      >
-                        <UserX size={15} />
-                      </button>
+                      <Button variant="ghost" aria-label={`Marcar falta de ${entry.displayName}`} onClick={() => noShowMutation.mutate(entry.bookingId)} disabled={noShowMutation.isPending}>
+                        <UserX size={16} aria-hidden="true" />
+                        Falta
+                      </Button>
                     )}
                     {canCancel && (
-                      <button
-                        data-press
-                        onClick={() => handleCancelBooking(entry)}
-                        disabled={cancelMutation.isPending}
-                        title="Cancelar reserva (devuelve crédito)"
-                        aria-label={`Cancelar reserva de ${entry.displayName}`}
-                        className="flex h-10 w-10 items-center justify-center rounded-lg border border-line-strong/60 bg-transparent text-ink/55 transition-colors hover:border-destructive/40 hover:bg-destructive/5 hover:text-destructive disabled:opacity-40"
-                      >
-                        <XCircle size={15} />
-                      </button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" aria-label={`Más acciones para ${entry.displayName}`}><MoreHorizontal size={18} /></Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleCancelBooking(entry)}>Cancelar reserva (devuelve crédito)</DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     )}
-                  </div>
-                </div>
+                  </span>
+                </li>
               );
-            })
-        }
-      </div>
+            })}
+          </ul>
+        )}
+
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line px-5 py-3.5 lg:px-6">
+          <p className="text-[13px] text-ink-muted">Cancelar una reserva devuelve el crédito, salvo que elijas lo contrario.</p>
+          {confirmed + waitlist > 0 && (
+            <Button variant="outline" className="border-danger text-danger hover:bg-sunken" onClick={handleCancelClass}>Cancelar clase</Button>
+          )}
+        </div>
+      </Panel>
 
       {/* Asignar socia (+ acompañante): panel lateral */}
       <Sheet
@@ -592,20 +523,22 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
 
           <div className="mt-4 space-y-4">
             {/* Toggle "+ acompañante" */}
-            <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-line bg-sunken p-2.5">
-              <input
-                type="checkbox"
-                checked={assignWithGuest}
-                onChange={(e) => { setAssignWithGuest(e.target.checked); if (!e.target.checked) setSelectedMember(null); }}
-                className="mt-0.5"
-              />
-              <div className="space-y-0.5">
-                <span className="text-sm font-medium text-ink">Llevará acompañante</span>
-                <p className="text-[11px] text-ink/55">
-                  Descuenta 2 créditos: 1 del pack regular + 1 del pack de visitas de la socia.
-                </p>
-              </div>
-            </label>
+            {FEATURES.visits && (
+              <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-line bg-sunken p-2.5">
+                <input
+                  type="checkbox"
+                  checked={assignWithGuest}
+                  onChange={(e) => { setAssignWithGuest(e.target.checked); if (!e.target.checked) setSelectedMember(null); }}
+                  className="mt-0.5"
+                />
+                <div className="space-y-0.5">
+                  <span className="text-sm font-medium text-ink">Llevará acompañante</span>
+                  <p className="text-[11px] text-ink/55">
+                    Descuenta 2 créditos: 1 del pack regular + 1 del pack de visitas de la socia.
+                  </p>
+                </div>
+              </label>
+            )}
 
             {/* Paso 1: elegir socia */}
             {(!assignWithGuest || !selectedMember) && (
@@ -890,12 +823,14 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
         </SheetContent>
       </Sheet>
 
-      <VisitAssignDialog
-        classId={classId}
-        open={visitOpen}
-        onOpenChange={setVisitOpen}
-        onSuccess={() => refetch()}
-      />
+      {FEATURES.visits && (
+        <VisitAssignDialog
+          classId={classId}
+          open={visitOpen}
+          onOpenChange={setVisitOpen}
+          onSuccess={() => refetch()}
+        />
+      )}
 
       <CancelBookingDialog
         entry={cancelTarget}
@@ -913,188 +848,144 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
   );
 };
 
-// ── Weekly class picker ────────────────────────────────────────────────────────
-const ClassPicker = ({ onSelectClass }: { onSelectClass: (id: string) => void }) => {
-  const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
-  const weekEnd = endOfWeek(weekStart, { weekStartsOn: 1 });
-
-  const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ["admin-classes-week", format(weekStart, "yyyy-MM-dd")],
-    queryFn: async () =>
-      (await api.get(`/classes?start=${format(weekStart, "yyyy-MM-dd")}&end=${format(weekEnd, "yyyy-MM-dd")}`)).data,
-  });
-  const classes: any[] = Array.isArray(data?.data) ? data.data : [];
-
-  const days = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(weekStart);
-    d.setDate(d.getDate() + i);
-    return d;
-  });
-
-  const todayStr = format(new Date(), "yyyy-MM-dd");
-
-  return (
-    <div className="space-y-5">
-      {/* Week navigation */}
-      <div className="flex items-center gap-3">
-        <button
-          onClick={() => setWeekStart((w) => subWeeks(w, 1))}
-          aria-label="Semana anterior"
-          className="flex h-9 w-9 items-center justify-center rounded-lg border border-line text-ink/55 transition-colors hover:border-line-strong hover:text-ink"
-        >
-          <ChevronLeft size={14} />
-        </button>
-        <span className="nums min-w-[200px] text-center text-sm font-semibold text-ink">
-          {format(weekStart, "d MMM", { locale: es })} – {format(weekEnd, "d MMM yyyy", { locale: es })}
-        </span>
-        <button
-          onClick={() => setWeekStart((w) => addWeeks(w, 1))}
-          aria-label="Semana siguiente"
-          className="flex h-9 w-9 items-center justify-center rounded-lg border border-line text-ink/55 transition-colors hover:border-line-strong hover:text-ink"
-        >
-          <ChevronRight size={14} />
-        </button>
-        <button
-          onClick={() => setWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }))}
-          className="ml-2 text-xs text-ink/70 transition-colors hover:text-ink"
-        >
-          Hoy
-        </button>
-      </div>
-
-      {isError ? (
-        <ErrorState
-          title="No pudimos cargar la semana"
-          onRetry={() => refetch()}
-        />
-      ) : (
-        <div className="space-y-4">
-          {days.map((day) => {
-            const dayStr = format(day, "yyyy-MM-dd");
-            const dayClasses = classes
-              .filter((c) => {
-                // date field is always YYYY-MM-DD after server normalisation
-                const d = (c.date as string)?.slice(0, 10)
-                  ?? (c.start_time as string)?.slice(0, 10);
-                return d === dayStr;
-              })
-              .sort((a, b) => (a.start_time ?? "").localeCompare(b.start_time ?? ""));
-
-            if (!dayClasses.length && !isLoading) return null;
-
-            const isToday = dayStr === todayStr;
-
-            return (
-              <div key={dayStr}>
-                <div className="mb-2 flex items-center gap-2">
-                  <p className={cn(
-                    "text-[0.72rem] font-semibold uppercase tracking-[0.12em]",
-                    isToday ? "text-ink" : "text-ink/45"
-                  )}>
-                    {format(day, "EEEE d", { locale: es })}
-                  </p>
-                  {isToday && (
-                    <span className="rounded-full bg-sunken px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-ink">
-                      Hoy
-                    </span>
-                  )}
-                </div>
-
-                {isLoading ? (
-                  <Skeleton className="h-16 rounded-xl" />
-                ) : (
-                  <div className="space-y-2">
-                    {dayClasses.map((cls) => {
-                      const time = cls.start_time
-                        ? format(new Date(cls.start_time), "HH:mm")
-                        : cls.startTime ?? "—";
-                      const capacity = cls.max_capacity ?? 0;
-                      const booked   = cls.current_bookings ?? 0;
-                      const full     = capacity > 0 && booked >= capacity;
-                      const pct      = capacity > 0 ? Math.min(Math.round((booked / capacity) * 100), 100) : 0;
-
-                      return (
-                        <button
-                          key={cls.id}
-                          onClick={() => onSelectClass(cls.id)}
-                          className="group flex w-full items-center gap-4 rounded-xl border border-line bg-sunken p-4 text-left transition-colors hover:border-line-strong hover:bg-sunken/30"
-                        >
-                          <span
-                            aria-hidden
-                            className="h-2.5 w-2.5 shrink-0 rounded-full"
-                            style={{ backgroundColor: cls.class_type_color ?? cls.color ?? DEFAULT_CLASS_COLOR }}
-                          />
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-semibold text-ink">
-                              {cls.class_type_name ?? cls.className ?? "Clase"}
-                            </p>
-                            <p className="nums text-xs text-ink/55">{time} · {cls.instructor_name ?? "—"}</p>
-                          </div>
-                          <div className="flex shrink-0 items-center gap-2">
-                            <div className="text-right">
-                              <p className={cn("nums text-sm font-bold", full ? "text-ink" : "text-ink/80")}>
-                                {booked}/{capacity}
-                              </p>
-                              <p className="text-[10px] text-ink/45">{full ? "llena" : "lugares"}</p>
-                            </div>
-                            <div className="h-1.5 w-12 overflow-hidden rounded-full bg-sunken">
-                              <div
-                                className={cn("h-full rounded-full transition-all", full ? "bg-ink" : "bg-ink")}
-                                style={{ width: `${pct}%` }}
-                              />
-                            </div>
-                            <ChevronRight size={14} className="text-ink/30 transition-colors group-hover:text-ink" />
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-
-          {!isLoading && classes.length === 0 && (
-            <div className="py-16 text-center text-sm text-ink/55">
-              <Calendar size={28} className="mx-auto mb-2 text-ink/30" />
-              No hay clases programadas esta semana
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
+type WeekClass = {
+  id: string;
+  date?: string;
+  start_time: string;
+  end_time?: string;
+  class_type_name?: string;
+  className?: string;
+  instructor_name?: string | null;
+  max_capacity?: number;
+  current_bookings?: number;
+  waitlist_count?: number;
 };
 
-// ── Main page ──────────────────────────────────────────────────────────────────
+const dateOf = (c: WeekClass) => c.date ?? String(c.start_time).split("T")[0];
+const weekDayLabel = (d: Date) => format(d, "EEE", { locale: es }).replace(".", "").toUpperCase();
+
+function WeekClassList({ weekStart, day, onDayChange, selectedId, onSelect }: {
+  weekStart: Date; day: string; onDayChange: (d: string) => void; selectedId: string | null; onSelect: (id: string) => void;
+}) {
+  const start = format(weekStart, "yyyy-MM-dd");
+  const end = format(addDays(weekStart, 6), "yyyy-MM-dd");
+  const { data, isLoading, isError, refetch } = useQuery<{ data: WeekClass[] }>({
+    queryKey: ["admin-classes-week", start],
+    queryFn: async () => (await api.get(`/classes?start=${start}&end=${end}`)).data,
+  });
+  const classes = Array.isArray(data?.data) ? data!.data : [];
+  const todayKey = format(new Date(), "yyyy-MM-dd");
+  const nowHHMM = format(new Date(), "HH:mm");
+  const days = Array.from({ length: 7 }, (_, i) => {
+    const d = addDays(weekStart, i);
+    const key = format(d, "yyyy-MM-dd");
+    return { date: key, label: weekDayLabel(d), day: d.getDate(), count: classes.filter((c) => dateOf(c) === key).length };
+  });
+  const dayClasses = classes
+    .filter((c) => dateOf(c) === day)
+    .sort((a, b) => hhmm(a.start_time).localeCompare(hhmm(b.start_time)));
+  const booked = dayClasses.reduce((s, c) => s + (Number(c.current_bookings) || 0), 0);
+  const capacity = dayClasses.reduce((s, c) => s + (Number(c.max_capacity) || 0), 0);
+  const title = format(parseISO(day), "EEEE d", { locale: es });
+
+  return (
+    <Panel aria-label="Clases de la semana" className="p-4">
+      <DayStrip days={days} value={day} onChange={onDayChange} today={todayKey} />
+      <div className="mt-4 flex items-baseline justify-between px-1">
+        <h2 className="text-[15px] font-extrabold capitalize">{title}{day === todayKey ? " · hoy" : ""}</h2>
+        <span className="nums text-[13px] text-ink-muted">{booked}/{capacity} lugares</span>
+      </div>
+      {isError ? (
+        <ErrorState title="No pudimos cargar la semana" onRetry={() => refetch()} />
+      ) : isLoading ? (
+        <div className="mt-3 space-y-2"><SkeletonRow /><SkeletonRow /><SkeletonRow /></div>
+      ) : dayClasses.length === 0 ? (
+        <p className="px-1 py-6 text-sm text-ink-muted">
+          {classes.length === 0 ? "No hay clases programadas esta semana" : "No hay clases este día."}
+        </p>
+      ) : (
+        <ul className="mt-2">
+          {dayClasses.map((c, i) => {
+            const cap = Number(c.max_capacity) || 0;
+            const taken = Number(c.current_bookings) || 0;
+            const full = cap > 0 && taken >= cap;
+            const past = day < todayKey || (day === todayKey && hhmm(c.end_time ?? c.start_time) <= nowHHMM);
+            const selected = c.id === selectedId;
+            const name = c.class_type_name ?? c.className ?? "Clase";
+            return (
+              <li key={c.id}>
+                <button
+                  type="button"
+                  onClick={() => onSelect(c.id)}
+                  aria-current={selected ? "true" : undefined}
+                  className={cn(
+                    "grid w-full grid-cols-[50px_minmax(0,1fr)_auto] items-center gap-2.5 rounded-xl px-3 py-3 text-left",
+                    selected ? "bg-canvas ring-2 ring-inset ring-ink" : i > 0 && "border-t border-line",
+                  )}
+                >
+                  <span className={cn("nums text-sm font-extrabold", past ? "text-ink-muted" : "text-ink")}>{hhmm(c.start_time)}</span>
+                  <span className="min-w-0 leading-tight">
+                    <span className={cn("block truncate text-sm font-extrabold", past ? "text-ink-muted" : "text-ink")}>{name}</span>
+                    <span className="block truncate text-xs text-ink-muted">
+                      con {c.instructor_name ?? "—"}{past ? " · terminó" : ""}
+                      {Number(c.waitlist_count) > 0 ? ` · ${c.waitlist_count} en espera` : ""}
+                    </span>
+                  </span>
+                  {full && !past ? (
+                    <Badge variant="attention">Llena</Badge>
+                  ) : (
+                    <span className="nums text-[13px] font-bold text-ink-muted">{taken}/{cap}</span>
+                  )}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </Panel>
+  );
+}
+
 const BookingsList = () => {
-  const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
+  const [classId, setClassId] = useSearchParamState("clase");
+  const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
+  const [day, setDay] = useState(() => format(new Date(), "yyyy-MM-dd"));
+
+  // Si la clase del enlace es de otra semana, la lista se va a esa semana y día.
+  const onClassLoaded = useCallback((date: string) => {
+    setWeekStart(startOfWeek(parseISO(date), { weekStartsOn: 1 }));
+    setDay(date);
+  }, []);
+
+  const changeWeek = (w: Date) => {
+    setWeekStart(w);
+    const today = new Date();
+    const inWeek = today >= w && today < addDays(w, 7);
+    setDay(format(inWeek ? today : w, "yyyy-MM-dd"));
+  };
 
   return (
     <AuthGuard>
       <AdminLayout>
-        <div className="admin-page max-w-3xl">
-          <SectionTabs
-            tabs={[
-              { label: "Semana", to: "/admin/bookings" },
-              { label: "Hoy · pasar lista", to: "/admin/pasar-lista" },
-            ]}
+        <AdminPage>
+          <AdminPageHeader kicker={`Reservas · semana ${getISOWeek(weekStart)}`} title="Reservas" actions={<ReservasTabs />} />
+          <WeekNav weekStart={weekStart} onChange={changeWeek} />
+          <MasterDetail
+            hasSelection={!!classId}
+            onBack={() => setClassId(null)}
+            backLabel="Volver a la semana"
+            list={<WeekClassList weekStart={weekStart} day={day} onDayChange={setDay} selectedId={classId} onSelect={setClassId} />}
+            detail={
+              classId ? (
+                <ClassRoster key={classId} classId={classId} onBack={() => setClassId(null)} onClassLoaded={onClassLoaded} />
+              ) : (
+                <Panel className="px-6 py-10">
+                  <p className="text-sm text-ink-muted">Elige una clase para ver su lista de alumnas.</p>
+                </Panel>
+              )
+            }
           />
-          <div className="mb-7">
-            <h1 className="admin-title mb-1 text-ink">Reservas</h1>
-            <p className="text-sm text-ink/55">
-              {selectedClassId
-                ? "Lista de alumnas · check-in y asistencia"
-                : "Selecciona una clase para ver su lista de alumnas"}
-            </p>
-          </div>
-
-          {selectedClassId ? (
-            <ClassRoster classId={selectedClassId} onBack={() => setSelectedClassId(null)} />
-          ) : (
-            <ClassPicker onSelectClass={setSelectedClassId} />
-          )}
-        </div>
+        </AdminPage>
       </AdminLayout>
     </AuthGuard>
   );

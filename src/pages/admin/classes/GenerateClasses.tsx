@@ -1,26 +1,28 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { eachDayOfInterval, format, parseISO } from "date-fns";
-import { es } from "date-fns/locale";
+import { eachDayOfInterval, isSameDay, parseISO } from "date-fns";
 import api from "@/lib/api";
 import { AuthGuard } from "@/components/admin/AuthGuard";
 import AdminLayout from "@/components/admin/AdminLayout";
+import { AdminPage, AdminPageHeader } from "@/components/admin/AdminPage";
+import { Panel } from "@/components/admin/Panel";
 import SectionTabs from "@/components/admin/SectionTabs";
 import { useConfirm } from "@/components/admin/ConfirmDialog";
 import { ErrorState } from "@/components/app/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DatePicker } from "@/components/ui/date-picker";
 import { TimePicker } from "@/components/ui/time-picker";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { CalendarDays, CalendarPlus, Loader2 } from "lucide-react";
+import { CalendarDays, Loader2 } from "lucide-react";
 import { resolveClassColor, CLASSES_SECTION_TABS } from "./palette";
+import { FEATURES } from "@/config/features";
+import { previewMonths, validateGenerate } from "./generate-helpers";
 
 interface ClassTypeOption {
   id: string;
@@ -162,6 +164,9 @@ const GenerateClasses = () => {
   };
 
   const canGenerate = Boolean(classTypeId && instructorId && startDate && endDate && selectedDays.length > 0);
+  const errors = validateGenerate({ startTime, endTime, maxCapacity });
+  const canSubmit = canGenerate && !errors.time && !errors.capacity;
+  const months = previewMonths(preview);
   const referenceError = typesQuery.isError || instructorsQuery.isError;
   const referenceLoading = typesQuery.isLoading || instructorsQuery.isLoading;
 
@@ -174,14 +179,13 @@ const GenerateClasses = () => {
   return (
     <AuthGuard>
       <AdminLayout>
-        <div className="admin-page max-w-3xl">
-          <SectionTabs tabs={CLASSES_SECTION_TABS} />
-          <div className="mb-6">
-            <h1 className="admin-title text-ink">Generar clases</h1>
-            <p className="mt-1 text-sm text-ink/55">
-              Aplica el horario oficial del estudio o crea clases en bloque para un rango de fechas.
-            </p>
-          </div>
+        <AdminPage>
+          <AdminPageHeader
+            kicker="Clases"
+            title="Generar clases"
+            subtitle="Aplica el horario oficial del estudio o crea clases en bloque para un rango de fechas."
+            actions={<SectionTabs aria-label="Secciones de Clases" tabs={CLASSES_SECTION_TABS} />}
+          />
 
           {referenceError ? (
             <ErrorState
@@ -198,303 +202,279 @@ const GenerateClasses = () => {
               <Skeleton className="h-36 w-full rounded-2xl" />
             </div>
           ) : (
-            <div className="space-y-5">
-              {/* ── Preset: Horario Alma oficial ── */}
-              <section className="space-y-4 rounded-2xl border border-line-strong/60 bg-sunken/40 p-5">
-                <div>
-                  <p className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-ink">Plantilla Alma</p>
-                  <p className="mt-1.5 text-sm font-semibold text-ink">Horario oficial del estudio</p>
-                  <p className="nums mt-0.5 text-xs text-ink/60">
-                    Lun a Vie: 7am, 8am, 7pm y 8pm · Sáb: 7am, 8am y 9am · 23 horarios por semana
-                  </p>
-                </div>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs text-ink/70">Instructora</Label>
-                    <Select value={presetInstructorId} onValueChange={setPresetInstructorId}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccionar instructora" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {instructors.map((inst) => (
-                          <SelectItem key={inst.id} value={inst.id}>{inst.displayName}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+            <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+              <div className="flex flex-col gap-4">
+                {/* ── Preset: Horario oficial del estudio ── */}
+                <Panel className="flex flex-col gap-4 p-6">
+                  <div>
+                    <p className="text-[0.75rem] font-bold uppercase tracking-[0.12em] text-ink-muted">Plantilla del estudio</p>
+                    <h2 className="text-base font-extrabold">Horario oficial</h2>
+                    <p className="nums mt-0.5 text-xs text-ink/60">
+                      Lun a Vie: 7am, 8am, 7pm y 8pm · Sáb: 7am, 8am y 9am · 23 horarios por semana
+                    </p>
                   </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs text-ink/70">Semanas a generar</Label>
-                    <Select value={String(presetWeeks)} onValueChange={(v) => setPresetWeeks(Number(v))}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {[1, 2, 4, 6, 8, 12].map((n) => (
-                          <SelectItem key={n} value={String(n)}>{n} semana{n === 1 ? "" : "s"}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-ink/70">Instructora</Label>
+                      <Select value={presetInstructorId} onValueChange={setPresetInstructorId}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Seleccionar instructora" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {instructors.map((inst) => (
+                            <SelectItem key={inst.id} value={inst.id}>{inst.displayName}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-ink/70">Semanas a generar</Label>
+                      <Select value={String(presetWeeks)} onValueChange={(v) => setPresetWeeks(Number(v))}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {[1, 2, 4, 6, 8, 12].map((n) => (
+                            <SelectItem key={n} value={String(n)}>{n} semana{n === 1 ? "" : "s"}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
-                </div>
-                <div className="flex flex-wrap gap-2 pt-1">
-                  <Button
-                    onClick={handlePresetGenerate}
-                    disabled={resetAlmaMutation.isPending || !presetInstructorId}
-                  >
-                    {resetAlmaMutation.isPending ? (
-                      <Loader2 size={14} className="mr-2 animate-spin" />
-                    ) : (
-                      <CalendarDays size={14} className="mr-2" />
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    <Button
+                      onClick={handlePresetGenerate}
+                      disabled={resetAlmaMutation.isPending || !presetInstructorId}
+                    >
+                      {resetAlmaMutation.isPending ? (
+                        <Loader2 size={14} className="mr-2 animate-spin" />
+                      ) : (
+                        <CalendarDays size={14} className="mr-2" />
+                      )}
+                      Aplicar y generar clases
+                    </Button>
+                    {FEATURES.scheduleTemplates && (
+                      <Button
+                        onClick={handlePresetTemplateOnly}
+                        disabled={resetAlmaMutation.isPending}
+                        variant="outline"
+                        className="border-line-strong/70 text-ink"
+                      >
+                        Solo plantilla
+                      </Button>
                     )}
-                    Aplicar y generar clases
-                  </Button>
-                  <Button
-                    onClick={handlePresetTemplateOnly}
-                    disabled={resetAlmaMutation.isPending}
-                    variant="outline"
-                    className="border-line-strong/70 text-ink"
-                  >
-                    Solo plantilla
-                  </Button>
-                </div>
-                {!presetInstructorId && instructors.length === 0 && (
-                  <p className="text-xs text-ink">
-                    Crea una instructora primero en la sección{" "}
-                    <Link to="/admin/staff" className="font-semibold underline">Instructoras</Link>.
-                  </p>
-                )}
-                {!presetInstructorId && instructors.length > 0 && (
-                  <p className="text-xs text-ink/55">
-                    Selecciona una instructora arriba para activar el botón.
-                  </p>
-                )}
-              </section>
-
-              {/* ── Step 1: Class type + Instructor ── */}
-              <section className="space-y-4 rounded-2xl border border-line bg-sunken p-5">
-                <div className="flex items-center gap-2">
-                  {stepBadge(1)}
-                  <span className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-ink">{STEP_LABELS[0]}</span>
-                </div>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs text-ink/70">Tipo de clase</Label>
-                    <Select onValueChange={setClassTypeId}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccionar tipo" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {types.map((t) => (
-                          <SelectItem key={t.id} value={t.id}>
-                            <span className="flex items-center gap-2">
-                              <span className="inline-block h-3 w-3 rounded-full" style={{ backgroundColor: resolveClassColor(t.color) }} />
-                              {t.name}
-                            </span>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
                   </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs text-ink/70">Instructora</Label>
-                    <Select onValueChange={setInstructorId}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccionar instructora" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {instructors.map((inst) => (
-                          <SelectItem key={inst.id} value={inst.id}>{inst.displayName}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </section>
-
-              {/* ── Step 2: Date range ── */}
-              <section className="space-y-4 rounded-2xl border border-line bg-sunken p-5">
-                <div className="flex items-center gap-2">
-                  {stepBadge(2)}
-                  <span className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-ink">{STEP_LABELS[1]}</span>
-                </div>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs text-ink/70">Fecha inicio</Label>
-                    <DatePicker value={startDate} onChange={setStartDate} placeholder="Desde" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs text-ink/70">Fecha fin</Label>
-                    <DatePicker value={endDate} onChange={setEndDate} placeholder="Hasta" min={startDate} />
-                  </div>
-                </div>
-              </section>
-
-              {/* ── Step 3: Days of week ── */}
-              <section className="space-y-4 rounded-2xl border border-line bg-sunken p-5">
-                <div className="flex items-center gap-2">
-                  {stepBadge(3)}
-                  <span className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-ink">{STEP_LABELS[2]}</span>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {GENERATE_DAYS.map((d) => {
-                    const active = selectedDays.includes(d.value);
-                    return (
-                      <button
-                        key={d.value}
-                        type="button"
-                        onClick={() => toggleDay(d.value)}
-                        aria-pressed={active}
-                        className={cn(
-                          "rounded-xl px-5 py-2.5 text-sm font-semibold transition-colors",
-                          active
-                            ? "bg-sunken text-ink ring-1 ring-inset ring-line-strong"
-                            : "border border-line bg-canvas text-ink/55 hover:border-line-strong hover:text-ink",
-                        )}
-                      >
-                        {d.label}
-                      </button>
-                    );
-                  })}
-                </div>
-                <div className="mt-2 flex gap-4">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedDays([1, 2, 3, 4, 5])}
-                    className="text-xs font-medium text-ink hover:underline"
-                  >
-                    Lun a Vie
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedDays([1, 2, 3, 4, 5, 6])}
-                    className="text-xs font-medium text-ink hover:underline"
-                  >
-                    Lun a Sáb
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedDays([0, 1, 2, 3, 4, 5, 6])}
-                    className="text-xs font-medium text-ink hover:underline"
-                  >
-                    Todos
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedDays([])}
-                    className="text-xs font-medium text-ink/45 hover:underline"
-                  >
-                    Limpiar
-                  </button>
-                </div>
-              </section>
-
-              {/* ── Step 4: Time + Capacity ── */}
-              <section className="space-y-4 rounded-2xl border border-line bg-sunken p-5">
-                <div className="flex items-center gap-2">
-                  {stepBadge(4)}
-                  <span className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-ink">{STEP_LABELS[3]}</span>
-                </div>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs text-ink/70">Hora inicio</Label>
-                    <TimePicker value={startTime} onChange={setStartTime} />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs text-ink/70">Hora fin</Label>
-                    <TimePicker value={endTime} onChange={setEndTime} />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs text-ink/70">Capacidad máx.</Label>
-                    <Input
-                      type="number"
-                      value={maxCapacity}
-                      onChange={(e) => setMaxCapacity(Number(e.target.value))}
-                      className="nums text-center"
-                    />
-                  </div>
-                </div>
-              </section>
-
-              {/* ── Preview ── */}
-              {preview.length > 0 && (
-                <section className="space-y-3 rounded-2xl border border-line-strong/50 bg-sunken p-5">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <CalendarDays size={14} className="text-ink" />
-                      <span className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-ink/60">Vista previa</span>
-                    </div>
-                    <Badge variant="outline" className="nums border-line-strong text-ink">
-                      {preview.length} {preview.length === 1 ? "clase" : "clases"}
-                    </Badge>
-                  </div>
-
-                  <div className="hidden grid-cols-7 gap-1.5 sm:grid">
-                    {["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map((d) => (
-                      <div key={d} className="text-center text-[10px] font-bold uppercase text-ink/40">{d}</div>
-                    ))}
-                  </div>
-
-                  <div className="grid max-h-[220px] grid-cols-4 gap-1.5 overflow-y-auto sm:grid-cols-7">
-                    {preview.map((d) => (
-                      <div
-                        key={d.toISOString()}
-                        className="flex flex-col items-center gap-0.5 rounded-lg border border-line bg-canvas px-1 py-2"
-                      >
-                        <span className="text-[10px] text-ink/50">
-                          {format(d, "MMM", { locale: es })}
-                        </span>
-                        <span className="nums text-sm font-bold text-ink">
-                          {format(d, "d")}
-                        </span>
-                        <span className="nums text-[9px] font-medium text-ink">
-                          {startTime}
-                        </span>
-                        {selectedType && (
-                          <span
-                            className="mt-0.5 h-2 w-2 rounded-full"
-                            style={{ backgroundColor: resolveClassColor(selectedType.color) }}
-                          />
-                        )}
-                      </div>
-                    ))}
-                  </div>
-
-                  {selectedType && (
-                    <div className="flex items-center gap-3 border-t border-line pt-2">
-                      <span className="h-3 w-3 rounded-full" style={{ backgroundColor: resolveClassColor(selectedType.color) }} />
-                      <span className="text-xs text-ink/65">
-                        <strong className="text-ink">{selectedType.name}</strong>
-                        {selectedInstructor && <> · {selectedInstructor.displayName}</>}
-                        {" · "}
-                        <span className="nums">{startTime} a {endTime}</span> · <span className="nums">{maxCapacity}</span> cupos
-                      </span>
-                    </div>
+                  {!presetInstructorId && instructors.length === 0 && (
+                    <p className="text-xs text-ink">
+                      Crea una instructora primero en la sección{" "}
+                      <Link to="/admin/staff" className="font-semibold underline">Instructoras</Link>.
+                    </p>
                   )}
-                </section>
-              )}
+                  {!presetInstructorId && instructors.length > 0 && (
+                    <p className="text-xs text-ink/55">
+                      Elige una instructora para activar el botón.
+                    </p>
+                  )}
+                </Panel>
 
-              {/* ── Generate Button ── */}
-              <Button
-                type="button"
-                size="lg"
-                disabled={!canGenerate || generateMutation.isPending}
-                onClick={() => generateMutation.mutate()}
-                className="w-full"
-              >
-                {generateMutation.isPending ? (
-                  <Loader2 className="mr-2 animate-spin" size={16} />
+                {/* ── Crear clases en bloque ── */}
+                <Panel className="p-6">
+                  <h2 className="mb-4 text-base font-extrabold">Crear clases en bloque</h2>
+                  <div className="flex flex-col gap-4">
+                    {/* ── Step 1: Class type + Instructor ── */}
+                    <div className="flex flex-col gap-4">
+                      <div className="flex items-center gap-2">
+                        {stepBadge(1)}
+                        <span className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-ink">{STEP_LABELS[0]}</span>
+                      </div>
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <div className="space-y-1.5">
+                          <Label className="text-xs text-ink/70">Tipo de clase</Label>
+                          <Select onValueChange={setClassTypeId}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Seleccionar tipo" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {types.map((t) => (
+                                <SelectItem key={t.id} value={t.id}>
+                                  <span className="flex items-center gap-2">
+                                    <span className="inline-block h-3 w-3 rounded-full" style={{ backgroundColor: resolveClassColor(t.color) }} />
+                                    {t.name}
+                                  </span>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-xs text-ink/70">Instructora</Label>
+                          <Select onValueChange={setInstructorId}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Seleccionar instructora" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {instructors.map((inst) => (
+                                <SelectItem key={inst.id} value={inst.id}>{inst.displayName}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* ── Step 2: Date range ── */}
+                    <div className="flex flex-col gap-4 border-t border-line pt-4">
+                      <div className="flex items-center gap-2">
+                        {stepBadge(2)}
+                        <span className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-ink">{STEP_LABELS[1]}</span>
+                      </div>
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <div className="space-y-1.5">
+                          <Label className="text-xs text-ink/70">Fecha inicio</Label>
+                          <DatePicker value={startDate} onChange={setStartDate} placeholder="Desde" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-xs text-ink/70">Fecha fin</Label>
+                          <DatePicker value={endDate} onChange={setEndDate} placeholder="Hasta" min={startDate} />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* ── Step 3: Days of week ── */}
+                    <div className="flex flex-col gap-4 border-t border-line pt-4">
+                      <div className="flex items-center gap-2">
+                        {stepBadge(3)}
+                        <span className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-ink">{STEP_LABELS[2]}</span>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {GENERATE_DAYS.map((d) => {
+                          const active = selectedDays.includes(d.value);
+                          return (
+                            <button
+                              key={d.value}
+                              type="button"
+                              onClick={() => toggleDay(d.value)}
+                              aria-pressed={active}
+                              className={cn(
+                                "rounded-xl px-5 py-2.5 text-sm font-semibold transition-colors",
+                                active
+                                  ? "bg-sunken text-ink ring-1 ring-inset ring-line-strong"
+                                  : "border border-line bg-canvas text-ink/55 hover:border-line-strong hover:text-ink",
+                              )}
+                            >
+                              {d.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <div className="mt-2 flex gap-4">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedDays([1, 2, 3, 4, 5])}
+                          className="text-xs font-medium text-ink hover:underline"
+                        >
+                          Lun a Vie
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedDays([1, 2, 3, 4, 5, 6])}
+                          className="text-xs font-medium text-ink hover:underline"
+                        >
+                          Lun a Sáb
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedDays([0, 1, 2, 3, 4, 5, 6])}
+                          className="text-xs font-medium text-ink hover:underline"
+                        >
+                          Todos
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedDays([])}
+                          className="text-xs font-medium text-ink/45 hover:underline"
+                        >
+                          Limpiar
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* ── Step 4: Time + Capacity ── */}
+                    <div className="flex flex-col gap-4 border-t border-line pt-4">
+                      <div className="flex items-center gap-2">
+                        {stepBadge(4)}
+                        <span className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-ink">{STEP_LABELS[3]}</span>
+                      </div>
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                        <div className="space-y-1.5">
+                          <Label className="text-xs text-ink/70">Hora inicio</Label>
+                          <TimePicker value={startTime} onChange={setStartTime} />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-xs text-ink/70">Hora fin</Label>
+                          <TimePicker value={endTime} onChange={setEndTime} />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-xs text-ink/70">Capacidad máx.</Label>
+                          <Input
+                            type="number"
+                            value={maxCapacity}
+                            onChange={(e) => setMaxCapacity(Number(e.target.value))}
+                            className="nums text-center"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {errors.time && <p className="text-[13px] font-bold text-danger">{errors.time}</p>}
+                    {errors.capacity && <p className="text-[13px] font-bold text-danger">{errors.capacity}</p>}
+                  </div>
+                </Panel>
+              </div>
+
+              {/* ── Vista previa ── */}
+              <aside aria-label="Vista previa" className="flex flex-col gap-4 rounded-2xl border border-line bg-surface p-6 lg:sticky lg:top-24">
+                <div className="flex items-center justify-between">
+                  <p className="text-[0.75rem] font-bold uppercase tracking-[0.12em] text-ink-muted">Vista previa</p>
+                  <span className="nums rounded-full bg-sunken px-2.5 py-1 text-[0.75rem] font-extrabold">{preview.length} {preview.length === 1 ? "clase" : "clases"}</span>
+                </div>
+                {months.length === 0 ? (
+                  <p className="text-sm text-ink-muted">Elige un rango de fechas y días para ver las clases que se van a crear.</p>
                 ) : (
-                  <CalendarPlus size={16} className="mr-2" />
+                  months.slice(0, 3).map((m) => (
+                    <div key={m.key}>
+                      <p className="mb-2 text-sm font-bold capitalize">{m.label}</p>
+                      <div className="grid grid-cols-7 gap-1 text-center">
+                        {["L", "M", "M", "J", "V", "S", "D"].map((d, i) => (
+                          <span key={i} className="text-[0.75rem] font-extrabold text-ink-muted">{d}</span>
+                        ))}
+                        {m.cells.map((d, i) => {
+                          if (!d) return <span key={i} />;
+                          const on = preview.some((p) => isSameDay(p, d));
+                          return (
+                            <span key={i} className={on ? "nums grid h-9 place-items-center rounded-lg bg-ink text-[13px] font-extrabold text-canvas" : "nums grid h-9 place-items-center text-[13px] text-ink-muted"}>
+                              {d.getDate()}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))
                 )}
-                {generateMutation.isPending
-                  ? "Generando…"
-                  : preview.length > 0
-                  ? `Generar ${preview.length} ${preview.length === 1 ? "clase" : "clases"}`
-                  : "Generar clases"}
-              </Button>
+                {months.length > 3 && <p className="text-[13px] text-ink-muted">Y {months.length - 3} meses más.</p>}
+                {preview.length > 0 && (
+                  <p className="text-[13px] text-ink-muted">
+                    {selectedType?.name ?? "—"} · {selectedInstructor?.displayName ?? "—"} · {startTime} a {endTime} · {maxCapacity} lugares
+                  </p>
+                )}
+                <Button size="lg" className="w-full" disabled={!canSubmit || generateMutation.isPending} onClick={() => generateMutation.mutate()}>
+                  {generateMutation.isPending ? "Generando…" : preview.length > 0 ? `Generar ${preview.length} ${preview.length === 1 ? "clase" : "clases"}` : "Generar clases"}
+                </Button>
+                <p className="text-center text-[0.75rem] text-ink-muted">Las clases que ya existan en ese horario no se duplican.</p>
+              </aside>
             </div>
           )}
-        </div>
+        </AdminPage>
 
         {dialog}
       </AdminLayout>

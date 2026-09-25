@@ -3,11 +3,15 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { AuthGuard } from "@/components/admin/AuthGuard";
 import AdminLayout from "@/components/admin/AdminLayout";
+import { AdminPage, AdminPageHeader } from "@/components/admin/AdminPage";
+import { Panel } from "@/components/admin/Panel";
+import PersonCell from "@/components/admin/PersonCell";
+import StatusDot from "@/components/admin/StatusDot";
+import { useSearchParamState } from "@/hooks/use-search-param-state";
 import { useConfirm } from "@/components/admin/ConfirmDialog";
 import { EmptyState, ErrorState } from "@/components/app/AppShell";
 import { formatDate } from "@/lib/format";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -18,6 +22,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { CreditCard, MoreHorizontal } from "lucide-react";
 import { COLOR } from "@/design/tokens";
+import { expiresSoon } from "./membership-helpers";
 
 const STATUS_OPTIONS = ["active", "pending_payment", "pending_activation", "expired", "cancelled"] as const;
 type MembershipStatus = (typeof STATUS_OPTIONS)[number];
@@ -28,14 +33,6 @@ const STATUS_LABELS: Record<MembershipStatus, string> = {
   pending_activation: "Pendiente activación",
   expired: "Expirada",
   cancelled: "Cancelada",
-};
-
-const STATUS_VARIANTS: Record<MembershipStatus, "default" | "secondary" | "destructive" | "outline"> = {
-  active: "default",
-  pending_payment: "outline",
-  pending_activation: "outline",
-  expired: "secondary",
-  cancelled: "destructive",
 };
 
 // Taxonomía única de categorías (sin color-coding: solo texto).
@@ -60,11 +57,14 @@ interface Membership {
   classLimit?: number | null;
 }
 
-// Misma regla que ClientDetail: null/9999+ significa ilimitado (∞).
-function formatRemaining(m: Membership): string {
-  if (m.classesRemaining == null) return m.classLimit == null ? "∞" : "—";
-  if (Number(m.classesRemaining) >= 9999) return "∞";
-  return m.classLimit ? `${m.classesRemaining} / ${m.classLimit}` : String(m.classesRemaining);
+function MembershipState({ status }: { status: string }) {
+  const label = STATUS_LABELS[status as MembershipStatus] ?? status;
+  if (status === "active") return <StatusDot tone="success">{label}</StatusDot>;
+  if (status === "cancelled") return <StatusDot tone="danger">{label}</StatusDot>;
+  if (status === "pending_payment" || status === "pending_activation") {
+    return <span className="whitespace-nowrap rounded-full bg-accent-soft px-2.5 py-1 text-[0.75rem] font-extrabold text-ink">{label}</span>;
+  }
+  return <StatusDot tone="muted">{label}</StatusDot>;
 }
 
 const MembershipTable = ({
@@ -222,7 +222,7 @@ const MembershipTable = ({
         </DialogContent>
       </Dialog>
 
-      <div className="rounded-xl border border-line bg-sunken overflow-hidden">
+      <Panel className="overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow>
@@ -244,7 +244,7 @@ const MembershipTable = ({
                 const catLabel = cat && cat !== "all" ? (CATEGORY_LABELS[cat] ?? cat) : null;
                 return (
                   <TableRow key={m.id}>
-                    <TableCell className="font-medium text-ink">{m.userName ?? m.userId}</TableCell>
+                    <TableCell><PersonCell name={m.userName ?? m.userId} /></TableCell>
                     <TableCell>
                       <div className="flex items-baseline gap-2">
                         <span className="text-ink">{m.planName ?? m.planId}</span>
@@ -254,19 +254,39 @@ const MembershipTable = ({
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={STATUS_VARIANTS[m.status]}>{STATUS_LABELS[m.status]}</Badge>
+                      <MembershipState status={m.status} />
                     </TableCell>
-                    <TableCell className="nums text-sm text-ink/70">
-                      <div>{m.endDate ? formatDate(m.endDate) : "—"}</div>
-                      {m.startDate && (
-                        <div className="text-xs text-ink/45">desde {formatDate(m.startDate)}</div>
+                    <TableCell>
+                      {m.endDate ? (
+                        <span className="leading-tight">
+                          <span className="nums block text-sm font-bold">
+                            {formatDate(m.endDate)}
+                            {m.status === "active" && expiresSoon(m.endDate) && <span className="font-extrabold text-accent-strong"> · vence pronto</span>}
+                          </span>
+                          {m.startDate && <span className="block text-xs text-ink-muted">desde {formatDate(m.startDate)}</span>}
+                        </span>
+                      ) : <span className="text-sm text-ink-muted">Sin iniciar</span>}
+                    </TableCell>
+                    <TableCell>
+                      {m.classesRemaining == null && !m.classLimit ? (
+                        <span className="text-sm text-ink-muted">—</span>
+                      ) : m.classesRemaining == null || m.classesRemaining >= 9999 ? (
+                        <span className="text-sm font-extrabold">Ilimitadas</span>
+                      ) : (
+                        <span className="flex items-center gap-2">
+                          {m.classLimit ? (
+                            <span aria-hidden="true" className="block h-1.5 w-14 overflow-hidden rounded-full bg-line">
+                              <span className="block h-full bg-ink" style={{ width: `${Math.min(100, Math.round((m.classesRemaining / m.classLimit) * 100))}%` }} />
+                            </span>
+                          ) : null}
+                          <span className="nums text-sm font-extrabold">{m.classesRemaining}{m.classLimit ? `/${m.classLimit}` : ""}</span>
+                        </span>
                       )}
                     </TableCell>
-                    <TableCell className="nums text-ink">{formatRemaining(m)}</TableCell>
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon"><MoreHorizontal size={14} /></Button>
+                          <Button variant="ghost" size="icon" aria-label={`Acciones de la membresía de ${m.userName ?? "la clienta"}`}><MoreHorizontal size={14} /></Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent>
                           <DropdownMenuItem onClick={() => openEdit(m)}>Editar vigencia</DropdownMenuItem>
@@ -285,26 +305,41 @@ const MembershipTable = ({
             }
           </TableBody>
         </Table>
-      </div>
+      </Panel>
     </div>
   );
 };
 
+const TABS = ["all", "active", "expiring", "pending"] as const;
+
 const MembershipsList = () => {
+  const [tabParam, setTab] = useSearchParamState("tab");
+  const tab = (TABS as readonly string[]).includes(tabParam ?? "") ? tabParam! : "all";
+  // Misma llave que MembershipTable (["memberships", status]): no duplica peticiones.
+  const expiringQ = useQuery<{ data: unknown[] }>({
+    queryKey: ["memberships", "expiring"],
+    queryFn: async () => (await api.get("/memberships?status=expiring")).data,
+  });
+  const pendingQ = useQuery<{ data: unknown[] }>({
+    queryKey: ["memberships", "pending_payment"],
+    queryFn: async () => (await api.get("/memberships?status=pending_payment")).data,
+  });
+  const expiring = expiringQ.data?.data?.length ?? 0;
+  const pending = pendingQ.data?.data?.length ?? 0;
+  const Count = ({ n }: { n: number }) =>
+    n > 0 ? <span className="nums ml-1.5 grid h-5 min-w-5 place-items-center rounded-full bg-accent px-1.5 text-[0.75rem] font-extrabold leading-none text-ink">{n}</span> : null;
+
   return (
     <AuthGuard>
       <AdminLayout>
-        <div className="admin-page max-w-6xl">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
-            <h1 className="admin-title font-semibold text-ink">Membresías</h1>
-          </div>
-
-          <Tabs defaultValue="all">
-            <TabsList className="mb-6">
+        <AdminPage>
+          <AdminPageHeader kicker="Más" title="Membresías" subtitle="Activa, cancela o ajusta la vigencia de las membresías de tus clientas." />
+          <Tabs value={tab} onValueChange={(v) => setTab(v === "all" ? null : v)}>
+            <TabsList>
               <TabsTrigger value="all">Todas</TabsTrigger>
               <TabsTrigger value="active">Activas</TabsTrigger>
-              <TabsTrigger value="expiring">Por vencer</TabsTrigger>
-              <TabsTrigger value="pending">Pendientes</TabsTrigger>
+              <TabsTrigger value="expiring">Por vencer<Count n={expiring} /></TabsTrigger>
+              <TabsTrigger value="pending">Pendientes<Count n={pending} /></TabsTrigger>
             </TabsList>
             <TabsContent value="all">
               <MembershipTable
@@ -334,7 +369,7 @@ const MembershipsList = () => {
               />
             </TabsContent>
           </Tabs>
-        </div>
+        </AdminPage>
       </AdminLayout>
     </AuthGuard>
   );

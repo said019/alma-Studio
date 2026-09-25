@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { FEATURES } from "@/config/features";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -7,14 +6,15 @@ import { z } from "zod";
 import api from "@/lib/api";
 import { AuthGuard } from "@/components/admin/AuthGuard";
 import AdminLayout from "@/components/admin/AdminLayout";
-import SectionTabs from "@/components/admin/SectionTabs";
+import { AdminPage, AdminPageHeader } from "@/components/admin/AdminPage";
+import { Panel } from "@/components/admin/Panel";
+import StatusDot from "@/components/admin/StatusDot";
 import { useConfirm } from "@/components/admin/ConfirmDialog";
 import { EmptyState, ErrorState } from "@/components/app/AppShell";
 import { formatDate, formatMXN } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -22,7 +22,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
-import { MoreHorizontal, Plus, TicketPercent } from "lucide-react";
+import { Copy, MoreHorizontal, Plus, TicketPercent } from "lucide-react";
+import { usageInfo } from "./discount-helpers";
 
 const nullableInt = z.preprocess(
   (v) => (v === "" || v === undefined || v === null ? null : Number(v)),
@@ -226,18 +227,13 @@ const DiscountCodes = () => {
     <AuthGuard>
       <AdminLayout>
         {dialog}
-        <div className="admin-page max-w-5xl">
-          <SectionTabs
-            tabs={[
-              { label: "Reportes", to: "/admin/reports" },
-              ...(FEATURES.loyalty ? [{ label: "Lealtad", to: "/admin/loyalty" }] : []),
-              { label: "Descuentos", to: "/admin/discount-codes" },
-            ]}
+        <AdminPage>
+          <AdminPageHeader
+            kicker="Más"
+            title="Descuentos"
+            subtitle="Cupones que las clientas escriben al pagar: porcentaje o monto fijo, con límites por plan, canal, usos o fecha."
+            actions={<Button onClick={openCreate}><Plus size={16} aria-hidden="true" />Nuevo código</Button>}
           />
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
-            <h1 className="admin-title font-semibold text-ink">Códigos de descuento</h1>
-            <Button size="sm" onClick={openCreate}><Plus size={14} className="mr-1" />Nuevo código</Button>
-          </div>
 
           {isError ? (
             <ErrorState
@@ -255,7 +251,7 @@ const DiscountCodes = () => {
               />
             </div>
           ) : (
-            <div className="rounded-xl border border-line bg-sunken overflow-hidden">
+            <Panel className="overflow-hidden">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -276,7 +272,22 @@ const DiscountCodes = () => {
                     ))
                     : codes.map((c) => (
                       <TableRow key={c.id}>
-                        <TableCell className="font-mono font-bold text-ink">{c.code}</TableCell>
+                        <TableCell>
+                          <span className="inline-flex items-center gap-1.5">
+                            <span className="rounded-lg border border-dashed border-line-strong bg-canvas px-2.5 py-1 font-mono text-sm font-extrabold tracking-[0.04em]">{c.code}</span>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              aria-label={`Copiar ${c.code}`}
+                              onClick={async () => {
+                                try { await navigator.clipboard.writeText(c.code); toast({ title: "Código copiado" }); }
+                                catch { toast({ title: "No se pudo copiar", variant: "destructive" }); }
+                              }}
+                            >
+                              <Copy size={16} />
+                            </Button>
+                          </span>
+                        </TableCell>
                         <TableCell className="nums text-ink">
                           {c.discountType === "percent" ? `${c.discountValue}%` : formatMXN(c.discountValue)}
                         </TableCell>
@@ -288,12 +299,26 @@ const DiscountCodes = () => {
                               ? `Categoría ${CATEGORY_LABELS[c.classCategory]}`
                               : "Todos los planes"}
                         </TableCell>
-                        <TableCell className="nums text-ink/70">{c.usesCount}/{c.maxUses ?? "∞"}</TableCell>
+                        <TableCell>
+                          {(() => {
+                            const u = usageInfo(c.usesCount, c.maxUses);
+                            return (
+                              <span className="flex w-[120px] flex-col gap-1">
+                                <span className="nums text-[13px] font-extrabold">{u.label}</span>
+                                {u.pct != null && (
+                                  <span aria-hidden="true" className="block h-1.5 overflow-hidden rounded-full bg-line">
+                                    <span className={u.exhausted ? "block h-full bg-accent" : "block h-full bg-ink"} style={{ width: `${u.pct}%` }} />
+                                  </span>
+                                )}
+                              </span>
+                            );
+                          })()}
+                        </TableCell>
                         <TableCell className="nums text-sm text-ink/70">{c.expiresAt ? formatDate(c.expiresAt) : "—"}</TableCell>
-                        <TableCell><Badge variant={c.isActive ? "default" : "secondary"}>{c.isActive ? "Activo" : "Inactivo"}</Badge></TableCell>
+                        <TableCell>{c.isActive ? <StatusDot tone="success">Activo</StatusDot> : <StatusDot tone="muted">Inactivo</StatusDot>}</TableCell>
                         <TableCell>
                           <DropdownMenu>
-                            <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal size={14} /></Button></DropdownMenuTrigger>
+                            <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" aria-label={`Acciones de ${c.code}`}><MoreHorizontal size={14} /></Button></DropdownMenuTrigger>
                             <DropdownMenuContent>
                               <DropdownMenuItem onClick={() => openEdit(c)}>Editar</DropdownMenuItem>
                               <DropdownMenuItem className="text-destructive" onClick={() => requestDelete(c)}>Eliminar</DropdownMenuItem>
@@ -304,9 +329,9 @@ const DiscountCodes = () => {
                     ))}
                 </TableBody>
               </Table>
-            </div>
+            </Panel>
           )}
-        </div>
+        </AdminPage>
 
         <Dialog
           open={open}

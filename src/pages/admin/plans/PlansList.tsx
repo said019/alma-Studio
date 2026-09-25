@@ -6,21 +6,20 @@ import { z } from "zod";
 import api from "@/lib/api";
 import { AuthGuard } from "@/components/admin/AuthGuard";
 import AdminLayout from "@/components/admin/AdminLayout";
+import { AdminPage, AdminPageHeader } from "@/components/admin/AdminPage";
+import StatusDot from "@/components/admin/StatusDot";
 import { useConfirm } from "@/components/admin/ConfirmDialog";
 import { EmptyState, ErrorState } from "@/components/app/AppShell";
 import { formatMXN } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
 import {
   Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle,
 } from "@/components/ui/sheet";
@@ -171,14 +170,54 @@ const SwitchRow = ({
   </div>
 );
 
-const CategoryPill = ({ category }: { category?: string }) => {
-  const cat = CATEGORIES.find((c) => c.value === (category ?? "all")) ?? CATEGORIES[3];
+// Una tarjeta de plan, para reutilizar dentro de cada categoría conocida y
+// en el cajón "Otros" (M8).
+function PlanCard({ p, onEdit, onToggleActive, onDelete }: {
+  p: Plan; onEdit: (p: Plan) => void; onToggleActive: (p: Plan) => void; onDelete: (p: Plan) => void;
+}) {
+  const rules = [
+    p.isNonTransferable && "No transferible",
+    p.isNonRepeatable && "No repetible",
+    p.morningOnly && "Sólo mañanas",
+    p.isVisitPack && "Paquete de visitas",
+  ].filter(Boolean) as string[];
   return (
-    <span className="inline-flex items-center rounded-full border border-line-strong/60 bg-sunken/50 px-2 py-0.5 text-[0.7rem] font-medium text-ink/80">
-      {cat.label}
-    </span>
+    <article className={cn("flex flex-col gap-2.5 rounded-2xl border border-line bg-surface p-5", !p.isActive && "opacity-60")}>
+      <div className="flex items-start justify-between gap-2">
+        <h3 className="text-[15px] font-extrabold leading-snug">{p.name}</h3>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" aria-label={`Acciones de ${p.name}`}><MoreHorizontal size={18} /></Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent>
+            <DropdownMenuItem onClick={() => onEdit(p)}>Editar</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onToggleActive(p)}>
+              {p.isActive ? "Desactivar" : "Activar"}
+            </DropdownMenuItem>
+            <DropdownMenuItem className="text-destructive" onClick={() => onDelete(p)}>
+              Eliminar
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+      <div className="flex flex-wrap items-baseline gap-2.5">
+        <span className="nums font-display text-[1.625rem] font-semibold leading-none">{formatMXN(Number(p.price))}</span>
+        {p.openingPrice != null && <span className="nums text-[0.75rem] font-bold text-ink-muted">Apertura {formatMXN(Number(p.openingPrice))}</span>}
+      </div>
+      <p className="text-[13px] text-ink-muted">
+        {p.classLimit == null ? "Ilimitado" : `${p.classLimit} ${p.classLimit === 1 ? "clase" : "clases"}`} · {p.durationDays} días
+      </p>
+      <div className="flex min-h-[24px] flex-wrap gap-1.5">
+        {rules.map((r) => <span key={r} className="rounded-full border border-line px-2.5 py-0.5 text-[0.75rem] font-bold text-ink-muted">{r}</span>)}
+      </div>
+      <div className="border-t border-line pt-2.5">
+        {p.isActive ? <StatusDot tone="success">Activo</StatusDot> : <StatusDot tone="muted">Inactivo</StatusDot>}
+      </div>
+    </article>
   );
-};
+}
+
+const KNOWN_CATEGORIES = new Set(CATEGORIES.map((c) => c.value));
 
 const PlansList = () => {
   const { toast } = useToast();
@@ -244,11 +283,13 @@ const PlansList = () => {
     <AuthGuard>
       <AdminLayout>
         {dialog}
-        <div className="admin-page max-w-5xl">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
-            <h1 className="admin-title font-semibold text-ink">Planes</h1>
-            <Button onClick={openCreate} size="sm"><Plus size={14} className="mr-1" />Nuevo plan</Button>
-          </div>
+        <AdminPage>
+          <AdminPageHeader
+            kicker="Más"
+            title="Planes"
+            subtitle="Los paquetes que vendes. Los cambios aplican a ventas nuevas; lo ya vendido no se toca."
+            actions={<Button onClick={openCreate}><Plus size={16} aria-hidden="true" />Nuevo plan</Button>}
+          />
 
           {isError ? (
             <ErrorState
@@ -265,75 +306,62 @@ const PlansList = () => {
                 onCta={openCreate}
               />
             </div>
+          ) : isLoading ? (
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-48 rounded-2xl" />)}</div>
           ) : (
-            <div className="rounded-xl border border-line bg-sunken overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Nombre</TableHead>
-                    <TableHead>Precio</TableHead>
-                    <TableHead>Duración</TableHead>
-                    <TableHead>Límite clases</TableHead>
-                    <TableHead>Categoría</TableHead>
-                    <TableHead>Reglas</TableHead>
-                    <TableHead>Estado</TableHead>
-                    <TableHead />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {isLoading
-                    ? Array(4).fill(0).map((_, i) => (
-                      <TableRow key={i}>{Array(8).fill(0).map((_, j) => <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>)}</TableRow>
-                    ))
-                    : plans.map((p) => (
-                      <TableRow key={p.id}>
-                        <TableCell className="font-medium text-ink">{p.name}</TableCell>
-                        <TableCell className="nums text-ink">{formatMXN(p.price)}</TableCell>
-                        <TableCell className="nums text-ink/70">{p.durationDays} días</TableCell>
-                        <TableCell className="nums text-ink/70">{p.classLimit == null ? "Ilimitado" : p.classLimit}</TableCell>
-                        <TableCell><CategoryPill category={p.classCategory} /></TableCell>
-                        <TableCell>
-                          <div className="flex flex-wrap gap-1.5">
-                            {p.isNonTransferable && <Badge variant="outline">No transferible</Badge>}
-                            {p.isNonRepeatable && <Badge variant="outline">No repetible</Badge>}
-                            {!p.isNonTransferable && !p.isNonRepeatable && (
-                              <span className="text-xs text-ink/55">—</span>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={p.isActive ? "default" : "secondary"}>
-                            {p.isActive ? "Activo" : "Inactivo"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon"><MoreHorizontal size={14} /></Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent>
-                              <DropdownMenuItem onClick={() => openEdit(p)}>Editar</DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => updateMutation.mutate({ ...p, isActive: !p.isActive })}
-                              >
-                                {p.isActive ? "Desactivar" : "Activar"}
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                className="text-destructive"
-                                onClick={() => requestDelete(p)}
-                              >
-                                Eliminar
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                </TableBody>
-              </Table>
-            </div>
+            <>
+              {CATEGORIES.map((cat) => {
+                const list = plans.filter((p) => (p.classCategory ?? "studio") === cat.value);
+                if (!list.length) return null;
+                return (
+                  <section key={cat.value} className="flex flex-col gap-3">
+                    <div className="flex items-baseline gap-2.5">
+                      <h2 className="text-base font-extrabold">{cat.label}</h2>
+                      <span className="text-[13px] text-ink-muted">{list.length} {list.length === 1 ? "plan" : "planes"}</span>
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                      {list.map((p) => (
+                        <PlanCard
+                          key={p.id}
+                          p={p}
+                          onEdit={openEdit}
+                          onToggleActive={(plan) => updateMutation.mutate({ ...plan, isActive: !plan.isActive })}
+                          onDelete={requestDelete}
+                        />
+                      ))}
+                    </div>
+                  </section>
+                );
+              })}
+              {/* Categoría no reconocida (por ejemplo "" heredada de datos
+                  viejos): antes desaparecía del todo y no había forma de
+                  editarla ni borrarla (M8). */}
+              {(() => {
+                const others = plans.filter((p) => !KNOWN_CATEGORIES.has((p.classCategory ?? "studio") as CategoryValue));
+                if (!others.length) return null;
+                return (
+                  <section key="otros" className="flex flex-col gap-3">
+                    <div className="flex items-baseline gap-2.5">
+                      <h2 className="text-base font-extrabold">Otros</h2>
+                      <span className="text-[13px] text-ink-muted">{others.length} {others.length === 1 ? "plan" : "planes"}</span>
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                      {others.map((p) => (
+                        <PlanCard
+                          key={p.id}
+                          p={p}
+                          onEdit={openEdit}
+                          onToggleActive={(plan) => updateMutation.mutate({ ...plan, isActive: !plan.isActive })}
+                          onDelete={requestDelete}
+                        />
+                      ))}
+                    </div>
+                  </section>
+                );
+              })()}
+            </>
           )}
-        </div>
+        </AdminPage>
 
         {/* Formulario lateral */}
         <Sheet open={open} onOpenChange={(next) => { setOpen(next); if (!next) setEditing(null); }}>
