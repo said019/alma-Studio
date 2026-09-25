@@ -33,12 +33,16 @@ prueba de contraste, ampliada a los dos temas.
 | App de clienta (`/app`), acceso (`/auth`), 404 | Oscuro |
 | Panel (`/admin`), landing y legales (hasta el sub-proyecto A) | Claro |
 
-El tema lo decide la **ruta**: `themeForPath` (`src/design/theme.ts`) fija
-`<html data-theme="dark|light">`, no un contenedor, para que los diálogos,
-menús y toasts —que se abren en portales fuera de la pantalla— hereden el
-tema. `AppShell`, `AuthShell` y `NotFound` quedan en oscuro; `AdminLayout` en
-claro. Un script en `index.html` replica `themeForPath` antes de que cargue
-React, para que no parpadee al entrar.
+El tema lo decide la **ruta**: `RouteTheme` (`src/design/theme.ts`), montado
+una vez dentro del router en `App.tsx`, aplica `themeForPath` en cada cambio de
+ruta —`/app` y `/auth` en oscuro; todo lo demás, panel incluido, en claro— y
+fija `<html data-theme="dark|light">` y `<meta name="theme-color">`, no un
+contenedor, para que los diálogos, menús y toasts —que se abren en portales
+fuera de la pantalla— hereden el tema. Los marcos (`AppShell`, `AuthShell`,
+`AdminLayout`) no fijan el tema; la única pantalla que lo fija por su cuenta es
+`NotFound` (`useTheme("dark")`), porque la 404 cae en cualquier ruta. Un script
+en `index.html` replica `themeForPath` antes de que cargue React, para que no
+parpadee al entrar.
 
 ### Por qué el color va en clases, no en variables en línea
 
