@@ -45,6 +45,10 @@ describe("tokens", () => {
     ["onInverse", "accent"],        // texto claro sobre coral
     ["accent", "canvas"],           // coral como texto
     ["accentStrong", "accentSoft"], // coral profundo sobre coral suave: 4.25:1
+    // F5 — 4.29:1, no llega a AA. Register.tsx:125, OrderDetail.tsx:171 y
+    // ProfileMembership.tsx:110-112 lo usan hoy; queda para el sub-proyecto 2
+    // (ruling F5: no se tocan esas pantallas en esta ronda).
+    ["accentStrong", "sunken"],
   ];
   it.each(prohibidos)("%s sobre %s no llega a 4.5:1 y está prohibido", (fg, bg) => {
     expect(contrast(COLOR[fg], COLOR[bg])).toBeLessThan(TEXT);
