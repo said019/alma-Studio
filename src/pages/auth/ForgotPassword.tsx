@@ -11,7 +11,6 @@ import {
   AuthSubmit,
   AuthErrorBanner,
 } from "@/components/auth/AuthShell";
-import { COLOR } from "@/design/tokens";
 
 const schema = z.object({ email: z.string().email("Email inválido") });
 type FormValues = { email: string };
@@ -59,19 +58,16 @@ const ForgotPassword = () => {
     >
       {sent ? (
         <div className="flex flex-col gap-6">
-          <div
-            className="flex items-start gap-4 rounded-2xl px-5 py-5"
-            style={{ backgroundColor: COLOR.sunken, border: `1px solid ${COLOR.lineStrong}4d` }}
-          >
-            <span className="grid h-10 w-10 place-items-center rounded-full shrink-0" style={{ backgroundColor: COLOR.ink, color: COLOR.canvas }}>
+          <div className="flex items-start gap-4 rounded-2xl border border-line-strong/30 bg-sunken px-5 py-5">
+            <span className="grid h-10 w-10 place-items-center rounded-full shrink-0 bg-ink text-canvas">
               <MailCheck size={18} />
             </span>
             <div>
-              <p className="text-[0.95rem] leading-[1.6]" style={{ color: COLOR.ink }}>
+              <p className="text-[0.95rem] leading-[1.6] text-ink">
                 Enviamos un enlace a{" "}
-                <strong className="font-medium" style={{ color: COLOR.accentStrong }}>{submittedEmail}</strong>.
+                <strong className="font-medium text-accent-strong">{submittedEmail}</strong>.
               </p>
-              <p className="mt-1 text-[0.84rem] leading-[1.5]" style={{ color: COLOR.ink, opacity: 0.62 }}>
+              <p className="mt-1 text-[0.84rem] leading-[1.5] text-ink-muted">
                 El enlace expira en 30 minutos. Revisa también la carpeta de spam.
               </p>
             </div>
@@ -79,22 +75,18 @@ const ForgotPassword = () => {
 
           <ul className="flex flex-col gap-2 list-none m-0 p-0">
             {[
-              "Abre el correo de Alma Movement.",
+              "Abre el correo de HIVE Pilates Studio.",
               "Haz click en “Crear nueva contraseña”.",
               "Vuelve aquí y entra con tu nueva clave.",
             ].map((step, i) => (
               <li
                 key={step}
-                className="grid grid-cols-[auto_1fr] gap-3 items-start py-2"
-                style={{ borderTop: i === 0 ? undefined : `1px solid ${COLOR.line}` }}
+                className={"grid grid-cols-[auto_1fr] gap-3 items-start py-2 " + (i === 0 ? "" : "border-t border-line")}
               >
-                <span
-                  className="font-display nums text-[0.95rem] leading-none"
-                  style={{ color: COLOR.accentStrong }}
-                >
+                <span className="font-display nums text-[0.95rem] leading-none text-accent-strong">
                   0{i + 1}
                 </span>
-                <span className="text-[0.92rem] leading-[1.55]" style={{ color: COLOR.ink, opacity: 0.78 }}>
+                <span className="text-[0.92rem] leading-[1.55] text-ink-muted">
                   {step}
                 </span>
               </li>
@@ -111,7 +103,7 @@ const ForgotPassword = () => {
             </button>
             <Link
               to="/auth/login"
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-ink px-6 py-3.5 text-[0.78rem] font-medium uppercase tracking-[0.18em] text-canvas no-underline transition-transform duration-200 hover:-translate-y-0.5 hover:bg-inverse focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-offset-2"
+              className="inline-flex items-center justify-center gap-2 rounded-full bg-ink px-6 py-3.5 text-[0.78rem] font-medium uppercase tracking-[0.18em] text-canvas no-underline transition-transform duration-200 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-offset-2"
             >
               <CheckCircle2 size={14} />
               Volver a iniciar sesión
@@ -138,9 +130,9 @@ const ForgotPassword = () => {
             </AuthSubmit>
           </form>
 
-          <p className="mt-7 text-center text-[0.86rem]" style={{ color: COLOR.ink, opacity: 0.7 }}>
+          <p className="mt-7 text-center text-[0.86rem] text-ink-muted">
             ¿Ya recordaste?{" "}
-            <Link to="/auth/login" className="no-underline font-medium" style={{ color: COLOR.accentStrong }}>
+            <Link to="/auth/login" className="no-underline font-medium text-accent-strong">
               Volver a iniciar sesión
             </Link>
           </p>

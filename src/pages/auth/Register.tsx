@@ -17,7 +17,6 @@ import {
   AuthPasswordRules,
 } from "@/components/auth/AuthShell";
 import { Check } from "lucide-react";
-import { COLOR } from "@/design/tokens";
 
 const todayISO = new Date().toISOString().slice(0, 10);
 
@@ -105,7 +104,7 @@ const Register = () => {
   return (
     <AuthShell
       brandTint="berry"
-      brandEyebrow="Nueva en Alma"
+      brandEyebrow="Nueva en HIVE"
       brandHeadline={<>Te recibimos</>}
       brandHeadlineItalic="como te recibe una amiga."
       brandSubline="Crea tu cuenta y reserva tu primera clase. Grupos pequeños, atención personalizada, técnica cuidada."
@@ -117,14 +116,11 @@ const Register = () => {
       ]}
       formEyebrow="Crear cuenta"
       formHeadline="Únete a"
-      formHeadlineItalic="Alma."
+      formHeadlineItalic="HIVE."
     >
       {refCode && (
-        <div
-          className="mb-6 flex items-center gap-3 rounded-2xl px-4 py-3 text-[0.84rem]"
-          style={{ backgroundColor: COLOR.sunken, color: COLOR.accentStrong, border: `1px solid ${COLOR.accentStrong}30` }}
-        >
-          <span className="grid h-6 w-6 place-items-center rounded-full" style={{ backgroundColor: COLOR.ink, color: COLOR.canvas }}>
+        <div className="mb-6 flex items-center gap-3 rounded-2xl border border-accent-strong/20 bg-sunken px-4 py-3 text-[0.84rem] text-accent-strong">
+          <span className="grid h-6 w-6 place-items-center rounded-full bg-ink text-canvas">
             <Check size={11} strokeWidth={3} />
           </span>
           Código de referido <strong className="ml-1 nums font-medium tracking-wide">{refCode}</strong>
@@ -218,8 +214,7 @@ const Register = () => {
               href="/legal/terminos"
               target="_blank"
               rel="noopener noreferrer"
-              className="no-underline font-medium"
-              style={{ color: COLOR.accentStrong }}
+              className="no-underline font-medium text-accent-strong"
             >
               términos y condiciones
             </a>{" "}
@@ -228,8 +223,7 @@ const Register = () => {
               href="/legal/privacidad"
               target="_blank"
               rel="noopener noreferrer"
-              className="no-underline font-medium"
-              style={{ color: COLOR.accentStrong }}
+              className="no-underline font-medium text-accent-strong"
             >
               aviso de privacidad
             </a>

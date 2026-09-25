@@ -10,7 +10,6 @@ import {
   AuthErrorBanner,
 } from "@/components/auth/AuthShell";
 import type { User } from "@/types/auth";
-import { COLOR } from "@/design/tokens";
 
 type YesNo = "yes" | "no" | null;
 
@@ -30,8 +29,7 @@ const YesNoField = ({
   <div className="flex flex-col gap-2.5">
     <span
       id={`${id}-label`}
-      className="text-[0.72rem] font-medium uppercase tracking-[0.18em] leading-[1.8]"
-      style={{ color: COLOR.accentStrong }}
+      className="text-[0.72rem] font-medium uppercase tracking-[0.18em] leading-[1.8] text-accent-strong"
     >
       {label}
     </span>
@@ -64,7 +62,7 @@ const YesNoField = ({
       })}
     </div>
     {error && (
-      <p id={`${id}-error`} className="flex items-center gap-1.5 text-[0.78rem]" style={{ color: COLOR.danger }}>
+      <p id={`${id}-error`} className="flex items-center gap-1.5 text-[0.78rem] text-danger">
         <AlertCircle size={13} className="shrink-0" />
         {error}
       </p>
@@ -133,10 +131,7 @@ const Onboarding = () => {
       formHeadline="Cuéntanos sobre"
       formHeadlineItalic="ti."
     >
-      <p
-        className="mb-6 text-[0.88rem] leading-relaxed"
-        style={{ color: COLOR.ink, opacity: 0.6 }}
-      >
+      <p className="mb-6 text-[0.88rem] leading-relaxed text-ink-muted">
         Necesitamos saber esto antes de que entres. Solo toma un momento.
       </p>
 
@@ -192,7 +187,7 @@ const Onboarding = () => {
         />
 
         <AuthSubmit loading={submitting} loadingLabel="Guardando…">
-          Entrar a Alma
+          Entrar a HIVE
         </AuthSubmit>
       </form>
     </AuthShell>
