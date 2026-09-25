@@ -49,7 +49,7 @@ export default function UpdateBanner() {
       role="status"
       className="fixed inset-x-0 top-0 z-[9999] flex justify-center px-3 pt-[calc(0.5rem+env(safe-area-inset-top))] pointer-events-none"
     >
-      <div className="pointer-events-auto flex w-full max-w-[440px] items-center gap-3 rounded-2xl bg-inverse px-4 py-3 text-inverse-foreground shadow-[0_12px_34px_rgba(0,0,0,0.28)]">
+      <div className="pointer-events-auto flex w-full max-w-[440px] items-center gap-3 rounded-2xl bg-inverse px-4 py-3 text-inverse-foreground shadow-[0_12px_34px_theme(colors.ink.DEFAULT/28%)]">
         <span className="flex-1 text-[13px] leading-snug">
           Hay una nueva versión de Alma disponible.
         </span>

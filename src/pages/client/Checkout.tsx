@@ -504,7 +504,7 @@ const Checkout = () => {
           >
             <div
               className="mx-auto flex max-w-[680px] items-center gap-3 rounded-2xl p-3 pl-5"
-              style={{ backgroundColor: COLOR.canvas, border: `1px solid ${COLOR.line}`, boxShadow: "0 10px 30px rgba(36,27,26,0.14)" }}
+              style={{ backgroundColor: COLOR.canvas, border: `1px solid ${COLOR.line}`, boxShadow: `0 10px 30px ${COLOR.ink}24` }}
             >
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[0.6rem] uppercase tracking-[0.18em]" style={{ color: COLOR.ink, opacity: 0.55 }}>

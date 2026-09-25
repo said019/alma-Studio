@@ -170,7 +170,7 @@ export const StickyCta = ({ children }: StickyCtaProps) => {
         style={{
           backgroundColor: stuck ? COLOR.surface : "transparent",
           border: stuck ? `1px solid ${COLOR.line}` : "0",
-          boxShadow: stuck ? "0 8px 24px rgba(17,17,17,0.08)" : "none",
+          boxShadow: stuck ? `0 8px 24px ${COLOR.ink}14` : "none",
         }}
       >
         {children}

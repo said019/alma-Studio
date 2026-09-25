@@ -175,7 +175,7 @@ export const DatePicker = ({
                   className={cn(
                     "h-8 w-full rounded-lg text-xs font-medium transition-all",
                     isSelected
-                      ? "bg-canvas text-ink shadow-[0_0_10px_rgba(0,0,0,0.4)]"
+                      ? "bg-canvas text-ink shadow-[0_0_10px_theme(colors.ink.DEFAULT/40%)]"
                       : isCurrentDay && !isSelected
                         ? "border border-line-strong/40 text-inverse-muted bg-line-strong/5"
                         : isThisMonth

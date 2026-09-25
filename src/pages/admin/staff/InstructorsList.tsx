@@ -411,10 +411,10 @@ const InstructorsList = () => {
                         style={{ objectPosition: `${focusX}% ${focusY}%` }}
                       />
                       <div
-                        className="pointer-events-none absolute h-8 w-8 rounded-full border-2 border-canvas bg-canvas/15 shadow-[0_0_0_1px_rgba(0,0,0,0.25)]"
+                        className="pointer-events-none absolute h-8 w-8 rounded-full border-2 border-canvas bg-canvas/15 shadow-[0_0_0_1px_theme(colors.ink.DEFAULT/25%)]"
                         style={{ left: `${focusX}%`, top: `${focusY}%`, transform: "translate(-50%, -50%)" }}
                       >
-                        <div className="absolute left-1/2 top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-canvas shadow-[0_0_0_1px_rgba(0,0,0,0.25)]" />
+                        <div className="absolute left-1/2 top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-canvas shadow-[0_0_0_1px_theme(colors.ink.DEFAULT/25%)]" />
                       </div>
                     </button>
                     <div className="nums mx-auto flex w-full max-w-[300px] items-center justify-between text-[11px] font-medium text-ink/60">

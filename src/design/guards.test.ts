@@ -88,6 +88,44 @@ describe("guardias contra volver a Alma", () => {
     }
   });
 
+  // F3 — la guardia de hex de 6 dígitos no veía #RRGGBBAA ni rgba()/rgb()
+  // literales. Misma lista de excepciones que arriba: wellhubBrand.ts
+  // completo (identidad ajena); en Wallet.tsx sólo los seis hex oficiales
+  // de los botones de wallet (ninguno es rgba ni #RRGGBBAA, así que ese
+  // archivo no necesita excepción aquí).
+  const PERMITIDOS_TODO: Record<string, "*"> = {
+    "src/lib/wellhubBrand.ts": "*",
+  };
+
+  it("no quedan colores #RRGGBBAA fuera de src/design (spec §3.2 regla 6)", () => {
+    const malos: string[] = [];
+    for (const f of sourceFiles()) {
+      const r = rel(f);
+      if (PERMITIDOS_TODO[r] === "*") continue;
+      const hits = (fs.readFileSync(f, "utf8").match(/#[0-9A-Fa-f]{8}\b/g) ?? []);
+      if (hits.length) malos.push(`${r}: ${[...new Set(hits)].join(" ")}`);
+    }
+    expect(malos).toEqual([]);
+  });
+
+  it("no quedan rgba()/rgb() con números escritos a mano fuera de src/design (spec §3.2 regla 6)", () => {
+    const malos: string[] = [];
+    for (const f of sourceFiles()) {
+      const r = rel(f);
+      if (PERMITIDOS_TODO[r] === "*") continue;
+      if (/rgba?\(\s*\d/.test(fs.readFileSync(f, "utf8"))) malos.push(r);
+    }
+    expect(malos).toEqual([]);
+  });
+
+  it("src/index.css no tiene hex de 6/8 dígitos ni rgb(a)( con números fuera de comentarios", () => {
+    const cssPath = path.join(root, "src/index.css");
+    const raw = fs.readFileSync(cssPath, "utf8");
+    const sinComentarios = raw.replace(/\/\*[\s\S]*?\*\//g, "");
+    expect(sinComentarios).not.toMatch(/#[0-9A-Fa-f]{6,8}\b/);
+    expect(sinComentarios).not.toMatch(/rgba?\(\s*\d/);
+  });
+
   it("ninguna pieza compartida pone texto claro sobre coral", () => {
     const dirs = ["src/components/app", "src/components/ui", "src/components/admin", "src/components/brand"];
     const malos: string[] = [];

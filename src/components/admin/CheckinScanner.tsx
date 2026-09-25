@@ -291,7 +291,7 @@ export const CheckinScanner = ({ open, onOpenChange }: Props) => {
               autoPlay
             />
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-              <div className="h-40 w-40 rounded-2xl border-2 border-canvas/80 shadow-[0_0_0_4000px_rgba(36,27,26,0.25)]" />
+              <div className="h-40 w-40 rounded-2xl border-2 border-canvas/80 shadow-[0_0_0_4000px_theme(colors.ink.DEFAULT/25%)]" />
             </div>
             {/* Placeholder mientras la cámara arranca: evita el flash del cuadro negro */}
             {!streamReady && !needsTap && (

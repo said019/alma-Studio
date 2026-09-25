@@ -20,7 +20,7 @@ type Tint = "berry" | "coral" | "olive";
 const LABEL_CLASS = "text-[0.72rem] font-medium uppercase tracking-[0.22em]";
 
 const INPUT_CLASS =
-  "w-full rounded-2xl px-4 py-3.5 text-[0.95rem] outline-none transition-all duration-200 placeholder:text-[color:rgba(67,57,47,0.38)] focus-visible:ring-2 focus-visible:ring-accent-strong";
+  "w-full rounded-2xl px-4 py-3.5 text-[0.95rem] outline-none transition-all duration-200 placeholder:text-ink-muted focus-visible:ring-2 focus-visible:ring-accent-strong";
 
 const inputStyle = (error?: string) => ({
   backgroundColor: COLOR.canvas,

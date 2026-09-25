@@ -80,7 +80,7 @@ const formatShortDate = (value?: string | null) => {
 };
 
 /* Hairline interna del pase drenched */
-const PASS_HAIRLINE = "1px solid rgba(250,249,246,0.14)";
+const PASS_HAIRLINE = `1px solid ${COLOR.onInverse}24`;
 
 const Wallet = () => {
   const { toast } = useToast();
@@ -224,7 +224,7 @@ const Wallet = () => {
               style={{
                 backgroundColor: COLOR.inverse,
                 color: COLOR.canvas,
-                boxShadow: "0 18px 48px -12px rgba(36,27,26,0.18)",
+                boxShadow: `0 18px 48px -12px ${COLOR.ink}2e`,
               }}
             >
               {/* Wordmark + estado */}
@@ -246,7 +246,7 @@ const Wallet = () => {
                 >
                   <span
                     className="inline-block h-1.5 w-1.5 rounded-full"
-                    style={{ backgroundColor: metrics.hasMembership ? COLOR.success : "rgba(250,249,246,0.4)" }}
+                    style={{ backgroundColor: metrics.hasMembership ? COLOR.success : `${COLOR.onInverse}66` }}
                   />
                   {metrics.hasMembership ? "Activo" : "Sin paquete"}
                 </span>
