@@ -25,7 +25,9 @@ describeZone(ZONA, {
 describe("textos de la zona", () => {
   it("no quedan textos Alma, salvo los que decide el sub-proyecto A", () => {
     const PERMITIDOS = [/Responsiva y consentimiento informado firmado con Alma Movement/, /alma-pass\.pkpass/, /paleta Alma/];
-    const malos = ZONA.flatMap((f) =>
+    // Texto legal versionado de la responsiva (RESPONSIVA_VERSION): cambiar el nombre obliga a una versión nueva; lo decide A.
+    const LEGALES = ["src/components/app/responsivaContent.ts"];
+    const malos = ZONA.filter((f) => !LEGALES.includes(f)).flatMap((f) =>
       read(f).split("\n").map((l, i) => [l, i + 1] as const)
         .filter(([l]) => /\bAlma\b/.test(l) && !PERMITIDOS.some((re) => re.test(l)))
         .map(([, n]) => `${f}:${n}`));
