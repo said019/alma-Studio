@@ -73,12 +73,12 @@ const PAYMENT_METHODS = [
 ] as const;
 
 // ── Clases compartidas de campos (tema claro nativo) ──────────────────────────
-const fieldCls = "bg-alma-canvas border-alma-sandstone/60 text-alma-ink placeholder:text-alma-ink/40";
-const outlineBtnCls = "border-alma-sandstone/70 bg-transparent text-alma-ink hover:bg-alma-mist hover:text-alma-ink";
-const primaryBtnCls = "bg-alma-ink-deep text-alma-canvas hover:bg-alma-ink";
+const fieldCls = "bg-canvas border-line-strong/60 text-ink placeholder:text-ink/40";
+const outlineBtnCls = "border-line-strong/70 bg-transparent text-ink hover:bg-sunken hover:text-ink";
+const primaryBtnCls = "bg-inverse text-canvas hover:bg-ink";
 
 const SectionLabel = ({ children }: { children: ReactNode }) => (
-  <p className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-alma-berry mb-3">{children}</p>
+  <p className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-ink mb-3">{children}</p>
 );
 
 const EmptyBlock = ({ Icon, title, description, action }: {
@@ -88,12 +88,12 @@ const EmptyBlock = ({ Icon, title, description, action }: {
   action?: ReactNode;
 }) => (
   <div className="flex flex-col items-center gap-3 py-14 text-center px-6">
-    <span className="grid h-12 w-12 place-items-center rounded-2xl bg-alma-oat text-alma-berry">
+    <span className="grid h-12 w-12 place-items-center rounded-2xl bg-sunken text-ink">
       <Icon size={20} strokeWidth={1.8} />
     </span>
     <div>
-      <p className="font-display text-lg text-alma-ink">{title}</p>
-      <p className="text-sm text-alma-ink/55 mt-1 max-w-[44ch]">{description}</p>
+      <p className="font-display text-lg text-ink">{title}</p>
+      <p className="text-sm text-ink/55 mt-1 max-w-[44ch]">{description}</p>
     </div>
     {action}
   </div>
@@ -215,8 +215,8 @@ const ClientsList = () => {
           {/* Header */}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-7">
             <div>
-              <h1 className="admin-title font-display text-alma-ink mb-1">Clientas</h1>
-              <p className="text-sm text-alma-ink/55">
+              <h1 className="admin-title font-display text-ink mb-1">Clientas</h1>
+              <p className="text-sm text-ink/55">
                 <span className="nums">{clients.length}</span> clientas registradas
               </p>
             </div>
@@ -227,7 +227,7 @@ const ClientsList = () => {
 
           {/* Search */}
           <div className="relative mb-5 max-w-sm">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-alma-ink/40" />
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink/40" />
             <Input
               className={cn(fieldCls, "pl-8")}
               placeholder="Buscar clienta..."
@@ -237,7 +237,7 @@ const ClientsList = () => {
           </div>
 
           {/* Table */}
-          <div className="rounded-2xl border border-alma-hairline overflow-hidden bg-alma-canvas">
+          <div className="rounded-2xl border border-line overflow-hidden bg-canvas">
             {isError ? (
               <div className="px-6">
                 <ErrorState
@@ -272,21 +272,21 @@ const ClientsList = () => {
             ) : (
               <Table>
                 <TableHeader>
-                  <TableRow className="border-alma-hairline hover:bg-transparent">
-                    <TableHead className="text-alma-ink/55 font-semibold text-xs uppercase tracking-wider">Nombre</TableHead>
-                    <TableHead className="text-alma-ink/55 font-semibold text-xs uppercase tracking-wider hidden md:table-cell">Email</TableHead>
-                    <TableHead className="text-alma-ink/55 font-semibold text-xs uppercase tracking-wider">Teléfono</TableHead>
-                    <TableHead className="text-alma-ink/55 font-semibold text-xs uppercase tracking-wider hidden lg:table-cell">Clienta desde</TableHead>
+                  <TableRow className="border-line hover:bg-transparent">
+                    <TableHead className="text-ink/55 font-semibold text-xs uppercase tracking-wider">Nombre</TableHead>
+                    <TableHead className="text-ink/55 font-semibold text-xs uppercase tracking-wider hidden md:table-cell">Email</TableHead>
+                    <TableHead className="text-ink/55 font-semibold text-xs uppercase tracking-wider">Teléfono</TableHead>
+                    <TableHead className="text-ink/55 font-semibold text-xs uppercase tracking-wider hidden lg:table-cell">Clienta desde</TableHead>
                     <TableHead className="w-12" />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {isLoading
                     ? Array(5).fill(0).map((_, i) => (
-                      <TableRow key={i} className="border-alma-hairline hover:bg-transparent">
+                      <TableRow key={i} className="border-line hover:bg-transparent">
                         {Array(5).fill(0).map((_, j) => (
                           <TableCell key={j} className={cn(j === 1 && "hidden md:table-cell", j === 3 && "hidden lg:table-cell")}>
-                            <Skeleton className="h-4 w-full bg-alma-oat/60" />
+                            <Skeleton className="h-4 w-full bg-sunken/60" />
                           </TableCell>
                         ))}
                       </TableRow>
@@ -295,27 +295,27 @@ const ClientsList = () => {
                       <TableRow
                         key={c.id}
                         onClick={() => navigate(`/admin/clients/${c.id}`)}
-                        className="border-alma-hairline cursor-pointer transition-colors hover:bg-alma-mist"
+                        className="border-line cursor-pointer transition-colors hover:bg-sunken"
                       >
-                        <TableCell className="font-semibold text-alma-ink">
+                        <TableCell className="font-semibold text-ink">
                           <span>{c.displayName}</span>
                         </TableCell>
-                        <TableCell className="text-sm text-alma-ink/60 hidden md:table-cell">{c.email}</TableCell>
-                        <TableCell className="text-sm text-alma-ink/60 nums">{c.phone ?? "—"}</TableCell>
-                        <TableCell className="text-sm text-alma-ink/60 nums hidden lg:table-cell">
+                        <TableCell className="text-sm text-ink/60 hidden md:table-cell">{c.email}</TableCell>
+                        <TableCell className="text-sm text-ink/60 nums">{c.phone ?? "—"}</TableCell>
+                        <TableCell className="text-sm text-ink/60 nums hidden lg:table-cell">
                           {c.createdAt ? formatDate(c.createdAt) : "—"}
                         </TableCell>
                         <TableCell onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center justify-end">
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="text-alma-ink/45 hover:text-alma-ink hover:bg-alma-oat/60">
+                                <Button variant="ghost" size="icon" className="text-ink/45 hover:text-ink hover:bg-sunken/60">
                                   <MoreHorizontal size={14} />
                                 </Button>
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent className="bg-alma-canvas border-alma-hairline">
+                              <DropdownMenuContent className="bg-canvas border-line">
                                 <DropdownMenuItem
-                                  className="text-alma-ink/80 focus:text-alma-ink focus:bg-alma-mist"
+                                  className="text-ink/80 focus:text-ink focus:bg-sunken"
                                   onClick={() => openEdit(c)}
                                 >
                                   Editar
@@ -340,10 +340,10 @@ const ClientsList = () => {
 
         {/* ── Edit sheet ───────────────────────────────────────────────────── */}
         <Sheet open={editOpen} onOpenChange={setEditOpen}>
-          <SheetContent className="w-full sm:max-w-md overflow-y-auto bg-alma-canvas border-alma-hairline text-alma-ink">
+          <SheetContent className="w-full sm:max-w-md overflow-y-auto bg-canvas border-line text-ink">
             <SheetHeader>
-              <SheetTitle className="font-display text-xl text-alma-ink">Editar clienta</SheetTitle>
-              <SheetDescription className="text-alma-ink/55">
+              <SheetTitle className="font-display text-xl text-ink">Editar clienta</SheetTitle>
+              <SheetDescription className="text-ink/55">
                 Actualiza los datos del expediente de {editing?.displayName ?? "la clienta"}.
               </SheetDescription>
             </SheetHeader>
@@ -352,49 +352,49 @@ const ClientsList = () => {
                 <SectionLabel>Datos</SectionLabel>
                 <div className="space-y-3">
                   <div className="space-y-1">
-                    <Label className="text-alma-ink/70 text-xs">Nombre</Label>
+                    <Label className="text-ink/70 text-xs">Nombre</Label>
                     <Input className={fieldCls} {...editForm.register("displayName")} />
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-alma-ink/70 text-xs">Fecha de nacimiento</Label>
+                    <Label className="text-ink/70 text-xs">Fecha de nacimiento</Label>
                     <DatePicker value={editForm.watch("dateOfBirth")} onChange={(v) => editForm.setValue("dateOfBirth", v)} />
                   </div>
                 </div>
               </div>
 
-              <div className="border-t border-alma-hairline pt-5">
+              <div className="border-t border-line pt-5">
                 <SectionLabel>Contacto</SectionLabel>
                 <div className="space-y-3">
                   <div className="space-y-1">
-                    <Label className="text-alma-ink/70 text-xs">Email</Label>
+                    <Label className="text-ink/70 text-xs">Email</Label>
                     <Input type="email" className={fieldCls} {...editForm.register("email")} />
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-alma-ink/70 text-xs">Teléfono</Label>
+                    <Label className="text-ink/70 text-xs">Teléfono</Label>
                     <Input className={fieldCls} {...editForm.register("phone")} />
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="space-y-1">
-                      <Label className="text-alma-ink/70 text-xs">Contacto de emergencia</Label>
+                      <Label className="text-ink/70 text-xs">Contacto de emergencia</Label>
                       <Input className={fieldCls} placeholder="Nombre" {...editForm.register("emergencyContactName")} />
                     </div>
                     <div className="space-y-1">
-                      <Label className="text-alma-ink/70 text-xs">Teléfono emergencia</Label>
+                      <Label className="text-ink/70 text-xs">Teléfono emergencia</Label>
                       <Input className={fieldCls} {...editForm.register("emergencyContactPhone")} />
                     </div>
                   </div>
                 </div>
               </div>
 
-              <div className="border-t border-alma-hairline pt-5">
+              <div className="border-t border-line pt-5">
                 <SectionLabel>Salud</SectionLabel>
                 <div className="space-y-1">
-                  <Label className="text-alma-ink/70 text-xs">Notas de salud</Label>
+                  <Label className="text-ink/70 text-xs">Notas de salud</Label>
                   <Input className={fieldCls} placeholder="Lesiones, condiciones..." {...editForm.register("healthNotes")} />
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2 border-t border-alma-hairline pt-4">
+              <div className="flex justify-end gap-2 border-t border-line pt-4">
                 <Button type="button" variant="outline" className={outlineBtnCls} onClick={() => setEditOpen(false)}>
                   Cancelar
                 </Button>
@@ -408,13 +408,13 @@ const ClientsList = () => {
 
         {/* ── Manual registration sheet ────────────────────────────────────── */}
         <Sheet open={manualOpen} onOpenChange={(v) => { setManualOpen(v); if (!v) manualForm.reset({ startDate: format(new Date(), "yyyy-MM-dd") }); }}>
-          <SheetContent className="w-full sm:max-w-lg overflow-y-auto bg-alma-canvas border-alma-hairline text-alma-ink">
+          <SheetContent className="w-full sm:max-w-lg overflow-y-auto bg-canvas border-line text-ink">
             <SheetHeader>
-              <SheetTitle className="font-display text-xl text-alma-ink flex items-center gap-2">
-                <UserPlus size={18} className="text-alma-berry" />
+              <SheetTitle className="font-display text-xl text-ink flex items-center gap-2">
+                <UserPlus size={18} className="text-ink" />
                 Nueva clienta
               </SheetTitle>
-              <SheetDescription className="text-alma-ink/55">
+              <SheetDescription className="text-ink/55">
                 Registro manual. La clienta recibe su contraseña por email.
               </SheetDescription>
             </SheetHeader>
@@ -425,56 +425,56 @@ const ClientsList = () => {
                 <SectionLabel>Datos</SectionLabel>
                 <div className="space-y-3">
                   <div className="space-y-1">
-                    <Label className="text-alma-ink/70 text-xs">Nombre completo *</Label>
+                    <Label className="text-ink/70 text-xs">Nombre completo *</Label>
                     <Input className={fieldCls} placeholder="Ana García" {...manualForm.register("displayName")} />
                     {manualForm.formState.errors.displayName && (
                       <p className="text-xs text-destructive">{manualForm.formState.errors.displayName.message}</p>
                     )}
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-alma-ink/70 text-xs">Fecha de nacimiento</Label>
+                    <Label className="text-ink/70 text-xs">Fecha de nacimiento</Label>
                     <DatePicker value={manualForm.watch("dateOfBirth")} onChange={(v) => manualForm.setValue("dateOfBirth", v)} />
                   </div>
                 </div>
               </div>
 
               {/* Contacto */}
-              <div className="border-t border-alma-hairline pt-5">
+              <div className="border-t border-line pt-5">
                 <SectionLabel>Contacto</SectionLabel>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <Label className="text-alma-ink/70 text-xs">Email *</Label>
+                    <Label className="text-ink/70 text-xs">Email *</Label>
                     <Input type="email" className={fieldCls} placeholder="ana@email.com" {...manualForm.register("email")} />
                     {manualForm.formState.errors.email && (
                       <p className="text-xs text-destructive">{manualForm.formState.errors.email.message}</p>
                     )}
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-alma-ink/70 text-xs">Teléfono</Label>
+                    <Label className="text-ink/70 text-xs">Teléfono</Label>
                     <Input className={fieldCls} placeholder="55 1234 5678" {...manualForm.register("phone")} />
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-alma-ink/70 text-xs">Contacto de emergencia</Label>
+                    <Label className="text-ink/70 text-xs">Contacto de emergencia</Label>
                     <Input className={fieldCls} placeholder="Nombre" {...manualForm.register("emergencyContactName")} />
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-alma-ink/70 text-xs">Teléfono emergencia</Label>
+                    <Label className="text-ink/70 text-xs">Teléfono emergencia</Label>
                     <Input className={fieldCls} {...manualForm.register("emergencyContactPhone")} />
                   </div>
                 </div>
               </div>
 
               {/* Salud */}
-              <div className="border-t border-alma-hairline pt-5">
+              <div className="border-t border-line pt-5">
                 <SectionLabel>Salud</SectionLabel>
                 <div className="space-y-1">
-                  <Label className="text-alma-ink/70 text-xs">Notas de salud</Label>
+                  <Label className="text-ink/70 text-xs">Notas de salud</Label>
                   <Input className={fieldCls} placeholder="Lesiones, condiciones..." {...manualForm.register("healthNotes")} />
                 </div>
               </div>
 
               {/* Membresía (opcional) */}
-              <div className="border-t border-alma-hairline pt-5">
+              <div className="border-t border-line pt-5">
                 <SectionLabel>Membresía (opcional)</SectionLabel>
                 {plansError ? (
                   <ErrorState
@@ -485,7 +485,7 @@ const ClientsList = () => {
                 ) : (
                 <div className="space-y-3">
                   <div className="space-y-1">
-                    <Label className="text-alma-ink/70 text-xs">Plan</Label>
+                    <Label className="text-ink/70 text-xs">Plan</Label>
                     <Select
                       value={selectedPlanId ?? "none"}
                       onValueChange={(v) => manualForm.setValue("planId", v === "none" ? undefined : v)}
@@ -493,13 +493,13 @@ const ClientsList = () => {
                       <SelectTrigger className={fieldCls}>
                         <SelectValue placeholder="Sin plan (solo crear cuenta)" />
                       </SelectTrigger>
-                      <SelectContent className="bg-alma-canvas border-alma-hairline text-alma-ink">
-                        <SelectItem value="none" className="text-alma-ink/60 focus:bg-alma-mist">Sin plan</SelectItem>
+                      <SelectContent className="bg-canvas border-line text-ink">
+                        <SelectItem value="none" className="text-ink/60 focus:bg-sunken">Sin plan</SelectItem>
                         {plans.map((p) => (
-                          <SelectItem key={p.id} value={p.id} className="text-alma-ink focus:bg-alma-mist">
+                          <SelectItem key={p.id} value={p.id} className="text-ink focus:bg-sunken">
                             {p.name}
                             {p.price > 0 && (
-                              <span className="ml-2 text-alma-ink/50 nums">{formatMXN(p.price)}</span>
+                              <span className="ml-2 text-ink/50 nums">{formatMXN(p.price)}</span>
                             )}
                           </SelectItem>
                         ))}
@@ -509,16 +509,16 @@ const ClientsList = () => {
 
                   {/* Show price of selected plan */}
                   {selectedPlan && (
-                    <div className="flex items-center justify-between rounded-xl border border-alma-sandstone/60 bg-alma-oat/50 px-4 py-2.5">
-                      <span className="text-sm text-alma-ink/70">{selectedPlan.name}</span>
-                      <span className="text-lg font-semibold text-alma-ink nums">{formatMXN(selectedPlan.price)}</span>
+                    <div className="flex items-center justify-between rounded-xl border border-line-strong/60 bg-sunken/50 px-4 py-2.5">
+                      <span className="text-sm text-ink/70">{selectedPlan.name}</span>
+                      <span className="text-lg font-semibold text-ink nums">{formatMXN(selectedPlan.price)}</span>
                     </div>
                   )}
 
                   {/* Payment method — only if plan selected */}
                   {hasPlanSelected && (
                     <div className="space-y-1">
-                      <Label className="text-alma-ink/70 text-xs">Método de pago</Label>
+                      <Label className="text-ink/70 text-xs">Método de pago</Label>
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                         {PAYMENT_METHODS.map(({ value, label, Icon }) => (
                           <button
@@ -528,8 +528,8 @@ const ClientsList = () => {
                             className={cn(
                               "flex flex-col items-center gap-1.5 p-3 rounded-xl border text-xs font-semibold transition-colors",
                               paymentMethod === value
-                                ? "border-alma-sandstone bg-alma-oat text-alma-ink"
-                                : "border-alma-hairline bg-alma-mist text-alma-ink/55 hover:border-alma-sandstone hover:text-alma-ink"
+                                ? "border-line-strong bg-sunken text-ink"
+                                : "border-line bg-sunken text-ink/55 hover:border-line-strong hover:text-ink"
                             )}
                           >
                             <Icon size={16} />
@@ -543,7 +543,7 @@ const ClientsList = () => {
                   {/* Start date — only if plan selected */}
                   {hasPlanSelected && (
                     <div className="space-y-1">
-                      <Label className="text-alma-ink/70 text-xs">Fecha de inicio</Label>
+                      <Label className="text-ink/70 text-xs">Fecha de inicio</Label>
                       <DatePicker value={manualForm.watch("startDate")} onChange={(v) => manualForm.setValue("startDate", v)} />
                     </div>
                   )}
@@ -551,13 +551,13 @@ const ClientsList = () => {
                   {/* Discount code — only if plan selected */}
                   {hasPlanSelected && (
                     <div className="space-y-1">
-                      <Label className="text-alma-ink/70 text-xs">Cupón de descuento (opcional)</Label>
+                      <Label className="text-ink/70 text-xs">Cupón de descuento (opcional)</Label>
                       <Input
                         className={cn(fieldCls, "uppercase")}
                         placeholder="Ej: ONLINE75"
                         {...manualForm.register("discountCode")}
                       />
-                      <p className="text-xs text-alma-ink/50">Se valida contra el plan elegido y queda anotado en la membresía.</p>
+                      <p className="text-xs text-ink/50">Se valida contra el plan elegido y queda anotado en la membresía.</p>
                     </div>
                   )}
                 </div>
@@ -565,12 +565,12 @@ const ClientsList = () => {
               </div>
 
               {/* Internal notes */}
-              <div className="border-t border-alma-hairline pt-5 space-y-1">
-                <Label className="text-alma-ink/70 text-xs">Notas internas</Label>
+              <div className="border-t border-line pt-5 space-y-1">
+                <Label className="text-ink/70 text-xs">Notas internas</Label>
                 <Input className={fieldCls} placeholder="Referida por, observaciones..." {...manualForm.register("notes")} />
               </div>
 
-              <div className="flex justify-end gap-2 border-t border-alma-hairline pt-4">
+              <div className="flex justify-end gap-2 border-t border-line pt-4">
                 <Button type="button" variant="outline" className={outlineBtnCls} onClick={() => setManualOpen(false)}>
                   Cancelar
                 </Button>

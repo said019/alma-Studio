@@ -12,10 +12,10 @@ import {
   ErrorState,
   SkeletonRow,
   GhostButton,
-  ALMA,
 } from "@/components/app/AppShell";
 import { BackLink, DataRow } from "@/components/app/widgets";
 import { RESPONSIVA_TITLE, RESPONSIVA_SECTIONS } from "@/components/app/responsivaContent";
+import { COLOR } from "@/design/tokens";
 
 interface WaiverRow {
   full_name: string;
@@ -73,16 +73,16 @@ const Responsiva = () => {
         ) : (
           <>
             {/* Summary card */}
-            <div className="rounded-3xl p-5 sm:p-7" style={{ backgroundColor: ALMA.blush }}>
+            <div className="rounded-3xl p-5 sm:p-7" style={{ backgroundColor: COLOR.sunken }}>
               <p
                 className="text-[0.72rem] font-medium uppercase tracking-[0.24em] mb-1.5"
-                style={{ color: ALMA.berry }}
+                style={{ color: COLOR.accentStrong }}
               >
                 Firmada
               </p>
               <p
                 className="font-display text-[1.45rem] leading-none mb-3"
-                style={{ color: ALMA.inkDeep }}
+                style={{ color: COLOR.inverse }}
               >
                 {RESPONSIVA_TITLE}
               </p>
@@ -95,7 +95,7 @@ const Responsiva = () => {
                 value={
                   <span
                     className="font-medium"
-                    style={{ color: waiver.image_consent ? ALMA.berry : ALMA.ink }}
+                    style={{ color: waiver.image_consent ? COLOR.accentStrong : COLOR.ink }}
                   >
                     {waiver.image_consent ? "Sí autorizado" : "No autorizado"}
                   </span>
@@ -108,7 +108,7 @@ const Responsiva = () => {
             <Section title="Tu firma">
               <div
                 className="inline-block max-w-full rounded-2xl p-4"
-                style={{ backgroundColor: ALMA.cream, border: `1px solid ${ALMA.border}` }}
+                style={{ backgroundColor: COLOR.canvas, border: `1px solid ${COLOR.line}` }}
               >
                 <img
                   src={waiver.signature_data}
@@ -124,26 +124,26 @@ const Responsiva = () => {
                 <div
                   key={section.n}
                   className="pt-4 pb-4"
-                  style={{ borderTop: `1px solid ${ALMA.border}` }}
+                  style={{ borderTop: `1px solid ${COLOR.line}` }}
                 >
                   <h3
                     className="font-display text-[1.05rem] leading-snug mb-1.5"
-                    style={{ color: ALMA.ink }}
+                    style={{ color: COLOR.ink }}
                   >
-                    <span className="nums mr-1.5" style={{ color: ALMA.berry }}>
+                    <span className="nums mr-1.5" style={{ color: COLOR.accentStrong }}>
                       {section.n}.
                     </span>
                     {section.title}
                   </h3>
                   <p
                     className="m-0 text-[0.875rem] leading-[1.65]"
-                    style={{ color: ALMA.ink, opacity: 0.75 }}
+                    style={{ color: COLOR.ink, opacity: 0.75 }}
                   >
                     {section.body}
                   </p>
                 </div>
               ))}
-              <div className="pt-3" style={{ borderTop: `1px solid ${ALMA.border}` }} />
+              <div className="pt-3" style={{ borderTop: `1px solid ${COLOR.line}` }} />
             </Section>
           </>
         )}

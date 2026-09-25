@@ -15,9 +15,9 @@ import {
   AuthSecondaryLink,
   AuthCheckbox,
   AuthPasswordRules,
-  ALMA,
 } from "@/components/auth/AuthShell";
 import { Check } from "lucide-react";
+import { COLOR } from "@/design/tokens";
 
 const todayISO = new Date().toISOString().slice(0, 10);
 
@@ -122,9 +122,9 @@ const Register = () => {
       {refCode && (
         <div
           className="mb-6 flex items-center gap-3 rounded-2xl px-4 py-3 text-[0.84rem]"
-          style={{ backgroundColor: ALMA.blush, color: ALMA.berry, border: `1px solid ${ALMA.berry}30` }}
+          style={{ backgroundColor: COLOR.sunken, color: COLOR.accentStrong, border: `1px solid ${COLOR.accentStrong}30` }}
         >
-          <span className="grid h-6 w-6 place-items-center rounded-full" style={{ backgroundColor: ALMA.berry, color: ALMA.cream }}>
+          <span className="grid h-6 w-6 place-items-center rounded-full" style={{ backgroundColor: COLOR.ink, color: COLOR.canvas }}>
             <Check size={11} strokeWidth={3} />
           </span>
           Código de referido <strong className="ml-1 nums font-medium tracking-wide">{refCode}</strong>
@@ -219,7 +219,7 @@ const Register = () => {
               target="_blank"
               rel="noopener noreferrer"
               className="no-underline font-medium"
-              style={{ color: ALMA.berry }}
+              style={{ color: COLOR.accentStrong }}
             >
               términos y condiciones
             </a>{" "}
@@ -229,7 +229,7 @@ const Register = () => {
               target="_blank"
               rel="noopener noreferrer"
               className="no-underline font-medium"
-              style={{ color: ALMA.berry }}
+              style={{ color: COLOR.accentStrong }}
             >
               aviso de privacidad
             </a>

@@ -10,7 +10,6 @@ import {
   ListGroup,
   ListRow,
   Tag,
-  ALMA,
 } from "@/components/app/AppShell";
 import {
   UserRound,
@@ -22,6 +21,7 @@ import {
   FileText,
   FileSignature,
 } from "lucide-react";
+import { COLOR } from "@/design/tokens";
 
 const Profile = () => {
   const { user, logout } = useAuthStore();
@@ -64,11 +64,11 @@ const Profile = () => {
         {/* ── Header card ── */}
         <div
           className="rounded-3xl p-5 sm:p-7 flex items-center gap-5"
-          style={{ backgroundColor: ALMA.blush }}
+          style={{ backgroundColor: COLOR.sunken }}
         >
           <div
             className="relative grid h-20 w-20 sm:h-24 sm:w-24 place-items-center rounded-full overflow-hidden text-[1.2rem] font-bold shrink-0"
-            style={{ backgroundColor: ALMA.berry, color: ALMA.cream }}
+            style={{ backgroundColor: COLOR.ink, color: COLOR.canvas }}
           >
             {(user?.photoUrl ?? user?.photo_url) ? (
               <img
@@ -83,22 +83,22 @@ const Profile = () => {
           <div className="min-w-0 flex-1">
             <h2
               className="font-display leading-tight truncate"
-              style={{ color: ALMA.ink, fontSize: "clamp(1.55rem, 2.6vw, 2.1rem)" }}
+              style={{ color: COLOR.ink, fontSize: "clamp(1.55rem, 2.6vw, 2.1rem)" }}
             >
               {fullName}
             </h2>
             {email && (
-              <p className="text-[0.86rem] mt-1 truncate" style={{ color: ALMA.ink, opacity: 0.65 }}>
+              <p className="text-[0.86rem] mt-1 truncate" style={{ color: COLOR.ink, opacity: 0.65 }}>
                 {email}
               </p>
             )}
             {phone && (
-              <p className="nums text-[0.82rem] mt-0.5 truncate" style={{ color: ALMA.ink, opacity: 0.55 }}>
+              <p className="nums text-[0.82rem] mt-0.5 truncate" style={{ color: COLOR.ink, opacity: 0.55 }}>
                 {phone}
               </p>
             )}
             <div className="mt-3">
-              <Tag tint="berry">{roleLabel}</Tag>
+              <Tag tint="accent">{roleLabel}</Tag>
             </div>
           </div>
         </div>
@@ -109,7 +109,7 @@ const Profile = () => {
             <ListRow
               to="/app/profile/edit"
               icon={<UserRound size={17} strokeWidth={1.7} />}
-              iconTint="berry"
+              iconTint="accent"
               title="Editar perfil"
               description="Nombre, foto, contacto"
             />
@@ -117,7 +117,7 @@ const Profile = () => {
               <ListRow
                 to="/app/profile/membership"
                 icon={<CreditCard size={17} strokeWidth={1.7} />}
-                iconTint="olive"
+                iconTint="success"
                 title="Mi membresía"
                 description="Plan, vigencia, clases por usar"
               />
@@ -125,14 +125,14 @@ const Profile = () => {
             <ListRow
               to="/app/orders"
               icon={<FileText size={17} strokeWidth={1.7} />}
-              iconTint="berry"
+              iconTint="accent"
               title="Mis órdenes"
               description="Historial de compras"
             />
             <ListRow
               to="/app/profile/responsiva"
               icon={<FileSignature size={17} strokeWidth={1.7} />}
-              iconTint="olive"
+              iconTint="success"
               title="Mi responsiva"
               description="Consentimiento informado firmado"
             />
@@ -145,7 +145,7 @@ const Profile = () => {
             <ListRow
               to="/app/profile/preferences"
               icon={<Bell size={17} strokeWidth={1.7} />}
-              iconTint="berry"
+              iconTint="accent"
               title="Notificaciones y privacidad"
               description="Recordatorios, novedades y datos"
             />
@@ -159,14 +159,14 @@ const Profile = () => {
               onClick={() => window.open(`https://wa.me/${STUDIO.whatsapp}`, "_blank", "noopener")}
               asButton
               icon={<MessageCircle size={17} strokeWidth={1.7} />}
-              iconTint="olive"
+              iconTint="success"
               title="Escríbenos por WhatsApp"
               description="Respondemos rápido"
             />
             <ListRow
               to="/legal/terminos"
               icon={<HelpCircle size={17} strokeWidth={1.7} />}
-              iconTint="berry"
+              iconTint="accent"
               title="Términos y condiciones"
             />
           </ListGroup>
@@ -186,7 +186,7 @@ const Profile = () => {
           </ListGroup>
         </Section>
 
-        <p className="nums mt-12 text-[0.72rem] uppercase tracking-[0.18em]" style={{ color: ALMA.ink, opacity: 0.4 }}>
+        <p className="nums mt-12 text-[0.72rem] uppercase tracking-[0.18em]" style={{ color: COLOR.ink, opacity: 0.4 }}>
           Versión Alma · {new Date().getFullYear()}
         </p>
       </AppShell>

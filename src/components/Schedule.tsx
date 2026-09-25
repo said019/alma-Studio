@@ -14,9 +14,10 @@ import {
 import { es } from "date-fns/locale";
 import { ArrowUpRight, Plus, Minus, ChevronLeft, ChevronRight } from "lucide-react";
 import api from "@/lib/api";
-import { ALMA } from "@/components/app/tokens";
+
 import { STUDIO } from "@/lib/studio";
 import { useAuthStore } from "@/stores/authStore";
+import { COLOR } from "@/design/tokens";
 
 /* ─── Types ──────────────────────────────────────────────────────────────── */
 
@@ -242,27 +243,27 @@ export default function Schedule() {
       ref={sectionRef}
       id="horario"
       className="scroll-mt-16 relative px-5 sm:px-8 lg:px-12 py-28 lg:py-40"
-      style={{ backgroundColor: ALMA.cream }}
+      style={{ backgroundColor: COLOR.canvas }}
     >
       <div className="mx-auto max-w-[1320px]">
 
         {/* ── Encabezado editorial ─────────────────────────────────────── */}
         <div data-reveal className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-12 lg:mb-16">
           <div>
-            <span className="text-[0.66rem] font-medium uppercase tracking-[0.34em]" style={{ color: ALMA.berry }}>
+            <span className="text-[0.66rem] font-medium uppercase tracking-[0.34em]" style={{ color: COLOR.accentStrong }}>
               Agenda de la semana
             </span>
             <h2
               className="font-display mt-4 leading-[0.94]"
-              style={{ color: ALMA.ink, fontSize: "clamp(2.4rem, 5.2vw, 4.6rem)", fontWeight: 420 }}
+              style={{ color: COLOR.ink, fontSize: "clamp(2.4rem, 5.2vw, 4.6rem)", fontWeight: 420 }}
             >
               Elige tu día,
-              <span className="block font-display-italic" style={{ color: ALMA.stone, fontWeight: 400 }}>
+              <span className="block font-display" style={{ color: COLOR.inkMuted, fontWeight: 400 }}>
                 aparta tu lugar.
               </span>
             </h2>
           </div>
-          <p className="max-w-[42ch] text-[0.95rem] leading-[1.7]" style={{ color: `${ALMA.ink}b8` }}>
+          <p className="max-w-[42ch] text-[0.95rem] leading-[1.7]" style={{ color: `${COLOR.ink}b8` }}>
             El horario vivo del estudio. Grupos de 4 en Reformer y Tower, 8 en Studio: cada clase con lugares contados.
           </p>
         </div>
@@ -270,7 +271,7 @@ export default function Schedule() {
         {/* ── Selector de día (lun→sáb) con navegación de semana ─────── */}
         <div data-reveal className="mb-10">
           <div className="flex items-center justify-between gap-4 mb-4">
-            <span className="text-[0.72rem] uppercase tracking-[0.22em]" style={{ color: ALMA.berry }}>
+            <span className="text-[0.72rem] uppercase tracking-[0.22em]" style={{ color: COLOR.accentStrong }}>
               {format(weekDays[0], "d MMM", { locale: es })} – {format(weekDays[5], "d MMM yyyy", { locale: es })}
             </span>
             <div className="flex items-center gap-1">
@@ -281,8 +282,8 @@ export default function Schedule() {
                 aria-label="Semana anterior"
                 className="grid h-9 w-9 place-items-center rounded-full border transition-colors"
                 style={{
-                  borderColor: weekOffset <= 0 ? `${ALMA.border}` : ALMA.berry,
-                  color: weekOffset <= 0 ? `${ALMA.ink}44` : ALMA.berry,
+                  borderColor: weekOffset <= 0 ? `${COLOR.line}` : COLOR.accentStrong,
+                  color: weekOffset <= 0 ? `${COLOR.ink}44` : COLOR.accentStrong,
                   backgroundColor: "transparent",
                   cursor: weekOffset <= 0 ? "default" : "pointer",
                 }}
@@ -293,8 +294,8 @@ export default function Schedule() {
                 type="button"
                 onClick={() => setWeekOffset((w) => w + 1)}
                 aria-label="Semana siguiente"
-                className="grid h-9 w-9 place-items-center rounded-full border transition-colors hover:bg-[color:var(--blush)]"
-                style={{ borderColor: ALMA.berry, color: ALMA.berry, backgroundColor: "transparent", cursor: "pointer" }}
+                className="grid h-9 w-9 place-items-center rounded-full border transition-colors hover:bg-sunken"
+                style={{ borderColor: COLOR.accentStrong, color: COLOR.accentStrong, backgroundColor: "transparent", cursor: "pointer" }}
               >
                 <ChevronRight size={15} />
               </button>
@@ -317,9 +318,9 @@ export default function Schedule() {
                 data-press={past ? undefined : ""}
                 className="inline-flex items-baseline gap-2 rounded-full border px-5 py-2.5 will-change-transform"
                 style={{
-                  backgroundColor: selected ? ALMA.ink : "transparent",
-                  borderColor: selected ? ALMA.ink : today ? ALMA.sandstone : ALMA.border,
-                  color: selected ? ALMA.cream : ALMA.ink,
+                  backgroundColor: selected ? COLOR.ink : "transparent",
+                  borderColor: selected ? COLOR.ink : today ? COLOR.lineStrong : COLOR.line,
+                  color: selected ? COLOR.canvas : COLOR.ink,
                   opacity: past ? 0.4 : 1,
                   cursor: past ? "default" : "pointer",
                 }}
@@ -334,7 +335,7 @@ export default function Schedule() {
                   <span
                     aria-hidden
                     className="self-center inline-block h-1 w-1 rounded-full"
-                    style={{ backgroundColor: ALMA.berry }}
+                    style={{ backgroundColor: COLOR.ink }}
                   />
                 )}
               </button>
@@ -345,11 +346,11 @@ export default function Schedule() {
 
         {/* ── Cabecera del día ─────────────────────────────────────────── */}
         <div data-reveal className="flex items-baseline justify-between gap-4 mb-1">
-          <p className="text-[0.72rem] uppercase tracking-[0.24em]" style={{ color: ALMA.berry }}>
+          <p className="text-[0.72rem] uppercase tracking-[0.24em]" style={{ color: COLOR.accentStrong }}>
             {format(selectedDate, "EEEE d 'de' MMMM", { locale: es })}
           </p>
           {!isLoading && !isError && dayClasses.length > 0 && (
-            <p className="nums text-[0.72rem] uppercase tracking-[0.18em]" style={{ color: `${ALMA.ink}8c` }}>
+            <p className="nums text-[0.72rem] uppercase tracking-[0.18em]" style={{ color: `${COLOR.ink}8c` }}>
               {dayClasses.length} {dayClasses.length === 1 ? "clase" : "clases"}
             </p>
           )}
@@ -364,15 +365,15 @@ export default function Schedule() {
                 <li
                   key={i}
                   className="py-7"
-                  style={{ borderTop: `1px solid ${ALMA.border}`, borderBottom: i === 3 ? `1px solid ${ALMA.border}` : undefined }}
+                  style={{ borderTop: `1px solid ${COLOR.line}`, borderBottom: i === 3 ? `1px solid ${COLOR.line}` : undefined }}
                 >
                   <div className="grid grid-cols-[56px_1fr_auto] sm:grid-cols-[88px_1fr_auto] items-center gap-x-4 sm:gap-x-6 px-1 sm:px-2">
-                    <div className="h-4 w-12 rounded-full animate-pulse" style={{ backgroundColor: ALMA.blush }} />
+                    <div className="h-4 w-12 rounded-full animate-pulse" style={{ backgroundColor: COLOR.sunken }} />
                     <div className="space-y-2">
-                      <div className="h-4 w-44 max-w-full rounded-full animate-pulse" style={{ backgroundColor: ALMA.mist }} />
-                      <div className="h-3 w-28 max-w-full rounded-full animate-pulse" style={{ backgroundColor: ALMA.mist }} />
+                      <div className="h-4 w-44 max-w-full rounded-full animate-pulse" style={{ backgroundColor: COLOR.sunken }} />
+                      <div className="h-3 w-28 max-w-full rounded-full animate-pulse" style={{ backgroundColor: COLOR.sunken }} />
                     </div>
-                    <div className="h-3 w-20 rounded-full animate-pulse" style={{ backgroundColor: ALMA.mist }} />
+                    <div className="h-3 w-20 rounded-full animate-pulse" style={{ backgroundColor: COLOR.sunken }} />
                   </div>
                 </li>
               ))}
@@ -381,12 +382,12 @@ export default function Schedule() {
             /* Error honesto con reintentar */
             <div
               className="py-16 text-center"
-              style={{ borderTop: `1px solid ${ALMA.border}`, borderBottom: `1px solid ${ALMA.border}` }}
+              style={{ borderTop: `1px solid ${COLOR.line}`, borderBottom: `1px solid ${COLOR.line}` }}
             >
-              <p className="text-[0.98rem]" style={{ color: ALMA.ink }}>
+              <p className="text-[0.98rem]" style={{ color: COLOR.ink }}>
                 No pudimos cargar el horario.
               </p>
-              <p className="mt-1 text-[0.85rem]" style={{ color: `${ALMA.ink}99` }}>
+              <p className="mt-1 text-[0.85rem]" style={{ color: `${COLOR.ink}99` }}>
                 Revisa tu conexión e inténtalo otra vez.
               </p>
               <button
@@ -394,7 +395,7 @@ export default function Schedule() {
                 onClick={() => refetch()}
                 data-press
                 className="mt-6 inline-flex items-center gap-2 rounded-full border px-6 py-2.5 text-[0.74rem] font-medium uppercase tracking-[0.18em]"
-                style={{ borderColor: ALMA.sandstone, color: ALMA.ink, backgroundColor: "transparent", cursor: "pointer" }}
+                style={{ borderColor: COLOR.lineStrong, color: COLOR.ink, backgroundColor: "transparent", cursor: "pointer" }}
               >
                 Reintentar
               </button>
@@ -403,12 +404,12 @@ export default function Schedule() {
             /* Día sin clases */
             <div
               className="py-16 text-center"
-              style={{ borderTop: `1px solid ${ALMA.border}`, borderBottom: `1px solid ${ALMA.border}` }}
+              style={{ borderTop: `1px solid ${COLOR.line}`, borderBottom: `1px solid ${COLOR.line}` }}
             >
-              <p className="font-display-italic" style={{ color: ALMA.stone, fontSize: "clamp(1.5rem, 2.6vw, 1.9rem)" }}>
+              <p className="font-display" style={{ color: COLOR.inkMuted, fontSize: "clamp(1.5rem, 2.6vw, 1.9rem)" }}>
                 El estudio descansa este día.
               </p>
-              <p className="mt-3 text-[0.9rem]" style={{ color: `${ALMA.ink}99` }}>
+              <p className="mt-3 text-[0.9rem]" style={{ color: `${COLOR.ink}99` }}>
                 Elige otro día de la semana para ver sus clases.
               </p>
             </div>
@@ -433,8 +434,8 @@ export default function Schedule() {
                   <li
                     key={cls.id}
                     style={{
-                      borderTop: `1px solid ${ALMA.border}`,
-                      borderBottom: isLast ? `1px solid ${ALMA.border}` : undefined,
+                      borderTop: `1px solid ${COLOR.line}`,
+                      borderBottom: isLast ? `1px solid ${COLOR.line}` : undefined,
                     }}
                   >
                     <button
@@ -445,31 +446,31 @@ export default function Schedule() {
                       className="w-full grid grid-cols-[56px_1fr_auto] sm:grid-cols-[88px_1fr_auto_auto] items-center gap-x-4 sm:gap-x-6 px-1 sm:px-2 py-6 bg-transparent border-0 text-left"
                       style={{ cursor: inactive ? "default" : "pointer", opacity: inactive ? 0.45 : 1 }}
                     >
-                      <span className="nums font-display text-[1.05rem] sm:text-[1.25rem] leading-none" style={{ color: ALMA.ink }}>
+                      <span className="nums font-display text-[1.05rem] sm:text-[1.25rem] leading-none" style={{ color: COLOR.ink }}>
                         {formatHour(cls.time)}
                       </span>
                       <span className="min-w-0">
-                        <h3 className="font-display text-[1.25rem] sm:text-[1.5rem] leading-tight truncate" style={{ color: ALMA.ink }}>
+                        <h3 className="font-display text-[1.25rem] sm:text-[1.5rem] leading-tight truncate" style={{ color: COLOR.ink }}>
                           {cls.name}
                         </h3>
-                        <p className="mt-1 flex items-center gap-1.5 text-[0.74rem] uppercase tracking-[0.18em]" style={{ color: ALMA.berry }}>
+                        <p className="mt-1 flex items-center gap-1.5 text-[0.74rem] uppercase tracking-[0.18em]" style={{ color: COLOR.accentStrong }}>
                           {cls.instructorPhoto && (
                             <img
                               src={cls.instructorPhoto}
                               alt=""
                               className="h-5 w-5 shrink-0 rounded-full object-cover"
-                              style={{ border: "1px solid #E0D5C6" }}
+                              style={{ border: `1px solid ${COLOR.line}` }}
                             />
                           )}
                           {cls.instructor}
                         </p>
                         {metaLabel && (
-                          <p className="sm:hidden nums mt-1.5 text-[0.68rem] uppercase tracking-[0.16em]" style={{ color: `${ALMA.ink}8c` }}>
+                          <p className="sm:hidden nums mt-1.5 text-[0.68rem] uppercase tracking-[0.16em]" style={{ color: `${COLOR.ink}8c` }}>
                             {metaLabel}
                           </p>
                         )}
                       </span>
-                      <span className="hidden sm:block nums text-[0.72rem] uppercase tracking-[0.16em] text-right" style={{ color: full && !inactive ? ALMA.berry : `${ALMA.ink}8c` }}>
+                      <span className="hidden sm:block nums text-[0.72rem] uppercase tracking-[0.16em] text-right" style={{ color: full && !inactive ? COLOR.accentStrong : `${COLOR.ink}8c` }}>
                         {metaLabel}
                       </span>
                       {!inactive ? (
@@ -477,10 +478,10 @@ export default function Schedule() {
                           aria-hidden
                           className="grid h-9 w-9 place-items-center rounded-full transition-transform duration-300"
                           style={{
-                            backgroundColor: isOpen ? ALMA.berry : "transparent",
-                            color: isOpen ? ALMA.cream : ALMA.berry,
-                            border: `1px solid ${ALMA.berry}`,
-                            transitionTimingFunction: "var(--ease-alma-out)",
+                            backgroundColor: isOpen ? COLOR.ink : "transparent",
+                            color: isOpen ? COLOR.canvas : COLOR.accentStrong,
+                            border: `1px solid ${COLOR.accentStrong}`,
+                            transitionTimingFunction: "var(--ease-out)",
                           }}
                         >
                           {isOpen ? <Minus size={14} /> : <Plus size={14} />}
@@ -493,42 +494,42 @@ export default function Schedule() {
                     {/* Detalle expandible in-place (grid-template-rows) */}
                     <div
                       className="grid overflow-hidden transition-[grid-template-rows] duration-500"
-                      style={{ gridTemplateRows: isOpen ? "1fr" : "0fr", transitionTimingFunction: "var(--ease-alma-out)" }}
+                      style={{ gridTemplateRows: isOpen ? "1fr" : "0fr", transitionTimingFunction: "var(--ease-out)" }}
                     >
                       <div className="min-h-0 overflow-hidden">
                         <div className="grid grid-cols-[56px_1fr] sm:grid-cols-[88px_1fr] gap-x-4 sm:gap-x-6 px-1 sm:px-2">
                           <span aria-hidden />
                           <div className="pb-7 pr-1 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-5">
-                            <dl className="flex flex-wrap gap-x-8 gap-y-2.5 text-[0.7rem] uppercase tracking-[0.18em]" style={{ color: `${ALMA.ink}8c` }}>
+                            <dl className="flex flex-wrap gap-x-8 gap-y-2.5 text-[0.7rem] uppercase tracking-[0.18em]" style={{ color: `${COLOR.ink}8c` }}>
                               <div className="flex items-baseline gap-2">
                                 <dt>Inicio</dt>
-                                <dd className="nums font-display text-[0.95rem] normal-case tracking-normal" style={{ color: ALMA.ink }}>
+                                <dd className="nums font-display text-[0.95rem] normal-case tracking-normal" style={{ color: COLOR.ink }}>
                                   {formatHour(cls.time)}
                                 </dd>
                               </div>
                               <div className="flex items-baseline gap-2">
                                 <dt>Duración</dt>
-                                <dd className="nums font-display text-[0.95rem] normal-case tracking-normal" style={{ color: ALMA.ink }}>
+                                <dd className="nums font-display text-[0.95rem] normal-case tracking-normal" style={{ color: COLOR.ink }}>
                                   {classDuration(cls)} min
                                 </dd>
                               </div>
                               <div className="flex items-baseline gap-2">
                                 <dt>Instructora</dt>
-                                <dd className="font-display text-[0.95rem] normal-case tracking-normal" style={{ color: ALMA.ink }}>
+                                <dd className="font-display text-[0.95rem] normal-case tracking-normal" style={{ color: COLOR.ink }}>
                                   {cls.instructor}
                                 </dd>
                               </div>
                               {hasSpotData && (
                                 <div className="flex items-baseline gap-2">
                                   <dt>Lugares</dt>
-                                  <dd className="nums font-display text-[0.95rem] normal-case tracking-normal" style={{ color: ALMA.ink }}>
+                                  <dd className="nums font-display text-[0.95rem] normal-case tracking-normal" style={{ color: COLOR.ink }}>
                                     {full ? "Completa" : `${cls.spots} de ${cls.maxSpots}`}
                                   </dd>
                                 </div>
                               )}
                             </dl>
                             {full ? (
-                              <p className="text-[0.85rem] leading-[1.6] shrink-0" style={{ color: `${ALMA.ink}99` }}>
+                              <p className="text-[0.85rem] leading-[1.6] shrink-0" style={{ color: `${COLOR.ink}99` }}>
                                 Esta clase ya está llena. Elige otro horario.
                               </p>
                             ) : (
@@ -537,13 +538,13 @@ export default function Schedule() {
                                 onClick={() => navigate(bookPath)}
                                 data-press
                                 className="group inline-flex w-fit items-center gap-2.5 rounded-full px-6 py-3 text-[0.74rem] font-medium uppercase tracking-[0.16em] shrink-0"
-                                style={{ backgroundColor: ALMA.ink, color: ALMA.cream, border: "none", cursor: "pointer" }}
+                                style={{ backgroundColor: COLOR.ink, color: COLOR.canvas, border: "none", cursor: "pointer" }}
                               >
                                 {isAuthenticated ? "Reservar esta clase" : "Crear cuenta y reservar"}
                                 <ArrowUpRight
                                   size={13}
                                   className="transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
-                                  style={{ transitionTimingFunction: "var(--ease-alma-out)" }}
+                                  style={{ transitionTimingFunction: "var(--ease-out)" }}
                                 />
                               </button>
                             )}
@@ -560,19 +561,19 @@ export default function Schedule() {
 
         {/* ── CTA principal: clase muestra ─────────────────────────────── */}
         <div data-reveal className="mt-16 lg:mt-24 flex flex-col items-center text-center">
-          <span className="text-[0.66rem] font-medium uppercase tracking-[0.34em]" style={{ color: ALMA.berry }}>
+          <span className="text-[0.66rem] font-medium uppercase tracking-[0.34em]" style={{ color: COLOR.accentStrong }}>
             ¿Primera vez en Alma?
           </span>
           <h3
             className="font-display mt-4 leading-[0.96]"
-            style={{ color: ALMA.ink, fontSize: "clamp(1.9rem, 3.6vw, 3rem)", fontWeight: 420 }}
+            style={{ color: COLOR.ink, fontSize: "clamp(1.9rem, 3.6vw, 3rem)", fontWeight: 420 }}
           >
             Empieza con una{" "}
-            <span className="font-display-italic" style={{ color: ALMA.berry, fontWeight: 400 }}>
+            <span className="font-display" style={{ color: COLOR.accentStrong, fontWeight: 400 }}>
               clase muestra.
             </span>
           </h3>
-          <p className="mt-4 max-w-[48ch] text-[0.95rem] leading-[1.7]" style={{ color: `${ALMA.ink}b8` }}>
+          <p className="mt-4 max-w-[48ch] text-[0.95rem] leading-[1.7]" style={{ color: `${COLOR.ink}b8` }}>
             Tu primera visita para conocer el estudio, el equipo y a tu coach. Crea tu cuenta y aparta tu lugar en el horario que te quede.
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-5">
@@ -581,12 +582,12 @@ export default function Schedule() {
               onClick={() => navigate(bookPath)}
               data-press
               className="group inline-flex items-center gap-3 rounded-full px-7 py-4 text-[0.8rem] font-medium uppercase tracking-[0.16em]"
-              style={{ backgroundColor: ALMA.ink, color: ALMA.cream, border: "none", cursor: "pointer" }}
+              style={{ backgroundColor: COLOR.ink, color: COLOR.canvas, border: "none", cursor: "pointer" }}
             >
               Reserva tu clase muestra
               <span
                 className="grid h-7 w-7 place-items-center rounded-full bg-white/15 transition-transform duration-300 group-hover:translate-x-1"
-                style={{ transitionTimingFunction: "var(--ease-alma-out)" }}
+                style={{ transitionTimingFunction: "var(--ease-out)" }}
               >
                 <ArrowUpRight size={13} />
               </span>
@@ -596,7 +597,7 @@ export default function Schedule() {
               target="_blank"
               rel="noopener noreferrer"
               className="text-[0.76rem] uppercase tracking-[0.2em] no-underline underline-offset-4 hover:underline"
-              style={{ color: ALMA.berry }}
+              style={{ color: COLOR.accentStrong }}
             >
               o escríbenos por WhatsApp
             </a>

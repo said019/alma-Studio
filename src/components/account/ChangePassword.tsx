@@ -7,9 +7,10 @@ import api from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { useAuthStore } from "@/stores/authStore";
 import { useNavigate } from "react-router-dom";
-import { ALMA } from "@/components/app/tokens";
+
 import { PrimaryButton } from "@/components/app/AppShell";
 import { PasswordField, PasswordRules } from "@/components/app/fields";
+import { COLOR } from "@/design/tokens";
 
 const schema = z
   .object({
@@ -91,9 +92,9 @@ export const ChangePassword = ({
         role="status"
         className="rounded-2xl px-5 py-4 text-[0.9rem] leading-[1.55]"
         style={{
-          backgroundColor: `${ALMA.olive}14`,
-          border: `1px solid ${ALMA.olive}40`,
-          color: ALMA.ink,
+          backgroundColor: `${COLOR.success}14`,
+          border: `1px solid ${COLOR.success}40`,
+          color: COLOR.ink,
         }}
       >
         Tu contraseña se actualizó correctamente.{" "}
@@ -101,7 +102,7 @@ export const ChangePassword = ({
           type="button"
           onClick={() => setDone(false)}
           className="font-medium underline bg-transparent border-0 p-0 cursor-pointer"
-          style={{ color: ALMA.berry }}
+          style={{ color: COLOR.accentStrong }}
         >
           Cambiar de nuevo
         </button>
@@ -116,9 +117,9 @@ export const ChangePassword = ({
           role="alert"
           className="flex items-start gap-3 rounded-2xl px-4 py-3 text-[0.86rem]"
           style={{
-            backgroundColor: `${ALMA.destructive}10`,
-            border: `1px solid ${ALMA.destructive}30`,
-            color: ALMA.destructive,
+            backgroundColor: `${COLOR.danger}10`,
+            border: `1px solid ${COLOR.danger}30`,
+            color: COLOR.danger,
           }}
         >
           <AlertCircle size={16} className="mt-0.5 shrink-0" />

@@ -391,11 +391,11 @@ const LoyaltyMilestones = () => {
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-lg font-semibold flex items-center gap-2 text-alma-ink">
-            <Trophy size={18} className="text-alma-berry" />
+          <h2 className="text-lg font-semibold flex items-center gap-2 text-ink">
+            <Trophy size={18} className="text-ink" />
             Recompensas por asistencia
           </h2>
-          <p className="text-xs text-alma-ink/55 mt-0.5">
+          <p className="text-xs text-ink/55 mt-0.5">
             Otorga puntos automáticamente cuando una alumna alcanza N clases (lifetime/mes/año).
           </p>
         </div>
@@ -432,7 +432,7 @@ const LoyaltyMilestones = () => {
               <TableCell>
                 <div className="font-medium">{m.name}</div>
                 {m.description && (
-                  <div className="text-xs text-alma-ink/55 mt-0.5">{m.description}</div>
+                  <div className="text-xs text-ink/55 mt-0.5">{m.description}</div>
                 )}
               </TableCell>
               <TableCell className="nums">{m.classes_required}</TableCell>
@@ -448,11 +448,11 @@ const LoyaltyMilestones = () => {
               </TableCell>
               <TableCell>
                 {m.message_template_key ? (
-                  <code className="text-[11px] px-1.5 py-0.5 rounded bg-alma-oat/60 text-alma-ink">
+                  <code className="text-[11px] px-1.5 py-0.5 rounded bg-sunken/60 text-ink">
                     {m.message_template_key}
                   </code>
                 ) : (
-                  <span className="text-xs text-alma-ink/55">—</span>
+                  <span className="text-xs text-ink/55">—</span>
                 )}
               </TableCell>
               <TableCell className="nums text-center">
@@ -497,8 +497,8 @@ const LoyaltyMilestones = () => {
 
       {/* ── Recent awards feed ── */}
       <div>
-        <h3 className="text-sm font-semibold mb-2 flex items-center gap-1.5 text-alma-ink">
-          <Sparkles size={14} className="text-alma-berry" />
+        <h3 className="text-sm font-semibold mb-2 flex items-center gap-1.5 text-ink">
+          <Sparkles size={14} className="text-ink" />
           Últimas alumnas premiadas
         </h3>
         {awardsError ? (
@@ -507,7 +507,7 @@ const LoyaltyMilestones = () => {
             onRetry={() => refetchAwards()}
           />
         ) : awards.length === 0 ? (
-          <p className="text-xs text-alma-ink/55 py-4">
+          <p className="text-xs text-ink/55 py-4">
             Aún ninguna alumna ha alcanzado un milestone.
           </p>
         ) : (
@@ -525,15 +525,15 @@ const LoyaltyMilestones = () => {
                   <TableRow key={a.id}>
                     <TableCell>
                       <div className="font-medium text-sm">{a.display_name || "—"}</div>
-                      <div className="nums text-[11px] text-alma-ink/55">{a.phone}</div>
+                      <div className="nums text-[11px] text-ink/55">{a.phone}</div>
                     </TableCell>
                     <TableCell>
                       <div className="text-sm">{a.milestone_name}</div>
-                      <div className="nums text-[11px] text-alma-ink/55">
+                      <div className="nums text-[11px] text-ink/55">
                         {a.classes_at_award} clases · +{a.award_points} pts
                       </div>
                     </TableCell>
-                    <TableCell className="nums text-right text-[11px] text-alma-ink/55">
+                    <TableCell className="nums text-right text-[11px] text-ink/55">
                       {formatDateTime(a.awarded_at)}
                     </TableCell>
                   </TableRow>
@@ -635,7 +635,7 @@ const LoyaltyMilestones = () => {
                     ))}
                 </SelectContent>
               </Select>
-              <p className="text-[11px] text-alma-ink/55">
+              <p className="text-[11px] text-ink/55">
                 {templatesError
                   ? "No se pudieron cargar los templates; puedes guardar sin notificación y asignarla después."
                   : "Se manda a la alumna cuando alcanza este milestone. Edita el texto en /admin/settings."}
@@ -679,7 +679,7 @@ const LoyaltyPage = () => (
             { label: "Descuentos", to: "/admin/discount-codes" },
           ]}
         />
-        <h1 className="admin-title font-display leading-none text-alma-ink mb-6">Programa de lealtad</h1>
+        <h1 className="admin-title font-display leading-none text-ink mb-6">Programa de lealtad</h1>
         <Tabs defaultValue="rewards">
           <TabsList>
             <TabsTrigger value="rewards">Recompensas</TabsTrigger>

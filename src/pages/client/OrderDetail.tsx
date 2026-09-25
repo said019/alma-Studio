@@ -14,7 +14,6 @@ import {
   GhostButton,
   SkeletonRow,
   ErrorState,
-  ALMA,
 } from "@/components/app/AppShell";
 import {
   BackLink,
@@ -27,16 +26,17 @@ import { UploadDropzone } from "@/components/app/UploadDropzone";
 import { useToast } from "@/hooks/use-toast";
 import { FileText } from "lucide-react";
 import type { Order } from "@/types/order";
+import { COLOR, type Tone } from "@/design/tokens";
 
 /* Ambos estados pendientes viven en berry para cumplir AA a 0.72rem
    (stone falla en texto pequeño): "Pago pendiente" pide acción de la
    socia, va sólido; "En verificación" es espera, va suave. */
-const STATUS: Record<string, { label: string; tone: keyof typeof ALMA; variant?: "soft" | "solid" }> = {
-  pending_payment: { label: "Pago pendiente", tone: "berry", variant: "solid" },
-  pending_verification: { label: "En verificación", tone: "berry" },
-  approved: { label: "Aprobado · membresía activa", tone: "olive" },
-  rejected: { label: "Rechazado", tone: "destructive" },
-  cancelled: { label: "Cancelado", tone: "destructive" },
+const STATUS: Record<string, { label: string; tone: Tone; variant?: "soft" | "solid" }> = {
+  pending_payment: { label: "Pago pendiente", tone: "accent", variant: "solid" },
+  pending_verification: { label: "En verificación", tone: "accent" },
+  approved: { label: "Aprobado · membresía activa", tone: "success" },
+  rejected: { label: "Rechazado", tone: "danger" },
+  cancelled: { label: "Cancelado", tone: "danger" },
 };
 
 const OrderDetail = () => {
@@ -76,7 +76,7 @@ const OrderDetail = () => {
       }),
   });
 
-  const status = order ? STATUS[order.status] ?? { label: order.status, tone: "berry" as const } : null;
+  const status = order ? STATUS[order.status] ?? { label: order.status, tone: "accent" as const } : null;
   const amountStr = order ? `$${formatMoneyMX(order.total_amount ?? order.amount)} ${order.currency ?? "MXN"}` : "";
 
   return (
@@ -108,12 +108,12 @@ const OrderDetail = () => {
             />
 
             <Section>
-              <div className="rounded-3xl p-5 sm:p-7" style={{ backgroundColor: ALMA.blush }}>
-                <div className="flex flex-wrap items-baseline justify-between gap-3 pb-3" style={{ borderBottom: `1px solid ${ALMA.border}` }}>
-                  <span className="text-[0.72rem] font-medium uppercase tracking-[0.24em]" style={{ color: ALMA.berry }}>
+              <div className="rounded-3xl p-5 sm:p-7" style={{ backgroundColor: COLOR.sunken }}>
+                <div className="flex flex-wrap items-baseline justify-between gap-3 pb-3" style={{ borderBottom: `1px solid ${COLOR.line}` }}>
+                  <span className="text-[0.72rem] font-medium uppercase tracking-[0.24em]" style={{ color: COLOR.accentStrong }}>
                     Total
                   </span>
-                  <span className="font-display nums leading-none" style={{ color: ALMA.ink, fontSize: "clamp(1.85rem, 3vw, 2.6rem)" }}>
+                  <span className="font-display nums leading-none" style={{ color: COLOR.ink, fontSize: "clamp(1.85rem, 3vw, 2.6rem)" }}>
                     {amountStr}
                   </span>
                 </div>
@@ -132,7 +132,7 @@ const OrderDetail = () => {
 
             {order.status === "pending_payment" && order.bank_clabe && (
               <Section title="Datos para transferencia">
-                <div className="rounded-3xl p-5 sm:p-7" style={{ backgroundColor: ALMA.cream, border: `1px solid ${ALMA.border}` }}>
+                <div className="rounded-3xl p-5 sm:p-7" style={{ backgroundColor: COLOR.canvas, border: `1px solid ${COLOR.line}` }}>
                   <DataRow label="CLABE" value={order.bank_clabe} mono copyable={String(order.bank_clabe)} />
                   {order.bank_name && <DataRow label="Banco" value={order.bank_name} />}
                   {order.bank_account_holder && (
@@ -168,7 +168,7 @@ const OrderDetail = () => {
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 rounded-2xl px-4 py-3 no-underline transition-colors"
-                  style={{ backgroundColor: ALMA.blush, color: ALMA.berry }}
+                  style={{ backgroundColor: COLOR.sunken, color: COLOR.accentStrong }}
                 >
                   <FileText size={15} />
                   Ver archivo
@@ -179,7 +179,7 @@ const OrderDetail = () => {
             {order.admin_notes && (
               <Section>
                 <InfoBanner
-                  tone="stone"
+                  tone="muted"
                   title="Nota del estudio"
                   description={order.admin_notes}
                 />

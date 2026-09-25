@@ -116,10 +116,10 @@ const ProfileEdit = () => {
               <img
                 src={user.photoUrl}
                 alt={user.displayName ?? "Tu foto"}
-                className="h-full w-full rounded-full object-cover border border-alma-hairline"
+                className="h-full w-full rounded-full object-cover border border-line"
               />
             ) : (
-              <span className="grid h-full w-full place-items-center rounded-full bg-alma-oat font-display text-2xl text-alma-ink">
+              <span className="grid h-full w-full place-items-center rounded-full bg-sunken font-display text-2xl text-ink">
                 {String(user?.displayName ?? "").trim().split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]).join("").toUpperCase() || "—"}
               </span>
             )}
@@ -127,7 +127,7 @@ const ProfileEdit = () => {
               type="button"
               onClick={() => avatarInputRef.current?.click()}
               disabled={avatarMutation.isPending}
-              className="absolute -bottom-1 -right-1 grid h-7 w-7 place-items-center rounded-full bg-alma-ink text-alma-canvas shadow-sm hover:bg-alma-ink-deep disabled:opacity-60"
+              className="absolute -bottom-1 -right-1 grid h-7 w-7 place-items-center rounded-full bg-ink text-canvas shadow-sm hover:bg-inverse disabled:opacity-60"
               aria-label="Cambiar foto de perfil"
             >
               <Camera size={14} />
@@ -145,11 +145,11 @@ const ProfileEdit = () => {
               type="button"
               onClick={() => avatarInputRef.current?.click()}
               disabled={avatarMutation.isPending}
-              className="text-sm font-medium text-alma-ink underline underline-offset-2 hover:text-alma-ink/70 disabled:opacity-60"
+              className="text-sm font-medium text-ink underline underline-offset-2 hover:text-ink/70 disabled:opacity-60"
             >
               {avatarMutation.isPending ? "Subiendo…" : "Cambiar foto"}
             </button>
-            <p className="mt-0.5 text-xs text-alma-ink/55">Se usa para identificarte en el estudio.</p>
+            <p className="mt-0.5 text-xs text-ink/55">Se usa para identificarte en el estudio.</p>
           </div>
         </div>
 
@@ -210,7 +210,7 @@ const ProfileEdit = () => {
                 <ListRow
                   to="/app/profile/security"
                   icon={<ShieldCheck size={17} strokeWidth={1.7} />}
-                  iconTint="berry"
+                  iconTint="accent"
                   title="Cambiar contraseña"
                   description="Actualiza tu acceso"
                 />

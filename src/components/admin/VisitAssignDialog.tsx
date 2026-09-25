@@ -258,7 +258,7 @@ export const VisitAssignDialog = ({ classId, open, onOpenChange, onSuccess }: Pr
               </Button>
             </div>
             {searched && (
-              <p className="text-[11px] text-alma-ink/55">
+              <p className="text-[11px] text-ink/55">
                 {foundGuest
                   ? "Visitante existente, su cuestionario está precargado."
                   : "Nueva visitante, llena el cuestionario abajo."}
@@ -268,44 +268,44 @@ export const VisitAssignDialog = ({ classId, open, onOpenChange, onSuccess }: Pr
 
           {/* Pack activo */}
           {activeMembership && (
-            <div className="rounded-xl border border-alma-olive/30 bg-alma-olive/5 p-3 text-sm">
-              <p className="flex items-center gap-1.5 text-alma-olive font-medium">
+            <div className="rounded-xl border border-success/30 bg-success/5 p-3 text-sm">
+              <p className="flex items-center gap-1.5 text-success font-medium">
                 <CheckCircle2 size={14} /> Pack activo
               </p>
-              <p className="nums text-xs text-alma-ink/70 mt-0.5">
+              <p className="nums text-xs text-ink/70 mt-0.5">
                 {activeMembership.plan_name} · {activeMembership.classes_remaining ?? "—"} clase{activeMembership.classes_remaining === 1 ? "" : "s"} restante{activeMembership.classes_remaining === 1 ? "" : "s"}
               </p>
-              <p className="text-[11px] text-alma-ink/55 mt-0.5">
+              <p className="text-[11px] text-ink/55 mt-0.5">
                 Se descuenta 1 al confirmar.
               </p>
             </div>
           )}
 
           {/* Anfitriona (socia que la invita) — el crédito se descuenta de SU pack de visitas */}
-          <div className="rounded-xl border border-alma-hairline p-3 space-y-2">
+          <div className="rounded-xl border border-line p-3 space-y-2">
             <div className="flex items-center justify-between">
-              <Label className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-alma-ink/60">
+              <Label className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-ink/60">
                 Trajo (opcional)
               </Label>
               {host && (
                 <button
                   type="button"
                   onClick={() => { setHost(null); setHostSearch(""); }}
-                  className="text-[11px] text-alma-ink/55 hover:text-alma-ink inline-flex items-center gap-1"
+                  className="text-[11px] text-ink/55 hover:text-ink inline-flex items-center gap-1"
                 >
                   <X size={11} /> quitar
                 </button>
               )}
             </div>
             {host ? (
-              <div className="rounded-lg bg-alma-oat/40 border border-alma-sandstone/50 px-3 py-2 text-sm">
-                <p className="font-medium text-alma-ink">{host.displayName}</p>
+              <div className="rounded-lg bg-sunken/40 border border-line-strong/50 px-3 py-2 text-sm">
+                <p className="font-medium text-ink">{host.displayName}</p>
                 {(host.email || host.phone) && (
-                  <p className="text-[11px] text-alma-ink/60 mt-0.5">
+                  <p className="text-[11px] text-ink/60 mt-0.5">
                     {[host.email, host.phone].filter(Boolean).join(" · ")}
                   </p>
                 )}
-                <p className="text-[11px] text-alma-berry mt-1">
+                <p className="text-[11px] text-ink mt-1">
                   El crédito se descuenta del pack de visitas de {host.displayName.split(" ")[0]}.
                 </p>
               </div>
@@ -317,9 +317,9 @@ export const VisitAssignDialog = ({ classId, open, onOpenChange, onSuccess }: Pr
                   placeholder="Buscar socia por nombre o teléfono…"
                 />
                 {hostSearch.trim().length >= 2 && (
-                  <div className="max-h-44 overflow-y-auto rounded-lg border border-alma-hairline bg-alma-canvas">
+                  <div className="max-h-44 overflow-y-auto rounded-lg border border-line bg-canvas">
                     {searchingHosts ? (
-                      <p className="px-3 py-2 text-xs text-alma-ink/55 inline-flex items-center gap-1.5">
+                      <p className="px-3 py-2 text-xs text-ink/55 inline-flex items-center gap-1.5">
                         <Loader2 size={11} className="animate-spin" /> Buscando…
                       </p>
                     ) : hostsError ? (
@@ -330,18 +330,18 @@ export const VisitAssignDialog = ({ classId, open, onOpenChange, onSuccess }: Pr
                         </button>
                       </p>
                     ) : hostOptions.length === 0 ? (
-                      <p className="px-3 py-2 text-xs text-alma-ink/55">Sin resultados</p>
+                      <p className="px-3 py-2 text-xs text-ink/55">Sin resultados</p>
                     ) : (
                       hostOptions.map((u) => (
                         <button
                           key={u.id}
                           type="button"
                           onClick={() => { setHost(u); setHostSearch(""); }}
-                          className="block w-full text-left px-3 py-2 hover:bg-alma-mist border-b border-alma-hairline last:border-b-0"
+                          className="block w-full text-left px-3 py-2 hover:bg-sunken border-b border-line last:border-b-0"
                         >
-                          <p className="text-sm font-medium text-alma-ink">{u.displayName}</p>
+                          <p className="text-sm font-medium text-ink">{u.displayName}</p>
                           {(u.email || u.phone) && (
-                            <p className="text-[11px] text-alma-ink/55">
+                            <p className="text-[11px] text-ink/55">
                               {[u.email, u.phone].filter(Boolean).join(" · ")}
                             </p>
                           )}
@@ -350,7 +350,7 @@ export const VisitAssignDialog = ({ classId, open, onOpenChange, onSuccess }: Pr
                     )}
                   </div>
                 )}
-                <p className="text-[11px] text-alma-ink/55">
+                <p className="text-[11px] text-ink/55">
                   Si llenas esto, el crédito se descuenta del pack de visitas de la socia, no de la invitada.
                 </p>
               </>
@@ -368,8 +368,8 @@ export const VisitAssignDialog = ({ classId, open, onOpenChange, onSuccess }: Pr
           </div>
 
           {/* Cuestionario */}
-          <div className="rounded-xl border border-alma-hairline bg-alma-mist p-3 space-y-3">
-            <p className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-alma-ink/60">Cuestionario inicial</p>
+          <div className="rounded-xl border border-line bg-sunken p-3 space-y-3">
+            <p className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-ink/60">Cuestionario inicial</p>
 
             <div className="flex items-center justify-between gap-3">
               <Label className="text-sm">¿Tiene alguna lesión o condición física?</Label>
@@ -389,7 +389,7 @@ export const VisitAssignDialog = ({ classId, open, onOpenChange, onSuccess }: Pr
               <Switch checked={practicedBefore} onCheckedChange={setPracticedBefore} />
             </div>
 
-            <div className="flex items-start justify-between gap-3 border-t border-alma-hairline pt-3">
+            <div className="flex items-start justify-between gap-3 border-t border-line pt-3">
               <Label className="text-xs">
                 Confirmo que la visitante leyó y aceptó los términos y riesgos de la clase.
               </Label>
@@ -401,8 +401,8 @@ export const VisitAssignDialog = ({ classId, open, onOpenChange, onSuccess }: Pr
               Si la anfitriona NO tiene créditos en su pack, el backend usará
               esto como fallback. */}
           {!activeMembership && !host && (
-            <div className="rounded-xl border border-alma-sandstone/60 bg-alma-oat/30 p-3 space-y-2">
-              <p className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-alma-berry">
+            <div className="rounded-xl border border-line-strong/60 bg-sunken/30 p-3 space-y-2">
+              <p className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-ink">
                 Venta de pack en este momento
               </p>
               <div className="space-y-1">
@@ -454,7 +454,7 @@ export const VisitAssignDialog = ({ classId, open, onOpenChange, onSuccess }: Pr
           <Button
             onClick={() => submitMutation.mutate()}
             disabled={!canSubmit || submitMutation.isPending}
-            className="bg-alma-ink text-alma-canvas hover:bg-alma-ink-deep"
+            className="bg-ink text-canvas hover:bg-inverse"
           >
             {submitMutation.isPending ? <><Loader2 size={14} className="animate-spin mr-2" />Asignando…</> : "Confirmar"}
           </Button>

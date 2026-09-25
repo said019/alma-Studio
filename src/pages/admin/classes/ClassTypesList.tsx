@@ -148,18 +148,18 @@ const ClassTypesList = () => {
 
   const renderStatusBadge = (t: ClassType) => (
     t.isActive !== false ? (
-      <Badge className="border border-alma-sandstone/50 bg-alma-oat/60 text-alma-ink hover:bg-alma-oat/60">Activo</Badge>
+      <Badge className="border border-line-strong/50 bg-sunken/60 text-ink hover:bg-sunken/60">Activo</Badge>
     ) : (
-      <Badge variant="outline" className="border-alma-hairline text-alma-ink/50">Inactivo</Badge>
+      <Badge variant="outline" className="border-line text-ink/50">Inactivo</Badge>
     )
   );
 
   const renderCategoryBadge = (t: ClassType) => {
     const label = categoryLabel(t.category);
     return label === "Sin categoría" ? (
-      <Badge variant="outline" className="border-alma-hairline text-alma-ink/50">Sin categoría</Badge>
+      <Badge variant="outline" className="border-line text-ink/50">Sin categoría</Badge>
     ) : (
-      <Badge variant="outline" className="border-alma-sandstone/60 bg-alma-mist text-alma-berry">{label}</Badge>
+      <Badge variant="outline" className="border-line-strong/60 bg-sunken text-ink">{label}</Badge>
     );
   };
 
@@ -170,8 +170,8 @@ const ClassTypesList = () => {
           <SectionTabs tabs={CLASSES_SECTION_TABS} />
           <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <h1 className="admin-title text-alma-ink">Tipos de clase</h1>
-              <p className="mt-1 text-sm text-alma-ink/55">
+              <h1 className="admin-title text-ink">Tipos de clase</h1>
+              <p className="mt-1 text-sm text-ink/55">
                 {types.length === 1 ? "1 tipo registrado" : `${types.length} tipos registrados`} · color y categoría que ven las clientas.
               </p>
             </div>
@@ -198,19 +198,19 @@ const ClassTypesList = () => {
                 : types.map((t) => {
                     const color = resolveClassColor(t.color);
                     return (
-                      <div key={t.id} className="rounded-xl border border-alma-hairline bg-alma-mist p-3">
+                      <div key={t.id} className="rounded-xl border border-line bg-sunken p-3">
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
                             <div className="flex items-center gap-2">
-                              <span className="h-3.5 w-3.5 shrink-0 rounded-full ring-1 ring-alma-hairline" style={{ backgroundColor: color }} />
-                              <p className="truncate text-sm font-semibold text-alma-ink">{t.name}</p>
+                              <span className="h-3.5 w-3.5 shrink-0 rounded-full ring-1 ring-line" style={{ backgroundColor: color }} />
+                              <p className="truncate text-sm font-semibold text-ink">{t.name}</p>
                             </div>
                             <div className="mt-2 flex flex-wrap gap-1.5">
                               {renderCategoryBadge(t)}
-                              <Badge variant="outline" className="nums border-alma-hairline text-alma-ink/70">
+                              <Badge variant="outline" className="nums border-line text-ink/70">
                                 {(t.defaultDuration ?? t.durationMin ?? "?") + " min"}
                               </Badge>
-                              <Badge variant="outline" className="nums border-alma-hairline text-alma-ink/70">
+                              <Badge variant="outline" className="nums border-line text-ink/70">
                                 {(t.maxCapacity ?? t.capacity ?? "?") + " cupos"}
                               </Badge>
                             </div>
@@ -233,7 +233,7 @@ const ClassTypesList = () => {
                   })}
             </div>
           ) : (
-            <div className="overflow-hidden rounded-xl border border-alma-hairline">
+            <div className="overflow-hidden rounded-xl border border-line">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -259,14 +259,14 @@ const ClassTypesList = () => {
                         <TableRow key={t.id}>
                           <TableCell>
                             <div
-                              className="h-6 w-6 rounded-full ring-1 ring-alma-hairline"
+                              className="h-6 w-6 rounded-full ring-1 ring-line"
                               style={{ backgroundColor: resolveClassColor(t.color) }}
                             />
                           </TableCell>
-                          <TableCell className="font-medium text-alma-ink">{t.name}</TableCell>
+                          <TableCell className="font-medium text-ink">{t.name}</TableCell>
                           <TableCell>{renderCategoryBadge(t)}</TableCell>
-                          <TableCell className="nums text-alma-ink/70">{(t.defaultDuration ?? t.durationMin ?? "?") + " min"}</TableCell>
-                          <TableCell className="nums text-alma-ink/70">{t.maxCapacity ?? t.capacity ?? "?"}</TableCell>
+                          <TableCell className="nums text-ink/70">{(t.defaultDuration ?? t.durationMin ?? "?") + " min"}</TableCell>
+                          <TableCell className="nums text-ink/70">{t.maxCapacity ?? t.capacity ?? "?"}</TableCell>
                           <TableCell>{renderStatusBadge(t)}</TableCell>
                           <TableCell>
                             <DropdownMenu>
@@ -330,12 +330,12 @@ const ClassTypesList = () => {
                       >
                         <span
                           className={cn(
-                            "h-8 w-8 rounded-full ring-1 ring-alma-hairline transition-all",
-                            selected ? "scale-110 ring-2 ring-alma-ink ring-offset-2 ring-offset-alma-canvas" : "opacity-80 hover:opacity-100",
+                            "h-8 w-8 rounded-full ring-1 ring-line transition-all",
+                            selected ? "scale-110 ring-2 ring-ink ring-offset-2 ring-offset-canvas" : "opacity-80 hover:opacity-100",
                           )}
                           style={{ backgroundColor: c.value }}
                         />
-                        <span className={cn("text-[10px]", selected ? "font-semibold text-alma-ink" : "text-alma-ink/55")}>
+                        <span className={cn("text-[10px]", selected ? "font-semibold text-ink" : "text-ink/55")}>
                           {c.label}
                         </span>
                       </button>

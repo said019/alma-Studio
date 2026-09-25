@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { useDebounce } from "@/hooks/use-debounce";
 import VisitAssignDialog from "@/components/admin/VisitAssignDialog";
+import { DEFAULT_CLASS_COLOR } from "@/design/classPalette";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 interface RosterEntry {
@@ -48,11 +49,11 @@ interface ClientOption {
 
 // ── Status config ──────────────────────────────────────────────────────────────
 const statusConfig: Record<string, { label: string; className: string }> = {
-  confirmed:  { label: "Confirmada",      className: "text-alma-berry border-alma-sandstone/60 bg-alma-oat/40" },
-  checked_in: { label: "Asistió",         className: "text-alma-olive border-alma-olive/40 bg-alma-olive/10 font-semibold" },
-  waitlist:   { label: "Lista de espera", className: "text-alma-ink/55 border-alma-hairline bg-alma-canvas" },
+  confirmed:  { label: "Confirmada",      className: "text-ink border-line-strong/60 bg-sunken/40" },
+  checked_in: { label: "Asistió",         className: "text-success border-success/40 bg-success/10 font-semibold" },
+  waitlist:   { label: "Lista de espera", className: "text-ink/55 border-line bg-canvas" },
   no_show:    { label: "No asistió",      className: "text-destructive border-destructive/30 bg-destructive/5" },
-  cancelled:  { label: "Cancelada",       className: "text-alma-ink/40 border-alma-hairline bg-transparent" },
+  cancelled:  { label: "Cancelada",       className: "text-ink/40 border-line bg-transparent" },
 };
 
 // ── Diálogo de cancelar reserva: muestra la ventana (a tiempo/tarde) y deja
@@ -86,36 +87,36 @@ const CancelBookingDialog = ({
 
   return (
     <Dialog open={!!entry} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="max-w-md bg-alma-canvas border-alma-hairline text-alma-ink">
+      <DialogContent className="max-w-md bg-canvas border-line text-ink">
         <DialogHeader>
-          <DialogTitle className="font-display text-alma-ink">Cancelar reserva de {entry.displayName}</DialogTitle>
+          <DialogTitle className="font-display text-ink">Cancelar reserva de {entry.displayName}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           {timeLabel && (
             <div className={cn(
               "rounded-xl border px-3 py-2 text-sm font-medium",
-              isLate ? "border-destructive/30 bg-destructive/5 text-destructive" : "border-alma-olive/40 bg-alma-olive/10 text-alma-olive",
+              isLate ? "border-destructive/30 bg-destructive/5 text-destructive" : "border-success/40 bg-success/10 text-success",
             )}>
               {timeLabel} para la clase — {isLate ? `tarde (dentro de ${windowHours}h)` : "a tiempo"}
             </div>
           )}
 
           <div className="space-y-1.5">
-            <Label className="text-xs text-alma-ink/70">Motivo (opcional)</Label>
+            <Label className="text-xs text-ink/70">Motivo (opcional)</Label>
             <Textarea
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               placeholder="Ej. nos pidió moverla por teléfono"
               rows={2}
-              className="bg-alma-canvas border-alma-sandstone/60 text-alma-ink placeholder:text-alma-ink/40"
+              className="bg-canvas border-line-strong/60 text-ink placeholder:text-ink/40"
             />
-            <p className="text-[11px] text-alma-ink/50">Se incluye en el WhatsApp que le llega a {entry.displayName}.</p>
+            <p className="text-[11px] text-ink/50">Se incluye en el WhatsApp que le llega a {entry.displayName}.</p>
           </div>
 
-          <div className="flex items-center justify-between gap-4 rounded-xl border border-alma-hairline bg-alma-mist px-4 py-3">
+          <div className="flex items-center justify-between gap-4 rounded-xl border border-line bg-sunken px-4 py-3">
             <div>
-              <Label className="text-sm font-medium text-alma-ink">Devolver crédito</Label>
-              <p className="text-xs text-alma-ink/55">
+              <Label className="text-sm font-medium text-ink">Devolver crédito</Label>
+              <p className="text-xs text-ink/55">
                 {isUnlimited
                   ? "Plan ilimitado — no usa créditos."
                   : refundCredit
@@ -127,12 +128,12 @@ const CancelBookingDialog = ({
               checked={refundCredit && !isUnlimited}
               onCheckedChange={setRefundCredit}
               disabled={isUnlimited}
-              className="data-[state=checked]:bg-alma-ink data-[state=unchecked]:bg-alma-sandstone/60"
+              className="data-[state=checked]:bg-ink data-[state=unchecked]:bg-line/60"
             />
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" className="border-alma-sandstone/70 bg-transparent text-alma-ink hover:bg-alma-mist" onClick={onClose} disabled={pending}>
+          <Button variant="outline" className="border-line-strong/70 bg-transparent text-ink hover:bg-sunken" onClick={onClose} disabled={pending}>
             Volver
           </Button>
           <Button
@@ -368,7 +369,7 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
   const backButton = (
     <button
       onClick={onBack}
-      className="flex items-center gap-2 text-sm text-alma-ink/55 transition-colors hover:text-alma-ink"
+      className="flex items-center gap-2 text-sm text-ink/55 transition-colors hover:text-ink"
     >
       <ArrowLeft size={14} /> Volver al calendario
     </button>
@@ -394,27 +395,27 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
       {isLoading ? (
         <Skeleton className="h-28 rounded-2xl" />
       ) : classInfo && (
-        <div className="rounded-2xl border border-alma-hairline bg-alma-mist p-5">
+        <div className="rounded-2xl border border-line bg-sunken p-5">
           <div className="flex items-start justify-between gap-4">
             <div>
               <div className="mb-1 flex items-center gap-2">
                 <span
                   aria-hidden
                   className="h-2.5 w-2.5 shrink-0 rounded-full"
-                  style={{ backgroundColor: classInfo.color || "#CBB9A4" }}
+                  style={{ backgroundColor: classInfo.color || DEFAULT_CLASS_COLOR }}
                 />
-                <h2 className="font-display text-xl text-alma-ink">{classInfo.classTypeName}</h2>
+                <h2 className="font-display text-xl text-ink">{classInfo.classTypeName}</h2>
               </div>
-              <p className="nums text-sm capitalize text-alma-ink/60">
+              <p className="nums text-sm capitalize text-ink/60">
                 {classInfo.startsAt
                   ? format(new Date(classInfo.startsAt), "EEEE d 'de' MMMM · HH:mm", { locale: es })
                   : classInfo.date ?? "—"}
               </p>
-              <p className="mt-0.5 text-xs text-alma-ink/45">Instructora: {classInfo.instructorName}</p>
+              <p className="mt-0.5 text-xs text-ink/45">Instructora: {classInfo.instructorName}</p>
             </div>
             <button
               onClick={() => refetch()}
-              className="flex items-center gap-1 text-xs text-alma-berry/70 transition-colors hover:text-alma-berry"
+              className="flex items-center gap-1 text-xs text-ink/70 transition-colors hover:text-ink"
             >
               <RotateCcw size={11} /> Actualizar
             </button>
@@ -425,7 +426,7 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
               size="sm"
               onClick={() => setAssignOpen(true)}
               data-press
-              className="bg-alma-ink text-alma-canvas hover:bg-alma-ink-deep"
+              className="bg-ink text-canvas hover:bg-inverse"
             >
               <Plus size={14} className="mr-1" /> Asignar socia
             </Button>
@@ -434,7 +435,7 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
               variant="outline"
               onClick={() => setVisitOpen(true)}
               data-press
-              className="border-alma-sandstone/70 bg-transparent text-alma-ink hover:bg-alma-oat/40 hover:text-alma-ink"
+              className="border-line-strong/70 bg-transparent text-ink hover:bg-sunken/40 hover:text-ink"
             >
               <UserPlus size={14} className="mr-1" /> Asignar visitante
             </Button>
@@ -453,16 +454,16 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
           </div>
 
           {/* Contadores del roster: fila editorial con hairlines */}
-          <dl className="mt-5 grid grid-cols-4 divide-x divide-alma-hairline border-t border-alma-hairline">
+          <dl className="mt-5 grid grid-cols-4 divide-x divide-line border-t border-line">
             {[
               { label: "Confirmadas", value: confirmed },
-              { label: "Asistieron",  value: checkedIn, accent: "text-alma-olive" },
+              { label: "Asistieron",  value: checkedIn, accent: "text-success" },
               { label: "En espera",   value: waitlist },
               { label: "Faltas",      value: noShow },
             ].map((s) => (
               <div key={s.label} className="px-3 py-3 first:pl-0">
-                <dt className="truncate text-[0.72rem] uppercase tracking-[0.12em] text-alma-ink/55">{s.label}</dt>
-                <dd className={cn("nums mt-1 font-display text-xl leading-none", s.accent ?? "text-alma-ink")}>
+                <dt className="truncate text-[0.72rem] uppercase tracking-[0.12em] text-ink/55">{s.label}</dt>
+                <dd className={cn("nums mt-1 font-display text-xl leading-none", s.accent ?? "text-ink")}>
                   {s.value}
                 </dd>
               </div>
@@ -477,8 +478,8 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
           ? Array(4).fill(0).map((_, i) => <Skeleton key={i} className="h-16 rounded-xl" />)
           : roster.length === 0
             ? (
-              <div className="py-12 text-center text-sm text-alma-ink/55">
-                <Users size={28} className="mx-auto mb-2 text-alma-ink/30" />
+              <div className="py-12 text-center text-sm text-ink/55">
+                <Users size={28} className="mx-auto mb-2 text-ink/30" />
                 No hay reservas para esta clase
               </div>
             )
@@ -493,18 +494,18 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
                   className={cn(
                     "flex items-center gap-4 rounded-xl border p-4 transition-colors",
                     entry.status === "checked_in"
-                      ? "border-alma-olive/30 bg-alma-olive/[0.07]"
+                      ? "border-success/30 bg-success/[0.07]"
                       : entry.status === "no_show"
-                        ? "border-alma-hairline bg-alma-mist opacity-60"
-                        : "border-alma-hairline bg-alma-mist hover:bg-alma-oat/30"
+                        ? "border-line bg-sunken opacity-60"
+                        : "border-line bg-sunken hover:bg-sunken/30"
                   )}
                 >
                   {/* Avatar */}
                   <div className={cn(
                     "flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold",
                     entry.status === "checked_in"
-                      ? "border border-alma-olive/30 bg-alma-olive/15 text-alma-olive"
-                      : "border border-alma-sandstone/50 bg-alma-oat text-alma-berry"
+                      ? "border border-success/30 bg-success/15 text-success"
+                      : "border border-line-strong/50 bg-sunken text-ink"
                   )}>
                     {entry.status === "checked_in"
                       ? <UserCheck size={16} />
@@ -513,13 +514,13 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
 
                   {/* Info */}
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold text-alma-ink">{entry.displayName}</p>
+                    <p className="truncate text-sm font-semibold text-ink">{entry.displayName}</p>
                     <div className="mt-0.5 flex flex-wrap items-center gap-2">
-                      <span className="truncate text-xs text-alma-ink/50">{entry.email}</span>
-                      {entry.phone && <span className="nums text-xs text-alma-ink/40">{entry.phone}</span>}
+                      <span className="truncate text-xs text-ink/50">{entry.email}</span>
+                      {entry.phone && <span className="nums text-xs text-ink/40">{entry.phone}</span>}
                     </div>
                     {entry.planName && (
-                      <p className="nums mt-0.5 text-[10px] text-alma-berry/80">
+                      <p className="nums mt-0.5 text-[10px] text-ink/80">
                         {entry.planName}
                         {entry.classesRemaining !== null
                           ? ` · ${entry.classesRemaining} clases restantes`
@@ -541,7 +542,7 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
                         disabled={checkinMutation.isPending}
                         title="Check-in"
                         aria-label={`Check-in de ${entry.displayName}`}
-                        className="flex h-10 w-10 items-center justify-center rounded-lg border border-alma-olive/40 bg-alma-olive/10 text-alma-olive transition-colors hover:bg-alma-olive/20 disabled:opacity-40"
+                        className="flex h-10 w-10 items-center justify-center rounded-lg border border-success/40 bg-success/10 text-success transition-colors hover:bg-success/20 disabled:opacity-40"
                       >
                         <CheckCircle2 size={15} />
                       </button>
@@ -552,7 +553,7 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
                         disabled={noShowMutation.isPending}
                         title="No asistió"
                         aria-label={`Marcar a ${entry.displayName} como no asistió`}
-                        className="flex h-10 w-10 items-center justify-center rounded-lg border border-alma-hairline bg-transparent text-alma-ink/50 transition-colors hover:border-destructive/40 hover:bg-destructive/5 hover:text-destructive disabled:opacity-40"
+                        className="flex h-10 w-10 items-center justify-center rounded-lg border border-line bg-transparent text-ink/50 transition-colors hover:border-destructive/40 hover:bg-destructive/5 hover:text-destructive disabled:opacity-40"
                       >
                         <UserX size={15} />
                       </button>
@@ -564,7 +565,7 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
                         disabled={cancelMutation.isPending}
                         title="Cancelar reserva (devuelve crédito)"
                         aria-label={`Cancelar reserva de ${entry.displayName}`}
-                        className="flex h-10 w-10 items-center justify-center rounded-lg border border-alma-sandstone/60 bg-transparent text-alma-ink/55 transition-colors hover:border-destructive/40 hover:bg-destructive/5 hover:text-destructive disabled:opacity-40"
+                        className="flex h-10 w-10 items-center justify-center rounded-lg border border-line-strong/60 bg-transparent text-ink/55 transition-colors hover:border-destructive/40 hover:bg-destructive/5 hover:text-destructive disabled:opacity-40"
                       >
                         <XCircle size={15} />
                       </button>
@@ -586,12 +587,12 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
       >
         <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-md">
           <SheetHeader>
-            <SheetTitle className="font-display text-alma-ink">Asignar reserva a socia</SheetTitle>
+            <SheetTitle className="font-display text-ink">Asignar reserva a socia</SheetTitle>
           </SheetHeader>
 
           <div className="mt-4 space-y-4">
             {/* Toggle "+ acompañante" */}
-            <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-alma-hairline bg-alma-mist p-2.5">
+            <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-line bg-sunken p-2.5">
               <input
                 type="checkbox"
                 checked={assignWithGuest}
@@ -599,8 +600,8 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
                 className="mt-0.5"
               />
               <div className="space-y-0.5">
-                <span className="text-sm font-medium text-alma-ink">Llevará acompañante</span>
-                <p className="text-[11px] text-alma-ink/55">
+                <span className="text-sm font-medium text-ink">Llevará acompañante</span>
+                <p className="text-[11px] text-ink/55">
                   Descuenta 2 créditos: 1 del pack regular + 1 del pack de visitas de la socia.
                 </p>
               </div>
@@ -610,7 +611,7 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
             {(!assignWithGuest || !selectedMember) && (
               <div className="space-y-3">
                 <div className="relative">
-                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-alma-ink/40" />
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink/40" />
                   <Input
                     className="pl-8"
                     value={memberSearch}
@@ -618,11 +619,11 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
                     placeholder="Buscar por nombre, email o teléfono"
                   />
                 </div>
-                <div className="max-h-72 overflow-auto rounded-xl border border-alma-hairline">
+                <div className="max-h-72 overflow-auto rounded-xl border border-line">
                   {searchingUsers ? (
-                    <p className="px-3 py-2 text-xs text-alma-ink/55">Buscando…</p>
+                    <p className="px-3 py-2 text-xs text-ink/55">Buscando…</p>
                   ) : userOptions.length === 0 ? (
-                    <p className="px-3 py-2 text-xs text-alma-ink/55">Sin resultados</p>
+                    <p className="px-3 py-2 text-xs text-ink/55">Sin resultados</p>
                   ) : (
                     userOptions.map((u) => (
                       <button
@@ -636,10 +637,10 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
                             assignMutation.mutate({ userId: u.id });
                           }
                         }}
-                        className="w-full border-b border-alma-hairline px-3 py-2.5 text-left transition-colors last:border-b-0 hover:bg-alma-oat/40 disabled:opacity-60"
+                        className="w-full border-b border-line px-3 py-2.5 text-left transition-colors last:border-b-0 hover:bg-sunken/40 disabled:opacity-60"
                       >
-                        <p className="text-sm font-medium text-alma-ink">{u.displayName}</p>
-                        <p className="text-xs text-alma-ink/55">
+                        <p className="text-sm font-medium text-ink">{u.displayName}</p>
+                        <p className="text-xs text-ink/55">
                           {u.email ?? "—"}
                           {u.phone ? ` · ${u.phone}` : ""}
                         </p>
@@ -654,17 +655,17 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
             {assignWithGuest && selectedMember && (
               <div className="space-y-3">
                 {/* Tarjeta de socia seleccionada */}
-                <div className="flex items-start justify-between gap-2 rounded-xl border border-alma-sandstone/60 bg-alma-oat/40 px-3 py-2.5">
+                <div className="flex items-start justify-between gap-2 rounded-xl border border-line-strong/60 bg-sunken/40 px-3 py-2.5">
                   <div className="min-w-0">
-                    <p className="text-[0.72rem] uppercase tracking-[0.12em] text-alma-berry">Socia</p>
-                    <p className="truncate text-sm font-medium text-alma-ink">{selectedMember.displayName}</p>
-                    <p className="truncate text-[11px] text-alma-ink/55">
+                    <p className="text-[0.72rem] uppercase tracking-[0.12em] text-ink">Socia</p>
+                    <p className="truncate text-sm font-medium text-ink">{selectedMember.displayName}</p>
+                    <p className="truncate text-[11px] text-ink/55">
                       {selectedMember.email ?? "—"}{selectedMember.phone ? ` · ${selectedMember.phone}` : ""}
                     </p>
                   </div>
                   <button
                     type="button"
-                    className="text-[11px] text-alma-ink/55 transition-colors hover:text-alma-ink"
+                    className="text-[11px] text-ink/55 transition-colors hover:text-ink"
                     onClick={() => setSelectedMember(null)}
                   >
                     Cambiar
@@ -672,13 +673,13 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
                 </div>
 
                 {/* Form acompañante */}
-                <div className="space-y-3 rounded-xl border border-alma-hairline bg-alma-mist p-3">
-                  <p className="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-alma-ink/55">
+                <div className="space-y-3 rounded-xl border border-line bg-sunken p-3">
+                  <p className="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-ink/55">
                     Acompañante
                   </p>
 
                   <div className="space-y-1">
-                    <label className="text-xs text-alma-ink">Teléfono</label>
+                    <label className="text-xs text-ink">Teléfono</label>
                     <div className="flex gap-2">
                       <Input
                         value={agGuestPhone}
@@ -692,20 +693,20 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
                         size="sm"
                         onClick={searchAdminGuest}
                         disabled={!agGuestPhone.trim() || agSearching}
-                        className="border-alma-sandstone/70 bg-transparent text-alma-ink hover:bg-alma-oat/40 hover:text-alma-ink"
+                        className="border-line-strong/70 bg-transparent text-ink hover:bg-sunken/40 hover:text-ink"
                       >
                         {agSearching ? "…" : <Search size={14} />}
                       </Button>
                     </div>
                     {agFound && (
-                      <p className="text-[11px] text-alma-olive">
+                      <p className="text-[11px] text-success">
                         Ya estuvo antes, cuestionario cargado.
                       </p>
                     )}
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-xs text-alma-ink">Nombre</label>
+                    <label className="text-xs text-ink">Nombre</label>
                     <Input
                       value={agGuestName}
                       onChange={(e) => setAgGuestName(e.target.value)}
@@ -714,7 +715,7 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-xs text-alma-ink">Email (opcional)</label>
+                    <label className="text-xs text-ink">Email (opcional)</label>
                     <Input
                       type="email"
                       value={agGuestEmail}
@@ -723,12 +724,12 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
                     />
                   </div>
 
-                  <div className="space-y-2 border-t border-alma-hairline pt-2.5">
-                    <p className="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-alma-ink/55">
+                  <div className="space-y-2 border-t border-line pt-2.5">
+                    <p className="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-ink/55">
                       Cuestionario inicial
                     </p>
 
-                    <label className="flex cursor-pointer items-center justify-between gap-2 text-xs text-alma-ink">
+                    <label className="flex cursor-pointer items-center justify-between gap-2 text-xs text-ink">
                       <span>¿Tiene lesión o condición física?</span>
                       <input
                         type="checkbox"
@@ -742,11 +743,11 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
                         value={agGuestInjuryDetails}
                         onChange={(e) => setAgGuestInjuryDetails(e.target.value)}
                         placeholder="Cuéntanos qué debemos saber"
-                        className="w-full rounded-md border border-alma-sandstone/50 bg-alma-canvas px-3 py-1.5 text-xs text-alma-ink placeholder:text-alma-ink/40"
+                        className="w-full rounded-md border border-line-strong/50 bg-canvas px-3 py-1.5 text-xs text-ink placeholder:text-ink/40"
                       />
                     )}
 
-                    <label className="flex cursor-pointer items-center justify-between gap-2 text-xs text-alma-ink">
+                    <label className="flex cursor-pointer items-center justify-between gap-2 text-xs text-ink">
                       <span>¿Practicó pilates antes?</span>
                       <input
                         type="checkbox"
@@ -755,7 +756,7 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
                       />
                     </label>
 
-                    <label className="flex cursor-pointer items-start justify-between gap-2 border-t border-alma-hairline pt-2 text-[11px] text-alma-ink">
+                    <label className="flex cursor-pointer items-start justify-between gap-2 border-t border-line pt-2 text-[11px] text-ink">
                       <span className="leading-relaxed">
                         Confirmo que la acompañante leyó y aceptó los términos y riesgos.
                       </span>
@@ -769,11 +770,11 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
                 </div>
 
                 {/* ── Cobro de la acompañante ───────────────────────────────── */}
-                <div className="space-y-2.5 rounded-2xl border border-alma-hairline bg-alma-mist p-3">
-                  <p className="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-alma-ink/55">
+                <div className="space-y-2.5 rounded-2xl border border-line bg-sunken p-3">
+                  <p className="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-ink/55">
                     Cobro de la acompañante
                   </p>
-                  <div className="flex flex-col gap-2 text-xs text-alma-ink">
+                  <div className="flex flex-col gap-2 text-xs text-ink">
                     <label className="flex cursor-pointer items-start gap-2">
                       <input
                         type="radio"
@@ -784,7 +785,7 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
                       />
                       <span>
                         Usar <strong>pack de visitas de la socia</strong>
-                        <span className="mt-0.5 block text-[10px] text-alma-ink/55">
+                        <span className="mt-0.5 block text-[10px] text-ink/55">
                           Descuenta 1 crédito del pack de visitas activo. La socia debe tenerlo.
                         </span>
                       </span>
@@ -799,7 +800,7 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
                       />
                       <span>
                         Venderle <strong>clase suelta / pack</strong> a la acompañante
-                        <span className="mt-0.5 block text-[10px] text-alma-ink/55">
+                        <span className="mt-0.5 block text-[10px] text-ink/55">
                           La socia no usa su pack de visitas; la acompañante paga su propia clase.
                         </span>
                       </span>
@@ -807,13 +808,13 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
                   </div>
 
                   {guestChargeMode === "guest_sale" && (
-                    <div className="space-y-2 border-t border-alma-hairline pt-2">
+                    <div className="space-y-2 border-t border-line pt-2">
                       <div className="space-y-1">
-                        <label className="text-[11px] font-medium text-alma-ink">Plan a vender</label>
+                        <label className="text-[11px] font-medium text-ink">Plan a vender</label>
                         <select
                           value={guestSalePlanId}
                           onChange={(e) => setGuestSalePlanId(e.target.value)}
-                          className="w-full rounded-md border border-alma-sandstone/50 bg-alma-canvas px-2.5 py-1.5 text-xs text-alma-ink"
+                          className="w-full rounded-md border border-line-strong/50 bg-canvas px-2.5 py-1.5 text-xs text-ink"
                         >
                           <option value="">— Seleccionar plan —</option>
                           {guestSalePlans.map((p) => (
@@ -823,17 +824,17 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
                           ))}
                         </select>
                         {guestSalePlans.length === 0 && (
-                          <p className="text-[10px] text-alma-ink/55">
+                          <p className="text-[10px] text-ink/55">
                             Cargando planes… o marca al menos un plan como activo en Planes.
                           </p>
                         )}
                       </div>
                       <div className="space-y-1">
-                        <label className="text-[11px] font-medium text-alma-ink">Método de pago</label>
+                        <label className="text-[11px] font-medium text-ink">Método de pago</label>
                         <select
                           value={guestSalePayment}
                           onChange={(e) => setGuestSalePayment(e.target.value as any)}
-                          className="w-full rounded-md border border-alma-sandstone/50 bg-alma-canvas px-2.5 py-1.5 text-xs text-alma-ink"
+                          className="w-full rounded-md border border-line-strong/50 bg-canvas px-2.5 py-1.5 text-xs text-ink"
                         >
                           <option value="cash">Efectivo</option>
                           <option value="transfer">Transferencia</option>
@@ -849,7 +850,7 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
                     variant="outline"
                     onClick={() => { setAssignOpen(false); resetAssignForm(); }}
                     disabled={assignMutation.isPending}
-                    className="flex-1 border-alma-sandstone/70 bg-transparent text-alma-ink hover:bg-alma-oat/40 hover:text-alma-ink"
+                    className="flex-1 border-line-strong/70 bg-transparent text-ink hover:bg-sunken/40 hover:text-ink"
                   >
                     Cancelar
                   </Button>
@@ -874,7 +875,7 @@ const ClassRoster = ({ classId, onBack }: { classId: string; onBack: () => void 
                       (guestChargeMode === "guest_sale" && !guestSalePlanId) ||
                       assignMutation.isPending
                     }
-                    className="flex-1 bg-alma-ink text-alma-canvas hover:bg-alma-ink-deep"
+                    className="flex-1 bg-ink text-canvas hover:bg-inverse"
                   >
                     {assignMutation.isPending
                       ? "Asignando…"
@@ -939,23 +940,23 @@ const ClassPicker = ({ onSelectClass }: { onSelectClass: (id: string) => void })
         <button
           onClick={() => setWeekStart((w) => subWeeks(w, 1))}
           aria-label="Semana anterior"
-          className="flex h-9 w-9 items-center justify-center rounded-lg border border-alma-hairline text-alma-ink/55 transition-colors hover:border-alma-sandstone hover:text-alma-ink"
+          className="flex h-9 w-9 items-center justify-center rounded-lg border border-line text-ink/55 transition-colors hover:border-line-strong hover:text-ink"
         >
           <ChevronLeft size={14} />
         </button>
-        <span className="nums min-w-[200px] text-center text-sm font-semibold text-alma-ink">
+        <span className="nums min-w-[200px] text-center text-sm font-semibold text-ink">
           {format(weekStart, "d MMM", { locale: es })} – {format(weekEnd, "d MMM yyyy", { locale: es })}
         </span>
         <button
           onClick={() => setWeekStart((w) => addWeeks(w, 1))}
           aria-label="Semana siguiente"
-          className="flex h-9 w-9 items-center justify-center rounded-lg border border-alma-hairline text-alma-ink/55 transition-colors hover:border-alma-sandstone hover:text-alma-ink"
+          className="flex h-9 w-9 items-center justify-center rounded-lg border border-line text-ink/55 transition-colors hover:border-line-strong hover:text-ink"
         >
           <ChevronRight size={14} />
         </button>
         <button
           onClick={() => setWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }))}
-          className="ml-2 text-xs text-alma-berry/70 transition-colors hover:text-alma-berry"
+          className="ml-2 text-xs text-ink/70 transition-colors hover:text-ink"
         >
           Hoy
         </button>
@@ -988,12 +989,12 @@ const ClassPicker = ({ onSelectClass }: { onSelectClass: (id: string) => void })
                 <div className="mb-2 flex items-center gap-2">
                   <p className={cn(
                     "text-[0.72rem] font-semibold uppercase tracking-[0.12em]",
-                    isToday ? "text-alma-berry" : "text-alma-ink/45"
+                    isToday ? "text-ink" : "text-ink/45"
                   )}>
                     {format(day, "EEEE d", { locale: es })}
                   </p>
                   {isToday && (
-                    <span className="rounded-full bg-alma-oat px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-alma-ink">
+                    <span className="rounded-full bg-sunken px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-ink">
                       Hoy
                     </span>
                   )}
@@ -1016,33 +1017,33 @@ const ClassPicker = ({ onSelectClass }: { onSelectClass: (id: string) => void })
                         <button
                           key={cls.id}
                           onClick={() => onSelectClass(cls.id)}
-                          className="group flex w-full items-center gap-4 rounded-xl border border-alma-hairline bg-alma-mist p-4 text-left transition-colors hover:border-alma-sandstone hover:bg-alma-oat/30"
+                          className="group flex w-full items-center gap-4 rounded-xl border border-line bg-sunken p-4 text-left transition-colors hover:border-line-strong hover:bg-sunken/30"
                         >
                           <span
                             aria-hidden
                             className="h-2.5 w-2.5 shrink-0 rounded-full"
-                            style={{ backgroundColor: cls.class_type_color ?? cls.color ?? "#CBB9A4" }}
+                            style={{ backgroundColor: cls.class_type_color ?? cls.color ?? DEFAULT_CLASS_COLOR }}
                           />
                           <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-semibold text-alma-ink">
+                            <p className="truncate text-sm font-semibold text-ink">
                               {cls.class_type_name ?? cls.className ?? "Clase"}
                             </p>
-                            <p className="nums text-xs text-alma-ink/55">{time} · {cls.instructor_name ?? "—"}</p>
+                            <p className="nums text-xs text-ink/55">{time} · {cls.instructor_name ?? "—"}</p>
                           </div>
                           <div className="flex shrink-0 items-center gap-2">
                             <div className="text-right">
-                              <p className={cn("nums text-sm font-bold", full ? "text-alma-ink" : "text-alma-ink/80")}>
+                              <p className={cn("nums text-sm font-bold", full ? "text-ink" : "text-ink/80")}>
                                 {booked}/{capacity}
                               </p>
-                              <p className="text-[10px] text-alma-ink/45">{full ? "llena" : "lugares"}</p>
+                              <p className="text-[10px] text-ink/45">{full ? "llena" : "lugares"}</p>
                             </div>
-                            <div className="h-1.5 w-12 overflow-hidden rounded-full bg-alma-oat">
+                            <div className="h-1.5 w-12 overflow-hidden rounded-full bg-sunken">
                               <div
-                                className={cn("h-full rounded-full transition-all", full ? "bg-alma-ink" : "bg-alma-berry")}
+                                className={cn("h-full rounded-full transition-all", full ? "bg-ink" : "bg-ink")}
                                 style={{ width: `${pct}%` }}
                               />
                             </div>
-                            <ChevronRight size={14} className="text-alma-ink/30 transition-colors group-hover:text-alma-berry" />
+                            <ChevronRight size={14} className="text-ink/30 transition-colors group-hover:text-ink" />
                           </div>
                         </button>
                       );
@@ -1054,8 +1055,8 @@ const ClassPicker = ({ onSelectClass }: { onSelectClass: (id: string) => void })
           })}
 
           {!isLoading && classes.length === 0 && (
-            <div className="py-16 text-center text-sm text-alma-ink/55">
-              <Calendar size={28} className="mx-auto mb-2 text-alma-ink/30" />
+            <div className="py-16 text-center text-sm text-ink/55">
+              <Calendar size={28} className="mx-auto mb-2 text-ink/30" />
               No hay clases programadas esta semana
             </div>
           )}
@@ -1080,8 +1081,8 @@ const BookingsList = () => {
             ]}
           />
           <div className="mb-7">
-            <h1 className="admin-title mb-1 text-alma-ink">Reservas</h1>
-            <p className="text-sm text-alma-ink/55">
+            <h1 className="admin-title mb-1 text-ink">Reservas</h1>
+            <p className="text-sm text-ink/55">
               {selectedClassId
                 ? "Lista de alumnas · check-in y asistencia"
                 : "Selecciona una clase para ver su lista de alumnas"}

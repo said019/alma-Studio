@@ -10,8 +10,8 @@ import {
   AuthField,
   AuthSubmit,
   AuthErrorBanner,
-  ALMA,
 } from "@/components/auth/AuthShell";
+import { COLOR } from "@/design/tokens";
 
 const schema = z.object({ email: z.string().email("Email inválido") });
 type FormValues = { email: string };
@@ -61,17 +61,17 @@ const ForgotPassword = () => {
         <div className="flex flex-col gap-6">
           <div
             className="flex items-start gap-4 rounded-2xl px-5 py-5"
-            style={{ backgroundColor: ALMA.blush, border: `1px solid ${ALMA.sandstone}4d` }}
+            style={{ backgroundColor: COLOR.sunken, border: `1px solid ${COLOR.lineStrong}4d` }}
           >
-            <span className="grid h-10 w-10 place-items-center rounded-full shrink-0" style={{ backgroundColor: ALMA.berry, color: ALMA.cream }}>
+            <span className="grid h-10 w-10 place-items-center rounded-full shrink-0" style={{ backgroundColor: COLOR.ink, color: COLOR.canvas }}>
               <MailCheck size={18} />
             </span>
             <div>
-              <p className="text-[0.95rem] leading-[1.6]" style={{ color: ALMA.ink }}>
+              <p className="text-[0.95rem] leading-[1.6]" style={{ color: COLOR.ink }}>
                 Enviamos un enlace a{" "}
-                <strong className="font-medium" style={{ color: ALMA.berry }}>{submittedEmail}</strong>.
+                <strong className="font-medium" style={{ color: COLOR.accentStrong }}>{submittedEmail}</strong>.
               </p>
-              <p className="mt-1 text-[0.84rem] leading-[1.5]" style={{ color: ALMA.ink, opacity: 0.62 }}>
+              <p className="mt-1 text-[0.84rem] leading-[1.5]" style={{ color: COLOR.ink, opacity: 0.62 }}>
                 El enlace expira en 30 minutos. Revisa también la carpeta de spam.
               </p>
             </div>
@@ -86,15 +86,15 @@ const ForgotPassword = () => {
               <li
                 key={step}
                 className="grid grid-cols-[auto_1fr] gap-3 items-start py-2"
-                style={{ borderTop: i === 0 ? undefined : `1px solid ${ALMA.border}` }}
+                style={{ borderTop: i === 0 ? undefined : `1px solid ${COLOR.line}` }}
               >
                 <span
                   className="font-display nums text-[0.95rem] leading-none"
-                  style={{ color: ALMA.berry }}
+                  style={{ color: COLOR.accentStrong }}
                 >
                   0{i + 1}
                 </span>
-                <span className="text-[0.92rem] leading-[1.55]" style={{ color: ALMA.ink, opacity: 0.78 }}>
+                <span className="text-[0.92rem] leading-[1.55]" style={{ color: COLOR.ink, opacity: 0.78 }}>
                   {step}
                 </span>
               </li>
@@ -105,13 +105,13 @@ const ForgotPassword = () => {
             <button
               type="button"
               onClick={() => setSent(false)}
-              className="inline-flex items-center justify-center gap-2 rounded-full border border-alma-hairline px-6 py-3.5 text-[0.78rem] font-medium uppercase tracking-[0.18em] text-alma-ink transition-colors duration-200 hover:border-alma-sandstone hover:bg-alma-mist focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-alma-berry focus-visible:ring-offset-2"
+              className="inline-flex items-center justify-center gap-2 rounded-full border border-line px-6 py-3.5 text-[0.78rem] font-medium uppercase tracking-[0.18em] text-ink transition-colors duration-200 hover:border-line-strong hover:bg-sunken focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-offset-2"
             >
               Cambiar correo
             </button>
             <Link
               to="/auth/login"
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-alma-ink px-6 py-3.5 text-[0.78rem] font-medium uppercase tracking-[0.18em] text-alma-canvas no-underline transition-transform duration-200 hover:-translate-y-0.5 hover:bg-alma-ink-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-alma-berry focus-visible:ring-offset-2"
+              className="inline-flex items-center justify-center gap-2 rounded-full bg-ink px-6 py-3.5 text-[0.78rem] font-medium uppercase tracking-[0.18em] text-canvas no-underline transition-transform duration-200 hover:-translate-y-0.5 hover:bg-inverse focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-offset-2"
             >
               <CheckCircle2 size={14} />
               Volver a iniciar sesión
@@ -138,9 +138,9 @@ const ForgotPassword = () => {
             </AuthSubmit>
           </form>
 
-          <p className="mt-7 text-center text-[0.86rem]" style={{ color: ALMA.ink, opacity: 0.7 }}>
+          <p className="mt-7 text-center text-[0.86rem]" style={{ color: COLOR.ink, opacity: 0.7 }}>
             ¿Ya recordaste?{" "}
-            <Link to="/auth/login" className="no-underline font-medium" style={{ color: ALMA.berry }}>
+            <Link to="/auth/login" className="no-underline font-medium" style={{ color: COLOR.accentStrong }}>
               Volver a iniciar sesión
             </Link>
           </p>

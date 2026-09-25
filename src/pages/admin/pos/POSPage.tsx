@@ -94,10 +94,10 @@ const ProductsPage = () => {
       {dialog}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
         <div className="relative max-w-xs">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-alma-ink/55" />
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink/55" />
           <Input className="pl-8" placeholder="Buscar producto…" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
-        <Button size="sm" className="bg-alma-ink-deep text-alma-canvas hover:bg-alma-ink" onClick={openNew}>
+        <Button size="sm" className="bg-inverse text-canvas hover:bg-ink" onClick={openNew}>
           <Plus size={14} className="mr-1" />Nuevo producto
         </Button>
       </div>
@@ -129,22 +129,22 @@ const ProductsPage = () => {
       )}
 
       {!isLoading && !isError && products.length > 0 && (
-        <div className="rounded-xl border border-alma-hairline overflow-hidden bg-alma-canvas">
+        <div className="rounded-xl border border-line overflow-hidden bg-canvas">
           <Table>
             <TableHeader><TableRow><TableHead>Nombre</TableHead><TableHead>Categoría</TableHead><TableHead className="text-right">Precio</TableHead><TableHead className="text-right">Stock</TableHead><TableHead>Estado</TableHead><TableHead /></TableRow></TableHeader>
             <TableBody>
               {products.map((p) => (
                 <TableRow key={p.id}>
-                  <TableCell className="font-medium text-alma-ink">{p.name}</TableCell>
-                  <TableCell className="text-sm text-alma-ink/55">{CATEGORY_LABEL[p.category] ?? p.category}</TableCell>
-                  <TableCell className="text-right text-alma-ink nums">{formatMXN(p.price)}</TableCell>
-                  <TableCell className="text-right text-alma-ink nums">{p.stock}</TableCell>
+                  <TableCell className="font-medium text-ink">{p.name}</TableCell>
+                  <TableCell className="text-sm text-ink/55">{CATEGORY_LABEL[p.category] ?? p.category}</TableCell>
+                  <TableCell className="text-right text-ink nums">{formatMXN(p.price)}</TableCell>
+                  <TableCell className="text-right text-ink nums">{p.stock}</TableCell>
                   <TableCell>
                     <span className={cn(
                       "inline-flex items-center px-2.5 py-0.5 rounded-full border text-[11px] font-semibold",
                       p.isActive
-                        ? "bg-alma-oat/60 text-alma-ink border-alma-sandstone/50"
-                        : "bg-alma-mist text-alma-ink/55 border-alma-hairline",
+                        ? "bg-sunken/60 text-ink border-line-strong/50"
+                        : "bg-sunken text-ink/55 border-line",
                     )}>
                       {p.isActive ? "Activo" : "Inactivo"}
                     </span>
@@ -189,7 +189,7 @@ const ProductsPage = () => {
             <div className="flex items-center gap-3"><Switch checked={form.watch("isActive")} onCheckedChange={(v) => form.setValue("isActive", v)} /><Label>Activo</Label></div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-              <Button type="submit" className="bg-alma-ink-deep text-alma-canvas hover:bg-alma-ink">{editing ? "Actualizar" : "Crear"}</Button>
+              <Button type="submit" className="bg-inverse text-canvas hover:bg-ink">{editing ? "Actualizar" : "Crear"}</Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -249,7 +249,7 @@ const POSTerminal = () => {
       {/* Productos */}
       <div>
         <div className="relative mb-3">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-alma-ink/55" />
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink/55" />
           <Input className="pl-8" placeholder="Buscar producto…" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
 
@@ -284,12 +284,12 @@ const POSTerminal = () => {
                 key={p.id}
                 type="button"
                 onClick={() => addToCart(p)}
-                className="p-3 rounded-xl border border-alma-hairline bg-alma-mist hover:bg-alma-oat/40 hover:border-alma-sandstone transition-colors text-left"
+                className="p-3 rounded-xl border border-line bg-sunken hover:bg-sunken/40 hover:border-line-strong transition-colors text-left"
               >
-                <p className="font-medium text-sm text-alma-ink">{p.name}</p>
-                <p className="text-xs text-alma-ink/55">{CATEGORY_LABEL[p.category] ?? p.category}</p>
-                <p className="font-semibold text-alma-ink nums mt-1">{formatMXN(p.price)}</p>
-                <p className="text-xs text-alma-ink/55 nums">Stock: {p.stock}</p>
+                <p className="font-medium text-sm text-ink">{p.name}</p>
+                <p className="text-xs text-ink/55">{CATEGORY_LABEL[p.category] ?? p.category}</p>
+                <p className="font-semibold text-ink nums mt-1">{formatMXN(p.price)}</p>
+                <p className="text-xs text-ink/55 nums">Stock: {p.stock}</p>
               </button>
             ))}
           </div>
@@ -297,16 +297,16 @@ const POSTerminal = () => {
       </div>
 
       {/* Carrito */}
-      <div className="bg-alma-mist border border-alma-hairline rounded-xl p-4 space-y-3 h-fit">
-        <h3 className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-alma-ink/70">Carrito</h3>
+      <div className="bg-sunken border border-line rounded-xl p-4 space-y-3 h-fit">
+        <h3 className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-ink/70">Carrito</h3>
         {cart.length === 0 && (
-          <div className="flex flex-col items-center gap-2 py-8 text-alma-ink/55">
+          <div className="flex flex-col items-center gap-2 py-8 text-ink/55">
             <ShoppingBag size={18} strokeWidth={1.8} />
             <p className="text-sm">Toca un producto para agregarlo</p>
           </div>
         )}
         {cart.map((item) => (
-          <div key={item.product.id} className="flex items-center justify-between text-sm text-alma-ink">
+          <div key={item.product.id} className="flex items-center justify-between text-sm text-ink">
             <span className="flex-1 truncate">{item.product.name}</span>
             <div className="flex items-center gap-1">
               <Button variant="ghost" size="icon" className="h-6 w-6" aria-label="Quitar uno" onClick={() => adjustQty(item.product.id, -1)}><Minus size={10} /></Button>
@@ -319,7 +319,7 @@ const POSTerminal = () => {
         ))}
         {cart.length > 0 && (
           <>
-            <div className="border-t border-alma-hairline pt-3 flex justify-between font-semibold text-alma-ink">
+            <div className="border-t border-line pt-3 flex justify-between font-semibold text-ink">
               <span>Total</span>
               <span className="nums">{formatMXN(total)}</span>
             </div>
@@ -342,7 +342,7 @@ const POSTerminal = () => {
                 placeholder="Ej. ALMA10"
               />
             </div>
-            <Button className="w-full bg-alma-ink-deep text-alma-canvas hover:bg-alma-ink font-semibold" onClick={() => checkoutMutation.mutate()} disabled={checkoutMutation.isPending}>
+            <Button className="w-full bg-inverse text-canvas hover:bg-ink font-semibold" onClick={() => checkoutMutation.mutate()} disabled={checkoutMutation.isPending}>
               {checkoutMutation.isPending ? "Procesando…" : "Confirmar venta"}
             </Button>
           </>
@@ -353,16 +353,16 @@ const POSTerminal = () => {
 };
 
 const tabTriggerClass =
-  "rounded-xl px-4 py-2 text-[13px] font-semibold text-alma-ink/70 data-[state=active]:bg-alma-oat data-[state=active]:text-alma-ink data-[state=active]:shadow-none data-[state=active]:ring-1 data-[state=active]:ring-inset data-[state=active]:ring-alma-sandstone";
+  "rounded-xl px-4 py-2 text-[13px] font-semibold text-ink/70 data-[state=active]:bg-sunken data-[state=active]:text-ink data-[state=active]:shadow-none data-[state=active]:ring-1 data-[state=active]:ring-inset data-[state=active]:ring-line-strong";
 
 // ── Página principal POS ──────────────────────────────────
 const POSPage = () => (
   <AuthGuard>
     <AdminLayout>
       <div className="admin-page max-w-5xl">
-        <h1 className="admin-title text-alma-ink mb-6">Punto de venta</h1>
+        <h1 className="admin-title text-ink mb-6">Punto de venta</h1>
         <Tabs defaultValue="pos">
-          <TabsList className="h-auto rounded-2xl border border-alma-hairline bg-alma-mist p-1">
+          <TabsList className="h-auto rounded-2xl border border-line bg-sunken p-1">
             <TabsTrigger value="pos" className={tabTriggerClass}>Terminal</TabsTrigger>
             <TabsTrigger value="products" className={tabTriggerClass}>Productos</TabsTrigger>
           </TabsList>

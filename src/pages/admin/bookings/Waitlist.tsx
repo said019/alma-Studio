@@ -65,8 +65,8 @@ const Waitlist = () => {
       <AdminLayout>
         <div className="admin-page max-w-3xl">
           <div className="mb-7">
-            <h1 className="admin-title font-display text-alma-ink mb-1">Lista de espera</h1>
-            <p className="text-sm text-alma-ink/55">
+            <h1 className="admin-title font-display text-ink mb-1">Lista de espera</h1>
+            <p className="text-sm text-ink/55">
               {selectedClassId
                 ? "Clientas en lista de espera para esta clase"
                 : "Selecciona una clase para ver su lista de espera"}
@@ -77,7 +77,7 @@ const Waitlist = () => {
             <div className="space-y-5">
               <button
                 onClick={() => setSelectedClassId(null)}
-                className="flex items-center gap-2 text-sm text-alma-ink/55 hover:text-alma-ink transition-colors"
+                className="flex items-center gap-2 text-sm text-ink/55 hover:text-ink transition-colors"
               >
                 <ChevronLeft size={14} /> Volver al calendario
               </button>
@@ -87,11 +87,11 @@ const Waitlist = () => {
               ) : rosterLoading ? (
                 <Skeleton className="h-20 rounded-2xl" />
               ) : classInfo && (
-                <div className="rounded-2xl border border-alma-hairline bg-alma-mist p-5">
+                <div className="rounded-2xl border border-line bg-sunken p-5">
                   <div className="flex items-start justify-between">
                     <div>
-                      <h2 className="text-xl text-alma-ink mb-1">{classInfo.classTypeName}</h2>
-                      <p className="text-sm text-alma-ink/60 nums">
+                      <h2 className="text-xl text-ink mb-1">{classInfo.classTypeName}</h2>
+                      <p className="text-sm text-ink/60 nums">
                         {classInfo.startsAt
                           ? format(new Date(classInfo.startsAt), "EEEE d 'de' MMMM · HH:mm", { locale: es })
                           : classInfo.date ?? "Sin fecha"}
@@ -99,13 +99,13 @@ const Waitlist = () => {
                     </div>
                     <button
                       onClick={() => refetch()}
-                      className="text-xs text-alma-berry hover:text-alma-ink transition-colors flex items-center gap-1"
+                      className="text-xs text-ink hover:text-ink transition-colors flex items-center gap-1"
                     >
                       <RefreshCw size={11} /> Actualizar
                     </button>
                   </div>
                   <div className="mt-3">
-                    <span className="inline-flex items-center rounded-full border border-alma-sandstone/60 bg-alma-oat/50 px-2.5 py-1 text-xs font-medium text-alma-ink nums">
+                    <span className="inline-flex items-center rounded-full border border-line-strong/60 bg-sunken/50 px-2.5 py-1 text-xs font-medium text-ink nums">
                       {roster.length} en lista de espera
                     </span>
                   </div>
@@ -117,27 +117,27 @@ const Waitlist = () => {
                   ? Array(3).fill(0).map((_, i) => <Skeleton key={i} className="h-16 rounded-xl" />)
                   : roster.length === 0
                     ? (
-                      <div className="text-center py-12 text-alma-ink/45 text-sm">
-                        <Users size={28} className="mx-auto mb-2 text-alma-sandstone" />
+                      <div className="text-center py-12 text-ink/45 text-sm">
+                        <Users size={28} className="mx-auto mb-2 text-ink-muted" />
                         No hay clientas en lista de espera
                       </div>
                     )
                     : roster.map((entry, idx) => (
                       <div
                         key={entry.bookingId}
-                        className="flex items-center gap-4 p-4 rounded-xl border border-alma-hairline bg-alma-mist"
+                        className="flex items-center gap-4 p-4 rounded-xl border border-line bg-sunken"
                       >
-                        <div className="w-10 h-10 rounded-full bg-alma-oat flex items-center justify-center text-sm font-semibold text-alma-berry nums">
+                        <div className="w-10 h-10 rounded-full bg-sunken flex items-center justify-center text-sm font-semibold text-ink nums">
                           {idx + 1}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-sm text-alma-ink truncate">{entry.displayName}</p>
+                          <p className="font-semibold text-sm text-ink truncate">{entry.displayName}</p>
                           <div className="flex items-center gap-2 mt-0.5">
-                            <span className="text-xs text-alma-ink/55 truncate">{entry.email}</span>
-                            {entry.phone && <span className="text-xs text-alma-ink/45 nums">{entry.phone}</span>}
+                            <span className="text-xs text-ink/55 truncate">{entry.email}</span>
+                            {entry.phone && <span className="text-xs text-ink/45 nums">{entry.phone}</span>}
                           </div>
                           {entry.planName && (
-                            <p className="text-xs text-alma-berry mt-0.5 nums">
+                            <p className="text-xs text-ink mt-0.5 nums">
                               {entry.planName}
                               {entry.classesRemaining !== null
                                 ? ` · ${entry.classesRemaining} clases`
@@ -145,7 +145,7 @@ const Waitlist = () => {
                             </p>
                           )}
                         </div>
-                        <span className="text-xs font-medium px-2.5 py-1 rounded-full border border-alma-sandstone/60 bg-alma-oat/50 text-alma-ink shrink-0 nums">
+                        <span className="text-xs font-medium px-2.5 py-1 rounded-full border border-line-strong/60 bg-sunken/50 text-ink shrink-0 nums">
                           Posición {idx + 1}
                         </span>
                       </div>
@@ -159,23 +159,23 @@ const Waitlist = () => {
                 <button
                   onClick={() => setWeekStart((w) => subWeeks(w, 1))}
                   aria-label="Semana anterior"
-                  className="w-8 h-8 rounded-lg border border-alma-hairline text-alma-ink/55 hover:text-alma-ink hover:border-alma-sandstone flex items-center justify-center transition-colors"
+                  className="w-8 h-8 rounded-lg border border-line text-ink/55 hover:text-ink hover:border-line-strong flex items-center justify-center transition-colors"
                 >
                   <ChevronLeft size={14} />
                 </button>
-                <span className="text-sm font-semibold text-alma-ink/70 min-w-[200px] text-center nums">
+                <span className="text-sm font-semibold text-ink/70 min-w-[200px] text-center nums">
                   {format(weekStart, "d MMM", { locale: es })} a {format(weekEnd, "d MMM yyyy", { locale: es })}
                 </span>
                 <button
                   onClick={() => setWeekStart((w) => addWeeks(w, 1))}
                   aria-label="Semana siguiente"
-                  className="w-8 h-8 rounded-lg border border-alma-hairline text-alma-ink/55 hover:text-alma-ink hover:border-alma-sandstone flex items-center justify-center transition-colors"
+                  className="w-8 h-8 rounded-lg border border-line text-ink/55 hover:text-ink hover:border-line-strong flex items-center justify-center transition-colors"
                 >
                   <ChevronRight size={14} />
                 </button>
                 <button
                   onClick={() => setWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }))}
-                  className="ml-2 text-xs text-alma-berry hover:text-alma-ink transition-colors"
+                  className="ml-2 text-xs text-ink hover:text-ink transition-colors"
                 >
                   Hoy
                 </button>
@@ -199,12 +199,12 @@ const Waitlist = () => {
                         <div className="flex items-center gap-2 mb-2">
                           <p className={cn(
                             "text-xs font-semibold uppercase tracking-wider",
-                            isToday ? "text-alma-berry" : "text-alma-ink/45"
+                            isToday ? "text-ink" : "text-ink/45"
                           )}>
                             {format(day, "EEEE d", { locale: es })}
                           </p>
                           {isToday && (
-                            <span className="text-xs px-2 py-0.5 rounded-full bg-alma-oat text-alma-ink font-semibold">
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-sunken text-ink font-semibold">
                               Hoy
                             </span>
                           )}
@@ -221,17 +221,17 @@ const Waitlist = () => {
                                 <button
                                   key={cls.id}
                                   onClick={() => setSelectedClassId(cls.id)}
-                                  className="w-full flex items-center gap-4 p-4 rounded-xl border border-alma-hairline bg-alma-mist hover:border-alma-sandstone hover:bg-alma-oat/40 transition-colors group text-left"
+                                  className="w-full flex items-center gap-4 p-4 rounded-xl border border-line bg-sunken hover:border-line-strong hover:bg-sunken/40 transition-colors group text-left"
                                 >
                                   <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-semibold text-alma-ink truncate">
+                                    <p className="text-sm font-semibold text-ink truncate">
                                       {cls.class_type_name ?? cls.className ?? "Clase"}
                                     </p>
-                                    <p className="text-xs text-alma-ink/55 nums">
+                                    <p className="text-xs text-ink/55 nums">
                                       {time} · {cls.instructor_name ?? "Sin instructora"}
                                     </p>
                                   </div>
-                                  <ChevronRight size={14} className="text-alma-ink/30 group-hover:text-alma-berry transition-colors" />
+                                  <ChevronRight size={14} className="text-ink/30 group-hover:text-ink transition-colors" />
                                 </button>
                               );
                             })}
@@ -242,8 +242,8 @@ const Waitlist = () => {
                   })}
 
                   {!classesLoading && classes.length === 0 && (
-                    <div className="text-center py-16 text-alma-ink/45 text-sm">
-                      <Calendar size={28} className="mx-auto mb-2 text-alma-sandstone" />
+                    <div className="text-center py-16 text-ink/45 text-sm">
+                      <Calendar size={28} className="mx-auto mb-2 text-ink-muted" />
                       No hay clases programadas esta semana
                     </div>
                   )}

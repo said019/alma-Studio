@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { ALMA } from "@/components/app/tokens";
+
 import LegalLayout, {
   LegalContact,
   LegalDynamicBody,
@@ -8,19 +8,20 @@ import LegalLayout, {
   LegalUpdated,
   usePolicyText,
 } from "./LegalLayout";
+import { COLOR } from "@/design/tokens";
 
 // Escenarios de cancelación: veredicto en TEXTO (sin chips ni glifos).
 // olive solo para el resultado positivo; destructive solo para pérdidas.
 const ESCENARIOS: { veredicto: string; tono: string; titulo: string; detalle: ReactNode }[] = [
   {
     veredicto: "Sin penalización",
-    tono: ALMA.olive,
+    tono: COLOR.success,
     titulo: "Cancelación con más de 12 horas de anticipación",
     detalle: "Puedes cancelar o reagendar tu clase desde la app sin penalización.",
   },
   {
     veredicto: "Cuenta como falta",
-    tono: ALMA.ink,
+    tono: COLOR.ink,
     titulo: "Cancelación dentro de las 12 horas previas",
     detalle: (
       <>
@@ -30,7 +31,7 @@ const ESCENARIOS: { veredicto: string; tono: string; titulo: string; detalle: Re
   },
   {
     veredicto: "Cuenta como falta",
-    tono: ALMA.ink,
+    tono: COLOR.ink,
     titulo: "Inasistencia sin aviso",
     detalle:
       "Cuenta como una clase reservada sin asistir y suma a tu conteo de faltas. Al acumular 5, se aplica la penalización con pérdida de puntos.",
@@ -39,13 +40,13 @@ const ESCENARIOS: { veredicto: string; tono: string; titulo: string; detalle: Re
 
 // Resumen rápido: resultado en texto con color semántico AA sobre cream.
 const RESUMEN: { situacion: string; resultado: string; tono: string }[] = [
-  { situacion: "Cancelas con más de 12 horas de anticipación", resultado: "Sin penalización", tono: ALMA.olive },
-  { situacion: "Cancelas dentro de las 12 horas previas", resultado: "Cuenta como falta", tono: ALMA.ink },
-  { situacion: "No asistes y no avisas", resultado: "Cuenta como falta", tono: ALMA.ink },
-  { situacion: "Acumulas 5 clases reservadas sin asistir", resultado: "Pérdida de puntos", tono: ALMA.destructive },
-  { situacion: "Llegas después del inicio de la clase", resultado: "Sin acceso, clase utilizada", tono: ALMA.destructive },
-  { situacion: "Pides reembolso de un paquete", resultado: "No aplica", tono: ALMA.destructive },
-  { situacion: "Emergencia médica comprobable", resultado: "Depende, se evalúa caso por caso", tono: ALMA.ink },
+  { situacion: "Cancelas con más de 12 horas de anticipación", resultado: "Sin penalización", tono: COLOR.success },
+  { situacion: "Cancelas dentro de las 12 horas previas", resultado: "Cuenta como falta", tono: COLOR.ink },
+  { situacion: "No asistes y no avisas", resultado: "Cuenta como falta", tono: COLOR.ink },
+  { situacion: "Acumulas 5 clases reservadas sin asistir", resultado: "Pérdida de puntos", tono: COLOR.danger },
+  { situacion: "Llegas después del inicio de la clase", resultado: "Sin acceso, clase utilizada", tono: COLOR.danger },
+  { situacion: "Pides reembolso de un paquete", resultado: "No aplica", tono: COLOR.danger },
+  { situacion: "Emergencia médica comprobable", resultado: "Depende, se evalúa caso por caso", tono: COLOR.ink },
 ];
 
 const Cancelacion = () => {
@@ -56,7 +57,7 @@ const Cancelacion = () => {
       current="/legal/cancelacion"
       title={
         <>
-          Política de <span className="font-display-italic">cancelación</span>
+          Política de <span className="font-display">cancelación</span>
         </>
       }
     >
@@ -73,9 +74,9 @@ const Cancelacion = () => {
           </p>
 
           <LegalH2>1. Cancelación de reservaciones</LegalH2>
-          <div style={{ borderTop: `1px solid ${ALMA.border}` }}>
+          <div style={{ borderTop: `1px solid ${COLOR.line}` }}>
             {ESCENARIOS.map((esc) => (
-              <div key={esc.titulo} className="py-5" style={{ borderBottom: `1px solid ${ALMA.border}` }}>
+              <div key={esc.titulo} className="py-5" style={{ borderBottom: `1px solid ${COLOR.line}` }}>
                 <p className="text-[0.7rem] uppercase tracking-[0.18em] font-semibold mb-1.5" style={{ color: esc.tono }}>
                   {esc.veredicto}
                 </p>
@@ -125,18 +126,18 @@ const Cancelacion = () => {
           <LegalH2>7. Resumen rápido</LegalH2>
           <table className="w-full text-sm border-collapse">
             <thead>
-              <tr style={{ borderBottom: `1px solid ${ALMA.sandstone}` }}>
-                <th className="py-3 pr-4 text-left text-[0.68rem] uppercase tracking-[0.2em] font-semibold" style={{ color: ALMA.berry }}>
+              <tr style={{ borderBottom: `1px solid ${COLOR.lineStrong}` }}>
+                <th className="py-3 pr-4 text-left text-[0.68rem] uppercase tracking-[0.2em] font-semibold" style={{ color: COLOR.accentStrong }}>
                   Situación
                 </th>
-                <th className="py-3 text-left text-[0.68rem] uppercase tracking-[0.2em] font-semibold" style={{ color: ALMA.berry }}>
+                <th className="py-3 text-left text-[0.68rem] uppercase tracking-[0.2em] font-semibold" style={{ color: COLOR.accentStrong }}>
                   Resultado
                 </th>
               </tr>
             </thead>
             <tbody>
               {RESUMEN.map((fila) => (
-                <tr key={fila.situacion} style={{ borderBottom: `1px solid ${ALMA.border}` }}>
+                <tr key={fila.situacion} style={{ borderBottom: `1px solid ${COLOR.line}` }}>
                   <td className="py-3 pr-4 align-top">{fila.situacion}</td>
                   <td className="py-3 align-top font-medium" style={{ color: fila.tono }}>
                     {fila.resultado}

@@ -17,13 +17,13 @@ import {
   AlertCircle,
 } from "lucide-react";
 
-import { ALMA } from "@/components/app/tokens";
-import almaMark from "@/assets/alma/alma-mark.png";
-export { ALMA };
+
+import { COLOR, resolveTone, type Tone } from "@/design/tokens";
+import { BrandLogo } from "@/components/brand/BrandLogo";
 
 /* ═══════════════════════════════════════════════════════════
    AppShell — /app layout: sidebar desktop + bottom-nav mobile
-   Active state: single berry tint, no rainbow.
+   Active state: single accent (coral) tint, no rainbow.
    ═══════════════════════════════════════════════════════════ */
 
 type NavItem = {
@@ -95,18 +95,14 @@ export const AppShell = ({ children, hideGreeting = false }: AppShellProps) => {
   const unreadCount = unreadData?.data?.unread_count ?? 0;
 
   return (
-    <div className="min-h-screen lg:grid lg:grid-cols-[260px_1fr]" style={{ backgroundColor: ALMA.cream, color: ALMA.ink }}>
+    <div className="min-h-screen lg:grid lg:grid-cols-[260px_1fr]" style={{ backgroundColor: COLOR.canvas, color: COLOR.ink }}>
       {/* ───────────── Sidebar (desktop) ───────────── */}
       <aside
         className="hidden lg:flex sticky top-0 self-start h-screen flex-col px-6 py-7"
-        style={{ borderRight: `1px solid ${ALMA.border}`, backgroundColor: ALMA.cream }}
+        style={{ borderRight: `1px solid ${COLOR.line}`, backgroundColor: COLOR.surface }}
       >
         <Link to="/" className="flex items-center no-underline mb-10">
-          <img
-            src={almaMark}
-            alt="Alma Movement"
-            className="h-12 w-auto object-contain"
-          />
+          <BrandLogo variant="lockup" size={40} />
         </Link>
 
         <nav className="flex flex-col gap-1">
@@ -120,27 +116,27 @@ export const AppShell = ({ children, hideGreeting = false }: AppShellProps) => {
                 aria-current={active ? "page" : undefined}
                 className="group grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-2xl px-3.5 py-2.5 text-[0.92rem] no-underline transition-colors"
                 style={{
-                  backgroundColor: active ? ALMA.blush : "transparent",
-                  color: active ? ALMA.berry : ALMA.ink,
-                  fontWeight: active ? 600 : 500,
+                  backgroundColor: active ? COLOR.accentSoft : "transparent",
+                  color: COLOR.ink,
+                  fontWeight: active ? 700 : 500,
                 }}
               >
                 <Icon size={17} strokeWidth={active ? 2.2 : 1.8} />
                 <span>{item.label}</span>
-                {active && <ChevronRight size={14} style={{ color: ALMA.berry, opacity: 0.6 }} />}
+                {active && <ChevronRight size={14} style={{ color: COLOR.accentStrong }} />}
               </Link>
             );
           })}
         </nav>
 
-        <div className="mt-6 pt-6 flex flex-col gap-1" style={{ borderTop: `1px solid ${ALMA.border}` }}>
+        <div className="mt-6 pt-6 flex flex-col gap-1" style={{ borderTop: `1px solid ${COLOR.line}` }}>
           <Link
             to="/app/notifications"
             aria-current={pathname.startsWith("/app/notifications") ? "page" : undefined}
             className="grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-2xl px-3.5 py-2.5 text-[0.88rem] no-underline transition-colors"
             style={{
-              color: pathname.startsWith("/app/notifications") ? ALMA.berry : ALMA.ink,
-              backgroundColor: pathname.startsWith("/app/notifications") ? ALMA.blush : "transparent",
+              color: pathname.startsWith("/app/notifications") ? COLOR.accentStrong : COLOR.ink,
+              backgroundColor: pathname.startsWith("/app/notifications") ? COLOR.sunken : "transparent",
               opacity: pathname.startsWith("/app/notifications") ? 1 : 0.78,
             }}
           >
@@ -148,8 +144,8 @@ export const AppShell = ({ children, hideGreeting = false }: AppShellProps) => {
               <Bell size={16} strokeWidth={1.8} />
               {unreadCount > 0 && (
                 <span
-                  className="nums absolute -top-1.5 -right-1.5 grid place-items-center rounded-full text-[0.7rem] font-semibold leading-none px-1 min-w-[16px] h-[16px]"
-                  style={{ backgroundColor: ALMA.berry, color: ALMA.cream }}
+                  className="nums absolute -top-1.5 -right-1.5 grid place-items-center rounded-full text-[0.75rem] font-semibold leading-none px-1 min-w-[16px] h-[16px]"
+                  style={{ backgroundColor: COLOR.accent, color: COLOR.onAccent }}
                 >
                   {unreadCount > 9 ? "9+" : unreadCount}
                 </span>
@@ -160,21 +156,21 @@ export const AppShell = ({ children, hideGreeting = false }: AppShellProps) => {
           </Link>
         </div>
 
-        <div className="mt-auto pt-6" style={{ borderTop: `1px solid ${ALMA.border}` }}>
+        <div className="mt-auto pt-6" style={{ borderTop: `1px solid ${COLOR.line}` }}>
           <Link
             to="/app/profile"
             className="flex items-center gap-3 no-underline group"
-            style={{ color: ALMA.ink }}
+            style={{ color: COLOR.ink }}
           >
             <span
               className="grid h-10 w-10 place-items-center rounded-full overflow-hidden text-[0.78rem] font-bold"
-              style={{ backgroundColor: ALMA.berry, color: ALMA.cream }}
+              style={{ backgroundColor: COLOR.ink, color: COLOR.canvas }}
             >
               {avatarUrl ? <img src={avatarUrl} alt="" className="h-full w-full object-cover" /> : initials}
             </span>
             <div className="min-w-0 flex-1">
               <p className="text-[0.86rem] font-medium truncate leading-tight">{firstName}</p>
-              <p className="text-[0.7rem] truncate" style={{ opacity: 0.55 }}>
+              <p className="text-[0.75rem] truncate" style={{ opacity: 0.55 }}>
                 {user?.email}
               </p>
             </div>
@@ -182,7 +178,7 @@ export const AppShell = ({ children, hideGreeting = false }: AppShellProps) => {
           <button
             onClick={handleLogout}
             className="mt-3 w-full grid grid-cols-[auto_1fr] items-center gap-3 rounded-2xl px-3.5 py-2.5 text-[0.84rem] cursor-pointer transition-colors"
-            style={{ background: "transparent", border: 0, color: ALMA.ink, opacity: 0.65 }}
+            style={{ background: "transparent", border: 0, color: COLOR.ink, opacity: 0.65 }}
           >
             <LogOut size={15} strokeWidth={1.8} />
             <span className="text-left">Cerrar sesión</span>
@@ -196,28 +192,28 @@ export const AppShell = ({ children, hideGreeting = false }: AppShellProps) => {
         <header
           className="lg:hidden sticky top-0 z-30 flex h-16 items-center justify-between px-5"
           style={{
-            backgroundColor: ALMA.cream,
-            borderBottom: `1px solid ${ALMA.border}`,
+            backgroundColor: COLOR.surface,
+            borderBottom: `1px solid ${COLOR.line}`,
           }}
         >
           <Link to="/app" className="flex items-center no-underline">
-            <img src={almaMark} alt="Alma Movement" className="h-10 w-auto object-contain" />
+            <BrandLogo size={34} />
           </Link>
           <div className="flex items-center gap-2">
             <Link
               to="/app/notifications"
               className="relative grid h-10 w-10 place-items-center rounded-full no-underline transition-colors"
               style={{
-                backgroundColor: pathname.startsWith("/app/notifications") ? ALMA.blush : "transparent",
-                color: ALMA.ink,
+                backgroundColor: pathname.startsWith("/app/notifications") ? COLOR.sunken : "transparent",
+                color: COLOR.ink,
               }}
               aria-label={unreadCount > 0 ? `Notificaciones (${unreadCount} sin leer)` : "Notificaciones"}
             >
               <Bell size={17} strokeWidth={1.8} />
               {unreadCount > 0 && (
                 <span
-                  className="nums absolute top-0.5 right-0.5 grid place-items-center rounded-full text-[0.7rem] font-semibold leading-none px-1 min-w-[18px] h-[18px]"
-                  style={{ backgroundColor: ALMA.berry, color: ALMA.cream }}
+                  className="nums absolute top-0.5 right-0.5 grid place-items-center rounded-full text-[0.75rem] font-semibold leading-none px-1 min-w-[18px] h-[18px]"
+                  style={{ backgroundColor: COLOR.accent, color: COLOR.onAccent }}
                 >
                   {unreadCount > 9 ? "9+" : unreadCount}
                 </span>
@@ -225,8 +221,8 @@ export const AppShell = ({ children, hideGreeting = false }: AppShellProps) => {
             </Link>
             <Link
               to="/app/profile"
-              className="grid h-10 w-10 place-items-center rounded-full overflow-hidden text-[0.74rem] font-bold no-underline"
-              style={{ backgroundColor: ALMA.berry, color: ALMA.cream }}
+              className="grid h-10 w-10 place-items-center rounded-full overflow-hidden text-[0.75rem] font-bold no-underline"
+              style={{ backgroundColor: COLOR.ink, color: COLOR.canvas }}
               aria-label="Perfil"
             >
               {avatarUrl ? <img src={avatarUrl} alt="" className="h-full w-full object-cover" /> : initials}
@@ -237,7 +233,7 @@ export const AppShell = ({ children, hideGreeting = false }: AppShellProps) => {
         {/* Greeting strip (hideable per page) */}
         {!hideGreeting && (
           <div className="px-5 sm:px-7 lg:px-12 pt-7 lg:pt-12 pb-1">
-            <p className="text-[0.72rem] uppercase tracking-[0.24em]" style={{ color: ALMA.ink, opacity: 0.55 }}>
+            <p className="text-[0.75rem] uppercase tracking-[0.24em]" style={{ color: COLOR.ink, opacity: 0.55 }}>
               {greetByHour(today)}, {firstName}
             </p>
           </div>
@@ -251,10 +247,11 @@ export const AppShell = ({ children, hideGreeting = false }: AppShellProps) => {
 
         {/* Mobile bottom nav */}
         <nav
+          data-bottom-nav
           className="lg:hidden fixed inset-x-0 bottom-0 z-40 grid grid-cols-5"
           style={{
-            backgroundColor: ALMA.cream,
-            borderTop: `1px solid ${ALMA.border}`,
+            backgroundColor: COLOR.surface,
+            borderTop: `1px solid ${COLOR.line}`,
             paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))",
             paddingTop: "0.5rem",
           }}
@@ -271,18 +268,13 @@ export const AppShell = ({ children, hideGreeting = false }: AppShellProps) => {
                 aria-current={active ? "page" : undefined}
               >
                 <span
-                  className="grid h-9 w-9 place-items-center rounded-full transition-colors"
-                  style={{
-                    backgroundColor: active ? ALMA.berry : "transparent",
-                    color: active ? ALMA.cream : ALMA.ink,
-                  }}
+                  data-nav-icon
+                  className="grid h-9 w-11 place-items-center rounded-full transition-colors"
+                  style={{ backgroundColor: active ? COLOR.accent : "transparent", color: active ? COLOR.onAccent : COLOR.inkMuted }}
                 >
-                  <Icon size={17} strokeWidth={active ? 2.2 : 1.8} />
+                  <Icon size={18} strokeWidth={active ? 2.2 : 1.8} />
                 </span>
-                <span
-                  className="text-[0.72rem] tracking-[0.04em]"
-                  style={{ color: active ? ALMA.berry : ALMA.ink, opacity: active ? 1 : 0.6, fontWeight: active ? 600 : 500 }}
-                >
+                <span className="text-[0.75rem]" style={{ color: active ? COLOR.ink : COLOR.inkMuted, fontWeight: active ? 700 : 500 }}>
                   {item.label}
                 </span>
               </Link>
@@ -298,7 +290,9 @@ export const AppShell = ({ children, hideGreeting = false }: AppShellProps) => {
    Primitives
    ═══════════════════════════════════════════════════════════ */
 
-/* ── PageHeader ── */
+/* ── PageHeader ── la firma de la app: un bloque coral por pantalla (spec §4.3).
+   En móvil llega a los bordes (cancela el padding de <main>) con las esquinas
+   inferiores redondeadas; en escritorio es una tarjeta. */
 type PageHeaderProps = {
   eyebrow?: string;
   title: ReactNode;
@@ -307,32 +301,30 @@ type PageHeaderProps = {
   actions?: ReactNode;
 };
 export const PageHeader = ({ eyebrow, title, titleAccent, subtitle, actions }: PageHeaderProps) => (
-  <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 mb-7 lg:mb-10">
-    <div>
-      {eyebrow && (
-        <span className="text-[0.72rem] font-medium uppercase tracking-[0.3em]" style={{ color: ALMA.berry }}>
-          {eyebrow}
-        </span>
-      )}
-      <h1
-        className={"font-bebas leading-[0.95] tracking-tight " + (eyebrow ? "mt-2" : "")}
-        style={{ color: ALMA.ink, fontSize: "clamp(1.85rem, 3.4vw, 2.6rem)" }}
-      >
-        {title}
-        {titleAccent && (
-          <span className="block italic font-alilato font-normal" style={{ color: ALMA.berry, fontSize: "0.78em" }}>
-            {titleAccent}
-          </span>
-        )}
-      </h1>
-      {subtitle && (
-        <p className="mt-2 text-[0.92rem] leading-[1.6] max-w-[60ch]" style={{ color: ALMA.ink, opacity: 0.65 }}>
-          {subtitle}
-        </p>
-      )}
+  <header
+    className="-mx-5 sm:-mx-7 first:-mt-4 lg:mx-0 lg:first:mt-0 mb-7 lg:mb-10 rounded-b-[22px] lg:rounded-[22px] px-5 sm:px-7 lg:px-8 py-6 lg:py-8"
+    style={{ backgroundColor: COLOR.accent, color: COLOR.onAccent }}
+  >
+    <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
+      <div className="min-w-0">
+        {eyebrow && <p className="text-[0.75rem] font-bold uppercase tracking-[0.14em]">{eyebrow}</p>}
+        <h1
+          lang="es"
+          className={"font-display font-extrabold uppercase leading-[1.02] tracking-[-0.01em] break-words hyphens-auto text-[length:clamp(1.5rem,7.2vw,1.75rem)] " + (eyebrow ? "mt-2" : "")}
+          /* display-l: 28 px desde 390 px */
+        >
+          {title}
+          {titleAccent && (
+            <span className="block mt-1 font-semibold normal-case tracking-normal" style={{ fontSize: "0.62em" }}>
+              {titleAccent}
+            </span>
+          )}
+        </h1>
+        {subtitle && <p className="mt-2 text-[0.95rem] font-semibold leading-[1.5] max-w-[60ch]">{subtitle}</p>}
+      </div>
+      {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
     </div>
-    {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
-  </div>
+  </header>
 );
 
 /* ── Section ── */
@@ -345,48 +337,39 @@ type SectionProps = {
 export const Section = ({ title, trailing, children, className }: SectionProps) => (
   <section className={"mt-8 lg:mt-10 " + (className ?? "")}>
     {(title || trailing) && (
-      <div
-        className="flex items-end justify-between gap-3 pb-3 mb-4"
-        style={{ borderBottom: `1px solid ${ALMA.border}` }}
-      >
+      <div className="flex items-end justify-between gap-3 pb-3 mb-4" style={{ borderBottom: `1px solid ${COLOR.line}` }}>
         {title && (
-          <h2
-            className="text-[0.72rem] font-medium uppercase tracking-[0.24em]"
-            style={{ color: ALMA.ink, opacity: 0.65 }}
-          >
+          <h2 className="font-sans text-[0.75rem] font-bold uppercase tracking-[0.12em]" style={{ color: COLOR.inkMuted }}>
             {title}
           </h2>
         )}
-        {trailing && <div className="text-[0.78rem]">{trailing}</div>}
+        {trailing && <div className="text-[0.8125rem]">{trailing}</div>}
       </div>
     )}
     {children}
   </section>
 );
 
-/* ── ListRow ── iOS-settings-style hairline row */
+/* ── ListRow ── fila con divisor; interactiva si recibe `to` u `onClick` */
 type ListRowProps = {
   to?: string;
   onClick?: () => void;
   icon?: ReactNode;
-  iconTint?: keyof typeof ALMA;
+  iconTint?: Tone;
   title: ReactNode;
   description?: ReactNode;
   trailing?: ReactNode;
   destructive?: boolean;
   asButton?: boolean;
 };
-export const ListRow = ({ to, onClick, icon, iconTint = "berry", title, description, trailing, destructive, asButton }: ListRowProps) => {
-  const tintColor = destructive ? ALMA.destructive : ALMA[iconTint];
+export const ListRow = ({ to, onClick, icon, iconTint = "accent", title, description, trailing, destructive, asButton }: ListRowProps) => {
+  const t = resolveTone(destructive ? "danger" : iconTint);
   const inner = (
     <div className="grid grid-cols-[auto_1fr_auto] items-center gap-4 py-4">
       {icon ? (
         <span
-          className="grid h-10 w-10 place-items-center rounded-2xl shrink-0"
-          style={{
-            backgroundColor: destructive ? `${ALMA.destructive}10` : ALMA.blush,
-            color: tintColor,
-          }}
+          className="grid h-10 w-10 place-items-center rounded-xl shrink-0"
+          style={{ backgroundColor: t.softBg, color: t.fg, boxShadow: `inset 0 0 0 1px ${COLOR.line}` }}
         >
           {icon}
         </span>
@@ -394,19 +377,16 @@ export const ListRow = ({ to, onClick, icon, iconTint = "berry", title, descript
         <span aria-hidden="true" />
       )}
       <div className="min-w-0">
-        <div
-          className="text-[0.94rem] font-medium leading-tight truncate"
-          style={{ color: destructive ? ALMA.destructive : ALMA.ink }}
-        >
+        <div className="text-[0.95rem] font-semibold leading-tight truncate" style={{ color: destructive ? COLOR.danger : COLOR.ink }}>
           {title}
         </div>
         {description && (
-          <div className="text-[0.78rem] mt-0.5 truncate" style={{ color: ALMA.ink, opacity: 0.55 }}>
+          <div className="text-[0.8125rem] mt-0.5 truncate" style={{ color: COLOR.inkMuted }}>
             {description}
           </div>
         )}
       </div>
-      <div className="flex items-center gap-2 shrink-0" style={{ color: ALMA.ink, opacity: 0.4 }}>
+      <div className="flex items-center gap-2 shrink-0" style={{ color: COLOR.inkMuted }}>
         {trailing}
         {(to || onClick) && <ChevronRight size={15} />}
       </div>
@@ -414,75 +394,82 @@ export const ListRow = ({ to, onClick, icon, iconTint = "berry", title, descript
   );
 
   const sharedClass = "block w-full text-left no-underline transition-colors";
-  // ALMA.mist: hover real para filas interactivas (las estáticas no lo reciben)
-  const interactiveClass = sharedClass + " hover:bg-[#F4F1EA]";
-  const sharedStyle = { color: ALMA.ink, borderTop: `1px solid ${ALMA.border}` };
+  const interactiveClass = sharedClass + " hover:bg-canvas";
+  const sharedStyle = { color: COLOR.ink, borderTop: `1px solid ${COLOR.line}` };
 
   if (asButton || (onClick && !to)) {
     return (
-      <button onClick={onClick} className={interactiveClass + " bg-transparent border-0 cursor-pointer px-1"} style={sharedStyle}>
+      <button onClick={onClick} className={interactiveClass + " bg-transparent border-0 cursor-pointer px-4"} style={sharedStyle}>
         {inner}
       </button>
     );
   }
   if (to) {
     return (
-      <Link to={to} onClick={onClick} className={interactiveClass + " px-1"} style={sharedStyle}>
+      <Link to={to} onClick={onClick} className={interactiveClass + " px-4"} style={sharedStyle}>
         {inner}
       </Link>
     );
   }
   return (
-    <div className={sharedClass + " px-1"} style={sharedStyle}>
+    <div className={sharedClass + " px-4"} style={sharedStyle}>
       {inner}
     </div>
   );
 };
 
-/* ── ListGroup ── wraps ListRows; closes the bottom hairline */
+/* ── ListGroup ── tarjeta blanca que agrupa ListRows */
 export const ListGroup = ({ children }: { children: ReactNode }) => (
-  <div style={{ borderBottom: `1px solid ${ALMA.border}` }}>{children}</div>
+  <div
+    className="rounded-2xl overflow-hidden [&>*:first-child]:!border-t-0"
+    style={{ backgroundColor: COLOR.surface, boxShadow: `inset 0 0 0 1px ${COLOR.line}` }}
+  >
+    {children}
+  </div>
 );
 
-/* ── Stat ── number + label, hairline above */
+/* ── Stat ── cifra + etiqueta */
 type StatProps = {
   value: ReactNode;
   label: string;
-  tint?: keyof typeof ALMA;
+  tint?: Tone;
 };
 export const Stat = ({ value, label, tint = "ink" }: StatProps) => (
-  <div className="pt-3" style={{ borderTop: `1px solid ${ALMA.border}` }}>
-    <div className="nums font-display text-2xl leading-none" style={{ color: ALMA[tint] }}>
+  <div className="pt-3" style={{ borderTop: `1px solid ${COLOR.line}` }}>
+    <div className="font-display font-semibold text-2xl leading-none" style={{ color: resolveTone(tint).fg }}>
       {value}
     </div>
-    <div className="text-[0.72rem] uppercase tracking-[0.18em] mt-1.5" style={{ color: ALMA.ink, opacity: 0.55 }}>
+    <div className="text-[0.75rem] font-bold uppercase tracking-[0.12em] mt-1.5" style={{ color: COLOR.inkMuted }}>
       {label}
     </div>
   </div>
 );
 
-/* ── Tag ── pill, color-coded */
+/* ── Tag ── pill; sólida para disponibilidad (coral = hay lugar) */
 type TagProps = {
   children: ReactNode;
-  tint?: keyof typeof ALMA;
+  tint?: Tone;
   variant?: "soft" | "solid";
 };
-export const Tag = ({ children, tint = "berry", variant = "soft" }: TagProps) => {
-  const c = ALMA[tint];
-  const isSoft = variant === "soft";
+export const Tag = ({ children, tint = "accent", variant = "soft" }: TagProps) => {
+  const t = resolveTone(tint);
+  const soft = variant === "soft";
   return (
     <span
-      className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[0.72rem] font-medium uppercase tracking-[0.18em]"
+      className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[0.75rem] font-bold leading-none"
       style={
-        isSoft
-          ? { backgroundColor: `${c}1a`, color: c }
-          : { backgroundColor: c, color: ALMA.cream }
+        soft
+          ? { backgroundColor: t.softBg, color: t.softFg, boxShadow: `inset 0 0 0 1px ${COLOR.line}` }
+          : { backgroundColor: t.solidBg, color: t.solidFg }
       }
     >
       {children}
     </span>
   );
 };
+
+/* ── Hexágono de marca para estados (spec §4.6) ── */
+const HEX_CLIP = "polygon(25% 3%, 75% 3%, 100% 50%, 75% 97%, 25% 97%, 0 50%)";
 
 /* ── EmptyState ── */
 type EmptyStateProps = {
@@ -495,31 +482,28 @@ type EmptyStateProps = {
 };
 export const EmptyState = ({ title, description, ctaLabel, ctaTo, onCta, icon }: EmptyStateProps) => (
   <div className="flex flex-col items-start gap-4 py-10">
-    {icon && (
-      <span
-        className="grid h-12 w-12 place-items-center rounded-2xl"
-        style={{ backgroundColor: ALMA.blush, color: ALMA.berry }}
-      >
-        {icon}
-      </span>
-    )}
+    <span
+      aria-hidden="true"
+      className="grid h-12 w-[52px] place-items-center"
+      style={{ backgroundColor: COLOR.accentSoft, color: COLOR.accentStrong, clipPath: HEX_CLIP }}
+    >
+      {icon}
+    </span>
     <div>
-      <h3 className="font-bebas text-[1.4rem] leading-tight" style={{ color: ALMA.ink }}>{title}</h3>
+      <h3 className="font-display font-extrabold uppercase text-[1.25rem] leading-tight" style={{ color: COLOR.ink }}>{title}</h3>
       {description && (
-        <p className="mt-2 text-[0.92rem] leading-[1.6] max-w-[44ch]" style={{ color: ALMA.ink, opacity: 0.65 }}>
+        <p className="mt-2 text-[0.95rem] leading-[1.6] max-w-[44ch]" style={{ color: COLOR.inkMuted }}>
           {description}
         </p>
       )}
     </div>
-    {ctaLabel && (ctaTo ? (
-      <PrimaryButton to={ctaTo}>{ctaLabel}</PrimaryButton>
-    ) : (
-      <PrimaryButton onClick={onCta}>{ctaLabel}</PrimaryButton>
-    ))}
+    {ctaLabel && (ctaTo ? <PrimaryButton to={ctaTo}>{ctaLabel}</PrimaryButton> : <PrimaryButton onClick={onCta}>{ctaLabel}</PrimaryButton>)}
   </div>
 );
 
-/* ── PrimaryButton ── berry pill */
+/* ── Botones ── primary negro en todas partes; accent coral sólo para la
+   acción que genera ingreso, una por pantalla y nunca dentro de un bloque
+   coral (spec §4.1). Todos ≥44 px. */
 type CommonBtnProps = {
   children: ReactNode;
   loading?: boolean;
@@ -530,24 +514,25 @@ type CommonBtnProps = {
   disabled?: boolean;
   type?: "button" | "submit" | "reset";
   className?: string;
+  variant?: "primary" | "accent";
 };
 
-export const PrimaryButton = ({ children, loading, loadingLabel, size = "md", to, onClick, disabled, type = "button", className: extra }: CommonBtnProps) => {
-  const sizeClass = size === "sm" ? "px-5 py-2.5 text-[0.74rem]" : "px-6 py-3 text-[0.78rem]";
-  const className =
-    `group inline-flex items-center justify-center gap-2 rounded-full font-medium uppercase tracking-[0.18em] no-underline transition-transform hover:-translate-y-px disabled:opacity-60 disabled:translate-y-0 ${sizeClass} ${extra ?? ""}`;
-  const style = { backgroundColor: ALMA.berry, color: ALMA.cream } as const;
-  const inner = loading ? (
-    <>{loadingLabel ?? "Cargando…"}</>
-  ) : (
+export const PrimaryButton = ({ children, loading, loadingLabel, size = "md", to, onClick, disabled, type = "button", className: extra, variant = "primary" }: CommonBtnProps) => {
+  const sizeClass = size === "sm" ? "min-h-[44px] px-5 text-[0.85rem]" : "min-h-[48px] px-6 text-[0.9rem]";
+  const className = `group inline-flex items-center justify-center gap-2 rounded-full font-bold no-underline transition-transform motion-safe:hover:-translate-y-px disabled:translate-y-0 ${sizeClass} ${extra ?? ""}`;
+  // Deshabilitado (spec §4.1): fondo sunken, texto lineStrong. Cargando conserva su color.
+  const style = disabled && !loading
+    ? { backgroundColor: COLOR.sunken, color: COLOR.lineStrong }
+    : variant === "accent"
+      ? { backgroundColor: COLOR.accent, color: COLOR.onAccent }
+      : { backgroundColor: COLOR.ink, color: COLOR.canvas };
+  const inner = loading ? <>{loadingLabel ?? "Cargando…"}</> : (
     <>
       {children}
-      <ArrowRight size={14} className="transition-transform group-hover:translate-x-0.5" />
+      <ArrowRight size={15} className="transition-transform motion-safe:group-hover:translate-x-0.5" />
     </>
   );
-  if (to) {
-    return <Link to={to} data-press className={className} style={style} onClick={onClick}>{inner}</Link>;
-  }
+  if (to) return <Link to={to} data-press className={className} style={style} onClick={onClick}>{inner}</Link>;
   return (
     <button type={type} data-press className={className} style={style} onClick={onClick} disabled={disabled || loading}>
       {inner}
@@ -555,18 +540,16 @@ export const PrimaryButton = ({ children, loading, loadingLabel, size = "md", to
   );
 };
 
-/* ── GhostButton ── secondary, no fill */
 export const GhostButton = ({ children, to, onClick, disabled, type = "button", className: extra }: CommonBtnProps) => {
-  const className =
-    `inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-[0.74rem] font-medium uppercase tracking-[0.18em] no-underline transition-colors ${extra ?? ""}`;
-  const style = { border: `1px solid ${ALMA.border}`, color: ALMA.ink } as const;
-  if (to) {
-    return <Link to={to} data-press className={className} style={style} onClick={onClick}>{children}</Link>;
-  }
+  // F7 — el fondo va en la clase (bg-surface), no en línea: un backgroundColor
+  // en style anulaba el hover:bg-sunken (el style attribute siempre gana).
+  const className = `inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full bg-surface px-5 text-[0.85rem] font-bold no-underline transition-colors hover:bg-sunken ${extra ?? ""}`;
+  const style = { boxShadow: `inset 0 0 0 1.5px ${COLOR.lineStrong}`, color: COLOR.ink };
+  if (to) return <Link to={to} data-press className={className} style={style} onClick={onClick}>{children}</Link>;
   return <button type={type} data-press className={className} style={style} onClick={onClick} disabled={disabled}>{children}</button>;
 };
 
-/* ── ActionRow ── full-width wide CTA, used in Dashboard "next class" */
+/* ── ActionRow ── tarjeta de acción amplia (p. ej. "tu próxima clase") */
 type ActionRowProps = {
   to?: string;
   onClick?: () => void;
@@ -574,37 +557,41 @@ type ActionRowProps = {
   title: ReactNode;
   meta?: ReactNode;
   rightLabel?: string;
-  tint?: keyof typeof ALMA;
+  tint?: Tone;
 };
-export const ActionRow = ({ to, onClick, eyebrow, title, meta, rightLabel, tint = "berry" }: ActionRowProps) => {
-  const c = ALMA[tint];
-  // stone/sandstone fallan AA en texto pequeño sobre blush; el texto chico se clava en berry
-  const textTint = tint === "stone" || tint === "coral" || tint === "sandstone" ? ALMA.berry : c;
+export const ActionRow = ({ to, onClick, eyebrow, title, meta, rightLabel, tint = "accent" }: ActionRowProps) => {
+  const t = resolveTone(tint);
   const inner = (
-    <div className="grid grid-cols-[1fr_auto] items-center gap-5 px-5 py-5 sm:px-6 sm:py-6 rounded-3xl transition-transform hover:-translate-y-px"
-      style={{ backgroundColor: ALMA.blush }}>
+    <div
+      className="grid grid-cols-[1fr_auto] items-center gap-5 px-5 py-5 sm:px-6 sm:py-6 rounded-2xl transition-transform motion-safe:hover:-translate-y-px"
+      style={{ backgroundColor: COLOR.surface, boxShadow: `inset 0 0 0 1px ${COLOR.line}` }}
+    >
       <div className="min-w-0">
         {eyebrow && (
-          <p className="text-[0.72rem] font-medium uppercase tracking-[0.24em]" style={{ color: textTint }}>
+          <p className="text-[0.75rem] font-bold uppercase tracking-[0.12em]" style={{ color: t.fg }}>
             {eyebrow}
           </p>
         )}
-        <div className="font-bebas text-[1.55rem] sm:text-[1.85rem] leading-tight mt-1" style={{ color: ALMA.ink }}>
+        <div className="font-display font-semibold text-[1.25rem] sm:text-[1.5rem] leading-tight mt-1" style={{ color: COLOR.ink }}>
           {title}
         </div>
         {meta && (
-          <p className="text-[0.84rem] mt-1" style={{ color: ALMA.ink, opacity: 0.6 }}>
+          <p className="text-[0.875rem] mt-1" style={{ color: COLOR.inkMuted }}>
             {meta}
           </p>
         )}
       </div>
       <div className="flex items-center gap-3 shrink-0">
         {rightLabel && (
-          <span className="hidden sm:inline-block text-[0.72rem] uppercase tracking-[0.2em]" style={{ color: textTint }}>
+          <span className="hidden sm:inline-block text-[0.75rem] font-bold uppercase tracking-[0.12em]" style={{ color: t.fg }}>
             {rightLabel}
           </span>
         )}
-        <span className="grid h-11 w-11 place-items-center rounded-full" style={{ backgroundColor: c, color: ALMA.cream }}>
+        <span
+          data-testid="action-row-arrow"
+          className="grid h-11 w-11 place-items-center rounded-full"
+          style={{ backgroundColor: t.solidBg, color: t.solidFg }}
+        >
           <ArrowUpRight size={16} />
         </span>
       </div>
@@ -620,24 +607,14 @@ export const ActionRow = ({ to, onClick, eyebrow, title, meta, rightLabel, tint 
   );
 };
 
-/* ── SkeletonRow ── placeholder de carga, visible sobre cualquier superficie
-   (cream, mist o blush). Base sandstone al 35% + pulso sutil de opacidad;
-   motion-safe lo apaga con prefers-reduced-motion. */
+/* ── SkeletonRow ── visible sobre canvas y sobre surface */
 export const SkeletonRow = ({ height = 64 }: { height?: number }) => (
-  <div
-    aria-hidden="true"
-    className="rounded-2xl overflow-hidden relative"
-    style={{ backgroundColor: "rgba(203,185,164,0.35)", height }}
-  >
-    <span
-      className="absolute inset-0 motion-safe:animate-pulse"
-      style={{ backgroundColor: "rgba(203,185,164,0.4)" }}
-    />
+  <div aria-hidden="true" className="rounded-2xl overflow-hidden relative" style={{ backgroundColor: COLOR.line, height }}>
+    <span className="absolute inset-0 motion-safe:animate-pulse" style={{ backgroundColor: COLOR.sunken }} />
   </div>
 );
 
-/* ── ErrorState ── error de página: honesto, con reintento.
-   Mismo lenguaje que EmptyState, tinte destructive sutil solo en el tile. */
+/* ── ErrorState ── honesto, con reintento (spec §4.6) */
 type ErrorStateProps = {
   title?: string;
   description?: string;
@@ -651,17 +628,12 @@ export const ErrorState = ({
   retryLabel = "Reintentar",
 }: ErrorStateProps) => (
   <div role="alert" className="flex flex-col items-start gap-4 py-10">
-    <span
-      className="grid h-12 w-12 place-items-center rounded-2xl"
-      style={{ backgroundColor: `${ALMA.destructive}12`, color: ALMA.destructive }}
-    >
+    <span aria-hidden="true" className="grid h-12 w-[52px] place-items-center" style={{ backgroundColor: COLOR.sunken, color: COLOR.danger, clipPath: HEX_CLIP }}>
       <AlertCircle size={20} strokeWidth={1.8} />
     </span>
     <div>
-      <h3 className="font-display text-[1.4rem] leading-tight" style={{ color: ALMA.ink }}>{title}</h3>
-      <p className="mt-2 text-[0.92rem] leading-[1.6] max-w-[44ch]" style={{ color: ALMA.ink, opacity: 0.65 }}>
-        {description}
-      </p>
+      <h3 className="font-display font-extrabold uppercase text-[1.25rem] leading-tight" style={{ color: COLOR.ink }}>{title}</h3>
+      <p className="mt-2 text-[0.95rem] leading-[1.6] max-w-[44ch]" style={{ color: COLOR.inkMuted }}>{description}</p>
     </div>
     {onRetry && <GhostButton onClick={onRetry}>{retryLabel}</GhostButton>}
   </div>

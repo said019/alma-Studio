@@ -15,7 +15,7 @@ const Terminos = () => {
       current="/legal/terminos"
       title={
         <>
-          Términos y <span className="font-display-italic">condiciones</span>
+          Términos y <span className="font-display">condiciones</span>
         </>
       }
     >

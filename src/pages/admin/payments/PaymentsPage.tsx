@@ -64,24 +64,24 @@ const StepBar = ({ step }: { step: number }) => (
           <div
             className={cn(
               "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold transition-colors",
-              active && "bg-alma-oat text-alma-ink ring-1 ring-inset ring-alma-sandstone",
-              done && "bg-alma-mist text-alma-ink/70 border border-alma-hairline",
-              !done && !active && "border border-alma-hairline text-alma-ink/55",
+              active && "bg-sunken text-ink ring-1 ring-inset ring-line-strong",
+              done && "bg-sunken text-ink/70 border border-line",
+              !done && !active && "border border-line text-ink/55",
             )}
           >
             <span
               className={cn(
                 "w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold nums",
-                active && "bg-alma-ink-deep text-alma-canvas",
-                done && "bg-alma-oat text-alma-ink",
-                !done && !active && "bg-alma-mist text-alma-ink/55",
+                active && "bg-inverse text-canvas",
+                done && "bg-sunken text-ink",
+                !done && !active && "bg-sunken text-ink/55",
               )}
             >
               {done ? <Check size={11} strokeWidth={3} /> : i + 1}
             </span>
             {s.label}
           </div>
-          {i < 2 && <div className={cn("w-8 h-px mx-1", done ? "bg-alma-sandstone" : "bg-alma-hairline")} />}
+          {i < 2 && <div className={cn("w-8 h-px mx-1", done ? "bg-line" : "bg-line")} />}
         </div>
       );
     })}
@@ -138,10 +138,10 @@ const CashAssignment = () => {
       {/* ── Paso 1: Buscar clienta ─────────────────────────── */}
       {step === 1 && (
         <div className="space-y-4">
-          <div className="rounded-2xl border border-alma-hairline bg-alma-mist p-5">
-            <h3 className="text-[0.72rem] font-semibold text-alma-ink/70 uppercase tracking-[0.14em] mb-4">Buscar clienta</h3>
+          <div className="rounded-2xl border border-line bg-sunken p-5">
+            <h3 className="text-[0.72rem] font-semibold text-ink/70 uppercase tracking-[0.14em] mb-4">Buscar clienta</h3>
             <div className="relative">
-              <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-alma-ink/55" />
+              <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink/55" />
               <Input
                 className="pl-9 rounded-xl"
                 value={search}
@@ -173,24 +173,24 @@ const CashAssignment = () => {
               {filteredUsers.map((u) => (
                 <button
                   key={u.id}
-                  className="w-full flex items-center gap-4 p-4 rounded-2xl border border-alma-hairline bg-alma-mist hover:bg-alma-oat/40 hover:border-alma-sandstone transition-colors group text-left"
+                  className="w-full flex items-center gap-4 p-4 rounded-2xl border border-line bg-sunken hover:bg-sunken/40 hover:border-line-strong transition-colors group text-left"
                   onClick={() => { setSelectedUser(u); setStep(2); }}
                 >
-                  <div className="w-9 h-9 rounded-full bg-alma-oat ring-1 ring-inset ring-alma-sandstone/50 flex items-center justify-center text-sm font-bold text-alma-ink shrink-0">
+                  <div className="w-9 h-9 rounded-full bg-sunken ring-1 ring-inset ring-line-strong/50 flex items-center justify-center text-sm font-bold text-ink shrink-0">
                     {u.displayName?.[0]?.toUpperCase() ?? "?"}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-sm text-alma-ink truncate">{u.displayName}</p>
-                    <p className="text-xs text-alma-ink/55 truncate">
+                    <p className="font-semibold text-sm text-ink truncate">{u.displayName}</p>
+                    <p className="text-xs text-ink/55 truncate">
                       {u.email}
                       {u.phone ? ` · ${u.phone}` : ""}
                     </p>
                   </div>
-                  <ArrowRight size={14} className="text-alma-ink/30 group-hover:text-alma-berry transition-colors shrink-0" />
+                  <ArrowRight size={14} className="text-ink/30 group-hover:text-ink transition-colors shrink-0" />
                 </button>
               ))}
               {filteredUsers.length === 0 && (
-                <p className="text-center py-6 text-alma-ink/55 text-sm">
+                <p className="text-center py-6 text-ink/55 text-sm">
                   {debouncedSearch
                     ? "No encontramos a nadie con esos datos."
                     : "Escribe un nombre, email o teléfono para buscar."}
@@ -205,15 +205,15 @@ const CashAssignment = () => {
       {step === 2 && (
         <div className="space-y-5">
           {/* Clienta seleccionada */}
-          <div className="flex items-center gap-3 p-3 rounded-xl bg-alma-oat/50 border border-alma-sandstone/50">
-            <div className="w-8 h-8 rounded-full bg-alma-oat ring-1 ring-inset ring-alma-sandstone flex items-center justify-center text-xs font-bold text-alma-ink">
+          <div className="flex items-center gap-3 p-3 rounded-xl bg-sunken/50 border border-line-strong/50">
+            <div className="w-8 h-8 rounded-full bg-sunken ring-1 ring-inset ring-line-strong flex items-center justify-center text-xs font-bold text-ink">
               {selectedUser?.displayName?.[0]?.toUpperCase()}
             </div>
             <div>
-              <p className="text-sm font-semibold text-alma-ink">{selectedUser?.displayName}</p>
-              <p className="text-xs text-alma-ink/55">{selectedUser?.email}</p>
+              <p className="text-sm font-semibold text-ink">{selectedUser?.displayName}</p>
+              <p className="text-xs text-ink/55">{selectedUser?.email}</p>
             </div>
-            <Button variant="ghost" size="sm" className="ml-auto text-alma-ink/70 hover:text-alma-ink text-xs" onClick={() => setStep(1)}>
+            <Button variant="ghost" size="sm" className="ml-auto text-ink/70 hover:text-ink text-xs" onClick={() => setStep(1)}>
               <ChevronLeft size={12} className="mr-1" /> Cambiar
             </Button>
           </div>
@@ -249,7 +249,7 @@ const CashAssignment = () => {
             if (!items.length) return null;
             return (
               <div key={group}>
-                <p className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-alma-berry mb-2 px-1">
+                <p className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-ink mb-2 px-1">
                   {GROUP_LABELS[group] ?? group}
                 </p>
                 <div className="grid grid-cols-1 gap-2">
@@ -262,8 +262,8 @@ const CashAssignment = () => {
                         className={cn(
                           "w-full flex items-center justify-between gap-3 p-3.5 rounded-xl border transition-colors text-left group",
                           isSelected
-                            ? "border-alma-sandstone bg-alma-oat ring-1 ring-inset ring-alma-sandstone"
-                            : "border-alma-hairline bg-alma-mist hover:border-alma-sandstone hover:bg-alma-oat/40",
+                            ? "border-line-strong bg-sunken ring-1 ring-inset ring-line-strong"
+                            : "border-line bg-sunken hover:border-line-strong hover:bg-sunken/40",
                         )}
                         onClick={() => setSelectedPlan(p)}
                       >
@@ -271,20 +271,20 @@ const CashAssignment = () => {
                           <span
                             className={cn(
                               "w-5 h-5 rounded-full flex items-center justify-center shrink-0 transition-colors",
-                              isSelected ? "bg-alma-ink-deep text-alma-canvas" : "border border-alma-sandstone/60",
+                              isSelected ? "bg-inverse text-canvas" : "border border-line-strong/60",
                             )}
                           >
                             {isSelected && <Check size={11} strokeWidth={3} />}
                           </span>
                           <div className="min-w-0">
-                            <p className="text-sm font-semibold text-alma-ink truncate">{p.name}</p>
-                            <p className="text-xs text-alma-ink/55 nums">
+                            <p className="text-sm font-semibold text-ink truncate">{p.name}</p>
+                            <p className="text-xs text-ink/55 nums">
                               {p.classLimit === null ? "Ilimitado" : `${p.classLimit} clases`}
                               {p.durationDays ? ` · ${p.durationDays} días` : ""}
                             </p>
                           </div>
                         </div>
-                        <span className="text-base font-semibold text-alma-ink nums shrink-0">
+                        <span className="text-base font-semibold text-ink nums shrink-0">
                           {formatMXN(Number(p.price))}
                         </span>
                       </button>
@@ -296,11 +296,11 @@ const CashAssignment = () => {
           })}
 
           <div className="flex gap-3 pt-2">
-            <Button variant="outline" className="border-alma-sandstone text-alma-ink hover:bg-alma-mist" onClick={() => setStep(1)}>
+            <Button variant="outline" className="border-line-strong text-ink hover:bg-sunken" onClick={() => setStep(1)}>
               <ChevronLeft size={14} className="mr-1" /> Volver
             </Button>
             <Button
-              className="flex-1 bg-alma-ink-deep text-alma-canvas hover:bg-alma-ink font-semibold"
+              className="flex-1 bg-inverse text-canvas hover:bg-ink font-semibold"
               disabled={!selectedPlan}
               onClick={() => setStep(3)}
             >
@@ -314,37 +314,37 @@ const CashAssignment = () => {
       {step === 3 && (
         <div className="space-y-5">
           {/* Resumen */}
-          <div className="rounded-2xl border border-alma-hairline bg-alma-mist overflow-hidden">
-            <div className="px-5 py-3 border-b border-alma-hairline flex items-center gap-2">
-              <Receipt size={14} className="text-alma-berry" />
-              <span className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-alma-ink/70">Resumen de la membresía</span>
+          <div className="rounded-2xl border border-line bg-sunken overflow-hidden">
+            <div className="px-5 py-3 border-b border-line flex items-center gap-2">
+              <Receipt size={14} className="text-ink" />
+              <span className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-ink/70">Resumen de la membresía</span>
             </div>
             <div className="p-5 space-y-3">
               <div className="flex justify-between items-center">
-                <span className="text-sm text-alma-ink/70">Clienta</span>
+                <span className="text-sm text-ink/70">Clienta</span>
                 <div className="flex items-center gap-2">
-                  <div className="w-5 h-5 rounded-full bg-alma-oat ring-1 ring-inset ring-alma-sandstone flex items-center justify-center text-[9px] font-bold text-alma-ink">
+                  <div className="w-5 h-5 rounded-full bg-sunken ring-1 ring-inset ring-line-strong flex items-center justify-center text-[9px] font-bold text-ink">
                     {selectedUser?.displayName?.[0]?.toUpperCase()}
                   </div>
-                  <span className="text-sm font-semibold text-alma-ink">{selectedUser?.displayName}</span>
+                  <span className="text-sm font-semibold text-ink">{selectedUser?.displayName}</span>
                 </div>
               </div>
-              <div className="h-px bg-alma-hairline" />
+              <div className="h-px bg-line" />
               <div className="flex justify-between items-center">
-                <span className="text-sm text-alma-ink/70">Plan</span>
-                <span className="text-sm font-semibold text-alma-ink">{selectedPlan?.name}</span>
+                <span className="text-sm text-ink/70">Plan</span>
+                <span className="text-sm font-semibold text-ink">{selectedPlan?.name}</span>
               </div>
-              <div className="h-px bg-alma-hairline" />
+              <div className="h-px bg-line" />
               <div className="flex justify-between items-center">
-                <span className="text-sm text-alma-ink/70">Total</span>
-                <span className="text-lg font-semibold text-alma-ink nums">{formatMXN(Number(selectedPlan?.price ?? 0))}</span>
+                <span className="text-sm text-ink/70">Total</span>
+                <span className="text-lg font-semibold text-ink nums">{formatMXN(Number(selectedPlan?.price ?? 0))}</span>
               </div>
             </div>
           </div>
 
           {/* Método de pago */}
-          <div className="rounded-2xl border border-alma-hairline bg-alma-mist p-5">
-            <Label className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-alma-ink/70 mb-3 block">Método de pago</Label>
+          <div className="rounded-2xl border border-line bg-sunken p-5">
+            <Label className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-ink/70 mb-3 block">Método de pago</Label>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               {PAYMENT_METHODS.map(({ value, label, icon: Icon }) => (
                 <button
@@ -353,8 +353,8 @@ const CashAssignment = () => {
                   className={cn(
                     "flex flex-col items-center gap-2 p-3 rounded-xl border transition-colors",
                     paymentMethod === value
-                      ? "border-alma-sandstone bg-alma-oat text-alma-ink ring-1 ring-inset ring-alma-sandstone"
-                      : "border-alma-hairline bg-alma-canvas text-alma-ink/55 hover:border-alma-sandstone hover:text-alma-ink",
+                      ? "border-line-strong bg-sunken text-ink ring-1 ring-inset ring-line-strong"
+                      : "border-line bg-canvas text-ink/55 hover:border-line-strong hover:text-ink",
                   )}
                   onClick={() => setPaymentMethod(value)}
                 >
@@ -366,11 +366,11 @@ const CashAssignment = () => {
           </div>
 
           <div className="flex gap-3">
-            <Button variant="outline" className="border-alma-sandstone text-alma-ink hover:bg-alma-mist" onClick={() => setStep(2)}>
+            <Button variant="outline" className="border-line-strong text-ink hover:bg-sunken" onClick={() => setStep(2)}>
               <ChevronLeft size={14} className="mr-1" /> Volver
             </Button>
             <Button
-              className="flex-1 bg-alma-ink-deep text-alma-canvas hover:bg-alma-ink font-semibold h-11"
+              className="flex-1 bg-inverse text-canvas hover:bg-ink font-semibold h-11"
               onClick={() => assignMutation.mutate()}
               disabled={assignMutation.isPending}
             >
@@ -429,19 +429,19 @@ const PaymentsHistory = () => {
   return (
     <div className="space-y-2">
       {payments.map((p: any) => (
-        <div key={p.id} className="flex items-center gap-4 p-4 rounded-xl border border-alma-hairline bg-alma-mist hover:bg-alma-oat/30 transition-colors">
-          <div className="w-8 h-8 rounded-full bg-alma-oat ring-1 ring-inset ring-alma-sandstone/50 flex items-center justify-center shrink-0">
-            <CreditCard size={13} className="text-alma-berry" />
+        <div key={p.id} className="flex items-center gap-4 p-4 rounded-xl border border-line bg-sunken hover:bg-sunken/30 transition-colors">
+          <div className="w-8 h-8 rounded-full bg-sunken ring-1 ring-inset ring-line-strong/50 flex items-center justify-center shrink-0">
+            <CreditCard size={13} className="text-ink" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-alma-ink truncate">{p.userName ?? p.userId ?? "—"}</p>
-            <p className="text-xs text-alma-ink/55 nums">{p.createdAt ? formatDate(p.createdAt) : "—"}</p>
+            <p className="text-sm font-semibold text-ink truncate">{p.userName ?? p.userId ?? "—"}</p>
+            <p className="text-xs text-ink/55 nums">{p.createdAt ? formatDate(p.createdAt) : "—"}</p>
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full border border-alma-hairline bg-alma-canvas text-alma-ink/70">
+            <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full border border-line bg-canvas text-ink/70">
               {methodLabels[p.method] ?? p.method ?? "—"}
             </span>
-            <span className="text-sm font-semibold text-alma-ink nums">{formatMXN(Number(p.total_amount ?? p.amount ?? 0))}</span>
+            <span className="text-sm font-semibold text-ink nums">{formatMXN(Number(p.total_amount ?? p.amount ?? 0))}</span>
           </div>
         </div>
       ))}
@@ -462,21 +462,21 @@ const PaymentsPage = () => (
         />
         {/* Header */}
         <div className="mb-6">
-          <h1 className="admin-title text-alma-ink mb-1">Pagos</h1>
-          <p className="text-sm text-alma-ink/55">Asigna membresías en mostrador y consulta el historial</p>
+          <h1 className="admin-title text-ink mb-1">Pagos</h1>
+          <p className="text-sm text-ink/55">Asigna membresías en mostrador y consulta el historial</p>
         </div>
 
         <Tabs defaultValue="cash">
-          <TabsList className="h-auto rounded-2xl border border-alma-hairline bg-alma-mist p-1 mb-6">
+          <TabsList className="h-auto rounded-2xl border border-line bg-sunken p-1 mb-6">
             <TabsTrigger
               value="cash"
-              className="rounded-xl px-4 py-2 text-[13px] font-semibold text-alma-ink/70 data-[state=active]:bg-alma-oat data-[state=active]:text-alma-ink data-[state=active]:shadow-none data-[state=active]:ring-1 data-[state=active]:ring-inset data-[state=active]:ring-alma-sandstone"
+              className="rounded-xl px-4 py-2 text-[13px] font-semibold text-ink/70 data-[state=active]:bg-sunken data-[state=active]:text-ink data-[state=active]:shadow-none data-[state=active]:ring-1 data-[state=active]:ring-inset data-[state=active]:ring-line-strong"
             >
               Cobro en mostrador
             </TabsTrigger>
             <TabsTrigger
               value="history"
-              className="rounded-xl px-4 py-2 text-[13px] font-semibold text-alma-ink/70 data-[state=active]:bg-alma-oat data-[state=active]:text-alma-ink data-[state=active]:shadow-none data-[state=active]:ring-1 data-[state=active]:ring-inset data-[state=active]:ring-alma-sandstone"
+              className="rounded-xl px-4 py-2 text-[13px] font-semibold text-ink/70 data-[state=active]:bg-sunken data-[state=active]:text-ink data-[state=active]:shadow-none data-[state=active]:ring-1 data-[state=active]:ring-inset data-[state=active]:ring-line-strong"
             >
               Historial
             </TabsTrigger>

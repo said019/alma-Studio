@@ -8,26 +8,30 @@ import {
 } from "react";
 import { Link } from "react-router-dom";
 import { Eye, EyeOff, Loader2, ArrowRight, Check, AlertCircle, ChevronDown } from "lucide-react";
-import { ALMA } from "@/components/app/tokens";
-import almaMarkLight from "@/assets/alma/alma-mark-light.png";
 
-/* Paleta canónica re-exportada: las páginas de auth y ChangePassword
-   importan ALMA desde aquí. Única fuente de verdad: app/tokens. */
-export { ALMA };
+import { BrandLogo } from "@/components/brand/BrandLogo";
+import { COLOR } from "@/design/tokens";
+
 
 type Tint = "berry" | "coral" | "olive";
 
-/* ── Micro-sistema de campos: label uppercase ≥0.72rem en berry (AA),
-   input cream con hairline y focus ring de marca. ── */
-const LABEL_CLASS = "text-[0.72rem] font-medium uppercase tracking-[0.22em]";
+/* ── Campos alineados con src/components/app/fields.tsx (Tarea 9, ruling
+   F6): fondo surface, borde 1.5px lineStrong (3:1), radio 12px, alto
+   ≥48px, foco ink + halo accent-soft, etiqueta 12px/inkMuted, placeholder
+   inkMuted, error en danger. Spec §4.4. ── */
+const LABEL_CLASS = "text-[0.75rem] font-bold uppercase tracking-[0.12em]";
 
 const INPUT_CLASS =
-  "w-full rounded-2xl px-4 py-3.5 text-[0.95rem] outline-none transition-all duration-200 placeholder:text-[color:rgba(67,57,47,0.38)] focus-visible:ring-2 focus-visible:ring-alma-berry";
+  "w-full rounded-xl px-4 py-3.5 text-[0.95rem] outline-none transition-shadow " +
+  "focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-0 " +
+  "focus-visible:shadow-[0_0_0_5px_theme(colors.accent.soft)] " +
+  "placeholder:text-ink-muted";
 
 const inputStyle = (error?: string) => ({
-  backgroundColor: ALMA.cream,
-  color: ALMA.ink,
-  border: `1px solid ${error ? ALMA.destructive : ALMA.border}`,
+  backgroundColor: COLOR.surface,
+  color: COLOR.ink,
+  border: `1.5px solid ${error ? COLOR.danger : COLOR.lineStrong}`,
+  minHeight: 48,
 });
 
 type FieldFeedbackProps = {
@@ -40,7 +44,7 @@ type FieldFeedbackProps = {
 const FieldFeedback = ({ errorId, error, success, hint }: FieldFeedbackProps) => {
   if (error) {
     return (
-      <p id={errorId} className="mt-0.5 flex items-center gap-1.5 text-[0.78rem]" style={{ color: ALMA.destructive }}>
+      <p id={errorId} className="mt-0.5 flex items-center gap-1.5 text-[0.78rem]" style={{ color: COLOR.danger }}>
         <AlertCircle size={13} className="shrink-0" />
         {error}
       </p>
@@ -48,10 +52,10 @@ const FieldFeedback = ({ errorId, error, success, hint }: FieldFeedbackProps) =>
   }
   if (success) {
     return (
-      <p className="mt-0.5 flex items-center gap-1.5 text-[0.78rem]" style={{ color: ALMA.olive }}>
+      <p className="mt-0.5 flex items-center gap-1.5 text-[0.78rem]" style={{ color: COLOR.success }}>
         <span
           className="grid h-4 w-4 shrink-0 place-items-center rounded-full"
-          style={{ backgroundColor: ALMA.olive, color: ALMA.cream }}
+          style={{ backgroundColor: COLOR.success, color: COLOR.canvas }}
         >
           <Check size={9} strokeWidth={3.5} />
         </span>
@@ -61,7 +65,7 @@ const FieldFeedback = ({ errorId, error, success, hint }: FieldFeedbackProps) =>
   }
   if (hint) {
     return (
-      <p className="text-[0.78rem]" style={{ color: ALMA.ink, opacity: 0.55 }}>
+      <p className="text-[0.78rem]" style={{ color: COLOR.ink, opacity: 0.55 }}>
         {hint}
       </p>
     );
@@ -111,44 +115,46 @@ export const AuthShell = ({
   footer,
 }: AuthShellProps) => {
   return (
-    <div className="min-h-screen w-full grid grid-cols-1 lg:grid-cols-2" style={{ backgroundColor: ALMA.cream, color: ALMA.ink }}>
+    <div className="min-h-screen w-full grid grid-cols-1 lg:grid-cols-2" style={{ backgroundColor: COLOR.canvas, color: COLOR.ink }}>
       {/* ── BRAND PANEL — drench oscuro + logo, sin foto ── */}
       <aside
         className="relative overflow-hidden lg:min-h-screen"
-        style={{ minHeight: "30vh", backgroundColor: ALMA.inkDeep }}
+        style={{ minHeight: "30vh", backgroundColor: COLOR.inverse }}
       >
-        <img src={almaMarkLight} alt="" aria-hidden className="pointer-events-none absolute -right-24 -bottom-24 w-[78%] max-w-[480px] opacity-[0.08]" />
-        <div aria-hidden className="absolute inset-0" style={{ background: `radial-gradient(110% 80% at 0% 0%, ${ALMA.berry}59 0%, transparent 55%)` }} />
+        <span aria-hidden="true" className="pointer-events-none absolute -right-24 -bottom-24 opacity-[0.08] text-accent">
+          <BrandLogo size={480} />
+        </span>
+        <div aria-hidden className="absolute inset-0" style={{ background: `radial-gradient(110% 80% at 0% 0%, ${COLOR.accentStrong}59 0%, transparent 55%)` }} />
 
         <div className="relative z-10 flex h-full min-h-[30vh] lg:min-h-screen flex-col justify-between p-6 sm:p-9 lg:p-12">
           <Link
             to="/"
-            className="inline-flex w-fit items-center rounded-md no-underline transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-alma-canvas"
+            className="inline-flex w-fit items-center rounded-md no-underline transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-canvas"
             aria-label="Inicio Alma Movement"
           >
-            <img src={almaMarkLight} alt="Alma Movement" className="h-16 sm:h-20 w-auto object-contain" />
+            <BrandLogo variant="lockup" size={56} className="text-accent" />
           </Link>
 
           <div className="max-w-[440px]">
-            <span className="text-[0.72rem] font-medium uppercase tracking-[0.32em]" style={{ color: ALMA.cream, opacity: 0.78 }}>
+            <span className="text-[0.72rem] font-medium uppercase tracking-[0.32em]" style={{ color: COLOR.canvas, opacity: 0.78 }}>
               {brandEyebrow}
             </span>
             <h2
               className="font-display mt-4 leading-[0.96]"
-              style={{ color: ALMA.cream, fontSize: "clamp(2.1rem, 4.4vw, 3.8rem)" }}
+              style={{ color: COLOR.canvas, fontSize: "clamp(2.1rem, 4.4vw, 3.8rem)" }}
             >
               {brandHeadline}
               {brandHeadlineItalic && (
                 <span
-                  className="block font-display-italic font-normal"
-                  style={{ color: ALMA.cream, opacity: 0.92, fontSize: "0.78em" }}
+                  className="block font-display font-normal"
+                  style={{ color: COLOR.canvas, opacity: 0.92, fontSize: "0.78em" }}
                 >
                   {brandHeadlineItalic}
                 </span>
               )}
             </h2>
             {brandSubline && (
-              <p className="mt-5 text-[0.95rem] leading-[1.7] max-w-[34ch]" style={{ color: ALMA.cream, opacity: 0.85 }}>
+              <p className="mt-5 text-[0.95rem] leading-[1.7] max-w-[34ch]" style={{ color: COLOR.canvas, opacity: 0.85 }}>
                 {brandSubline}
               </p>
             )}
@@ -160,17 +166,17 @@ export const AuthShell = ({
                     key={item.label}
                     className="grid grid-cols-[auto_1fr] items-center gap-4 py-3"
                     style={{
-                      borderTop: `1px solid ${ALMA.cream}33`,
-                      borderBottom: i === brandList.length - 1 ? `1px solid ${ALMA.cream}33` : undefined,
+                      borderTop: `1px solid ${COLOR.canvas}33`,
+                      borderBottom: i === brandList.length - 1 ? `1px solid ${COLOR.canvas}33` : undefined,
                     }}
                   >
                     <span
                       className="grid h-7 w-7 place-items-center rounded-full"
-                      style={{ backgroundColor: ALMA.cream, color: ALMA.berry }}
+                      style={{ backgroundColor: COLOR.canvas, color: COLOR.accentStrong }}
                     >
                       <Check size={12} strokeWidth={3} />
                     </span>
-                    <span className="text-[0.88rem] leading-[1.55]" style={{ color: ALMA.cream, opacity: 0.92 }}>
+                    <span className="text-[0.88rem] leading-[1.55]" style={{ color: COLOR.canvas, opacity: 0.92 }}>
                       {item.label}
                     </span>
                   </li>
@@ -179,13 +185,13 @@ export const AuthShell = ({
             )}
 
             {brandQuote && (
-              <p className="mt-7 hidden lg:block font-display-italic text-[1.05rem] leading-[1.55] max-w-[32ch]" style={{ color: ALMA.cream, opacity: 0.85 }}>
+              <p className="mt-7 hidden lg:block font-display text-[1.05rem] leading-[1.55] max-w-[32ch]" style={{ color: COLOR.canvas, opacity: 0.85 }}>
                 «{brandQuote}»
               </p>
             )}
           </div>
 
-          <div className="hidden lg:flex items-center justify-between text-[0.72rem] uppercase tracking-[0.22em]" style={{ color: ALMA.cream, opacity: 0.55 }}>
+          <div className="hidden lg:flex items-center justify-between text-[0.72rem] uppercase tracking-[0.22em]" style={{ color: COLOR.canvas, opacity: 0.55 }}>
             <span>Move with intention</span>
             <span>Juriquilla, Querétaro, MX</span>
           </div>
@@ -196,26 +202,26 @@ export const AuthShell = ({
       <main className="relative flex flex-col justify-center px-6 sm:px-10 lg:px-14 py-10 lg:py-12">
         <div className="mx-auto w-full max-w-[460px]">
           <div className="mb-9">
-            <span className="inline-flex items-center gap-2 text-[0.72rem] font-medium uppercase tracking-[0.32em]" style={{ color: ALMA.berry }}>
-              <span className="inline-block h-px w-5" style={{ backgroundColor: ALMA.berry }} />
+            <span className="inline-flex items-center gap-2 text-[0.72rem] font-medium uppercase tracking-[0.32em]" style={{ color: COLOR.accentStrong }}>
+              <span className="inline-block h-px w-5" style={{ backgroundColor: COLOR.ink }} />
               {formEyebrow}
             </span>
             <h1
               className="font-display mt-4 leading-[0.96] tracking-[-0.005em]"
-              style={{ color: ALMA.ink, fontSize: "clamp(2.3rem, 4vw, 3.2rem)" }}
+              style={{ color: COLOR.ink, fontSize: "clamp(2.3rem, 4vw, 3.2rem)" }}
             >
               {formHeadline}
               {formHeadlineItalic && (
                 <span
-                  className="block font-display-italic font-normal"
-                  style={{ color: ALMA.stone, fontSize: "0.78em" }}
+                  className="block font-display font-normal"
+                  style={{ color: COLOR.inkMuted, fontSize: "0.78em" }}
                 >
                   {formHeadlineItalic}
                 </span>
               )}
             </h1>
             {formIntro && (
-              <p className="mt-4 text-[0.95rem] leading-[1.65] max-w-[44ch]" style={{ color: ALMA.ink, opacity: 0.7 }}>
+              <p className="mt-4 text-[0.95rem] leading-[1.65] max-w-[44ch]" style={{ color: COLOR.ink, opacity: 0.7 }}>
                 {formIntro}
               </p>
             )}
@@ -225,7 +231,7 @@ export const AuthShell = ({
 
           {footer && <div className="mt-8">{footer}</div>}
 
-          <p className="mt-10 text-[0.72rem] uppercase tracking-[0.2em]" style={{ color: ALMA.ink, opacity: 0.42 }}>
+          <p className="mt-10 text-[0.72rem] uppercase tracking-[0.2em]" style={{ color: COLOR.ink, opacity: 0.42 }}>
             © <span className="nums">{new Date().getFullYear()}</span> Alma Movement
           </p>
         </div>
@@ -253,7 +259,7 @@ export const AuthField = forwardRef<HTMLInputElement, AuthFieldProps>(
     return (
       <div className="flex flex-col gap-1.5">
         <div className="flex items-center justify-between gap-2">
-          <label htmlFor={inputId} className={LABEL_CLASS} style={{ color: ALMA.berry }}>
+          <label htmlFor={inputId} className={LABEL_CLASS} style={{ color: COLOR.inkMuted }}>
             {label}
           </label>
           {rightSlot}
@@ -290,14 +296,14 @@ export const AuthPasswordField = forwardRef<HTMLInputElement, AuthPasswordFieldP
     return (
       <div className="flex flex-col gap-1.5">
         <div className="flex items-center justify-between gap-2">
-          <label htmlFor={inputId} className={LABEL_CLASS} style={{ color: ALMA.berry }}>
+          <label htmlFor={inputId} className={LABEL_CLASS} style={{ color: COLOR.inkMuted }}>
             {label}
           </label>
           {forgotLink && (
             <Link
               to={forgotLink}
-              className="rounded-md text-[0.74rem] no-underline transition-opacity hover:opacity-75 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-alma-berry"
-              style={{ color: ALMA.berry }}
+              className="rounded-md text-[0.74rem] no-underline transition-opacity hover:opacity-75 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong"
+              style={{ color: COLOR.accentStrong }}
             >
               ¿Olvidaste?
             </Link>
@@ -319,8 +325,8 @@ export const AuthPasswordField = forwardRef<HTMLInputElement, AuthPasswordFieldP
             aria-pressed={show}
             aria-label={show ? "Ocultar contraseña" : "Mostrar contraseña"}
             onClick={() => setShow((v) => !v)}
-            className="absolute right-1.5 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full transition-colors hover:bg-alma-mist focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-alma-berry"
-            style={{ color: ALMA.berry }}
+            className="absolute right-1.5 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full transition-colors hover:bg-sunken focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong"
+            style={{ color: COLOR.accentStrong }}
           >
             {show ? <EyeOff size={16} /> : <Eye size={16} />}
           </button>
@@ -349,7 +355,7 @@ export const AuthSelect = forwardRef<HTMLSelectElement, AuthSelectProps>(
     const errorId = `${inputId}-error`;
     return (
       <div className="flex flex-col gap-1.5">
-        <label htmlFor={inputId} className={LABEL_CLASS} style={{ color: ALMA.berry }}>
+        <label htmlFor={inputId} className={LABEL_CLASS} style={{ color: COLOR.inkMuted }}>
           {label}
         </label>
         <div className="relative">
@@ -368,7 +374,7 @@ export const AuthSelect = forwardRef<HTMLSelectElement, AuthSelectProps>(
             size={15}
             aria-hidden
             className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2"
-            style={{ color: ALMA.ink }}
+            style={{ color: COLOR.ink }}
           />
         </div>
         <FieldFeedback errorId={errorId} error={error} hint={hint} />
@@ -394,7 +400,7 @@ export const AuthTextarea = forwardRef<HTMLTextAreaElement, AuthTextareaProps>(
     const errorId = `${inputId}-error`;
     return (
       <div className="flex flex-col gap-1.5">
-        <label htmlFor={inputId} className={LABEL_CLASS} style={{ color: ALMA.berry }}>
+        <label htmlFor={inputId} className={LABEL_CLASS} style={{ color: COLOR.inkMuted }}>
           {label}
         </label>
         <textarea
@@ -428,8 +434,8 @@ export const AuthSubmit = ({ loading, loadingLabel, children, disabled }: AuthSu
   <button
     type="submit"
     disabled={disabled || loading}
-    className="group relative mt-2 inline-flex w-full items-center justify-center gap-3 rounded-full bg-alma-ink px-7 py-4 text-[0.84rem] font-medium uppercase tracking-[0.18em] text-alma-canvas transition-transform duration-200 hover:-translate-y-0.5 hover:bg-alma-ink-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-alma-berry focus-visible:ring-offset-2 disabled:opacity-60 disabled:translate-y-0 disabled:cursor-not-allowed"
-    style={{ boxShadow: `0 12px 28px ${ALMA.ink}30` }}
+    className="group relative mt-2 inline-flex w-full items-center justify-center gap-3 rounded-full bg-ink px-7 py-4 text-[0.84rem] font-medium uppercase tracking-[0.18em] text-canvas transition-transform duration-200 hover:-translate-y-0.5 hover:bg-inverse focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-offset-2 disabled:opacity-60 disabled:translate-y-0 disabled:cursor-not-allowed"
+    style={{ boxShadow: `0 12px 28px ${COLOR.ink}30` }}
   >
     {loading ? (
       <>
@@ -441,7 +447,7 @@ export const AuthSubmit = ({ loading, loadingLabel, children, disabled }: AuthSu
         {children}
         <span
           className="grid h-7 w-7 place-items-center rounded-full transition-transform group-hover:translate-x-0.5"
-          style={{ backgroundColor: `${ALMA.cream}26` }}
+          style={{ backgroundColor: `${COLOR.canvas}26` }}
         >
           <ArrowRight size={13} />
         </span>
@@ -462,7 +468,7 @@ type AuthSecondaryLinkProps = {
 export const AuthSecondaryLink = ({ to, children }: AuthSecondaryLinkProps) => (
   <Link
     to={to}
-    className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-alma-hairline px-6 py-3.5 text-[0.78rem] font-medium uppercase tracking-[0.2em] text-alma-ink no-underline transition-colors duration-200 hover:border-alma-sandstone hover:bg-alma-mist focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-alma-berry focus-visible:ring-offset-2"
+    className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-line px-6 py-3.5 text-[0.78rem] font-medium uppercase tracking-[0.2em] text-ink no-underline transition-colors duration-200 hover:border-line-strong hover:bg-sunken focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-offset-2"
   >
     {children}
   </Link>
@@ -477,9 +483,9 @@ export const AuthErrorBanner = ({ message }: { message: string }) => (
     role="alert"
     className="mb-6 flex items-start gap-3 rounded-2xl px-4 py-3 text-[0.86rem]"
     style={{
-      backgroundColor: `${ALMA.destructive}10`,
-      border: `1px solid ${ALMA.destructive}40`,
-      color: ALMA.destructive,
+      backgroundColor: `${COLOR.danger}10`,
+      border: `1px solid ${COLOR.danger}40`,
+      color: COLOR.danger,
     }}
   >
     <AlertCircle size={16} className="mt-0.5 shrink-0" />
@@ -493,13 +499,13 @@ export const AuthErrorBanner = ({ message }: { message: string }) => (
 
 export const AuthDivider = ({ label }: { label?: string }) => (
   <div className="my-7 flex items-center gap-4">
-    <span className="flex-1 h-px" style={{ backgroundColor: ALMA.border }} />
+    <span className="flex-1 h-px" style={{ backgroundColor: COLOR.line }} />
     {label && (
-      <span className="text-[0.72rem] uppercase tracking-[0.22em]" style={{ color: ALMA.ink, opacity: 0.45 }}>
+      <span className="text-[0.72rem] uppercase tracking-[0.22em]" style={{ color: COLOR.ink, opacity: 0.45 }}>
         {label}
       </span>
     )}
-    <span className="flex-1 h-px" style={{ backgroundColor: ALMA.border }} />
+    <span className="flex-1 h-px" style={{ backgroundColor: COLOR.line }} />
   </div>
 );
 
@@ -522,20 +528,20 @@ export const AuthCheckbox = ({ checked, onChange, children, error }: AuthCheckbo
         role="checkbox"
         aria-checked={checked}
         onClick={() => onChange(!checked)}
-        className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-alma-berry focus-visible:ring-offset-1"
+        className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-offset-1"
         style={{
-          backgroundColor: checked ? ALMA.berry : "transparent",
-          border: `1px solid ${checked ? ALMA.berry : ALMA.sandstone}`,
+          backgroundColor: checked ? COLOR.ink : "transparent",
+          border: `1px solid ${checked ? COLOR.accentStrong : COLOR.lineStrong}`,
         }}
       >
-        {checked && <Check size={12} strokeWidth={3} style={{ color: ALMA.cream }} />}
+        {checked && <Check size={12} strokeWidth={3} style={{ color: COLOR.canvas }} />}
       </button>
-      <span className="text-[0.86rem] leading-[1.5] transition-opacity group-hover:opacity-100" style={{ color: ALMA.ink, opacity: 0.78 }}>
+      <span className="text-[0.86rem] leading-[1.5] transition-opacity group-hover:opacity-100" style={{ color: COLOR.ink, opacity: 0.78 }}>
         {children}
       </span>
     </label>
     {error && (
-      <p className="flex items-center gap-1.5 pl-8 text-[0.78rem]" style={{ color: ALMA.destructive }}>
+      <p className="flex items-center gap-1.5 pl-8 text-[0.78rem]" style={{ color: COLOR.danger }}>
         <AlertCircle size={13} />
         {error}
       </p>
@@ -557,13 +563,13 @@ export const AuthPasswordRules = ({ password = "" }: { password?: string }) => {
   return (
     <ul className="mt-1 grid grid-cols-1 sm:grid-cols-3 gap-y-1 gap-x-4 list-none p-0 m-0">
       {rules.map((r) => (
-        <li key={r.label} className="flex items-center gap-2 text-[0.74rem]" style={{ color: r.ok ? ALMA.olive : ALMA.ink, opacity: r.ok ? 1 : 0.5 }}>
+        <li key={r.label} className="flex items-center gap-2 text-[0.74rem]" style={{ color: r.ok ? COLOR.success : COLOR.ink, opacity: r.ok ? 1 : 0.5 }}>
           <span
             className="grid h-4 w-4 place-items-center rounded-full transition-colors"
             style={{
-              backgroundColor: r.ok ? ALMA.olive : "transparent",
-              border: `1px solid ${r.ok ? ALMA.olive : ALMA.border}`,
-              color: ALMA.cream,
+              backgroundColor: r.ok ? COLOR.success : "transparent",
+              border: `1px solid ${r.ok ? COLOR.success : COLOR.line}`,
+              color: COLOR.canvas,
             }}
           >
             {r.ok && <Check size={9} strokeWidth={3.5} />}

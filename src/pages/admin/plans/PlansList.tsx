@@ -143,7 +143,7 @@ function normalizePlan(p: Plan): PlanFormData {
 
 const FormSection = ({ title, children }: { title: string; children: ReactNode }) => (
   <section className="space-y-4">
-    <p className="border-b border-alma-hairline pb-2 text-[0.72rem] font-medium uppercase tracking-[0.18em] text-alma-berry">
+    <p className="border-b border-line pb-2 text-[0.72rem] font-medium uppercase tracking-[0.18em] text-ink">
       {title}
     </p>
     {children}
@@ -151,7 +151,7 @@ const FormSection = ({ title, children }: { title: string; children: ReactNode }
 );
 
 const FieldHelp = ({ children }: { children: ReactNode }) => (
-  <p className="text-xs leading-relaxed text-alma-ink/55">{children}</p>
+  <p className="text-xs leading-relaxed text-ink/55">{children}</p>
 );
 
 const SwitchRow = ({
@@ -162,7 +162,7 @@ const SwitchRow = ({
   checked: boolean;
   onCheckedChange: (v: boolean) => void;
 }) => (
-  <div className="flex items-start justify-between gap-3 rounded-xl border border-alma-hairline bg-alma-mist/60 p-3">
+  <div className="flex items-start justify-between gap-3 rounded-xl border border-line bg-sunken/60 p-3">
     <div className="space-y-0.5">
       <Label>{label}</Label>
       {help && <FieldHelp>{help}</FieldHelp>}
@@ -174,7 +174,7 @@ const SwitchRow = ({
 const CategoryPill = ({ category }: { category?: string }) => {
   const cat = CATEGORIES.find((c) => c.value === (category ?? "all")) ?? CATEGORIES[3];
   return (
-    <span className="inline-flex items-center rounded-full border border-alma-sandstone/60 bg-alma-oat/50 px-2 py-0.5 text-[0.7rem] font-medium text-alma-ink/80">
+    <span className="inline-flex items-center rounded-full border border-line-strong/60 bg-sunken/50 px-2 py-0.5 text-[0.7rem] font-medium text-ink/80">
       {cat.label}
     </span>
   );
@@ -246,7 +246,7 @@ const PlansList = () => {
         {dialog}
         <div className="admin-page max-w-5xl">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
-            <h1 className="admin-title font-semibold text-alma-ink">Planes</h1>
+            <h1 className="admin-title font-semibold text-ink">Planes</h1>
             <Button onClick={openCreate} size="sm"><Plus size={14} className="mr-1" />Nuevo plan</Button>
           </div>
 
@@ -256,7 +256,7 @@ const PlansList = () => {
               onRetry={() => refetch()}
             />
           ) : !isLoading && plans.length === 0 ? (
-            <div className="rounded-xl border border-alma-hairline bg-alma-mist px-6">
+            <div className="rounded-xl border border-line bg-sunken px-6">
               <EmptyState
                 icon={<Package size={20} strokeWidth={1.8} />}
                 title="Aún no hay planes"
@@ -266,7 +266,7 @@ const PlansList = () => {
               />
             </div>
           ) : (
-            <div className="rounded-xl border border-alma-hairline bg-alma-mist overflow-hidden">
+            <div className="rounded-xl border border-line bg-sunken overflow-hidden">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -287,17 +287,17 @@ const PlansList = () => {
                     ))
                     : plans.map((p) => (
                       <TableRow key={p.id}>
-                        <TableCell className="font-medium text-alma-ink">{p.name}</TableCell>
-                        <TableCell className="nums text-alma-ink">{formatMXN(p.price)}</TableCell>
-                        <TableCell className="nums text-alma-ink/70">{p.durationDays} días</TableCell>
-                        <TableCell className="nums text-alma-ink/70">{p.classLimit == null ? "Ilimitado" : p.classLimit}</TableCell>
+                        <TableCell className="font-medium text-ink">{p.name}</TableCell>
+                        <TableCell className="nums text-ink">{formatMXN(p.price)}</TableCell>
+                        <TableCell className="nums text-ink/70">{p.durationDays} días</TableCell>
+                        <TableCell className="nums text-ink/70">{p.classLimit == null ? "Ilimitado" : p.classLimit}</TableCell>
                         <TableCell><CategoryPill category={p.classCategory} /></TableCell>
                         <TableCell>
                           <div className="flex flex-wrap gap-1.5">
                             {p.isNonTransferable && <Badge variant="outline">No transferible</Badge>}
                             {p.isNonRepeatable && <Badge variant="outline">No repetible</Badge>}
                             {!p.isNonTransferable && !p.isNonRepeatable && (
-                              <span className="text-xs text-alma-ink/55">—</span>
+                              <span className="text-xs text-ink/55">—</span>
                             )}
                           </div>
                         </TableCell>
@@ -337,10 +337,10 @@ const PlansList = () => {
 
         {/* Formulario lateral */}
         <Sheet open={open} onOpenChange={(next) => { setOpen(next); if (!next) setEditing(null); }}>
-          <SheetContent side="right" className="w-full overflow-y-auto border-alma-hairline bg-alma-canvas sm:max-w-md">
+          <SheetContent side="right" className="w-full overflow-y-auto border-line bg-canvas sm:max-w-md">
             <SheetHeader>
-              <SheetTitle className="font-display text-alma-ink">{editing ? "Editar plan" : "Nuevo plan"}</SheetTitle>
-              <SheetDescription className="text-alma-ink/55">
+              <SheetTitle className="font-display text-ink">{editing ? "Editar plan" : "Nuevo plan"}</SheetTitle>
+              <SheetDescription className="text-ink/55">
                 {editing ? "Los cambios aplican a ventas nuevas; las membresías ya vendidas no se tocan." : "Define qué incluye el paquete y cómo se vende."}
               </SheetDescription>
             </SheetHeader>
@@ -443,7 +443,7 @@ const PlansList = () => {
                 </div>
               </FormSection>
 
-              <SheetFooter className="gap-2 border-t border-alma-hairline pt-4">
+              <SheetFooter className="gap-2 border-t border-line pt-4">
                 <Button type="button" variant="outline" onClick={closeSheet}>Cancelar</Button>
                 <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
                   {editing ? "Guardar cambios" : "Crear plan"}

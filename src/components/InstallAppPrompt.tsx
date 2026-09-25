@@ -81,7 +81,7 @@ export function InstallAppPrompt({ force, onClose }: InstallAppPromptProps) {
               <img src="/icon-192.png" alt="Alma" className="w-10 h-10 object-contain" />
             </div>
             <div>
-              <h3 className="font-bebas text-2xl text-foreground leading-none tracking-wide">
+              <h3 className="font-display text-2xl text-foreground leading-none tracking-wide">
                 INSTALA LA APP
               </h3>
               <p className="text-xs text-muted-foreground mt-1">

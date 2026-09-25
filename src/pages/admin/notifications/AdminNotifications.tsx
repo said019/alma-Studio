@@ -114,8 +114,8 @@ const AdminNotifications = () => {
         <div className="admin-page max-w-4xl">
           <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
             <div>
-              <h1 className="admin-title font-display leading-none text-alma-ink">Bandeja del studio</h1>
-              <p className="mt-1.5 text-sm text-alma-ink/55">
+              <h1 className="admin-title font-display leading-none text-ink">Bandeja del studio</h1>
+              <p className="mt-1.5 text-sm text-ink/55">
                 Eventos recientes: nuevas alumnas, órdenes pendientes, logros, check-ins y más.
               </p>
             </div>
@@ -123,7 +123,7 @@ const AdminNotifications = () => {
               <Button
                 size="sm"
                 variant="outline"
-                className="border-alma-sandstone"
+                className="border-line-strong"
                 onClick={() => markReadMutation.mutate()}
                 disabled={markReadMutation.isPending}
                 data-press
@@ -144,8 +144,8 @@ const AdminNotifications = () => {
                 className={cn(
                   "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
                   filter === "all"
-                    ? "border-alma-sandstone bg-alma-oat text-alma-ink"
-                    : "border-alma-hairline bg-alma-mist text-alma-ink/70 hover:bg-alma-oat/40 hover:text-alma-ink",
+                    ? "border-line-strong bg-sunken text-ink"
+                    : "border-line bg-sunken text-ink/70 hover:bg-sunken/40 hover:text-ink",
                 )}
               >
                 Todas <span className="nums">{items.length}</span>
@@ -159,8 +159,8 @@ const AdminNotifications = () => {
                   className={cn(
                     "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
                     filter === cat
-                      ? "border-alma-sandstone bg-alma-oat text-alma-ink"
-                      : "border-alma-hairline bg-alma-mist text-alma-ink/70 hover:bg-alma-oat/40 hover:text-alma-ink",
+                      ? "border-line-strong bg-sunken text-ink"
+                      : "border-line bg-sunken text-ink/70 hover:bg-sunken/40 hover:text-ink",
                   )}
                 >
                   {CATEGORY_LABEL[cat]} <span className="nums">{counts[cat]}</span>
@@ -173,7 +173,7 @@ const AdminNotifications = () => {
           {isLoading ? (
             <div className="space-y-2">{[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-16 w-full" />)}</div>
           ) : isError ? (
-            <Card className="border-alma-hairline bg-alma-mist">
+            <Card className="border-line bg-sunken">
               <CardContent className="px-6">
                 <ErrorState
                   title="No pudimos cargar la bandeja"
@@ -183,32 +183,32 @@ const AdminNotifications = () => {
               </CardContent>
             </Card>
           ) : items.length === 0 ? (
-            <Card className="border-alma-hairline bg-alma-mist">
+            <Card className="border-line bg-sunken">
               <CardContent className="p-10 text-center">
-                <BellOff size={28} className="mx-auto mb-3 text-alma-ink/40" />
-                <p className="font-medium text-alma-ink">Sin novedades</p>
-                <p className="mt-1 text-xs text-alma-ink/55">
+                <BellOff size={28} className="mx-auto mb-3 text-ink/40" />
+                <p className="font-medium text-ink">Sin novedades</p>
+                <p className="mt-1 text-xs text-ink/55">
                   Aquí van a aparecer reservas, registros, órdenes y demás eventos del studio.
                 </p>
               </CardContent>
             </Card>
           ) : visible.length === 0 ? (
-            <Card className="border-alma-hairline bg-alma-mist">
+            <Card className="border-line bg-sunken">
               <CardContent className="p-10 text-center">
-                <BellOff size={28} className="mx-auto mb-3 text-alma-ink/40" />
-                <p className="font-medium text-alma-ink">Nada en esta categoría</p>
-                <p className="mt-1 text-xs text-alma-ink/55">
+                <BellOff size={28} className="mx-auto mb-3 text-ink/40" />
+                <p className="font-medium text-ink">Nada en esta categoría</p>
+                <p className="mt-1 text-xs text-ink/55">
                   No hay eventos de "{filter !== "all" ? CATEGORY_LABEL[filter] : ""}" en los últimos 30 días.
                 </p>
-                <Button size="sm" variant="outline" className="mt-4 border-alma-sandstone" onClick={() => setFilter("all")} data-press>
+                <Button size="sm" variant="outline" className="mt-4 border-line-strong" onClick={() => setFilter("all")} data-press>
                   Ver todas
                 </Button>
               </CardContent>
             </Card>
           ) : (
-            <Card className="border-alma-hairline bg-alma-canvas">
+            <Card className="border-line bg-canvas">
               <CardContent className="p-0">
-                <ul className="divide-y divide-alma-hairline">
+                <ul className="divide-y divide-line">
                   {visible.map((n) => {
                     const urgent = URGENT.has(n.category);
                     const unread = !!n.unread && !readLocal.has(n.id);
@@ -217,14 +217,14 @@ const AdminNotifications = () => {
                         <button
                           data-press
                           onClick={() => openItem(n)}
-                          className="flex w-full items-start gap-3 p-4 text-left transition-colors hover:bg-alma-mist/70"
+                          className="flex w-full items-start gap-3 p-4 text-left transition-colors hover:bg-sunken/70"
                         >
                           <span
                             className={cn(
                               "grid h-9 w-9 shrink-0 place-items-center rounded-full",
                               urgent
-                                ? "bg-alma-oat text-alma-berry"
-                                : "border border-alma-hairline bg-alma-mist text-alma-ink/50",
+                                ? "bg-sunken text-ink"
+                                : "border border-line bg-sunken text-ink/50",
                             )}
                           >
                             {ICON[n.category]}
@@ -234,19 +234,19 @@ const AdminNotifications = () => {
                               className={cn(
                                 "truncate text-sm",
                                 urgent ? "font-semibold" : "font-medium",
-                                unread ? "text-alma-ink" : "text-alma-ink/60",
+                                unread ? "text-ink" : "text-ink/60",
                               )}
                             >
                               {n.title}
                             </p>
-                            <p className="mt-0.5 truncate text-xs text-alma-ink/55">
+                            <p className="mt-0.5 truncate text-xs text-ink/55">
                               {n.body}
-                              <span className="nums text-alma-ink/40"> · {formatTime(n.time)}</span>
+                              <span className="nums text-ink/40"> · {formatTime(n.time)}</span>
                             </p>
                           </div>
                           {unread && (
                             <span
-                              className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-alma-berry"
+                              className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-ink"
                               aria-label="Sin leer"
                             />
                           )}
@@ -259,7 +259,7 @@ const AdminNotifications = () => {
             </Card>
           )}
 
-          <p className="mt-6 text-[11px] text-alma-ink/45">
+          <p className="mt-6 text-[11px] text-ink/45">
             Actualización automática cada 30 segundos · Últimos 30 días.
           </p>
         </div>

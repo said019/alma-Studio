@@ -9,14 +9,14 @@ import {
   Section,
   ListGroup,
   ListRow,
-  ALMA,
 } from "@/components/app/AppShell";
 import { BackLink } from "@/components/app/widgets";
 import { ShieldCheck } from "lucide-react";
-// Switch shadcn ya tematizado: track activo = --primary (#43392F, ink),
-// track inactivo = --input (hairline) y focus ring = --ring (#6E5A46, berry).
+// Switch shadcn ya tematizado: track activo = --primary (ink),
+// track inactivo = --input (lineStrong) y focus ring = --ring (ink).
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
+import { COLOR } from "@/design/tokens";
 
 type PrefKey = "receiveReminders" | "receivePromotions" | "receiveWeeklySummary";
 type Prefs = Record<PrefKey, boolean>;
@@ -92,7 +92,7 @@ const ProfilePreferences = () => {
             <span
               aria-live="polite"
               className="text-[0.72rem] uppercase tracking-[0.18em]"
-              style={{ color: ALMA.ink, opacity: 0.5 }}
+              style={{ color: COLOR.ink, opacity: 0.5 }}
             >
               {mutation.isPending ? "Guardando…" : ""}
             </span>
@@ -104,15 +104,15 @@ const ProfilePreferences = () => {
                 key={it.key}
                 className="grid grid-cols-[1fr_auto] items-center gap-5 py-5"
                 style={{
-                  borderTop: `1px solid ${ALMA.border}`,
-                  borderBottom: i === arr.length - 1 ? `1px solid ${ALMA.border}` : undefined,
+                  borderTop: `1px solid ${COLOR.line}`,
+                  borderBottom: i === arr.length - 1 ? `1px solid ${COLOR.line}` : undefined,
                 }}
               >
                 <div>
-                  <p className="text-[0.94rem] font-medium leading-tight" style={{ color: ALMA.ink }}>
+                  <p className="text-[0.94rem] font-medium leading-tight" style={{ color: COLOR.ink }}>
                     {it.label}
                   </p>
-                  <p className="mt-1 text-[0.84rem] leading-[1.55]" style={{ color: ALMA.ink, opacity: 0.6 }}>
+                  <p className="mt-1 text-[0.84rem] leading-[1.55]" style={{ color: COLOR.ink, opacity: 0.6 }}>
                     {it.desc}
                   </p>
                 </div>
@@ -131,7 +131,7 @@ const ProfilePreferences = () => {
             <ListRow
               to="/legal/privacidad"
               icon={<ShieldCheck size={17} strokeWidth={1.7} />}
-              iconTint="olive"
+              iconTint="success"
               title="Cómo cuidamos tus datos"
               description="Aviso de privacidad"
             />

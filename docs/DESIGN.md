@@ -1,64 +1,66 @@
-# Alma Movement Design Context
+# HIVE — Contexto de diseño
 
-Dirección (confirmada por la dueña, 2026-06-09): **lujo cálido terroso estilo Frame Pilates Lab** — editorial, monocromático cálido estricto, serif protagonista, fotografía full-bleed, mucha calma y restraint. El lujo viene de la restricción, el serif y la fotografía, no de un color de acento brillante. **El vino/berry #76214D está descartado definitivamente** (era la dirección Femmé). La paleta canónica es el brand kit greige oficial + espresso.
+Sistema visual de HIVE Pilates Studio (Coyoacán, CDMX). Fuente de verdad en
+código: `src/design/tokens.ts`. Diseño completo y razones:
+`docs/superpowers/specs/2026-09-24-hive-sistema-visual-design.md`.
+Referencia viva en desarrollo: `/sistema`.
 
-## Palette (canónica — única fuente de verdad)
+## Dirección
 
-Estrategia: **Restrained estricto** con momentos **drenched** espresso como firma (paquetes, footer, pase de wallet). Implementada en `tailwind.config.ts` (`alma.*`), `src/components/app/tokens.ts` (`ALMA`) y las vars shadcn de `src/index.css`. Esos tres puntos DEBEN coincidir; no crear paletas locales por archivo.
+Coral Bold: base neutra de concreto, coral `#FA936A` en bloques, negro. Premium
+y energética, urbana/industrial; se aparta a propósito de los colores cálidos
+asociados a calma. El coral es la única calidez del sistema.
 
-| Token | Hex | Rol |
-|---|---|---|
-| `canvas` / `cream` | `#FAF9F6` | Feather White — fondo principal |
-| `mist` | `#F4F1EA` | Porcelain Mist — superficies suaves, cards |
-| `oat` / `blush` | `#E6DAC8` | Creamed Oat — bloques tintados, pills activos |
-| `sandstone` | `#CBB9A4` | Soft Sandstone — bordes fuertes, detalle |
-| `stone` | `#A48D78` | Desert Rock — acento decorativo, SOLO texto grande (≈2.6:1 sobre canvas) |
-| `berry` | `#6E5A46` | taupe profundo — acento AA para texto pequeño y fills (≈6.2:1) |
-| `ink` | `#43392F` | espresso — texto principal, CTAs sólidos |
-| `ink-deep` | `#241B1A` | espresso profundo — secciones drenched |
-| `hairline` / `border` | `#E0D5C6` | divisores |
-| `olive` | `#5F6B4A` | **SOLO** éxito/confirmación (funcional, nunca decorativo) |
-| `destructive` | `#B23A48` | **SOLO** error/destructivo |
+## Color
+
+Tokens por función (canvas, surface, sunken, line, line-strong, ink, ink-muted,
+accent, accent-soft, accent-strong, success, danger, inverse, inverse-raised).
+Valores y contrastes: `src/design/tokens.ts` y su prueba.
+
+Texto sobre un fondo lleva la clase Tailwind con sufijo `-foreground` (token
+`onAccent`/`onInverse`/`onInverseMuted` en `tokens.ts`): sobre `accent` es la
+clase `accent-foreground` (`text-accent-foreground`); sobre `inverse`,
+`inverse-foreground` (o `inverse-muted` para texto secundario, más tenue).
 
 Reglas:
-- Nunca `#000` ni `#fff` puros (la firma en Responsiva y el QR eran las únicas excepciones; migrar a `canvas`).
-- Los CTAs primarios son **ink sólido** con texto canvas (estilo Frame), no stone (falla AA).
-- Nada de verdes/amarillos/rojos crudos de Tailwind (`green-500`, `yellow-400`…): éxito = `olive`, error = `destructive`.
-- Color-coding decorativo por categoría está prohibido: monocromo + texto.
+1. Nunca texto claro sobre coral: sobre `accent` el texto es `accent-foreground`.
+2. El coral no es texto: número, ícono o enlace coral → `accent-strong`.
+3. En el panel, coral = atención (activo, pendiente, lleno), siempre con texto.
+4. Nunca coral sobre coral.
+5. `success` y `danger` son funcionales, nunca decorativos.
+6. Ningún color escrito a mano fuera de `src/design/`.
 
-## Typography
+## Tipografía
 
-- **Display / titulares**: **Fraunces** variable (optical sizing auto, weight ~500, letter-spacing -0.01em). Es la regla base de `h1-h6`; `.font-display` y `.font-display-italic` para gestos editoriales. Los acentos itálicos de titulares SIEMPRE en Fraunces italic (`.font-display-italic`), nunca itálica sintetizada de una sans.
-- **Body / UI**: **Jost** (pesos reales 300–700 + itálica). Alilato ExtraLight quedó como detalle opcional (`.font-alilato`); no usar con `font-bold` ni `italic` (sintetiza).
-- Números (precios, cupos, vigencias, rankings) con `tabular-nums` (utilidad `.nums`).
-- Contraste de jerarquía ≥1.25 entre pasos; mínimo legible 0.75rem para labels uppercase (nada de 0.55–0.66rem).
-- Aliases legacy (`font-bebas`, `font-gulfs` → Fraunces; `font-syne`, `font-dm` → Jost) existen solo por compatibilidad; en código nuevo usar `font-display` / default sans.
+Unbounded (600/800) para titulares —los grandes en mayúsculas— y cifras
+sueltas; Manrope para todo lo que se lee. Cifras tabulares (`.nums`) en listas
+de horas y montos. Mínimo 12 px.
 
-## Layout
+## Piezas
 
-- Heroes y secciones **image-led full-bleed** con texto serif sobrepuesto (Frame); tratamiento fotográfico unificado `.alma-photo` + `.alma-photo-tint`.
-- Asimetría editorial intencional; ritmo de espaciado variable (no padding uniforme).
-- Alternar secciones claras (canvas/oat) con secciones **drenched** oscuras (ink-deep).
-- Lenguaje de **listas editoriales con hairlines** (ListRow/DataRow) en vez de rejillas de tarjetas; nunca tarjetas anidadas.
-- Modal solo para confirmaciones destructivas; flujos y formularios largos son páginas o paneles.
+`src/components/app/` (app de clienta) y `src/components/ui/` (shadcn, panel).
+Extender estas piezas; no crear paralelas. Botones ≥44 px. `PageHeader` es el
+bloque coral firma: uno por pantalla. Botón coral sólo en la app, para la
+acción que genera ingreso.
 
-## Components
+## Logo
 
-- CTAs principales: pill ink sólido (texto canvas) o outline hairline; micro-interacción `data-press`.
-- Primitivas del app (`AppShell.tsx` / `widgets.tsx`): PageHeader, Section, ListRow, ListGroup, DataRow, Tag, StatusPill, StickyCta, EmptyState, SkeletonRow — extender estas, no inventar paralelas.
-- Iconografía: lucide-react, discreta. **Nunca emojis como iconos** (toasts, títulos, botones).
-- Fotografía real del estudio como protagonista.
-- Targets táctiles ≥44px en la app de clienta.
+`BrandLogo` (`src/components/brand/`) — **provisional**. Un solo color
+(`currentColor`). Para reemplazarlo por el oficial: cambiar
+`src/assets/brand/hive-mark.svg` y los trazos de `BrandLogo.tsx`, y correr
+`npm run brand:assets`.
 
-## Motion (filosofía Emil Kowalski)
+## Movimiento y estados
 
-- Solo `transform` y `opacity`; ease-out exponencial (`--ease-alma-out`); sin bounce ni elastic.
-- Sistema por data-attributes: `data-press`, `data-lift`, `data-stagger`, `data-reveal`, `data-scale-in`, `data-slide-up` — todos cubiertos por `prefers-reduced-motion`.
-- Scroll reveals sutiles (fade + translate corto), stagger ligero. Sin glows, sin shimmer, sin animaciones ambientales infinitas.
+Sólo `transform` y `opacity`, salida suave, sin rebotes; respetar
+`prefers-reduced-motion`. Atributos (`src/index.css`): `data-press`,
+`data-reveal`, `data-stagger`, `data-lift`, `data-scale-in`, `data-slide-up`,
+`data-fade-in` — el sistema se conserva con nombres neutros (spec §4.7).
+Toda pantalla maneja cargando, vacío y error; un fallo de red nunca se
+disfraza de vacío.
 
-## Estados (obligatorios en toda pantalla)
+## Entorno
 
-- **Loading**: SkeletonRow visible (contraste con la superficie que lo contiene).
-- **Empty**: EmptyState con copy de marca y CTA contextual.
-- **Error**: toda query maneja `isError` con mensaje honesto + retry. Un fallo de red nunca se disfraza de estado vacío.
-- **Confirmación destructiva**: AlertDialog de marca (nunca `window.confirm` / `window.prompt`), proporcional a la consecuencia.
+`npm run brand:assets` y `npm run test:scripts` importan `src/design/tokens.ts`
+directamente y necesitan Node ≥ 22.18 (type stripping nativo); el build de
+producción (`vite build`) no pasa por ahí y no tiene ese requisito.

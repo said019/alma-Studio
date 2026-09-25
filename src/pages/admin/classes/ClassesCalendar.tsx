@@ -97,8 +97,8 @@ const ClassesCalendar = () => {
         <div className="admin-page max-w-6xl">
           <SectionTabs tabs={CLASSES_SECTION_TABS} />
           <div className="mb-6">
-            <h1 className="admin-title text-alma-ink">Clases</h1>
-            <p className="mt-1 text-sm text-alma-ink/55">Calendario semanal del estudio.</p>
+            <h1 className="admin-title text-ink">Clases</h1>
+            <p className="mt-1 text-sm text-ink/55">Calendario semanal del estudio.</p>
           </div>
 
           {referenceError ? (
@@ -406,7 +406,7 @@ function CalendarView({
           <Button variant="outline" size="icon" aria-label="Semana anterior" onClick={() => shiftWeek(-7)}>
             <ChevronLeft size={14} />
           </Button>
-          <span className="nums text-center text-xs font-medium text-alma-ink sm:text-sm">{weekLabel}</span>
+          <span className="nums text-center text-xs font-medium text-ink sm:text-sm">{weekLabel}</span>
           <Button variant="outline" size="icon" aria-label="Semana siguiente" onClick={() => shiftWeek(7)}>
             <ChevronRight size={14} />
           </Button>
@@ -427,19 +427,19 @@ function CalendarView({
 
       {/* Empty week */}
       {!isLoadingClasses && classes.length === 0 && (
-        <div className="mb-4 flex flex-col items-start gap-3 rounded-xl border border-dashed border-alma-sandstone/70 bg-alma-mist p-5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mb-4 flex flex-col items-start gap-3 rounded-xl border border-dashed border-line-strong/70 bg-sunken p-5 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
-            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-alma-oat text-alma-berry">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-sunken text-ink">
               <CalendarDays size={18} />
             </span>
             <div>
-              <p className="text-sm font-semibold text-alma-ink">Semana sin clases</p>
-              <p className="text-xs text-alma-ink/60">
+              <p className="text-sm font-semibold text-ink">Semana sin clases</p>
+              <p className="text-xs text-ink/60">
                 Genera la semana con la plantilla del estudio o toca un día para crear una clase.
               </p>
             </div>
           </div>
-          <Button asChild size="sm" variant="outline" className="border-alma-sandstone text-alma-ink">
+          <Button asChild size="sm" variant="outline" className="border-line-strong text-ink">
             <Link to="/admin/class-generator">Generar semana</Link>
           </Button>
         </div>
@@ -447,7 +447,7 @@ function CalendarView({
 
       {isMobile ? (
         <div className="space-y-3">
-          <div className="overflow-x-auto rounded-xl border border-alma-hairline bg-alma-mist p-2">
+          <div className="overflow-x-auto rounded-xl border border-line bg-sunken p-2">
             <div className="flex min-w-max gap-2">
               {days.map((day) => {
                 const dayKey = format(day, "yyyy-MM-dd");
@@ -461,13 +461,13 @@ function CalendarView({
                     className={cn(
                       "flex min-h-[52px] min-w-[76px] flex-col items-center justify-center rounded-xl border px-2 text-xs transition-colors",
                       isActive
-                        ? "border-alma-sandstone bg-alma-oat text-alma-ink"
-                        : "border-alma-hairline bg-alma-canvas text-alma-ink/60",
+                        ? "border-line-strong bg-sunken text-ink"
+                        : "border-line bg-canvas text-ink/60",
                     )}
                   >
                     <span className="text-[10px] uppercase">{DAYS_ES[day.getDay()]}</span>
                     <span className="nums text-base font-bold leading-none">{format(day, "d")}</span>
-                    <span className="nums mt-0.5 text-[10px] text-alma-ink/55">
+                    <span className="nums mt-0.5 text-[10px] text-ink/55">
                       {count} {count === 1 ? "clase" : "clases"}
                     </span>
                   </button>
@@ -476,11 +476,11 @@ function CalendarView({
             </div>
           </div>
 
-          <div className="rounded-xl border border-alma-hairline bg-alma-mist p-3">
+          <div className="rounded-xl border border-line bg-sunken p-3">
             <div className="mb-3 flex items-center justify-between gap-2">
               <div>
-                <p className="text-[0.72rem] uppercase tracking-widest text-alma-ink/55">{DAYS_ES[mobileDayDate.getDay()]}</p>
-                <p className="text-sm font-semibold text-alma-ink">{format(mobileDayDate, "d 'de' MMMM", { locale: es })}</p>
+                <p className="text-[0.72rem] uppercase tracking-widest text-ink/55">{DAYS_ES[mobileDayDate.getDay()]}</p>
+                <p className="text-sm font-semibold text-ink">{format(mobileDayDate, "d 'de' MMMM", { locale: es })}</p>
               </div>
               <Button size="sm" className="h-9" onClick={() => openCreate(mobileDay)}>
                 <Plus size={14} className="mr-1" /> Nueva
@@ -494,7 +494,7 @@ function CalendarView({
                 ))}
               </div>
             ) : mobileClasses.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-alma-sandstone/60 p-6 text-center text-xs text-alma-ink/55">
+              <div className="rounded-lg border border-dashed border-line-strong/60 p-6 text-center text-xs text-ink/55">
                 Sin clases programadas para este día.
               </div>
             ) : (
@@ -506,16 +506,16 @@ function CalendarView({
                       key={c.id}
                       type="button"
                       onClick={() => { setSelectedClass(c); setSheetOpen(true); }}
-                      className="w-full rounded-xl border border-alma-hairline p-3 text-left transition-colors hover:border-alma-sandstone"
+                      className="w-full rounded-xl border border-line p-3 text-left transition-colors hover:border-line-strong"
                       style={{ backgroundColor: classTint(color) }}
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <p className="flex items-center gap-1.5 truncate text-sm font-semibold text-alma-ink">
+                          <p className="flex items-center gap-1.5 truncate text-sm font-semibold text-ink">
                             <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: color }} />
                             <span className="truncate">{c.classTypeName ?? "Clase"}</span>
                           </p>
-                          <p className="nums text-xs text-alma-ink/60">
+                          <p className="nums text-xs text-ink/60">
                             {c.startTime ? formatTime(c.startTime) : "sin hora"}
                             {c.endTime ? ` a ${formatTime(c.endTime)}` : ""}
                           </p>
@@ -523,9 +523,9 @@ function CalendarView({
                         {c.isCancelled ? (
                           <Badge variant="destructive" className="text-[10px]">Cancelada</Badge>
                         ) : c.isClosed ? (
-                          <Badge variant="outline" className="border-alma-sandstone/70 text-[10px] text-alma-ink/70">Cerrada</Badge>
+                          <Badge variant="outline" className="border-line-strong/70 text-[10px] text-ink/70">Cerrada</Badge>
                         ) : (
-                          <Badge variant="outline" className="border-alma-sandstone/60 text-[10px] text-alma-ink/70">Activa</Badge>
+                          <Badge variant="outline" className="border-line-strong/60 text-[10px] text-ink/70">Activa</Badge>
                         )}
                       </div>
                       <div className="mt-2 flex items-center gap-2">
@@ -533,15 +533,15 @@ function CalendarView({
                           <img
                             src={c.instructorPhoto}
                             alt={c.instructorName ?? ""}
-                            className="h-6 w-6 rounded-full object-cover ring-1 ring-alma-hairline"
+                            className="h-6 w-6 rounded-full object-cover ring-1 ring-line"
                           />
                         ) : (
-                          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-alma-oat text-[0.6rem] font-bold text-alma-ink">
+                          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-sunken text-[0.6rem] font-bold text-ink">
                             {(c.instructorName ?? "?")[0].toUpperCase()}
                           </span>
                         )}
-                        <span className="truncate text-xs text-alma-ink/60">{c.instructorName ?? "Sin asignar"}</span>
-                        <span className="nums ml-auto text-xs text-alma-ink/55">
+                        <span className="truncate text-xs text-ink/60">{c.instructorName ?? "Sin asignar"}</span>
+                        <span className="nums ml-auto text-xs text-ink/55">
                           {(c.bookedCount ?? c.currentBookings ?? 0)}/{c.maxCapacity ?? c.capacity ?? "?"}
                         </span>
                       </div>
@@ -561,11 +561,11 @@ function CalendarView({
                 <div key={i} className="min-h-[320px]">
                   <button
                     type="button"
-                    className="mb-2 w-full text-center text-xs font-medium text-alma-ink/55 transition-colors hover:text-alma-ink"
+                    className="mb-2 w-full text-center text-xs font-medium text-ink/55 transition-colors hover:text-ink"
                     onClick={() => openCreate(format(day, "yyyy-MM-dd"))}
                   >
                     <div className="uppercase tracking-wide">{DAYS_ES[day.getDay()]}</div>
-                    <div className="nums text-lg font-semibold text-alma-ink">{format(day, "d")}</div>
+                    <div className="nums text-lg font-semibold text-ink">{format(day, "d")}</div>
                   </button>
                   <div className="space-y-1">
                     {isLoadingClasses
@@ -580,35 +580,35 @@ function CalendarView({
                               type="button"
                               onClick={() => { setSelectedClass(c); setSheetOpen(true); }}
                               className={cn(
-                                "w-full rounded-lg border border-alma-hairline px-2 py-1.5 text-left text-xs transition-colors hover:border-alma-sandstone",
+                                "w-full rounded-lg border border-line px-2 py-1.5 text-left text-xs transition-colors hover:border-line-strong",
                                 c.isCancelled && "opacity-60",
                               )}
                               style={{ backgroundColor: classTint(color) }}
                             >
                               <div className="flex items-center gap-1.5">
                                 <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: color }} />
-                                <span className="truncate font-semibold text-alma-ink">{c.classTypeName ?? "Clase"}</span>
+                                <span className="truncate font-semibold text-ink">{c.classTypeName ?? "Clase"}</span>
                               </div>
-                              <div className="nums text-alma-ink/60">{c.startTime ? formatTime(c.startTime) : ""}</div>
+                              <div className="nums text-ink/60">{c.startTime ? formatTime(c.startTime) : ""}</div>
                               <div className="mt-1 flex items-center gap-1">
                                 {c.instructorPhoto ? (
                                   <img
                                     src={c.instructorPhoto}
                                     alt={c.instructorName ?? ""}
-                                    className="h-4 w-4 rounded-full object-cover ring-1 ring-alma-hairline"
+                                    className="h-4 w-4 rounded-full object-cover ring-1 ring-line"
                                   />
                                 ) : (
-                                  <span className="flex h-4 w-4 items-center justify-center rounded-full bg-alma-oat text-[0.5rem] font-bold text-alma-ink">
+                                  <span className="flex h-4 w-4 items-center justify-center rounded-full bg-sunken text-[0.5rem] font-bold text-ink">
                                     {(c.instructorName ?? "?")[0].toUpperCase()}
                                   </span>
                                 )}
-                                <span className="truncate text-[0.65rem] text-alma-ink/60">{c.instructorName ?? "Sin asignar"}</span>
+                                <span className="truncate text-[0.65rem] text-ink/60">{c.instructorName ?? "Sin asignar"}</span>
                               </div>
-                              <div className="nums mt-0.5 text-alma-ink/55">
+                              <div className="nums mt-0.5 text-ink/55">
                                 {(c.bookedCount ?? c.currentBookings ?? 0)}/{c.maxCapacity ?? c.capacity ?? "?"}
                               </div>
                               {c.isCancelled && <Badge variant="destructive" className="mt-1 px-1 text-[0.6rem]">Cancelada</Badge>}
-                              {c.isClosed && <Badge variant="outline" className="mt-1 px-1 text-[0.6rem] border-alma-sandstone/70 text-alma-ink/70">Cerrada</Badge>}
+                              {c.isClosed && <Badge variant="outline" className="mt-1 px-1 text-[0.6rem] border-line-strong/70 text-ink/70">Cerrada</Badge>}
                             </button>
                           );
                         })}
@@ -616,7 +616,7 @@ function CalendarView({
                       type="button"
                       aria-label={`Crear clase el ${format(day, "d 'de' MMMM", { locale: es })}`}
                       onClick={() => openCreate(format(day, "yyyy-MM-dd"))}
-                      className="w-full py-1 text-center text-alma-ink/30 transition-colors hover:text-alma-ink/70"
+                      className="w-full py-1 text-center text-ink/30 transition-colors hover:text-ink/70"
                     >
                       <Plus size={12} className="mx-auto" />
                     </button>
@@ -634,7 +634,7 @@ function CalendarView({
           <DialogHeader><DialogTitle>{editingId ? "Editar clase" : "Nueva clase"}</DialogTitle></DialogHeader>
           <form onSubmit={form.handleSubmit((d) => editingId ? editMutation.mutate({ id: editingId, d }) : createMutation.mutate(d))} className="space-y-5">
             <fieldset className="space-y-3">
-              <legend className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-alma-berry">Clase</legend>
+              <legend className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-ink">Clase</legend>
               <div className="space-y-1">
                 <Label>Tipo de clase</Label>
                 <Select value={form.watch("classTypeId")} onValueChange={(v) => form.setValue("classTypeId", v, { shouldValidate: true })}>
@@ -664,14 +664,14 @@ function CalendarView({
               </div>
             </fieldset>
             <fieldset className="space-y-3">
-              <legend className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-alma-berry">Horario</legend>
+              <legend className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-ink">Horario</legend>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="space-y-1"><Label>Inicio</Label><Input type="datetime-local" className="nums" {...form.register("startTime")} /></div>
                 <div className="space-y-1"><Label>Fin</Label><Input type="datetime-local" className="nums" {...form.register("endTime")} /></div>
               </div>
             </fieldset>
             <fieldset className="space-y-3">
-              <legend className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-alma-berry">Cupo y notas</legend>
+              <legend className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-ink">Cupo y notas</legend>
               <div className="space-y-1"><Label>Capacidad máxima</Label><Input type="number" className="nums" {...form.register("maxCapacity")} /></div>
               <div className="space-y-1"><Label>Notas</Label><Input {...form.register("notes")} /></div>
             </fieldset>
@@ -691,23 +691,23 @@ function CalendarView({
         <SheetContent className="overflow-y-auto">
           <SheetHeader><SheetTitle>{selectedClass?.classTypeName ?? "Clase"}</SheetTitle></SheetHeader>
           {selectedClass && (
-            <div className="mt-6 space-y-4 text-sm text-alma-ink">
+            <div className="mt-6 space-y-4 text-sm text-ink">
               {/* Instructora con avatar */}
               <div className="flex items-center gap-3">
                 {selectedClass.instructorPhoto ? (
                   <img
                     src={selectedClass.instructorPhoto}
                     alt=""
-                    className="h-8 w-8 rounded-full object-cover ring-1 ring-alma-sandstone"
+                    className="h-8 w-8 rounded-full object-cover ring-1 ring-line-strong"
                   />
                 ) : (
-                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-alma-oat text-sm font-bold text-alma-ink">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-sunken text-sm font-bold text-ink">
                     {(selectedClass.instructorName ?? "?")[0].toUpperCase()}
                   </span>
                 )}
                 <div>
                   <div className="font-medium">{selectedClass.instructorName ?? selectedClass.instructorId}</div>
-                  <div className="text-xs text-alma-ink/55">Instructora</div>
+                  <div className="text-xs text-ink/55">Instructora</div>
                 </div>
               </div>
               <div>
@@ -721,20 +721,20 @@ function CalendarView({
                 const isFull = occupied >= cap;
                 const canShrink = cap > Math.max(1, occupied);
                 return (
-                  <div className="flex items-center justify-between gap-2 rounded-lg border border-alma-hairline bg-alma-mist px-3 py-2">
+                  <div className="flex items-center justify-between gap-2 rounded-lg border border-line bg-sunken px-3 py-2">
                     <div>
                       <span className="font-medium">Cupo:</span>{" "}
-                      <span className={cn("nums", isFull && "font-semibold text-alma-berry")}>
+                      <span className={cn("nums", isFull && "font-semibold text-ink")}>
                         {occupied} / {cap || "?"}
                       </span>
-                      {isFull && <span className="ml-2 text-[10px] uppercase tracking-wider text-alma-berry">Llena</span>}
+                      {isFull && <span className="ml-2 text-[10px] uppercase tracking-wider text-ink">Llena</span>}
                     </div>
                     <div className="flex items-center gap-1">
                       <button
                         type="button"
                         onClick={() => capacityMutation.mutate({ id: selectedClass.id, newCap: Math.max(1, cap - 1) })}
                         disabled={!canShrink || capacityMutation.isPending}
-                        className="h-7 w-7 rounded-md border border-alma-hairline bg-alma-canvas text-sm font-semibold text-alma-ink transition-colors hover:bg-alma-oat/50 disabled:cursor-not-allowed disabled:opacity-40"
+                        className="h-7 w-7 rounded-md border border-line bg-canvas text-sm font-semibold text-ink transition-colors hover:bg-sunken/50 disabled:cursor-not-allowed disabled:opacity-40"
                         title="Quitar 1 lugar"
                       >
                         −
@@ -743,7 +743,7 @@ function CalendarView({
                         type="button"
                         onClick={() => capacityMutation.mutate({ id: selectedClass.id, newCap: cap + 1 })}
                         disabled={capacityMutation.isPending}
-                        className="h-7 w-7 rounded-md border border-alma-hairline bg-alma-canvas text-sm font-semibold text-alma-ink transition-colors hover:bg-alma-oat/50"
+                        className="h-7 w-7 rounded-md border border-line bg-canvas text-sm font-semibold text-ink transition-colors hover:bg-sunken/50"
                         title="Agregar 1 lugar"
                       >
                         +
@@ -762,7 +762,7 @@ function CalendarView({
                 const noShow = roster.filter((r) => r.status === "no_show");
                 return (
                   <div className="pt-1">
-                    <div className="mb-2 text-[0.72rem] font-semibold uppercase tracking-wider text-alma-ink/55">
+                    <div className="mb-2 text-[0.72rem] font-semibold uppercase tracking-wider text-ink/55">
                       Inscritas <span className="nums">({activos.length})</span>
                       {espera.length > 0 && <span className="ml-1 font-normal opacity-70">· {espera.length} en espera</span>}
                       {noShow.length > 0 && <span className="ml-1 font-normal opacity-70">· {noShow.length} no asistió</span>}
@@ -780,7 +780,7 @@ function CalendarView({
                         </button>
                       </p>
                     ) : roster.length === 0 ? (
-                      <p className="rounded-lg border border-dashed border-alma-sandstone/60 px-3 py-2 text-xs text-alma-ink/55">
+                      <p className="rounded-lg border border-dashed border-line-strong/60 px-3 py-2 text-xs text-ink/55">
                         Sin reservas aún
                       </p>
                     ) : (
@@ -797,15 +797,15 @@ function CalendarView({
                             : status === "no_show" ? "No asistió"
                             : status;
                           const statusClr =
-                            status === "checked_in" ? "border-alma-olive/30 bg-alma-olive/10 text-alma-olive"
-                            : status === "waitlist" ? "border-alma-sandstone/60 bg-alma-canvas text-alma-berry"
+                            status === "checked_in" ? "border-success/30 bg-success/10 text-success"
+                            : status === "waitlist" ? "border-line-strong/60 bg-canvas text-ink"
                             : status === "no_show" ? "border-destructive/30 bg-destructive/10 text-destructive"
-                            : "border-alma-hairline bg-alma-oat/60 text-alma-ink";
+                            : "border-line bg-sunken/60 text-ink";
                           return (
-                            <li key={r.bookingId ?? r.booking_id} className="flex items-center justify-between gap-2 rounded-lg border border-alma-hairline bg-alma-mist px-3 py-2">
+                            <li key={r.bookingId ?? r.booking_id} className="flex items-center justify-between gap-2 rounded-lg border border-line bg-sunken px-3 py-2">
                               <div className="min-w-0">
-                                <p className="truncate text-sm font-medium text-alma-ink">{name}</p>
-                                {planLabel && <p className="truncate text-[11px] text-alma-ink/55">{planLabel}</p>}
+                                <p className="truncate text-sm font-medium text-ink">{name}</p>
+                                {planLabel && <p className="truncate text-[11px] text-ink/55">{planLabel}</p>}
                               </div>
                               <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${statusClr}`}>
                                 {statusLabel}
@@ -815,7 +815,7 @@ function CalendarView({
                         })}
                       </ul>
                     )}
-                    <Button asChild variant="outline" className="mt-3 w-full border-alma-sandstone/70 text-alma-ink">
+                    <Button asChild variant="outline" className="mt-3 w-full border-line-strong/70 text-ink">
                       <Link to="/admin/bookings">
                         Gestionar en Reservas
                         <ArrowRight size={14} className="ml-1.5" />
@@ -831,18 +831,18 @@ function CalendarView({
               )}
               <div className="flex flex-col gap-2 pt-4">
                 {!selectedClass.isCancelled && !selectedClass.isClosed && (
-                  <Button variant="outline" className="border-alma-sandstone/70 text-alma-ink" onClick={() => openEdit(selectedClass)}>
+                  <Button variant="outline" className="border-line-strong/70 text-ink" onClick={() => openEdit(selectedClass)}>
                     Editar clase
                   </Button>
                 )}
                 {!selectedClass.isCancelled && !selectedClass.isClosed && (
-                  <Button variant="outline" className="border-alma-sandstone/70 text-alma-ink" onClick={handleCloseClass} disabled={closeMutation.isPending}>
+                  <Button variant="outline" className="border-line-strong/70 text-ink" onClick={handleCloseClass} disabled={closeMutation.isPending}>
                     {closeMutation.isPending && <Loader2 size={14} className="mr-2 animate-spin" />}
                     Cerrar clase
                   </Button>
                 )}
                 {selectedClass.isClosed && (
-                  <Button variant="outline" className="border-alma-sandstone/70 text-alma-ink" onClick={() => reopenMutation.mutate(selectedClass.id)} disabled={reopenMutation.isPending}>
+                  <Button variant="outline" className="border-line-strong/70 text-ink" onClick={() => reopenMutation.mutate(selectedClass.id)} disabled={reopenMutation.isPending}>
                     {reopenMutation.isPending && <Loader2 size={14} className="mr-2 animate-spin" />}
                     Reabrir clase
                   </Button>
@@ -853,7 +853,7 @@ function CalendarView({
                     Cancelar clase
                   </Button>
                 )}
-                {selectedClass.isClosed && <Badge variant="outline" className="w-fit border-alma-sandstone/70 text-alma-ink/70">Clase cerrada</Badge>}
+                {selectedClass.isClosed && <Badge variant="outline" className="w-fit border-line-strong/70 text-ink/70">Clase cerrada</Badge>}
                 {selectedClass.isCancelled && <Badge variant="destructive" className="w-fit">Clase cancelada</Badge>}
               </div>
             </div>

@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { CreditCard, MoreHorizontal } from "lucide-react";
+import { COLOR } from "@/design/tokens";
 
 const STATUS_OPTIONS = ["active", "pending_payment", "pending_activation", "expired", "cancelled"] as const;
 type MembershipStatus = (typeof STATUS_OPTIONS)[number];
@@ -162,7 +163,7 @@ const MembershipTable = ({
 
   if (!isLoading && memberships.length === 0) {
     return (
-      <div className="rounded-xl border border-alma-hairline bg-alma-mist px-6">
+      <div className="rounded-xl border border-line bg-sunken px-6">
         <EmptyState
           icon={<CreditCard size={20} strokeWidth={1.8} />}
           title={emptyTitle}
@@ -183,7 +184,7 @@ const MembershipTable = ({
           </DialogHeader>
           <div className="space-y-4">
             {editing && (
-              <p className="text-sm text-alma-ink/60">
+              <p className="text-sm text-ink/60">
                 {editing.userName ?? "Clienta"} · {editing.planName ?? ""}
               </p>
             )}
@@ -191,12 +192,12 @@ const MembershipTable = ({
               <Label htmlFor="m-start">Fecha de inicio</Label>
               <Input id="m-start" type="date" value={startVal} onChange={(e) => setStartVal(e.target.value)} />
             </div>
-            <label className="flex items-center gap-2 text-sm text-alma-ink/80 cursor-pointer">
+            <label className="flex items-center gap-2 text-sm text-ink/80 cursor-pointer">
               <input
                 type="checkbox"
                 checked={autoEnd}
                 onChange={(e) => setAutoEnd(e.target.checked)}
-                style={{ accentColor: "#6E5A46", width: 16, height: 16 }}
+                style={{ accentColor: COLOR.ink, width: 16, height: 16 }}
               />
               Recalcular el fin con la duración del plan
             </label>
@@ -206,7 +207,7 @@ const MembershipTable = ({
                 <Input id="m-end" type="date" value={endVal} onChange={(e) => setEndVal(e.target.value)} />
               </div>
             )}
-            <p className="text-xs text-alma-ink/50">
+            <p className="text-xs text-ink/50">
               Para preventa: fija el inicio en la fecha en que la membresía debe empezar a valer.
               Con el recálculo activado, el vencimiento se ajusta solo según la duración del plan;
               desactívalo para poner una fecha de fin manual.
@@ -221,7 +222,7 @@ const MembershipTable = ({
         </DialogContent>
       </Dialog>
 
-      <div className="rounded-xl border border-alma-hairline bg-alma-mist overflow-hidden">
+      <div className="rounded-xl border border-line bg-sunken overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow>
@@ -243,25 +244,25 @@ const MembershipTable = ({
                 const catLabel = cat && cat !== "all" ? (CATEGORY_LABELS[cat] ?? cat) : null;
                 return (
                   <TableRow key={m.id}>
-                    <TableCell className="font-medium text-alma-ink">{m.userName ?? m.userId}</TableCell>
+                    <TableCell className="font-medium text-ink">{m.userName ?? m.userId}</TableCell>
                     <TableCell>
                       <div className="flex items-baseline gap-2">
-                        <span className="text-alma-ink">{m.planName ?? m.planId}</span>
+                        <span className="text-ink">{m.planName ?? m.planId}</span>
                         {catLabel && (
-                          <span className="text-xs text-alma-ink/55">{catLabel}</span>
+                          <span className="text-xs text-ink/55">{catLabel}</span>
                         )}
                       </div>
                     </TableCell>
                     <TableCell>
                       <Badge variant={STATUS_VARIANTS[m.status]}>{STATUS_LABELS[m.status]}</Badge>
                     </TableCell>
-                    <TableCell className="nums text-sm text-alma-ink/70">
+                    <TableCell className="nums text-sm text-ink/70">
                       <div>{m.endDate ? formatDate(m.endDate) : "—"}</div>
                       {m.startDate && (
-                        <div className="text-xs text-alma-ink/45">desde {formatDate(m.startDate)}</div>
+                        <div className="text-xs text-ink/45">desde {formatDate(m.startDate)}</div>
                       )}
                     </TableCell>
-                    <TableCell className="nums text-alma-ink">{formatRemaining(m)}</TableCell>
+                    <TableCell className="nums text-ink">{formatRemaining(m)}</TableCell>
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -295,7 +296,7 @@ const MembershipsList = () => {
       <AdminLayout>
         <div className="admin-page max-w-6xl">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
-            <h1 className="admin-title font-semibold text-alma-ink">Membresías</h1>
+            <h1 className="admin-title font-semibold text-ink">Membresías</h1>
           </div>
 
           <Tabs defaultValue="all">

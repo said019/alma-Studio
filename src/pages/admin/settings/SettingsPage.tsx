@@ -72,7 +72,7 @@ function inferVenueMediaType(url: string, explicitType?: string): "image" | "vid
 }
 
 // Etiqueta pequeña de sección (uppercase, tracking amplio)
-const sectionLabelClass = "text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-alma-ink/60";
+const sectionLabelClass = "text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-ink/60";
 
 // Generic settings section — reads { data: <value_object> } from server
 const SettingsSection = ({ settingKey, fields }: { settingKey: string; fields: { key: string; label: string; type?: string; multiline?: boolean }[] }) => {
@@ -143,7 +143,7 @@ const SettingsSection = ({ settingKey, fields }: { settingKey: string; fields: {
           }
         </div>
       ))}
-      <Button onClick={() => updateMutation.mutate()} disabled={updateMutation.isPending} className="bg-alma-ink text-alma-canvas hover:bg-alma-ink-deep">
+      <Button onClick={() => updateMutation.mutate()} disabled={updateMutation.isPending} className="bg-ink text-canvas hover:bg-inverse">
         {updateMutation.isPending ? <Loader2 className="animate-spin mr-2" size={14} /> : null}
         Guardar cambios
       </Button>
@@ -227,7 +227,7 @@ const BankInfoSettings = () => {
 
   return (
     <div className="space-y-5 max-w-md">
-      <p className="text-sm text-alma-ink/70">
+      <p className="text-sm text-ink/70">
         Estos datos se muestran a las clientas en la pantalla de pago por transferencia (SPEI).
       </p>
 
@@ -250,7 +250,7 @@ const BankInfoSettings = () => {
           inputMode="numeric"
           className="nums"
         />
-        <p className={`nums text-xs ${clabeValid || clabeDigits.length === 0 ? "text-alma-ink/55" : "text-destructive"}`}>
+        <p className={`nums text-xs ${clabeValid || clabeDigits.length === 0 ? "text-ink/55" : "text-destructive"}`}>
           {clabeDigits.length}/18 dígitos{!clabeValid && clabeDigits.length > 0 ? " (debe tener 18)" : ""}
         </p>
       </div>
@@ -266,7 +266,7 @@ const BankInfoSettings = () => {
         />
       </div>
 
-      <Button onClick={() => save.mutate()} disabled={!canSave} className="bg-alma-ink text-alma-canvas hover:bg-alma-ink-deep">
+      <Button onClick={() => save.mutate()} disabled={!canSave} className="bg-ink text-canvas hover:bg-inverse">
         {save.isPending ? <Loader2 className="animate-spin mr-2" size={14} /> : null}
         Guardar datos de transferencia
       </Button>
@@ -346,10 +346,10 @@ const WhatsAppSettings = () => {
   return (
     <div className="space-y-8 max-w-xl">
       {/* ── Status ─────────────────────────────────────────────────── */}
-      <div className="rounded-xl border border-alma-hairline bg-alma-mist p-5 space-y-4">
+      <div className="rounded-xl border border-line bg-sunken p-5 space-y-4">
         <div className="flex items-center justify-between">
           <p className={`${sectionLabelClass} flex items-center gap-2`}>
-            {status.connected ? <Wifi size={15} className="text-alma-olive" /> : <WifiOff size={15} className="text-alma-ink/45" />}
+            {status.connected ? <Wifi size={15} className="text-success" /> : <WifiOff size={15} className="text-ink/45" />}
             Conexión WhatsApp
           </p>
           <Button variant="ghost" size="sm" onClick={() => refetch()} disabled={isFetching} aria-label="Actualizar estado">
@@ -359,26 +359,26 @@ const WhatsAppSettings = () => {
 
         <div className="flex items-center gap-3">
           {status.connected ? (
-            <Badge variant="outline" className="border-transparent bg-alma-olive/15 text-alma-olive hover:bg-alma-olive/15">Conectado</Badge>
+            <Badge variant="outline" className="border-transparent bg-success/15 text-success hover:bg-success/15">Conectado</Badge>
           ) : (
-            <Badge variant="outline" className="border-alma-hairline bg-transparent text-alma-ink/55">
+            <Badge variant="outline" className="border-line bg-transparent text-ink/55">
               {status.state === "qr_pending" ? "Esperando QR" : "Desconectado"}
             </Badge>
           )}
-          {status.number && <span className="nums text-sm text-alma-ink/60">{status.number}</span>}
+          {status.number && <span className="nums text-sm text-ink/60">{status.number}</span>}
         </div>
 
         {status.state === "qr_pending" && status.qrCode && (
           <div className="space-y-2">
-            <p className="text-sm text-alma-ink/70">Escanea con WhatsApp para conectar:</p>
-            <img src={status.qrCode} alt="QR Code" className="w-52 h-52 border border-alma-hairline rounded-xl bg-alma-canvas" />
-            <p className="text-xs text-alma-ink/55">Actualizando cada 3 segundos…</p>
+            <p className="text-sm text-ink/70">Escanea con WhatsApp para conectar:</p>
+            <img src={status.qrCode} alt="QR Code" className="w-52 h-52 border border-line rounded-xl bg-canvas" />
+            <p className="text-xs text-ink/55">Actualizando cada 3 segundos…</p>
           </div>
         )}
 
         <div className="flex gap-3">
           {!status.connected ? (
-            <Button onClick={() => connectMutation.mutate()} disabled={connectMutation.isPending} className="bg-alma-ink text-alma-canvas hover:bg-alma-ink-deep">
+            <Button onClick={() => connectMutation.mutate()} disabled={connectMutation.isPending} className="bg-ink text-canvas hover:bg-inverse">
               {connectMutation.isPending ? <Loader2 className="animate-spin mr-2" size={14} /> : null}
               {status.state === "qr_pending" ? "Obtener nuevo QR" : "Conectar WhatsApp"}
             </Button>
@@ -393,7 +393,7 @@ const WhatsAppSettings = () => {
 
       {/* ── Test message ────────────────────────────────────────────── */}
       {status.connected && (
-        <div className="rounded-xl border border-alma-hairline bg-alma-mist p-5 space-y-4">
+        <div className="rounded-xl border border-line bg-sunken p-5 space-y-4">
           <p className={`${sectionLabelClass} flex items-center gap-2`}>
             <MessageSquare size={15} />
             Mensaje de prueba
@@ -403,19 +403,19 @@ const WhatsAppSettings = () => {
               placeholder="Ej. 5219991234567"
               value={testPhone}
               onChange={(e) => setTestPhone(e.target.value)}
-              className="flex-1 bg-alma-canvas nums"
+              className="flex-1 bg-canvas nums"
               inputMode="numeric"
             />
             <Button
               onClick={() => testMutation.mutate()}
               disabled={testMutation.isPending || !testPhone}
-              className="bg-alma-ink text-alma-canvas hover:bg-alma-ink-deep"
+              className="bg-ink text-canvas hover:bg-inverse"
               aria-label="Enviar mensaje de prueba"
             >
               {testMutation.isPending ? <Loader2 className="animate-spin" size={14} /> : <Send size={14} />}
             </Button>
           </div>
-          <p className="text-xs text-alma-ink/55">Incluye código de país. Ej: 521 + 10 dígitos para México.</p>
+          <p className="text-xs text-ink/55">Incluye código de país. Ej: 521 + 10 dígitos para México.</p>
         </div>
       )}
     </div>
@@ -505,13 +505,13 @@ const NotificationTemplates = () => {
   return (
     <div className="space-y-6 max-w-xl">
       {/* Alcance: sistema vs Templates de WhatsApp */}
-      <div className="flex items-start gap-2.5 rounded-xl border border-alma-hairline bg-alma-oat/40 px-3.5 py-3">
-        <Info size={15} className="mt-0.5 shrink-0 text-alma-berry" />
-        <p className="text-xs leading-relaxed text-alma-ink/80">
+      <div className="flex items-start gap-2.5 rounded-xl border border-line bg-sunken/40 px-3.5 py-3">
+        <Info size={15} className="mt-0.5 shrink-0 text-ink" />
+        <p className="text-xs leading-relaxed text-ink/80">
           Estos son los mensajes del sistema. Para las plantillas de WhatsApp ve a{" "}
           <Link
             to="/admin/whatsapp-templates"
-            className="font-medium text-alma-berry underline underline-offset-2 hover:text-alma-ink"
+            className="font-medium text-ink underline underline-offset-2 hover:text-ink"
           >
             Templates de WhatsApp
           </Link>.
@@ -519,7 +519,7 @@ const NotificationTemplates = () => {
       </div>
 
       {/* Config toggles */}
-      <div className="rounded-xl border border-alma-hairline bg-alma-mist p-4 space-y-3">
+      <div className="rounded-xl border border-line bg-sunken p-4 space-y-3">
         <p className={sectionLabelClass}>Canales activos</p>
         {configError ? (
           <p className="text-xs text-destructive">
@@ -541,19 +541,19 @@ const NotificationTemplates = () => {
               <Label>Horas antes del recordatorio</Label>
               <Input
                 type="number"
-                className="w-28 bg-alma-canvas nums"
+                className="w-28 bg-canvas nums"
                 value={config.reminder_hours_before ?? 2}
                 onChange={(e) => setConfig((p) => ({ ...p, reminder_hours_before: Number(e.target.value) }))}
               />
             </div>
-            <Button size="sm" onClick={() => saveConfigMutation.mutate()} disabled={saveConfigMutation.isPending} className="bg-alma-ink text-alma-canvas hover:bg-alma-ink-deep">
+            <Button size="sm" onClick={() => saveConfigMutation.mutate()} disabled={saveConfigMutation.isPending} className="bg-ink text-canvas hover:bg-inverse">
               {saveConfigMutation.isPending ? <Loader2 className="animate-spin mr-1" size={12} /> : null}Guardar
             </Button>
           </>
         )}
       </div>
 
-      <div className="rounded-xl border border-alma-hairline bg-alma-mist p-4 space-y-3">
+      <div className="rounded-xl border border-line bg-sunken p-4 space-y-3">
         <div className="flex items-center justify-between gap-2">
           <p className={`${sectionLabelClass} flex items-center gap-2`}>
             <BellDot size={15} />
@@ -570,30 +570,30 @@ const NotificationTemplates = () => {
             <button type="button" className="underline underline-offset-2" onClick={() => refetchWalletLogs()}>Reintentar</button>
           </p>
         ) : !walletLogs.length ? (
-          <p className="text-xs text-alma-ink/55">Aún no hay notificaciones de pase registradas.</p>
+          <p className="text-xs text-ink/55">Aún no hay notificaciones de pase registradas.</p>
         ) : (
           <div className="space-y-2 max-h-72 overflow-auto pr-1">
             {walletLogs.map((row) => (
-              <div key={row.id} className="rounded-lg border border-alma-hairline bg-alma-canvas px-3 py-2 text-xs">
+              <div key={row.id} className="rounded-lg border border-line bg-canvas px-3 py-2 text-xs">
                 <div className="flex items-center justify-between gap-2">
-                  <p className="font-medium text-alma-ink truncate">{row.display_name || row.email || row.user_id || "Usuaria"}</p>
+                  <p className="font-medium text-ink truncate">{row.display_name || row.email || row.user_id || "Usuaria"}</p>
                   <Badge
                     variant="outline"
                     className={
                       row.status === "ok"
-                        ? "border-transparent bg-alma-olive/15 text-alma-olive hover:bg-alma-olive/15"
+                        ? "border-transparent bg-success/15 text-success hover:bg-success/15"
                         : row.status === "partial"
-                          ? "border-alma-sandstone/60 bg-alma-oat/50 text-alma-berry"
+                          ? "border-line-strong/60 bg-sunken/50 text-ink"
                           : "border-transparent bg-destructive/10 text-destructive"
                     }
                   >
                     {row.status === "ok" ? "OK" : row.status === "partial" ? "Parcial" : "Error"}
                   </Badge>
                 </div>
-                <p className="mt-0.5 text-alma-ink/60">
+                <p className="mt-0.5 text-ink/60">
                   <span className="nums">{formatDateTime(row.created_at)}</span> · motivo: {row.reason}
                 </p>
-                <p className="mt-1 text-alma-ink/60 nums">
+                <p className="mt-1 text-ink/60 nums">
                   Apple: {row.apple_sent ?? 0} enviadas / {row.apple_failed ?? 0} fallidas · Google: {row.google_synced ? `sincronizado (${row.google_mode || "updated"})` : "sin sincronizar"}
                 </p>
               </div>
@@ -621,14 +621,14 @@ const NotificationTemplates = () => {
             const tpl = templates[t.key];
             const Icon = t.icon;
             return (
-              <div key={t.key} className="flex items-start justify-between gap-3 p-3 rounded-xl border border-alma-hairline bg-alma-mist">
-                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-alma-oat/60 text-alma-berry">
+              <div key={t.key} className="flex items-start justify-between gap-3 p-3 rounded-xl border border-line bg-sunken">
+                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-sunken/60 text-ink">
                   <Icon size={15} strokeWidth={1.8} />
                 </span>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-alma-ink">{t.label}</p>
-                  <p className="text-xs text-alma-ink/55 mt-0.5 truncate">
-                    {tpl?.body ? tpl.body.slice(0, 80) + (tpl.body.length > 80 ? "…" : "") : <span className="italic text-alma-ink/45">Sin personalizar (usa plantilla por defecto)</span>}
+                  <p className="text-sm font-medium text-ink">{t.label}</p>
+                  <p className="text-xs text-ink/55 mt-0.5 truncate">
+                    {tpl?.body ? tpl.body.slice(0, 80) + (tpl.body.length > 80 ? "…" : "") : <span className="italic text-ink/45">Sin personalizar (usa plantilla por defecto)</span>}
                   </p>
                 </div>
                 <Button size="icon" variant="ghost" className="shrink-0" onClick={() => openEdit(t.key)} aria-label={`Editar plantilla ${t.label}`}>
@@ -647,7 +647,7 @@ const NotificationTemplates = () => {
             <DialogTitle>Editar plantilla · {currentTpl?.label}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
-            <p className="text-xs text-alma-ink/70 bg-alma-oat/40 rounded-lg px-3 py-2">{currentTpl?.hint}</p>
+            <p className="text-xs text-ink/70 bg-sunken/40 rounded-lg px-3 py-2">{currentTpl?.hint}</p>
             <div className="space-y-1">
               <Label>Asunto (email)</Label>
               <Input value={editSubject} onChange={(e) => setEditSubject(e.target.value)} placeholder="Asunto del email..." />
@@ -655,7 +655,7 @@ const NotificationTemplates = () => {
             <div className="space-y-1">
               <Label>Cuerpo del mensaje (WhatsApp / Email)</Label>
               <Textarea rows={6} value={editText} onChange={(e) => setEditText(e.target.value)} placeholder="Escribe el mensaje aquí..." />
-              <p className="nums text-xs text-alma-ink/55">{editText.length} caracteres</p>
+              <p className="nums text-xs text-ink/55">{editText.length} caracteres</p>
             </div>
           </div>
           <DialogFooter>
@@ -663,7 +663,7 @@ const NotificationTemplates = () => {
             <Button
               onClick={() => editingKey && saveTplMutation.mutate({ key: editingKey, subject: editSubject, body: editText })}
               disabled={saveTplMutation.isPending}
-              className="bg-alma-ink text-alma-canvas hover:bg-alma-ink-deep"
+              className="bg-ink text-canvas hover:bg-inverse"
             >
               {saveTplMutation.isPending ? <Loader2 className="animate-spin mr-1" size={12} /> : null}Guardar plantilla
             </Button>
@@ -829,10 +829,10 @@ const VenueMediaSettings = () => {
   }
 
   return (
-    <div className="rounded-xl border border-alma-hairline bg-alma-mist p-4 space-y-4 max-w-2xl">
+    <div className="rounded-xl border border-line bg-sunken p-4 space-y-4 max-w-2xl">
       <div className="space-y-1">
         <p className={sectionLabelClass}>Media del lugar</p>
-        <p className="text-xs text-alma-ink/60">
+        <p className="text-xs text-ink/60">
           Sube una imagen o video para mostrar el estudio desde el admin.
         </p>
       </div>
@@ -853,7 +853,7 @@ const VenueMediaSettings = () => {
           type="button"
           onClick={() => fileInputRef.current?.click()}
           disabled={isUploading || saveGeneralMutation.isPending}
-          className="bg-alma-ink text-alma-canvas hover:bg-alma-ink-deep"
+          className="bg-ink text-canvas hover:bg-inverse"
         >
           {isUploading ? <Loader2 className="animate-spin mr-2" size={14} /> : <Upload size={14} className="mr-2" />}
           Subir imagen o video
@@ -874,26 +874,26 @@ const VenueMediaSettings = () => {
       {isUploading ? (
         <div className="space-y-2">
           <Progress value={uploadProgress} />
-          <p className="nums text-xs text-alma-ink/55">{uploadProgress}% subido</p>
+          <p className="nums text-xs text-ink/55">{uploadProgress}% subido</p>
         </div>
       ) : null}
 
       {mediaUrl ? (
         <div className="space-y-2">
-          <div className="rounded-lg border border-alma-hairline overflow-hidden bg-alma-ink-deep">
+          <div className="rounded-lg border border-line overflow-hidden bg-inverse">
             {mediaType === "video" ? (
-              <video src={mediaUrl} controls className="w-full max-h-[360px] object-cover bg-alma-ink-deep" />
+              <video src={mediaUrl} controls className="w-full max-h-[360px] object-cover bg-inverse" />
             ) : (
               <img src={mediaUrl} alt="Media del lugar" className="w-full max-h-[360px] object-cover" />
             )}
           </div>
-          <p className="text-xs text-alma-ink/60 flex items-center gap-2">
+          <p className="text-xs text-ink/60 flex items-center gap-2">
             {mediaType === "video" ? <Video size={13} /> : <ImageIcon size={13} />}
             {generalSettings.venue_media_name || "Archivo cargado"}
           </p>
         </div>
       ) : (
-        <div className="rounded-lg border border-dashed border-alma-hairline p-4 text-xs text-alma-ink/55">
+        <div className="rounded-lg border border-dashed border-line p-4 text-xs text-ink/55">
           Aún no hay media cargada.
         </div>
       )}
@@ -913,7 +913,7 @@ const SettingsPage = () => {
             ...(FEATURES.whatsappTemplates ? [{ label: "Templates WA", to: "/admin/whatsapp-templates" }] : []),
           ]}
         />
-        <h1 className="admin-title font-semibold text-alma-ink mb-6">Configuración</h1>
+        <h1 className="admin-title font-semibold text-ink mb-6">Configuración</h1>
         <Tabs defaultValue={defaultTab}>
           <TabsList className="flex-wrap h-auto gap-1 mb-6">
             <TabsTrigger value="general">General</TabsTrigger>
@@ -969,8 +969,8 @@ const SettingsPage = () => {
 
           <TabsContent value="security">
             <div className="max-w-md">
-              <h2 className="text-lg font-semibold text-alma-ink mb-1">Cambiar mi contraseña</h2>
-              <p className="text-sm text-alma-ink/70 mb-6">
+              <h2 className="text-lg font-semibold text-ink mb-1">Cambiar mi contraseña</h2>
+              <p className="text-sm text-ink/70 mb-6">
                 Cambia la contraseña de tu cuenta de administradora. Por seguridad cerraremos tu sesión al terminar.
               </p>
               <ChangePassword logoutAfter />

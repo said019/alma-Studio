@@ -21,26 +21,21 @@ import {
   TrendingUp, TrendingDown, Minus, Download, Printer, Sparkles,
   AlertTriangle, Star, BarChart3, CalendarDays, Users,
 } from "lucide-react";
+import { COLOR } from "@/design/tokens";
 
 /* ════════════════════════════════════════════════════════════════
    ReportsPage — página patrón del admin (Hero / Secondary / Strip)
    ════════════════════════════════════════════════════════════════ */
 
-// Paleta canónica Alma. Solo para recharts (necesita hex);
-// en el markup se usan las utilidades alma-* de Tailwind.
-const C = {
-  ink: "#43392F",
-  inkSoft: "rgba(67, 57, 47, 0.55)",
-  berry: "#6E5A46",
-  stone: "#A48D78",
-  sandstone: "#CBB9A4",
-  oat: "#E6DAC8",
-  mist: "#F4F1EA",
-  canvas: "#FAF9F6",
-  hairline: "#E0D5C6",
-  olive: "#5F6B4A",
-  destructive: "#B23A48",
-};
+// Paleta para recharts (tokens de src/design/tokens.ts; en el markup se usan
+// las clases de Tailwind del token, p. ej. bg-sunken, border-line).
+// Series ordinarias: principal ink, secundaria inkMuted, terciaria
+// lineStrong. Nunca coral decorativo en una serie (spec §3.2 regla 3).
+const CHART_PRIMARY = COLOR.ink;
+const CHART_SECONDARY = COLOR.inkMuted;
+const CHART_TERTIARY = COLOR.lineStrong;
+const CHART_GRID = COLOR.line;
+const CHART_AXIS = `${COLOR.ink}8c`;
 
 type RangeKey = "this_month" | "30d" | "90d" | "ytd";
 const RANGES: { key: RangeKey; label: string }[] = [
@@ -87,7 +82,7 @@ function Delta({ pct, suffix = "" }: { pct: number | undefined; suffix?: string 
     <span
       className={cn(
         "nums inline-flex items-center gap-1 text-[11px] font-medium",
-        isFlat ? "text-alma-ink/55" : isUp ? "text-alma-olive" : "text-destructive",
+        isFlat ? "text-ink/55" : isUp ? "text-success" : "text-destructive",
       )}
     >
       <Icon size={11} strokeWidth={2.2} />
@@ -122,10 +117,10 @@ function HeroKPI({
   loading?: boolean;
 }) {
   return (
-    <Card className="h-full border-alma-sandstone/70 bg-alma-mist" data-stagger-item>
+    <Card className="h-full border-line-strong/70 bg-sunken" data-stagger-item>
       <CardContent className="p-5 sm:p-6">
         <div className="mb-2 flex items-start justify-between gap-3">
-          <p className="text-[0.72rem] font-medium uppercase tracking-[0.16em] text-alma-ink/55">
+          <p className="text-[0.72rem] font-medium uppercase tracking-[0.16em] text-ink/55">
             {label}
           </p>
           <Delta pct={delta} suffix={deltaSuffix} />
@@ -133,13 +128,13 @@ function HeroKPI({
         {loading ? (
           <Skeleton className="h-10 w-32" />
         ) : (
-          <p className="font-display nums leading-none text-alma-ink" style={{ fontSize: "clamp(2.2rem, 4vw, 3rem)" }}>
+          <p className="font-display nums leading-none text-ink" style={{ fontSize: "clamp(2.2rem, 4vw, 3rem)" }}>
             {value}
           </p>
         )}
         {sparkData && sparkData.length > 0 && (
           <div className="-mx-1 mt-3">
-            <Sparkline data={sparkData} color={sparkColor || C.berry} height={42} />
+            <Sparkline data={sparkData} color={sparkColor || CHART_PRIMARY} height={42} />
           </div>
         )}
       </CardContent>
@@ -158,15 +153,15 @@ function SecondaryKPI({
   loading?: boolean;
 }) {
   return (
-    <Card className="h-full border-alma-hairline bg-alma-mist" data-stagger-item>
+    <Card className="h-full border-line bg-sunken" data-stagger-item>
       <CardContent className="p-4">
-        <p className="mb-1.5 text-[0.72rem] font-medium uppercase tracking-[0.14em] text-alma-ink/55">
+        <p className="mb-1.5 text-[0.72rem] font-medium uppercase tracking-[0.14em] text-ink/55">
           {label}
         </p>
         {loading ? (
           <Skeleton className="h-7 w-20" />
         ) : (
-          <p className="font-display nums leading-none text-alma-ink" style={{ fontSize: "1.7rem" }}>{value}</p>
+          <p className="font-display nums leading-none text-ink" style={{ fontSize: "1.7rem" }}>{value}</p>
         )}
         {delta !== undefined && (
           <div className="mt-1.5">
@@ -181,9 +176,9 @@ function SecondaryKPI({
 /* ═══════════ Strip stat (mini compactos sobre hairline superior) ═══════════ */
 function StripStat({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="border-t border-alma-hairline pb-1 pt-2.5" data-stagger-item>
-      <p className="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-alma-ink/60">{label}</p>
-      <p className="font-display nums mt-1.5 leading-none text-alma-ink" style={{ fontSize: "1.15rem" }}>{value}</p>
+    <div className="border-t border-line pb-1 pt-2.5" data-stagger-item>
+      <p className="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-ink/60">{label}</p>
+      <p className="font-display nums mt-1.5 leading-none text-ink" style={{ fontSize: "1.15rem" }}>{value}</p>
     </div>
   );
 }
@@ -221,19 +216,19 @@ function ActionPanel({ dorm, conv, cancelRate, cancelled, navigate }: { dorm: an
   }
   if (actions.length === 0) return null;
   return (
-    <Card className="mb-6 border-alma-hairline bg-alma-oat/50">
+    <Card className="mb-6 border-line bg-sunken/50">
       <CardContent className="p-4">
-        <p className="mb-3 text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-alma-berry">
+        <p className="mb-3 text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-ink">
           Acciones sugeridas
         </p>
         <div className="space-y-2">
           {actions.map((a, i) => {
             const Icon = a.icon;
             return (
-              <div key={i} className="flex items-center justify-between gap-3 rounded-lg border border-alma-hairline bg-alma-canvas p-2.5">
+              <div key={i} className="flex items-center justify-between gap-3 rounded-lg border border-line bg-canvas p-2.5">
                 <div className="flex min-w-0 items-center gap-2.5">
-                  <Icon size={15} className={a.urgent ? "shrink-0 text-destructive" : "shrink-0 text-alma-berry"} />
-                  <span className="truncate text-[13px] text-alma-ink">{a.label}</span>
+                  <Icon size={15} className={a.urgent ? "shrink-0 text-destructive" : "shrink-0 text-ink"} />
+                  <span className="truncate text-[13px] text-ink">{a.label}</span>
                 </div>
                 <Button size="sm" onClick={() => navigate(a.link)} data-press className="shrink-0">
                   {a.cta}
@@ -271,7 +266,7 @@ function downloadCSV(filename: string, rows: any[], columns: { key: string; labe
 
 /* ═══════════ Chart helpers ═══════════ */
 const ChartSkeleton = () => <Skeleton className="h-[280px] w-full" />;
-const tooltipStyle = { fontSize: 12, borderColor: C.hairline, backgroundColor: C.canvas, borderRadius: 8 };
+const tooltipStyle = { fontSize: 12, borderColor: CHART_GRID, backgroundColor: COLOR.canvas, borderRadius: 8 };
 
 /* ═══════════════════════════════════════════════════════════════
    Main Component
@@ -398,10 +393,10 @@ const ReportsPage = () => {
           {/* ═════ Header con range picker ═════ */}
           <div className="mb-7 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <h1 className="admin-title font-display mb-1 leading-none text-alma-ink">
+              <h1 className="admin-title font-display mb-1 leading-none text-ink">
                 Reportes
               </h1>
-              <p className="text-[13px] text-alma-ink/55">
+              <p className="text-[13px] text-ink/55">
                 Última actualización · <span className="nums">{formatDateTime(new Date())}</span>
               </p>
             </div>
@@ -418,7 +413,7 @@ const ReportsPage = () => {
                 variant="outline"
                 onClick={() => window.print()}
                 data-press
-                className="hidden border-alma-sandstone sm:inline-flex"
+                className="hidden border-line-strong sm:inline-flex"
               >
                 <Printer size={13} className="mr-1.5" /> Imprimir
               </Button>
@@ -435,7 +430,7 @@ const ReportsPage = () => {
           />
 
           {overviewError ? (
-            <Card className="mb-6 border-alma-hairline bg-alma-mist">
+            <Card className="mb-6 border-line bg-sunken">
               <CardContent className="px-5">
                 <ErrorState
                   title="No pudimos cargar el resumen"
@@ -455,7 +450,7 @@ const ReportsPage = () => {
                     value={formatMXN(o.monthlyRevenue || 0)}
                     delta={deltas.revenue}
                     sparkData={revSparkValues}
-                    sparkColor={C.berry}
+                    sparkColor={CHART_PRIMARY}
                     loading={isLoading}
                   />
                 </div>
@@ -498,7 +493,7 @@ const ReportsPage = () => {
                   value={
                     <span className="inline-flex items-center gap-1">
                       {o.reviewsAverage ? Number(o.reviewsAverage).toFixed(1) : "—"}
-                      <Star size={13} className="text-alma-berry" fill="currentColor" strokeWidth={0} />
+                      <Star size={13} className="text-ink" fill="currentColor" strokeWidth={0} />
                     </span>
                   }
                 />
@@ -509,7 +504,7 @@ const ReportsPage = () => {
           {/* ═════ Conversión + dormant cohorts (side-by-side cuando aplica) ═════ */}
           <div className="mb-6 grid grid-cols-1 gap-3 lg:grid-cols-2">
             {conversionError ? (
-              <Card className="border-alma-hairline bg-alma-mist" data-stagger-item>
+              <Card className="border-line bg-sunken" data-stagger-item>
                 <CardContent className="px-5">
                   <ErrorState
                     title="Conversión no disponible"
@@ -519,22 +514,22 @@ const ReportsPage = () => {
                 </CardContent>
               </Card>
             ) : conv && (
-              <Card className="border-alma-hairline bg-alma-mist" data-stagger-item>
+              <Card className="border-line bg-sunken" data-stagger-item>
                 <CardContent className="p-5">
-                  <p className="mb-3 text-[0.72rem] font-medium uppercase tracking-[0.14em] text-alma-ink/55">
+                  <p className="mb-3 text-[0.72rem] font-medium uppercase tracking-[0.14em] text-ink/55">
                     Conversión muestra a paquete
                   </p>
                   <div className="flex items-baseline gap-3">
-                    <span className="font-display nums leading-none text-alma-berry" style={{ fontSize: "2.5rem" }}>
+                    <span className="font-display nums leading-none text-ink" style={{ fontSize: "2.5rem" }}>
                       {conv.conversion_rate ?? 0}%
                     </span>
-                    <span className="nums text-[12px] text-alma-ink/55">
+                    <span className="nums text-[12px] text-ink/55">
                       {conv.converted_total ?? 0} de {conv.muestras_total ?? 0} muestras
                     </span>
                   </div>
-                  <div className="mt-4 h-2 overflow-hidden rounded-full bg-alma-oat">
+                  <div className="mt-4 h-2 overflow-hidden rounded-full bg-sunken">
                     <div
-                      className="h-full rounded-full bg-alma-berry transition-[width] duration-700"
+                      className="h-full rounded-full bg-ink transition-[width] duration-700"
                       style={{ width: `${conv.conversion_rate || 0}%` }}
                     />
                   </div>
@@ -542,7 +537,7 @@ const ReportsPage = () => {
               </Card>
             )}
             {dormantError ? (
-              <Card className="border-alma-hairline bg-alma-mist" data-stagger-item>
+              <Card className="border-line bg-sunken" data-stagger-item>
                 <CardContent className="px-5">
                   <ErrorState
                     title="Cohortes no disponibles"
@@ -552,9 +547,9 @@ const ReportsPage = () => {
                 </CardContent>
               </Card>
             ) : dorm && (
-              <Card className="border-alma-hairline bg-alma-mist" data-stagger-item>
+              <Card className="border-line bg-sunken" data-stagger-item>
                 <CardContent className="p-5">
-                  <p className="mb-3 text-[0.72rem] font-medium uppercase tracking-[0.14em] text-alma-ink/55">
+                  <p className="mb-3 text-[0.72rem] font-medium uppercase tracking-[0.14em] text-ink/55">
                     Por última visita
                   </p>
                   <div className="grid grid-cols-5 gap-1 text-center">
@@ -566,8 +561,8 @@ const ReportsPage = () => {
                       { l: "60+", v: dorm.lost_60d },
                     ].map((b) => (
                       <div key={b.l}>
-                        <p className="font-display nums leading-none text-alma-ink" style={{ fontSize: "1.5rem" }}>{b.v ?? 0}</p>
-                        <p className="mt-1 text-[0.72rem] uppercase tracking-[0.1em] text-alma-ink/55">{b.l}</p>
+                        <p className="font-display nums leading-none text-ink" style={{ fontSize: "1.5rem" }}>{b.v ?? 0}</p>
+                        <p className="mt-1 text-[0.72rem] uppercase tracking-[0.1em] text-ink/55">{b.l}</p>
                       </div>
                     ))}
                   </div>
@@ -588,24 +583,24 @@ const ReportsPage = () => {
               </TabsList>
               {/* Export CSV button changes per tab */}
               {tab === "revenue" && revenueData.length > 0 && (
-                <Button size="sm" variant="outline" onClick={exportRevenueCsv} data-press className="border-alma-sandstone">
+                <Button size="sm" variant="outline" onClick={exportRevenueCsv} data-press className="border-line-strong">
                   <Download size={13} className="mr-1.5" /> Exportar CSV
                 </Button>
               )}
               {tab === "top" && topAttendanceData.length > 0 && (
-                <Button size="sm" variant="outline" onClick={exportTopCsv} data-press className="border-alma-sandstone">
+                <Button size="sm" variant="outline" onClick={exportTopCsv} data-press className="border-line-strong">
                   <Download size={13} className="mr-1.5" /> Exportar CSV
                 </Button>
               )}
               {tab === "retention" && retentionData.length > 0 && (
-                <Button size="sm" variant="outline" onClick={exportRetentionCsv} data-press className="border-alma-sandstone">
+                <Button size="sm" variant="outline" onClick={exportRetentionCsv} data-press className="border-line-strong">
                   <Download size={13} className="mr-1.5" /> Exportar CSV
                 </Button>
               )}
             </div>
 
             {/* ═════ Tab content ═════ */}
-            <Card className="border-alma-hairline bg-alma-mist">
+            <Card className="border-line bg-sunken">
               <CardContent className="p-5">
                 {tab === "revenue" && (
                   revenueError ? (
@@ -625,18 +620,18 @@ const ReportsPage = () => {
                     />
                   ) : (
                     <>
-                      <p className="mb-3 text-[0.72rem] font-medium uppercase tracking-[0.14em] text-alma-ink/55">
+                      <p className="mb-3 text-[0.72rem] font-medium uppercase tracking-[0.14em] text-ink/55">
                         Ingresos mensuales · últimos 12 meses
                       </p>
                       <ResponsiveContainer width="100%" height={280}>
                         <BarChart data={revenueData} margin={{ top: 10, right: 5, left: 5, bottom: 0 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke={C.hairline} />
-                          <XAxis dataKey="month" tick={{ fontSize: 11, fill: C.inkSoft }} axisLine={false} tickLine={false} />
-                          <YAxis tick={{ fontSize: 11, fill: C.inkSoft }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
+                          <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} />
+                          <XAxis dataKey="month" tick={{ fontSize: 11, fill: CHART_AXIS }} axisLine={false} tickLine={false} />
+                          <YAxis tick={{ fontSize: 11, fill: CHART_AXIS }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
                           <Tooltip formatter={(v: any) => formatMXN(Number(v))} contentStyle={tooltipStyle} />
                           <Bar dataKey="amount" radius={[6, 6, 0, 0]}>
                             {revenueData.map((_, i) => (
-                              <Cell key={i} fill={i === revenueData.length - 1 ? C.berry : C.stone} fillOpacity={i === revenueData.length - 1 ? 1 : 0.55} />
+                              <Cell key={i} fill={i === revenueData.length - 1 ? CHART_PRIMARY : CHART_SECONDARY} fillOpacity={i === revenueData.length - 1 ? 1 : 0.55} />
                             ))}
                           </Bar>
                         </BarChart>
@@ -661,17 +656,17 @@ const ReportsPage = () => {
                     />
                   ) : (
                     <>
-                      <p className="mb-3 text-[0.72rem] font-medium uppercase tracking-[0.14em] text-alma-ink/55">
+                      <p className="mb-3 text-[0.72rem] font-medium uppercase tracking-[0.14em] text-ink/55">
                         Reservas vs asistencias por tipo
                       </p>
                       <ResponsiveContainer width="100%" height={280}>
                         <BarChart data={classesData}>
-                          <CartesianGrid strokeDasharray="3 3" stroke={C.hairline} />
-                          <XAxis dataKey="label" tick={{ fontSize: 11, fill: C.inkSoft }} />
-                          <YAxis tick={{ fontSize: 11, fill: C.inkSoft }} />
+                          <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} />
+                          <XAxis dataKey="label" tick={{ fontSize: 11, fill: CHART_AXIS }} />
+                          <YAxis tick={{ fontSize: 11, fill: CHART_AXIS }} />
                           <Tooltip contentStyle={tooltipStyle} />
-                          <Bar dataKey="bookings" fill={C.berry} radius={[4, 4, 0, 0]} name="Reservas" />
-                          <Bar dataKey="attended" fill={C.sandstone} radius={[4, 4, 0, 0]} name="Asistencias" />
+                          <Bar dataKey="bookings" fill={CHART_PRIMARY} radius={[4, 4, 0, 0]} name="Reservas" />
+                          <Bar dataKey="attended" fill={CHART_TERTIARY} radius={[4, 4, 0, 0]} name="Asistencias" />
                         </BarChart>
                       </ResponsiveContainer>
                     </>
@@ -694,21 +689,21 @@ const ReportsPage = () => {
                     />
                   ) : (
                     <>
-                      <p className="mb-3 text-[0.72rem] font-medium uppercase tracking-[0.14em] text-alma-ink/55">
+                      <p className="mb-3 text-[0.72rem] font-medium uppercase tracking-[0.14em] text-ink/55">
                         Tasa de retención mensual · 12 meses
                       </p>
                       <ResponsiveContainer width="100%" height={280}>
                         <LineChart data={retentionData}>
-                          <CartesianGrid strokeDasharray="3 3" stroke={C.hairline} />
-                          <XAxis dataKey="month" tick={{ fontSize: 11, fill: C.inkSoft }} />
-                          <YAxis tick={{ fontSize: 11, fill: C.inkSoft }} tickFormatter={(v) => `${v}%`} domain={[0, 100]} />
+                          <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} />
+                          <XAxis dataKey="month" tick={{ fontSize: 11, fill: CHART_AXIS }} />
+                          <YAxis tick={{ fontSize: 11, fill: CHART_AXIS }} tickFormatter={(v) => `${v}%`} domain={[0, 100]} />
                           <Tooltip formatter={(v: any) => `${v}%`} contentStyle={tooltipStyle} />
                           <Line
                             type="monotone"
                             dataKey="rate"
-                            stroke={C.berry}
+                            stroke={CHART_PRIMARY}
                             strokeWidth={2.5}
-                            dot={{ fill: C.berry, r: 3 }}
+                            dot={{ fill: CHART_PRIMARY, r: 3 }}
                             activeDot={{ r: 5 }}
                           />
                         </LineChart>
@@ -743,27 +738,27 @@ const ReportsPage = () => {
                             key={u.id}
                             className={cn(
                               "flex items-center gap-3 py-2",
-                              idx < topAttendanceData.length - 1 && "border-b border-alma-hairline",
+                              idx < topAttendanceData.length - 1 && "border-b border-line",
                             )}
                           >
                             <span
                               className={cn(
                                 "nums grid h-8 w-8 shrink-0 place-items-center rounded-full text-[11px] font-bold",
-                                idx < 3 ? "bg-alma-berry text-alma-canvas" : "bg-alma-oat text-alma-berry",
+                                idx < 3 ? "bg-ink text-canvas" : "bg-sunken text-ink",
                               )}
                             >
                               {idx + 1}
                             </span>
                             <div className="min-w-0 flex-1">
-                              <p className="truncate text-[14px] font-medium text-alma-ink">{u.display_name}</p>
-                              <p className="nums mt-0.5 text-[11px] text-alma-ink/55">
+                              <p className="truncate text-[14px] font-medium text-ink">{u.display_name}</p>
+                              <p className="nums mt-0.5 text-[11px] text-ink/55">
                                 {u.this_month} este mes · última {u.last_visit ? formatDate(u.last_visit) : "—"}
                               </p>
                             </div>
-                            <div className="hidden h-1.5 w-32 overflow-hidden rounded-full bg-alma-oat sm:block">
-                              <div className="h-full rounded-full bg-alma-berry" style={{ width: `${pct}%` }} />
+                            <div className="hidden h-1.5 w-32 overflow-hidden rounded-full bg-sunken sm:block">
+                              <div className="h-full rounded-full bg-ink" style={{ width: `${pct}%` }} />
                             </div>
-                            <span className="nums shrink-0 rounded-full bg-alma-ink-deep px-2.5 py-0.5 text-[12px] font-semibold text-alma-canvas">
+                            <span className="nums shrink-0 rounded-full bg-inverse px-2.5 py-0.5 text-[12px] font-semibold text-canvas">
                               {u.lifetime}
                             </span>
                           </div>
@@ -798,12 +793,12 @@ const ReportsPage = () => {
                         const pct = max > 0 ? (count / max) * 100 : 0;
                         return (
                           <div key={ins.id} className="flex items-center justify-between gap-3 text-sm">
-                            <span className="flex-1 truncate font-medium text-alma-ink">{ins.name || ins.display_name}</span>
+                            <span className="flex-1 truncate font-medium text-ink">{ins.name || ins.display_name}</span>
                             <div className="flex items-center gap-3">
-                              <div className="h-2 w-40 overflow-hidden rounded-full bg-alma-oat">
-                                <div className="h-full rounded-full bg-alma-berry" style={{ width: `${pct}%` }} />
+                              <div className="h-2 w-40 overflow-hidden rounded-full bg-sunken">
+                                <div className="h-full rounded-full bg-ink" style={{ width: `${pct}%` }} />
                               </div>
-                              <span className="font-display nums w-8 text-right text-alma-ink">{count}</span>
+                              <span className="font-display nums w-8 text-right text-ink">{count}</span>
                             </div>
                           </div>
                         );

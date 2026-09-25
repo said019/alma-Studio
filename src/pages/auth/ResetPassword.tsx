@@ -11,8 +11,8 @@ import {
   AuthSubmit,
   AuthErrorBanner,
   AuthPasswordRules,
-  ALMA,
 } from "@/components/auth/AuthShell";
+import { COLOR } from "@/design/tokens";
 
 const schema = z.object({
   password: z
@@ -77,19 +77,19 @@ const ResetPassword = () => {
       {done ? (
         <div
           className="flex items-start gap-4 rounded-2xl px-5 py-5"
-          style={{ backgroundColor: ALMA.blush, border: `1px solid ${ALMA.olive}40` }}
+          style={{ backgroundColor: COLOR.sunken, border: `1px solid ${COLOR.success}40` }}
         >
-          <span className="grid h-10 w-10 place-items-center rounded-full shrink-0" style={{ backgroundColor: ALMA.olive, color: ALMA.cream }}>
+          <span className="grid h-10 w-10 place-items-center rounded-full shrink-0" style={{ backgroundColor: COLOR.success, color: COLOR.canvas }}>
             <CheckCircle2 size={18} />
           </span>
           <div>
-            <p className="text-[0.96rem] leading-[1.5]" style={{ color: ALMA.ink }}>
+            <p className="text-[0.96rem] leading-[1.5]" style={{ color: COLOR.ink }}>
               Contraseña actualizada. Te llevamos a iniciar sesión en un momento.
             </p>
             <Link
               to="/auth/login"
               className="mt-3 inline-flex items-center gap-2 text-[0.86rem] font-medium no-underline"
-              style={{ color: ALMA.berry }}
+              style={{ color: COLOR.accentStrong }}
             >
               Entrar ahora
             </Link>
@@ -99,7 +99,7 @@ const ResetPassword = () => {
         <div
           role="alert"
           className="flex items-start gap-4 rounded-2xl px-5 py-5"
-          style={{ backgroundColor: `${ALMA.destructive}10`, border: `1px solid ${ALMA.destructive}40`, color: ALMA.destructive }}
+          style={{ backgroundColor: `${COLOR.danger}10`, border: `1px solid ${COLOR.danger}40`, color: COLOR.danger }}
         >
           <AlertTriangle size={18} className="mt-0.5 shrink-0" />
           <div>
@@ -109,7 +109,7 @@ const ResetPassword = () => {
             <Link
               to="/auth/forgot-password"
               className="mt-3 inline-flex items-center gap-2 text-[0.86rem] font-medium no-underline"
-              style={{ color: ALMA.berry }}
+              style={{ color: COLOR.accentStrong }}
             >
               Pedir un enlace nuevo
             </Link>
@@ -145,8 +145,8 @@ const ResetPassword = () => {
             </AuthSubmit>
           </form>
 
-          <p className="mt-7 text-center text-[0.86rem]" style={{ color: ALMA.ink, opacity: 0.7 }}>
-            <Link to="/auth/login" className="no-underline font-medium" style={{ color: ALMA.berry }}>
+          <p className="mt-7 text-center text-[0.86rem]" style={{ color: COLOR.ink, opacity: 0.7 }}>
+            <Link to="/auth/login" className="no-underline font-medium" style={{ color: COLOR.accentStrong }}>
               Volver a iniciar sesión
             </Link>
           </p>

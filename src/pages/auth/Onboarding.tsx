@@ -8,9 +8,9 @@ import {
   AuthSubmit,
   AuthTextarea,
   AuthErrorBanner,
-  ALMA,
 } from "@/components/auth/AuthShell";
 import type { User } from "@/types/auth";
+import { COLOR } from "@/design/tokens";
 
 type YesNo = "yes" | "no" | null;
 
@@ -31,7 +31,7 @@ const YesNoField = ({
     <span
       id={`${id}-label`}
       className="text-[0.72rem] font-medium uppercase tracking-[0.18em] leading-[1.8]"
-      style={{ color: ALMA.berry }}
+      style={{ color: COLOR.accentStrong }}
     >
       {label}
     </span>
@@ -52,10 +52,10 @@ const YesNoField = ({
             aria-checked={active}
             onClick={() => onChange(opt)}
             className={
-              "min-h-[44px] rounded-full border px-4 py-3 text-[0.9rem] font-medium transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-alma-berry focus-visible:ring-offset-2 " +
+              "min-h-[44px] rounded-full border px-4 py-3 text-[0.9rem] font-medium transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-offset-2 " +
               (active
-                ? "border-alma-ink bg-alma-ink text-alma-canvas"
-                : "border-alma-hairline bg-alma-canvas text-alma-ink hover:border-alma-sandstone hover:bg-alma-mist")
+                ? "border-ink bg-ink text-canvas"
+                : "border-line bg-canvas text-ink hover:border-line-strong hover:bg-sunken")
             }
           >
             {opt === "yes" ? "Sí" : "No"}
@@ -64,7 +64,7 @@ const YesNoField = ({
       })}
     </div>
     {error && (
-      <p id={`${id}-error`} className="flex items-center gap-1.5 text-[0.78rem]" style={{ color: ALMA.destructive }}>
+      <p id={`${id}-error`} className="flex items-center gap-1.5 text-[0.78rem]" style={{ color: COLOR.danger }}>
         <AlertCircle size={13} className="shrink-0" />
         {error}
       </p>
@@ -135,7 +135,7 @@ const Onboarding = () => {
     >
       <p
         className="mb-6 text-[0.88rem] leading-relaxed"
-        style={{ color: ALMA.ink, opacity: 0.6 }}
+        style={{ color: COLOR.ink, opacity: 0.6 }}
       >
         Necesitamos saber esto antes de que entres. Solo toma un momento.
       </p>
@@ -157,7 +157,7 @@ const Onboarding = () => {
             className="grid transition-[grid-template-rows] duration-300 motion-reduce:transition-none"
             style={{
               gridTemplateRows: injuryReported ? "1fr" : "0fr",
-              transitionTimingFunction: "var(--ease-alma-out)",
+              transitionTimingFunction: "var(--ease-out)",
             }}
           >
             <div
