@@ -26,7 +26,7 @@ import {
   SkeletonRow,
   Tag,
 } from "@/components/app/AppShell";
-import { InfoBanner, SegmentedTabs } from "@/components/app/widgets";
+import { InfoBanner, SegmentedTabs, StatusPill } from "@/components/app/widgets";
 import { CalendarDays, ChevronRight, Moon } from "lucide-react";
 import type { BookingClient } from "@/types/booking";
 
@@ -375,6 +375,7 @@ const BookClasses = () => {
           >
             {days.map((day, i) => {
               const selected = isSameDay(day, selectedDay);
+              const today = isToday(day);
               const hasClasses = daysWithClasses.has(dayKey(day));
               return (
                 <button
@@ -399,8 +400,13 @@ const BookClasses = () => {
                   </span>
                   <span
                     className={
-                      "nums font-display text-[1.05rem] leading-none " +
-                      (selected ? "" : "text-ink")
+                      "nums font-display text-[1.05rem] leading-none" +
+                      (today ? " font-bold" : "") +
+                      (selected
+                        ? ""
+                        : today
+                          ? " text-accent-strong dark:text-accent"
+                          : " text-ink")
                     }
                   >
                     {format(day, "d")}
@@ -525,6 +531,10 @@ type ClassRowProps = {
   onPick: () => void;
 };
 
+/* Escasez (spec §5, "Últimos N"): las etiquetas de getRowState para 1 y 2
+   lugares, en pill terracota suave junto a los lugares. */
+const SCARCITY_LABELS = new Set(["Último lugar", "Pocos lugares"]);
+
 /* Lo que comparten ClassRow y ClassCell: qué acción lleva la clase, su
    disponibilidad en texto y la atenuación. La atenuación va sólo en la
    información (hora, clase, meta, disponibilidad); botones y pills quedan a
@@ -537,7 +547,8 @@ const classCta = (cls: DecoratedClass, state: RowState) => {
   const dim = isFull ? "opacity-60" : state.dimmed ? "opacity-55" : undefined;
   const availability = isFull ? "Llena" : showReservarBtn ? `${cls.remaining} de ${cls.capacity} lugares` : state.label;
   const availabilityClass = isFull ? "text-ink-muted" : showReservarBtn ? "text-accent-strong" : state.toneClass;
-  return { isFull, showReservarBtn, noCta, meta, dim, availability, availabilityClass };
+  const scarcity = SCARCITY_LABELS.has(state.label) ? state.label : null;
+  return { isFull, showReservarBtn, noCta, meta, dim, availability, availabilityClass, scarcity };
 };
 
 /* Fila editorial móvil: hora grande, clase, instructora, cupos y estado en texto,
@@ -545,7 +556,7 @@ const classCta = (cls: DecoratedClass, state: RowState) => {
    interactivas sin acción propia (p. ej. "Reservada") vuelven a ser el botón de
    toda la fila, como antes de este rediseño: sin botón anidado dentro. */
 const ClassRow = ({ cls, state, onPick }: ClassRowProps) => {
-  const { isFull, showReservarBtn, noCta, meta, dim, availability, availabilityClass } = classCta(cls, state);
+  const { isFull, showReservarBtn, noCta, meta, dim, availability, availabilityClass, scarcity } = classCta(cls, state);
   const cardClass =
     "grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-[18px] border border-line bg-surface dark:bg-surface/70 p-4";
 
@@ -570,6 +581,7 @@ const ClassRow = ({ cls, state, onPick }: ClassRowProps) => {
           <span className={cn("nums text-[0.75rem] font-medium", availabilityClass, dim)}>
             {availability}
           </span>
+          {scarcity && <StatusPill label={scarcity} tone="accent" />}
         </div>
       </div>
       <div className="shrink-0">
@@ -609,7 +621,7 @@ const ClassRow = ({ cls, state, onPick }: ClassRowProps) => {
 /* Fila compacta para las columnas de la semana en desktop: mismo lenguaje, como tarjeta.
    Igual que ClassRow: sin acción propia, toda la celda vuelve a ser el botón. */
 const ClassCell = ({ cls, state, onPick }: ClassRowProps) => {
-  const { isFull, showReservarBtn, noCta, meta, dim, availability, availabilityClass } = classCta(cls, state);
+  const { isFull, showReservarBtn, noCta, meta, dim, availability, availabilityClass, scarcity } = classCta(cls, state);
   const cardClass = "rounded-[18px] border border-line bg-surface dark:bg-surface/70 p-3";
 
   const content = (
@@ -630,6 +642,11 @@ const ClassCell = ({ cls, state, onPick }: ClassRowProps) => {
           {availability}
         </p>
       </div>
+      {scarcity && (
+        <div className="mt-1.5">
+          <StatusPill label={scarcity} tone="accent" />
+        </div>
+      )}
       {(isFull || showReservarBtn) && (
         <div className="mt-2">
           {isFull ? (

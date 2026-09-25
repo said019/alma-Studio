@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { screen } from "@testing-library/react";
+import { screen, fireEvent, within } from "@testing-library/react";
 import api from "@/lib/api";
 import BookClasses from "./BookClasses";
 import { renderPage, respuestas, atenuadoPor } from "@/test/renderPage";
@@ -61,5 +61,40 @@ describe("Reservar: la clase llena se atenúa sin apagar su acción (I1)", () =>
     expect(pills.length).toBeGreaterThan(0);
     for (const p of pills) expect(atenuadoPor(p)).toEqual([]);
     for (const b of screen.getAllByRole("button", { name: /Reservar$/ })) expect(atenuadoPor(b)).toEqual([]);
+  });
+});
+
+describe("Reservar: vuelven la marca de hoy y las etiquetas de escasez (M7)", () => {
+  it('"Último lugar" (1 lugar) y "Pocos lugares" (2) vuelven, en pill terracota suave', async () => {
+    renderPage(<BookClasses />, "/app/classes");
+    await screen.findAllByRole("button", { name: /Lista de espera/ });
+    for (const label of ["Último lugar", "Pocos lugares"]) {
+      const pills = screen.getAllByText(label);
+      expect(pills, label).toHaveLength(2); // fila móvil y celda de escritorio
+      for (const p of pills) {
+        expect(p.className).toMatch(/\bbg-accent-soft\b/);
+        expect(atenuadoPor(p)).toEqual([]);
+      }
+    }
+    // Con 6 lugares libres no hay etiqueta de escasez.
+    expect(screen.getAllByText(/Último lugar|Pocos lugares/)).toHaveLength(4);
+  });
+
+  it("la tira de días marca hoy: cifra en text-accent-strong dark:text-accent y negrita cuando no está elegido", async () => {
+    renderPage(<BookClasses />, "/app/classes");
+    const hoy = await screen.findByRole("tab", { name: "miércoles 23 de septiembre" });
+    // Elegido (al entrar): va sobre el degradado, sin color propio, pero en negrita.
+    const cifraElegida = within(hoy).getByText("23");
+    expect(cifraElegida.className).toMatch(/\bfont-bold\b/);
+    expect(cifraElegida.className).not.toMatch(/text-accent-strong|(?:^|\s)text-ink(?:\s|$)/);
+
+    fireEvent.click(screen.getByRole("tab", { name: "jueves 24 de septiembre" }));
+    const cifra = within(screen.getByRole("tab", { name: "miércoles 23 de septiembre" })).getByText("23");
+    expect(cifra.className.split(/\s+/)).toEqual(expect.arrayContaining(["text-accent-strong", "dark:text-accent", "font-bold"]));
+    expect(cifra.className).not.toMatch(/(?:^|\s)text-ink(?:\s|$)/);
+
+    const otro = within(screen.getByRole("tab", { name: "viernes 25 de septiembre" })).getByText("25");
+    expect(otro.className).toMatch(/(?:^|\s)text-ink(?:\s|$)/);
+    expect(otro.className).not.toMatch(/\bfont-bold\b|text-accent/);
   });
 });
