@@ -28,6 +28,7 @@ const STATUS: Record<string, { label: string; tone: Tone; variant?: "soft" | "so
   approved: { label: "Aprobado", tone: "success" },
   rejected: { label: "Rechazado", tone: "danger" },
   cancelled: { label: "Cancelado", tone: "danger" },
+  expired: { label: "Vencido", tone: "muted" },
 };
 
 const Orders = () => {
