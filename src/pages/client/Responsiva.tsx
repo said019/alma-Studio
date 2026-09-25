@@ -15,7 +15,6 @@ import {
 } from "@/components/app/AppShell";
 import { BackLink, DataRow } from "@/components/app/widgets";
 import { RESPONSIVA_TITLE, RESPONSIVA_SECTIONS } from "@/components/app/responsivaContent";
-import { COLOR } from "@/design/tokens";
 
 interface WaiverRow {
   full_name: string;
@@ -73,17 +72,11 @@ const Responsiva = () => {
         ) : (
           <>
             {/* Summary card */}
-            <div className="rounded-3xl p-5 sm:p-7" style={{ backgroundColor: COLOR.sunken }}>
-              <p
-                className="text-[0.75rem] font-medium uppercase tracking-[0.24em] mb-1.5"
-                style={{ color: COLOR.accentStrong }}
-              >
+            <div className="rounded-3xl p-5 sm:p-7 bg-sunken">
+              <p className="text-[0.75rem] font-medium uppercase tracking-[0.24em] mb-1.5 text-accent-strong">
                 Firmada
               </p>
-              <p
-                className="font-display text-[1.45rem] leading-none mb-3"
-                style={{ color: COLOR.inverse }}
-              >
+              <p className="font-display text-[1.45rem] leading-none mb-3 text-ink">
                 {RESPONSIVA_TITLE}
               </p>
 
@@ -93,10 +86,7 @@ const Responsiva = () => {
               <DataRow
                 label="Uso de imagen"
                 value={
-                  <span
-                    className="font-medium"
-                    style={{ color: waiver.image_consent ? COLOR.accentStrong : COLOR.ink }}
-                  >
+                  <span className={"font-medium " + (waiver.image_consent ? "text-accent-strong" : "text-ink")}>
                     {waiver.image_consent ? "Sí autorizado" : "No autorizado"}
                   </span>
                 }
@@ -104,12 +94,9 @@ const Responsiva = () => {
               {signedDate && <DataRow label="Firmada el" value={<span className="nums">{signedDate}</span>} />}
             </div>
 
-            {/* Signature */}
+            {/* Signature — baldosa clara (bg-inverse) para que el trazo oscuro se vea en la app oscura. */}
             <Section title="Tu firma">
-              <div
-                className="inline-block max-w-full rounded-2xl p-4"
-                style={{ backgroundColor: COLOR.canvas, border: `1px solid ${COLOR.line}` }}
-              >
+              <div className="inline-block max-w-full rounded-2xl p-4 border border-line bg-inverse">
                 <img
                   src={waiver.signature_data}
                   alt="Tu firma"
@@ -121,29 +108,19 @@ const Responsiva = () => {
             {/* Full document */}
             <Section title="Documento completo">
               {RESPONSIVA_SECTIONS.map((section) => (
-                <div
-                  key={section.n}
-                  className="pt-4 pb-4"
-                  style={{ borderTop: `1px solid ${COLOR.line}` }}
-                >
-                  <h3
-                    className="font-display text-[1.05rem] leading-snug mb-1.5"
-                    style={{ color: COLOR.ink }}
-                  >
-                    <span className="nums mr-1.5" style={{ color: COLOR.accentStrong }}>
+                <div key={section.n} className="pt-4 pb-4 border-t border-line">
+                  <h3 className="font-display text-[1.05rem] leading-snug mb-1.5 text-ink">
+                    <span className="nums mr-1.5 text-accent-strong">
                       {section.n}.
                     </span>
                     {section.title}
                   </h3>
-                  <p
-                    className="m-0 text-[0.875rem] leading-[1.65]"
-                    style={{ color: COLOR.ink, opacity: 0.75 }}
-                  >
+                  <p className="m-0 text-[0.875rem] leading-[1.65] text-ink-muted">
                     {section.body}
                   </p>
                 </div>
               ))}
-              <div className="pt-3" style={{ borderTop: `1px solid ${COLOR.line}` }} />
+              <div className="pt-3 border-t border-line" />
             </Section>
           </>
         )}

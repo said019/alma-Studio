@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 
 export const Lightbox = ({ src, alt = "", onClose }: { src: string; alt?: string; onClose: () => void }) => (
   <div className="fixed inset-0 z-[200] bg-inverse/95 flex items-center justify-center p-4" onClick={onClose}>
-    <button aria-label="Cerrar" className="absolute top-4 right-4 text-canvas/80 hover:text-canvas bg-ink/60 rounded-full p-2" onClick={onClose}>
+    <button aria-label="Cerrar" className="absolute top-4 right-4 text-canvas/80 hover:text-canvas bg-ink/60 rounded-full p-3" onClick={onClose}>
       <X size={20} />
     </button>
     <img src={src} alt={alt} className="max-w-full max-h-full rounded-xl object-contain shadow-2xl" onClick={(e) => e.stopPropagation()} />

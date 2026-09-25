@@ -1,6 +1,10 @@
 import { useRef, useEffect, useCallback } from "react";
-import { COLOR } from "@/design/tokens";
+import { DARK } from "@/design/tokens";
 
+/* El lienzo de firma pinta con Canvas2D, que no lee variables CSS: usa el
+   hex fijo de DARK (excepción de librería, como el QR de Wallet). La
+   baldosa es bg-inverse (clase, por tema) para que el trazo oscuro se vea
+   siempre, incluso en la app oscura. */
 
 interface SignaturePadProps {
   onChange: (dataUrl: string | null) => void;
@@ -30,7 +34,7 @@ export const SignaturePad = ({ onChange }: SignaturePadProps) => {
     canvas.width = rect.width * dpr;
     canvas.height = rect.height * dpr;
     ctx.scale(dpr, dpr);
-    ctx.strokeStyle = COLOR.ink;
+    ctx.strokeStyle = DARK.onInverse;
     ctx.lineWidth = 2;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
@@ -45,7 +49,7 @@ export const SignaturePad = ({ onChange }: SignaturePadProps) => {
   ) => {
     // baseline
     ctx.save();
-    ctx.strokeStyle = COLOR.line;
+    ctx.strokeStyle = DARK.onInverseMuted;
     ctx.lineWidth = 1;
     ctx.setLineDash([4, 4]);
     ctx.beginPath();
@@ -56,8 +60,7 @@ export const SignaturePad = ({ onChange }: SignaturePadProps) => {
 
     // placeholder text
     ctx.save();
-    ctx.fillStyle = COLOR.ink;
-    ctx.globalAlpha = 0.22;
+    ctx.fillStyle = DARK.onInverseMuted;
     ctx.font = "13px system-ui, -apple-system, sans-serif";
     ctx.textAlign = "center";
     ctx.fillText("Firma aquí", w / 2, h / 2 + 5);
@@ -100,7 +103,7 @@ export const SignaturePad = ({ onChange }: SignaturePadProps) => {
       if (ctx) {
         const dpr = window.devicePixelRatio || 1;
         ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
-        ctx.strokeStyle = COLOR.ink;
+        ctx.strokeStyle = DARK.onInverse;
         ctx.lineWidth = 2;
         ctx.lineCap = "round";
         ctx.lineJoin = "round";
@@ -112,7 +115,7 @@ export const SignaturePad = ({ onChange }: SignaturePadProps) => {
     if (!ctx) return;
     ctx.beginPath();
     ctx.arc(x, y, 1, 0, Math.PI * 2);
-    ctx.fillStyle = COLOR.ink;
+    ctx.fillStyle = DARK.onInverse;
     ctx.fill();
   };
 
@@ -124,7 +127,7 @@ export const SignaturePad = ({ onChange }: SignaturePadProps) => {
 
     const { x, y } = getCoords(e);
     ctx.beginPath();
-    ctx.strokeStyle = COLOR.ink;
+    ctx.strokeStyle = DARK.onInverse;
     ctx.lineWidth = 2;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
@@ -167,22 +170,12 @@ export const SignaturePad = ({ onChange }: SignaturePadProps) => {
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerLeave={onPointerUp}
-        style={{
-          width: "100%",
-          height: 140,
-          display: "block",
-          borderRadius: 16,
-          border: `1px solid ${COLOR.line}`,
-          backgroundColor: COLOR.surface,
-          touchAction: "none",
-          cursor: "crosshair",
-        }}
+        className="block w-full h-[140px] rounded-2xl border border-line bg-inverse touch-none cursor-crosshair"
       />
       <button
         type="button"
         onClick={handleClear}
-        className="self-end text-[0.75rem] uppercase tracking-[0.18em] transition-opacity hover:opacity-100"
-        style={{ background: "transparent", border: 0, color: COLOR.ink, opacity: 0.5, cursor: "pointer", padding: "2px 0" }}
+        className="self-end min-h-[44px] px-1 flex items-center bg-transparent border-0 cursor-pointer text-[0.75rem] uppercase tracking-[0.18em] text-ink-muted transition-colors hover:text-ink"
       >
         Borrar
       </button>
