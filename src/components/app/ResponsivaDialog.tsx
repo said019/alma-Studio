@@ -83,7 +83,7 @@ export const ResponsivaDialog = ({
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-end justify-center bg-inverse/55 backdrop-blur-sm"
+      className="fixed inset-0 z-[60] flex items-end justify-center bg-canvas/80"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div
