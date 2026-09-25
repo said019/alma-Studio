@@ -12,6 +12,7 @@ import { es } from "date-fns/locale";
 import { ChevronLeft, ChevronRight, CalendarDays } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
+import { COLOR } from "@/design/tokens";
 
 interface DatePickerProps {
   value?: string;           // "YYYY-MM-DD"
@@ -77,17 +78,19 @@ export const DatePicker = ({
   if (isMobile) {
     return (
       <div className={cn("relative w-full", className)}>
-        <CalendarDays size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#A48D78]/60" />
+        <CalendarDays size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted/60" />
         <input
           type="date"
           min={min}
           value={value ?? ""}
           disabled={disabled}
           onChange={(e) => onChange?.(e.target.value)}
-          style={{ colorScheme: "light", color: "#1A1A1A" }}
+          style={{ colorScheme: "light", color: COLOR.ink }}
           className={cn(
-            "w-full rounded-xl border border-white/[0.08] bg-white/[0.03] py-2.5 pl-9 pr-3 text-sm text-white/90",
-            "focus:border-[#A48D78]/40 focus:bg-[#A48D78]/[0.03] focus:outline-none",
+            // F7 — disparador sobre fondo claro: border-line-strong (1.5px,
+            // como los campos) y fondo surface, no el tema oscuro del calendario.
+            "w-full rounded-xl border-[1.5px] border-line-strong bg-surface py-2.5 pl-9 pr-3 text-sm",
+            "focus:border-ink focus:outline-none",
             "disabled:pointer-events-none disabled:opacity-50",
           )}
           aria-label={placeholder}
@@ -105,13 +108,14 @@ export const DatePicker = ({
         onClick={() => setOpen((o) => !o)}
         style={{ colorScheme: "light" }}
         className={cn(
-          "flex w-full items-center gap-2.5 rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2.5 text-sm transition-all",
-          "hover:border-[#A48D78]/30 focus:outline-none",
-          open ? "border-[#A48D78]/40 bg-[#A48D78]/[0.03]" : "",
+          // F7 — mismo motivo que el input móvil: border-line-strong + surface.
+          "flex w-full items-center gap-2.5 rounded-xl border-[1.5px] border-line-strong bg-surface px-3 py-2.5 text-sm transition-all",
+          "hover:border-ink focus:outline-none",
+          open ? "border-ink bg-sunken" : "",
           disabled && "opacity-50 pointer-events-none",
         )}
       >
-        <CalendarDays size={14} className="shrink-0 text-[#A48D78]/60" />
+        <CalendarDays size={14} className="shrink-0 text-ink-muted/60" />
         <span className={cn("flex-1 text-left", selected ? "text-foreground font-semibold" : "text-muted-foreground")}>
 
           {selected
@@ -120,19 +124,19 @@ export const DatePicker = ({
         </span>
         <ChevronRight
           size={13}
-          className={cn("text-white/20 transition-transform", open && "rotate-90")}
+          className={cn("text-ink-muted/50 transition-transform", open && "rotate-90")}
         />
       </button>
 
       {/* Dropdown calendar */}
       {open && (
-        <div className="absolute left-0 top-[calc(100%+6px)] z-50 rounded-2xl border border-white/[0.08] bg-[#0f0518] shadow-2xl shadow-black/60 p-4 min-w-[280px]">
+        <div className="absolute left-0 top-[calc(100%+6px)] z-50 rounded-2xl border border-white/[0.08] bg-inverse shadow-2xl shadow-black/60 p-4 min-w-[280px]">
           {/* Month nav */}
           <div className="flex items-center justify-between mb-3">
             <button
               type="button"
               onClick={() => setViewMonth((m) => subMonths(m, 1))}
-              className="w-7 h-7 rounded-lg flex items-center justify-center text-white/30 hover:text-[#A48D78] hover:bg-[#A48D78]/10 transition-all"
+              className="w-7 h-7 rounded-lg flex items-center justify-center text-white/30 hover:text-inverse-foreground hover:bg-line-strong/10 transition-all"
             >
               <ChevronLeft size={13} />
             </button>
@@ -142,7 +146,7 @@ export const DatePicker = ({
             <button
               type="button"
               onClick={() => setViewMonth((m) => addMonths(m, 1))}
-              className="w-7 h-7 rounded-lg flex items-center justify-center text-white/30 hover:text-[#A48D78] hover:bg-[#A48D78]/10 transition-all"
+              className="w-7 h-7 rounded-lg flex items-center justify-center text-white/30 hover:text-inverse-foreground hover:bg-line-strong/10 transition-all"
             >
               <ChevronRight size={13} />
             </button>
@@ -151,7 +155,7 @@ export const DatePicker = ({
           {/* Day headers */}
           <div className="grid grid-cols-7 mb-1">
             {DAYS_SHORT.map((d) => (
-              <div key={d} className="text-center text-[10px] font-semibold text-[#CBB9A4]/50 py-1">
+              <div key={d} className="text-center text-[10px] font-semibold text-inverse-muted/50 py-1">
                 {d}
               </div>
             ))}
@@ -174,9 +178,9 @@ export const DatePicker = ({
                   className={cn(
                     "h-8 w-full rounded-lg text-xs font-medium transition-all",
                     isSelected
-                      ? "bg-gradient-to-br from-[#A48D78] to-[#CBB9A4] text-white shadow-[0_0_10px_rgba(118,33,77,0.4)]"
+                      ? "bg-canvas text-ink shadow-[0_0_10px_theme(colors.ink.DEFAULT/40%)]"
                       : isCurrentDay && !isSelected
-                        ? "border border-[#C0A688]/40 text-[#C0A688] bg-[#C0A688]/5"
+                        ? "border border-line-strong/40 text-inverse-muted bg-line-strong/5"
                         : isThisMonth
                           ? "text-white/70 hover:bg-white/8 hover:text-white"
                           : "text-white/20",
@@ -194,7 +198,7 @@ export const DatePicker = ({
             <button
               type="button"
               onClick={() => select(new Date())}
-              className="text-[11px] text-[#C0A688]/60 hover:text-[#C0A688] transition-colors font-medium"
+              className="text-[11px] text-inverse-muted/60 hover:text-inverse-foreground transition-colors font-medium"
             >
               Hoy
             </button>

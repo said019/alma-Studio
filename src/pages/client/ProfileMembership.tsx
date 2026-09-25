@@ -14,18 +14,18 @@ import {
   EmptyState,
   SkeletonRow,
   ErrorState,
-  ALMA,
 } from "@/components/app/AppShell";
 import { BackLink, DataRow, InfoBanner } from "@/components/app/widgets";
 import { CreditCard } from "lucide-react";
 import type { ClientMembership } from "@/types/membership";
+import { COLOR, type Tone } from "@/design/tokens";
 
-const STATUS: Record<string, { label: string; tone: keyof typeof ALMA }> = {
-  active: { label: "Activa", tone: "olive" },
-  expired: { label: "Vencida", tone: "destructive" },
-  pending_payment: { label: "Pago pendiente", tone: "berry" },
-  pending_activation: { label: "Por activar", tone: "berry" },
-  cancelled: { label: "Cancelada", tone: "destructive" },
+const STATUS: Record<string, { label: string; tone: Tone }> = {
+  active: { label: "Activa", tone: "success" },
+  expired: { label: "Vencida", tone: "danger" },
+  pending_payment: { label: "Pago pendiente", tone: "accent" },
+  pending_activation: { label: "Por activar", tone: "accent" },
+  cancelled: { label: "Cancelada", tone: "danger" },
 };
 
 const CATEGORY_LABEL: Record<string, string> = {
@@ -55,7 +55,7 @@ const ProfileMembership = () => {
   const daysRemaining = membership?.end_date
     ? Math.max(differenceInCalendarDays(safeParse(membership.end_date), new Date()), 0)
     : null;
-  const status = membership ? STATUS[membership.status] ?? { label: membership.status, tone: "berry" as const } : null;
+  const status = membership ? STATUS[membership.status] ?? { label: membership.status, tone: "accent" as const } : null;
   const isUnlimited =
     membership && (membership.class_limit === null || Number(membership.class_limit) >= 9999);
   const classesUsed = membership?.class_limit
@@ -107,14 +107,14 @@ const ProfileMembership = () => {
             />
 
             <Section>
-              <div className="rounded-3xl p-5 sm:p-7" style={{ backgroundColor: ALMA.blush }}>
-                <div className="flex items-baseline justify-between gap-4 pb-3" style={{ borderBottom: `1px solid ${ALMA.border}` }}>
-                  <span className="text-[0.72rem] font-medium uppercase tracking-[0.24em]" style={{ color: ALMA.berry }}>
+              <div className="rounded-3xl p-5 sm:p-7" style={{ backgroundColor: COLOR.sunken }}>
+                <div className="flex items-baseline justify-between gap-4 pb-3" style={{ borderBottom: `1px solid ${COLOR.line}` }}>
+                  <span className="text-[0.72rem] font-medium uppercase tracking-[0.24em]" style={{ color: COLOR.accentStrong }}>
                     {CATEGORY_LABEL[String(membership.classCategory ?? "all")] ?? "Todas las disciplinas"}
                   </span>
-                  <span className="nums font-display" style={{ color: ALMA.berry, fontSize: "clamp(1.6rem, 2.6vw, 2.1rem)" }}>
+                  <span className="nums font-display" style={{ color: COLOR.accentStrong, fontSize: "clamp(1.6rem, 2.6vw, 2.1rem)" }}>
                     {isUnlimited ? "∞" : Number(membership.classes_remaining ?? 0)}{" "}
-                    <span className="text-[0.72rem] font-sans uppercase tracking-[0.18em]" style={{ color: ALMA.ink, opacity: 0.55 }}>
+                    <span className="text-[0.72rem] font-sans uppercase tracking-[0.18em]" style={{ color: COLOR.ink, opacity: 0.55 }}>
                       por usar
                     </span>
                   </span>
@@ -151,24 +151,24 @@ const ProfileMembership = () => {
             {isMixto && (
               <Section title="Créditos por área">
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-2xl p-5 text-center" style={{ backgroundColor: ALMA.cream, border: `1px solid ${ALMA.border}` }}>
-                    <div className="nums font-display" style={{ color: ALMA.berry, fontSize: "clamp(1.8rem, 4vw, 2.4rem)" }}>
+                  <div className="rounded-2xl p-5 text-center" style={{ backgroundColor: COLOR.canvas, border: `1px solid ${COLOR.line}` }}>
+                    <div className="nums font-display" style={{ color: COLOR.accentStrong, fontSize: "clamp(1.8rem, 4vw, 2.4rem)" }}>
                       {Number(membership.studioRemaining ?? 0)}
                     </div>
-                    <div className="text-[0.64rem] uppercase tracking-[0.16em] mt-1" style={{ color: ALMA.ink, opacity: 0.6 }}>
+                    <div className="text-[0.64rem] uppercase tracking-[0.16em] mt-1" style={{ color: COLOR.ink, opacity: 0.6 }}>
                       Studio · Mat · Barre · Sculpt
                     </div>
                   </div>
-                  <div className="rounded-2xl p-5 text-center" style={{ backgroundColor: ALMA.cream, border: `1px solid ${ALMA.border}` }}>
-                    <div className="nums font-display" style={{ color: ALMA.berry, fontSize: "clamp(1.8rem, 4vw, 2.4rem)" }}>
+                  <div className="rounded-2xl p-5 text-center" style={{ backgroundColor: COLOR.canvas, border: `1px solid ${COLOR.line}` }}>
+                    <div className="nums font-display" style={{ color: COLOR.accentStrong, fontSize: "clamp(1.8rem, 4vw, 2.4rem)" }}>
                       {Number(membership.rtRemaining ?? 0)}
                     </div>
-                    <div className="text-[0.64rem] uppercase tracking-[0.16em] mt-1" style={{ color: ALMA.ink, opacity: 0.6 }}>
+                    <div className="text-[0.64rem] uppercase tracking-[0.16em] mt-1" style={{ color: COLOR.ink, opacity: 0.6 }}>
                       Reformer · Tower
                     </div>
                   </div>
                 </div>
-                <p className="mt-3 text-[0.78rem]" style={{ color: ALMA.ink, opacity: 0.62 }}>
+                <p className="mt-3 text-[0.78rem]" style={{ color: COLOR.ink, opacity: 0.62 }}>
                   Tu paquete mixto reparte sus créditos entre las dos áreas; cada uno se usa solo en su disciplina.
                 </p>
               </Section>
@@ -176,29 +176,29 @@ const ProfileMembership = () => {
 
             {classesPercent !== null && (
               <Section title="Avance del paquete">
-                <div className="rounded-2xl p-5" style={{ backgroundColor: ALMA.cream, border: `1px solid ${ALMA.border}` }}>
+                <div className="rounded-2xl p-5" style={{ backgroundColor: COLOR.canvas, border: `1px solid ${COLOR.line}` }}>
                   <div className="flex items-baseline justify-between gap-3 mb-3">
-                    <span className="nums text-[0.78rem]" style={{ color: ALMA.ink, opacity: 0.6 }}>
+                    <span className="nums text-[0.78rem]" style={{ color: COLOR.ink, opacity: 0.6 }}>
                       {classesUsed} de {Number(membership.class_limit)} usadas
                     </span>
                     <span
                       className="nums font-display text-[1.2rem]"
-                      style={{ color: isLow ? ALMA.destructive : ALMA.berry }}
+                      style={{ color: isLow ? COLOR.danger : COLOR.accentStrong }}
                     >
                       {classesPercent}%
                     </span>
                   </div>
-                  <div className="h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: ALMA.blush }}>
+                  <div className="h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: COLOR.sunken }}>
                     <div
                       className="h-full rounded-full transition-[width] duration-700"
                       style={{
                         width: `${classesPercent}%`,
-                        backgroundColor: isLow ? ALMA.destructive : ALMA.berry,
+                        backgroundColor: isLow ? COLOR.danger : COLOR.ink,
                       }}
                     />
                   </div>
                   {isLow && (
-                    <p className="mt-2.5 text-[0.78rem]" style={{ color: ALMA.destructive }}>
+                    <p className="mt-2.5 text-[0.78rem]" style={{ color: COLOR.danger }}>
                       {lowClasses
                         ? "Te quedan pocas clases en este paquete."
                         : "Tu paquete vence pronto."}
@@ -215,14 +215,14 @@ const ProfileMembership = () => {
                     key={line}
                     className="grid grid-cols-[auto_1fr] items-baseline gap-4 py-3.5"
                     style={{
-                      borderTop: `1px solid ${ALMA.border}`,
-                      borderBottom: i === arr.length - 1 ? `1px solid ${ALMA.border}` : undefined,
+                      borderTop: `1px solid ${COLOR.line}`,
+                      borderBottom: i === arr.length - 1 ? `1px solid ${COLOR.line}` : undefined,
                     }}
                   >
-                    <span className="nums font-display text-[0.95rem] leading-none" style={{ color: ALMA.berry }}>
+                    <span className="nums font-display text-[0.95rem] leading-none" style={{ color: COLOR.accentStrong }}>
                       {String(i + 1).padStart(2, "0")}
                     </span>
-                    <span className="text-[0.9rem] leading-[1.55]" style={{ color: ALMA.ink, opacity: 0.78 }}>
+                    <span className="text-[0.9rem] leading-[1.55]" style={{ color: COLOR.ink, opacity: 0.78 }}>
                       {line}
                     </span>
                   </li>
@@ -233,7 +233,7 @@ const ProfileMembership = () => {
             {(membership.status !== "active" || (daysRemaining !== null && daysRemaining <= 7)) && (
               <Section>
                 <InfoBanner
-                  tone={membership.status === "active" ? "destructive" : "berry"}
+                  tone={membership.status === "active" ? "danger" : "accent"}
                   title={
                     membership.status === "active"
                       ? "Tu paquete vence pronto."

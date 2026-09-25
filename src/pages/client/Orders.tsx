@@ -13,21 +13,21 @@ import {
   EmptyState,
   ErrorState,
   SkeletonRow,
-  ALMA,
 } from "@/components/app/AppShell";
 import { StatusPill, formatMoneyMX } from "@/components/app/widgets";
 import { Receipt } from "lucide-react";
 import type { Order } from "@/types/order";
+import { type Tone } from "@/design/tokens";
 
 /* Ambos estados pendientes viven en berry para cumplir AA a 0.72rem
    (stone falla en texto pequeño): "Pago pendiente" pide acción de la
    socia, va sólido; "En verificación" es espera, va suave. */
-const STATUS: Record<string, { label: string; tone: keyof typeof ALMA; variant?: "soft" | "solid" }> = {
-  pending_payment: { label: "Pago pendiente", tone: "berry", variant: "solid" },
-  pending_verification: { label: "En verificación", tone: "berry" },
-  approved: { label: "Aprobado", tone: "olive" },
-  rejected: { label: "Rechazado", tone: "destructive" },
-  cancelled: { label: "Cancelado", tone: "destructive" },
+const STATUS: Record<string, { label: string; tone: Tone; variant?: "soft" | "solid" }> = {
+  pending_payment: { label: "Pago pendiente", tone: "accent", variant: "solid" },
+  pending_verification: { label: "En verificación", tone: "accent" },
+  approved: { label: "Aprobado", tone: "success" },
+  rejected: { label: "Rechazado", tone: "danger" },
+  cancelled: { label: "Cancelado", tone: "danger" },
 };
 
 const Orders = () => {
@@ -66,7 +66,7 @@ const Orders = () => {
           ) : (
             <ListGroup>
               {orders.map((order) => {
-                const status = STATUS[order.status] ?? { label: order.status, tone: "berry" as const };
+                const status = STATUS[order.status] ?? { label: order.status, tone: "accent" as const };
                 return (
                   <ListRow
                     key={order.id}

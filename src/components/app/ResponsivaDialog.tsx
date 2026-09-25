@@ -2,10 +2,11 @@ import { useState, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { X } from "lucide-react";
 import api from "@/lib/api";
-import { ALMA } from "@/components/app/tokens";
+
 import { SignaturePad } from "@/components/app/SignaturePad";
 import { RESPONSIVA_TITLE, RESPONSIVA_SECTIONS } from "@/components/app/responsivaContent";
 import { useToast } from "@/hooks/use-toast";
+import { COLOR } from "@/design/tokens";
 
 interface ResponsivaDialogProps {
   open: boolean;
@@ -21,9 +22,9 @@ const fieldStyle: React.CSSProperties = {
   borderRadius: 12,
   padding: "0.75rem 0.9rem",
   fontSize: "0.95rem",
-  color: ALMA.ink,
-  backgroundColor: "#ffffff",
-  border: `1px solid ${ALMA.border}`,
+  color: COLOR.ink,
+  backgroundColor: COLOR.surface,
+  border: `1px solid ${COLOR.line}`,
   outline: "none",
   boxSizing: "border-box",
 };
@@ -33,7 +34,7 @@ const labelStyle: React.CSSProperties = {
   fontWeight: 500,
   textTransform: "uppercase" as const,
   letterSpacing: "0.22em",
-  color: ALMA.ink,
+  color: COLOR.ink,
   opacity: 0.62,
   marginBottom: 6,
   display: "block",
@@ -105,7 +106,7 @@ export const ResponsivaDialog = ({
         position: "fixed",
         inset: 0,
         zIndex: 60,
-        backgroundColor: "rgba(36,27,26,0.55)",
+        backgroundColor: `${COLOR.inverse}8c`,
         backdropFilter: "blur(4px)",
         WebkitBackdropFilter: "blur(4px)",
         display: "flex",
@@ -121,10 +122,10 @@ export const ResponsivaDialog = ({
           width: "100%",
           maxWidth: 600,
           maxHeight: "92vh",
-          backgroundColor: ALMA.cream,
+          backgroundColor: COLOR.canvas,
           borderRadius: "24px 24px 0 0",
           overflowY: "auto",
-          boxShadow: "0 -12px 48px rgba(36,27,26,0.14)",
+          boxShadow: `0 -12px 48px ${COLOR.inverse}24`,
           // Center on desktop
         }}
         // Prevent click propagation so clicking inside doesn't close
@@ -136,10 +137,10 @@ export const ResponsivaDialog = ({
             position: "sticky",
             top: 0,
             zIndex: 10,
-            backgroundColor: `${ALMA.cream}f5`,
+            backgroundColor: `${COLOR.canvas}f5`,
             backdropFilter: "blur(12px)",
             WebkitBackdropFilter: "blur(12px)",
-            borderBottom: `1px solid ${ALMA.border}`,
+            borderBottom: `1px solid ${COLOR.line}`,
             padding: "1.1rem 1.4rem",
             display: "flex",
             alignItems: "center",
@@ -154,16 +155,16 @@ export const ResponsivaDialog = ({
                 fontWeight: 500,
                 textTransform: "uppercase",
                 letterSpacing: "0.28em",
-                color: ALMA.berry,
+                color: COLOR.accentStrong,
                 margin: 0,
               }}
             >
               Antes de reservar
             </p>
             <h2
-              className="font-bebas"
+              className="font-display"
               style={{
-                color: ALMA.inkDeep,
+                color: COLOR.inverse,
                 fontSize: "clamp(1.25rem, 2.5vw, 1.65rem)",
                 lineHeight: 1,
                 margin: "4px 0 0",
@@ -179,7 +180,7 @@ export const ResponsivaDialog = ({
               background: "transparent",
               border: 0,
               cursor: "pointer",
-              color: ALMA.ink,
+              color: COLOR.ink,
               opacity: 0.5,
               padding: 6,
               borderRadius: 8,
@@ -199,26 +200,26 @@ export const ResponsivaDialog = ({
               <div
                 key={section.n}
                 style={{
-                  borderTop: `1px solid ${ALMA.border}`,
+                  borderTop: `1px solid ${COLOR.line}`,
                   paddingTop: "1.1rem",
                   paddingBottom: "1rem",
                 }}
               >
                 <h3
-                  className="font-bebas"
+                  className="font-display"
                   style={{
-                    color: ALMA.ink,
+                    color: COLOR.ink,
                     fontSize: "1.05rem",
                     margin: "0 0 0.35rem",
                     letterSpacing: "0.03em",
                   }}
                 >
-                  <span style={{ color: ALMA.berry, marginRight: 6 }}>{section.n}.</span>
+                  <span style={{ color: COLOR.accentStrong, marginRight: 6 }}>{section.n}.</span>
                   {section.title}
                 </h3>
                 <p
                   style={{
-                    color: ALMA.ink,
+                    color: COLOR.ink,
                     opacity: 0.75,
                     fontSize: "0.875rem",
                     lineHeight: 1.65,
@@ -234,7 +235,7 @@ export const ResponsivaDialog = ({
           {/* Form */}
           <div
             style={{
-              borderTop: `2px solid ${ALMA.border}`,
+              borderTop: `2px solid ${COLOR.line}`,
               paddingTop: "1.4rem",
               display: "flex",
               flexDirection: "column",
@@ -242,8 +243,8 @@ export const ResponsivaDialog = ({
             }}
           >
             <p
-              className="font-bebas"
-              style={{ color: ALMA.inkDeep, fontSize: "1.2rem", margin: 0 }}
+              className="font-display"
+              style={{ color: COLOR.inverse, fontSize: "1.2rem", margin: 0 }}
             >
               Tus datos
             </p>
@@ -308,9 +309,9 @@ export const ResponsivaDialog = ({
                         flex: 1,
                         padding: "0.6rem 0.8rem",
                         borderRadius: 12,
-                        border: `1px solid ${isSelected ? ALMA.berry : ALMA.border}`,
-                        backgroundColor: isSelected ? `${ALMA.berry}18` : "#ffffff",
-                        color: isSelected ? ALMA.berry : ALMA.ink,
+                        border: `1px solid ${isSelected ? COLOR.accentStrong : COLOR.line}`,
+                        backgroundColor: isSelected ? `${COLOR.ink}18` : COLOR.surface,
+                        color: isSelected ? COLOR.accentStrong : COLOR.ink,
                         fontSize: "0.82rem",
                         fontWeight: isSelected ? 600 : 400,
                         cursor: "pointer",
@@ -342,8 +343,8 @@ export const ResponsivaDialog = ({
                 cursor: "pointer",
                 padding: "0.8rem",
                 borderRadius: 12,
-                border: `1px solid ${accepted ? ALMA.berry : ALMA.border}`,
-                backgroundColor: accepted ? `${ALMA.berry}0d` : "transparent",
+                border: `1px solid ${accepted ? COLOR.accentStrong : COLOR.line}`,
+                backgroundColor: accepted ? `${COLOR.ink}0d` : "transparent",
                 transition: "all 0.15s",
               }}
             >
@@ -353,14 +354,14 @@ export const ResponsivaDialog = ({
                 onChange={(e) => setAccepted(e.target.checked)}
                 style={{
                   marginTop: 2,
-                  accentColor: ALMA.berry,
+                  accentColor: COLOR.accentStrong,
                   width: 16,
                   height: 16,
                   flexShrink: 0,
                   cursor: "pointer",
                 }}
               />
-              <span style={{ fontSize: "0.84rem", color: ALMA.ink, lineHeight: 1.5 }}>
+              <span style={{ fontSize: "0.84rem", color: COLOR.ink, lineHeight: 1.5 }}>
                 He leído y acepto la responsiva y consentimiento informado en su totalidad.
               </span>
             </label>
@@ -375,8 +376,8 @@ export const ResponsivaDialog = ({
                 padding: "1rem",
                 borderRadius: 99,
                 border: 0,
-                backgroundColor: canSubmit && !mutation.isPending ? ALMA.inkDeep : ALMA.border,
-                color: ALMA.cream,
+                backgroundColor: canSubmit && !mutation.isPending ? COLOR.inverse : COLOR.line,
+                color: COLOR.canvas,
                 fontSize: "0.82rem",
                 fontWeight: 600,
                 textTransform: "uppercase",
@@ -392,7 +393,7 @@ export const ResponsivaDialog = ({
             <p
               style={{
                 fontSize: "0.72rem",
-                color: ALMA.ink,
+                color: COLOR.ink,
                 opacity: 0.45,
                 textAlign: "center",
                 margin: 0,

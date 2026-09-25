@@ -21,8 +21,9 @@ import { useConfirm } from "@/components/admin/ConfirmDialog";
 import { ErrorState, EmptyState } from "@/components/app/AppShell";
 import { formatDateTime } from "@/lib/format";
 import { MessageSquare, MoreHorizontal, Pencil, Plus, Star, Tag, X } from "lucide-react";
+import { COLOR } from "@/design/tokens";
 
-const tagSchema = z.object({ name: z.string().min(1), color: z.string().default("#6E5A46") });
+const tagSchema = z.object({ name: z.string().min(1), color: z.string().default(COLOR.ink) });
 type TagFormData = z.infer<typeof tagSchema>;
 interface ReviewTag extends TagFormData { id: string }
 
@@ -36,7 +37,7 @@ const ReviewTagsManager = () => {
   const { data, isError, refetch } = useQuery<{ data: ReviewTag[] }>({ queryKey: ["review-tags"], queryFn: async () => (await api.get("/review-tags")).data });
   const tags = Array.isArray(data?.data) ? data.data : [];
 
-  const form = useForm<TagFormData>({ resolver: zodResolver(tagSchema), defaultValues: { color: "#6E5A46" } });
+  const form = useForm<TagFormData>({ resolver: zodResolver(tagSchema), defaultValues: { color: COLOR.ink } });
 
   const createMutation = useMutation({ mutationFn: (d: TagFormData) => api.post("/review-tags", d), onSuccess: () => { qc.invalidateQueries({ queryKey: ["review-tags"] }); toast({ title: "Tag creado" }); setOpen(false); } });
   const updateMutation = useMutation({ mutationFn: ({ id, ...d }: ReviewTag) => api.put(`/review-tags/${id}`, d), onSuccess: () => { qc.invalidateQueries({ queryKey: ["review-tags"] }); toast({ title: "Tag actualizado" }); setOpen(false); } });
@@ -45,8 +46,8 @@ const ReviewTagsManager = () => {
   return (
     <div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
-        <h2 className="text-lg font-semibold text-alma-ink">Tags de reseñas</h2>
-        <Button size="sm" onClick={() => { form.reset({ color: "#6E5A46" }); setEditing(null); setOpen(true); }}><Plus size={14} className="mr-1" />Nuevo tag</Button>
+        <h2 className="text-lg font-semibold text-ink">Tags de reseñas</h2>
+        <Button size="sm" onClick={() => { form.reset({ color: COLOR.ink }); setEditing(null); setOpen(true); }}><Plus size={14} className="mr-1" />Nuevo tag</Button>
       </div>
       {isError ? (
         <ErrorState
@@ -59,7 +60,7 @@ const ReviewTagsManager = () => {
           title="Aún no hay tags"
           description="Sirven para clasificar reseñas (limpieza, instructoras, equipo) y detectar patrones."
           ctaLabel="Nuevo tag"
-          onCta={() => { form.reset({ color: "#6E5A46" }); setEditing(null); setOpen(true); }}
+          onCta={() => { form.reset({ color: COLOR.ink }); setEditing(null); setOpen(true); }}
         />
       ) : (
         <div className="flex flex-wrap gap-2 mb-4">
@@ -128,9 +129,9 @@ interface AdminReview {
 
 /* Stat compacto sobre hairline superior (mismo lenguaje que Reportes) */
 const StripStat = ({ label, value }: { label: string; value: React.ReactNode }) => (
-  <div className="border-t border-alma-hairline pb-1 pt-2.5">
-    <p className="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-alma-ink/60">{label}</p>
-    <p className="font-display nums mt-1.5 leading-none text-alma-ink" style={{ fontSize: "1.5rem" }}>{value}</p>
+  <div className="border-t border-line pb-1 pt-2.5">
+    <p className="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-ink/60">{label}</p>
+    <p className="font-display nums mt-1.5 leading-none text-ink" style={{ fontSize: "1.5rem" }}>{value}</p>
   </div>
 );
 
@@ -181,7 +182,7 @@ const AdminReviewsDashboard = () => {
       key={i}
       size={12}
       fill={i < n ? "currentColor" : "none"}
-      className={i < n ? "text-alma-berry" : "text-alma-ink/25"}
+      className={i < n ? "text-ink" : "text-ink/25"}
     />
   ));
 
@@ -201,7 +202,7 @@ const AdminReviewsDashboard = () => {
     <AuthGuard>
       <AdminLayout>
         <div className="admin-page max-w-5xl">
-          <h1 className="admin-title font-display leading-none text-alma-ink mb-6">Reseñas</h1>
+          <h1 className="admin-title font-display leading-none text-ink mb-6">Reseñas</h1>
 
           {!isError && (
             <div className="mb-8 grid max-w-lg grid-cols-3 gap-x-6">
@@ -211,7 +212,7 @@ const AdminReviewsDashboard = () => {
                 value={
                   <span className="inline-flex items-center gap-1">
                     {stats.average}
-                    <Star size={14} className="text-alma-berry" fill="currentColor" strokeWidth={0} />
+                    <Star size={14} className="text-ink" fill="currentColor" strokeWidth={0} />
                   </span>
                 }
               />
@@ -271,9 +272,9 @@ const AdminReviewsDashboard = () => {
                           </TableCell>
                           <TableCell>
                             {r.is_approved ? (
-                              <Badge variant="outline" className="border-alma-olive/40 bg-alma-olive/10 text-alma-olive">Aprobada</Badge>
+                              <Badge variant="outline" className="border-success/40 bg-success/10 text-success">Aprobada</Badge>
                             ) : (
-                              <Badge variant="outline" className="border-alma-sandstone bg-alma-oat/60 text-alma-berry">Pendiente</Badge>
+                              <Badge variant="outline" className="border-line-strong bg-sunken/60 text-ink">Pendiente</Badge>
                             )}
                           </TableCell>
                           <TableCell className="text-sm max-w-xs truncate">{r.comment || "—"}</TableCell>

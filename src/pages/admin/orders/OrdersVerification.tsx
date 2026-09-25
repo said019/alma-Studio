@@ -28,17 +28,17 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 const STATUS_PILL: Record<string, string> = {
-  pending_payment: "bg-alma-oat/60 text-alma-ink border-alma-sandstone/50",
-  pending_verification: "bg-alma-oat/60 text-alma-ink border-alma-sandstone/50",
-  approved: "bg-alma-olive/10 text-alma-olive border-alma-olive/30",
+  pending_payment: "bg-sunken/60 text-ink border-line-strong/50",
+  pending_verification: "bg-sunken/60 text-ink border-line-strong/50",
+  approved: "bg-success/10 text-success border-success/30",
   rejected: "bg-destructive/10 text-destructive border-destructive/30",
-  cancelled: "bg-alma-mist text-alma-ink/55 border-alma-hairline",
+  cancelled: "bg-sunken text-ink/55 border-line",
 };
 
 const StatusPill = ({ status }: { status: string }) => (
   <span className={cn(
     "inline-flex items-center px-2.5 py-0.5 rounded-full border text-[11px] font-semibold whitespace-nowrap",
-    STATUS_PILL[status] ?? "bg-alma-mist text-alma-ink/55 border-alma-hairline",
+    STATUS_PILL[status] ?? "bg-sunken text-ink/55 border-line",
   )}>
     {STATUS_LABEL[status] ?? status}
   </span>
@@ -79,7 +79,7 @@ function useIsDesktop() {
 const ProofViewer = ({ order, onZoom }: { order: Order; onZoom: (src: string) => void }) => {
   if (!order.proofUrl) {
     return (
-      <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-alma-sandstone/60 bg-alma-canvas py-8 text-alma-ink/55">
+      <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-line-strong/60 bg-canvas py-8 text-ink/55">
         <ImageOff size={18} strokeWidth={1.8} />
         <span className="text-xs">Sin comprobante adjunto</span>
       </div>
@@ -91,7 +91,7 @@ const ProofViewer = ({ order, onZoom }: { order: Order; onZoom: (src: string) =>
         href={order.proofUrl}
         target="_blank"
         rel="noreferrer"
-        className="flex items-center gap-2 rounded-xl border border-alma-hairline bg-alma-canvas px-4 py-3 text-sm font-medium text-alma-berry hover:border-alma-sandstone transition-colors"
+        className="flex items-center gap-2 rounded-xl border border-line bg-canvas px-4 py-3 text-sm font-medium text-ink hover:border-line-strong transition-colors"
       >
         <FileText size={15} /> Ver comprobante PDF
       </a>
@@ -106,9 +106,9 @@ const ProofViewer = ({ order, onZoom }: { order: Order; onZoom: (src: string) =>
       <img
         src={order.proofUrl}
         alt="Comprobante de pago"
-        className="max-h-72 w-full rounded-xl object-contain border border-alma-hairline bg-alma-canvas"
+        className="max-h-72 w-full rounded-xl object-contain border border-line bg-canvas"
       />
-      <span className="absolute inset-0 bg-alma-ink-deep/60 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl flex items-center justify-center gap-2 text-alma-canvas text-sm">
+      <span className="absolute inset-0 bg-inverse/60 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl flex items-center justify-center gap-2 text-canvas text-sm">
         <ZoomIn size={20} /> Ver completo
       </span>
     </button>
@@ -133,7 +133,7 @@ const OrderDetail = ({ order, onZoom, onApprove, onReject, approving, rejecting 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
-        <p className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-alma-ink/70 nums">
+        <p className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-ink/70 nums">
           Orden #{order.id.slice(0, 8)}
         </p>
         <StatusPill status={order.status} />
@@ -141,40 +141,40 @@ const OrderDetail = ({ order, onZoom, onApprove, onReject, approving, rejecting 
 
       <div className="space-y-2 text-sm">
         <div className="flex justify-between gap-3">
-          <span className="text-alma-ink/55">Clienta</span>
-          <span className="font-semibold text-alma-ink text-right truncate">{order.userName ?? order.userId}</span>
+          <span className="text-ink/55">Clienta</span>
+          <span className="font-semibold text-ink text-right truncate">{order.userName ?? order.userId}</span>
         </div>
         <div className="flex justify-between gap-3">
-          <span className="text-alma-ink/55">Plan</span>
-          <span className="font-medium text-alma-ink text-right truncate">{order.planName ?? "—"}</span>
+          <span className="text-ink/55">Plan</span>
+          <span className="font-medium text-ink text-right truncate">{order.planName ?? "—"}</span>
         </div>
         <div className="flex justify-between gap-3">
-          <span className="text-alma-ink/55">Método</span>
-          <span className="font-medium text-alma-ink">{METHOD_LABEL[order.paymentMethod ?? ""] ?? order.paymentMethod ?? "—"}</span>
+          <span className="text-ink/55">Método</span>
+          <span className="font-medium text-ink">{METHOD_LABEL[order.paymentMethod ?? ""] ?? order.paymentMethod ?? "—"}</span>
         </div>
         <div className="flex justify-between gap-3">
-          <span className="text-alma-ink/55">Fecha</span>
-          <span className="font-medium text-alma-ink nums">{formatDate(order.createdAt)}</span>
+          <span className="text-ink/55">Fecha</span>
+          <span className="font-medium text-ink nums">{formatDate(order.createdAt)}</span>
         </div>
       </div>
 
       {/* Monto destacado: la tarea es compararlo contra el comprobante */}
-      <div className="rounded-xl bg-alma-oat/50 border border-alma-sandstone/50 px-4 py-3">
-        <p className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-alma-berry">Monto a verificar</p>
-        <p className="text-2xl font-semibold text-alma-ink nums mt-0.5">{formatMXN(Number(order.totalAmount))}</p>
+      <div className="rounded-xl bg-sunken/50 border border-line-strong/50 px-4 py-3">
+        <p className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-ink">Monto a verificar</p>
+        <p className="text-2xl font-semibold text-ink nums mt-0.5">{formatMXN(Number(order.totalAmount))}</p>
       </div>
 
       {order.paymentMethod === "card" ? (
-        <div className="rounded-xl border border-alma-sandstone/50 bg-alma-oat/30 px-4 py-3 space-y-1">
-          <p className="text-sm font-semibold text-alma-ink">Pago con tarjeta (automático)</p>
-          <p className="text-xs leading-relaxed text-alma-ink/70">
+        <div className="rounded-xl border border-line-strong/50 bg-sunken/30 px-4 py-3 space-y-1">
+          <p className="text-sm font-semibold text-ink">Pago con tarjeta (automático)</p>
+          <p className="text-xs leading-relaxed text-ink/70">
             Stripe cobra y activa la membresía sola cuando la clienta completa el pago — no necesitas verificar nada.
             Si esta orden sigue en espera, la clienta no terminó el pago: puedes ignorarla o rechazarla para limpiarla.
           </p>
         </div>
       ) : (
         <div>
-          <Label className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-alma-ink/70 mb-2 block">
+          <Label className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-ink/70 mb-2 block">
             Comprobante de pago
           </Label>
           <ProofViewer order={order} onZoom={onZoom} />
@@ -184,7 +184,7 @@ const OrderDetail = ({ order, onZoom, onApprove, onReject, approving, rejecting 
       {isPending(order) && !rejectMode && (
         <>
           <div className="space-y-1">
-            <Label htmlFor={`notes-${order.id}`} className="text-alma-ink/70">Notas internas (opcional)</Label>
+            <Label htmlFor={`notes-${order.id}`} className="text-ink/70">Notas internas (opcional)</Label>
             <Input
               id={`notes-${order.id}`}
               value={notes}
@@ -202,7 +202,7 @@ const OrderDetail = ({ order, onZoom, onApprove, onReject, approving, rejecting 
               Rechazar
             </Button>
             <Button
-              className="flex-1 bg-alma-ink-deep text-alma-canvas hover:bg-alma-ink font-semibold"
+              className="flex-1 bg-inverse text-canvas hover:bg-ink font-semibold"
               onClick={() => onApprove(order.id, notes)}
               disabled={approving || rejecting}
             >
@@ -215,13 +215,13 @@ const OrderDetail = ({ order, onZoom, onApprove, onReject, approving, rejecting 
       {isPending(order) && rejectMode && (
         <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 space-y-3">
           <div>
-            <p className="text-sm font-semibold text-alma-ink">Rechazar orden</p>
-            <p className="text-xs text-alma-ink/70 mt-0.5">
+            <p className="text-sm font-semibold text-ink">Rechazar orden</p>
+            <p className="text-xs text-ink/70 mt-0.5">
               Se notificará a la clienta por email y WhatsApp con el motivo.
             </p>
           </div>
           <div className="space-y-1">
-            <Label htmlFor={`reason-${order.id}`} className="text-alma-ink/70">Motivo del rechazo *</Label>
+            <Label htmlFor={`reason-${order.id}`} className="text-ink/70">Motivo del rechazo *</Label>
             <Textarea
               id={`reason-${order.id}`}
               rows={3}
@@ -231,7 +231,7 @@ const OrderDetail = ({ order, onZoom, onApprove, onReject, approving, rejecting 
             />
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" className="border-alma-sandstone text-alma-ink hover:bg-alma-mist" onClick={() => { setRejectMode(false); setReason(""); }} disabled={rejecting}>
+            <Button variant="outline" className="border-line-strong text-ink hover:bg-sunken" onClick={() => { setRejectMode(false); setReason(""); }} disabled={rejecting}>
               Cancelar
             </Button>
             <Button
@@ -343,7 +343,7 @@ const OrdersBoard = ({ sources, emptyTitle, emptyDescription, emptyIcon, hideCar
 
       <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start lg:gap-5">
         {/* Lista */}
-        <div className="rounded-xl border border-alma-hairline overflow-hidden bg-alma-canvas">
+        <div className="rounded-xl border border-line overflow-hidden bg-canvas">
           <Table>
             <TableHeader>
               <TableRow>
@@ -360,21 +360,21 @@ const OrdersBoard = ({ sources, emptyTitle, emptyDescription, emptyIcon, hideCar
                   <TableRow
                     key={o.id}
                     aria-selected={active}
-                    className={cn("cursor-pointer", active && "bg-alma-oat/40 hover:bg-alma-oat/40")}
+                    className={cn("cursor-pointer", active && "bg-sunken/40 hover:bg-sunken/40")}
                     onClick={() => {
                       setSelectedId(o.id);
                       if (!isDesktop) setMobileOpen(true);
                     }}
                   >
                     <TableCell>
-                      <p className="font-medium text-alma-ink truncate max-w-[22ch]">{o.userName ?? o.userId}</p>
-                      <p className="text-xs text-alma-ink/55">{METHOD_LABEL[o.paymentMethod ?? ""] ?? o.paymentMethod ?? "—"}</p>
+                      <p className="font-medium text-ink truncate max-w-[22ch]">{o.userName ?? o.userId}</p>
+                      <p className="text-xs text-ink/55">{METHOD_LABEL[o.paymentMethod ?? ""] ?? o.paymentMethod ?? "—"}</p>
                     </TableCell>
-                    <TableCell className="text-right font-medium text-alma-ink nums whitespace-nowrap">
+                    <TableCell className="text-right font-medium text-ink nums whitespace-nowrap">
                       {formatMXN(Number(o.totalAmount))}
                     </TableCell>
                     <TableCell><StatusPill status={o.status} /></TableCell>
-                    <TableCell className="text-sm text-alma-ink/70 nums whitespace-nowrap">{formatDate(o.createdAt)}</TableCell>
+                    <TableCell className="text-sm text-ink/70 nums whitespace-nowrap">{formatDate(o.createdAt)}</TableCell>
                   </TableRow>
                 );
               })}
@@ -383,11 +383,11 @@ const OrdersBoard = ({ sources, emptyTitle, emptyDescription, emptyIcon, hideCar
         </div>
 
         {/* Panel persistente (desktop): el comprobante siempre a la vista */}
-        <aside className="hidden lg:block sticky top-20 rounded-2xl border border-alma-hairline bg-alma-mist p-5">
+        <aside className="hidden lg:block sticky top-20 rounded-2xl border border-line bg-sunken p-5">
           {detailProps ? (
             <OrderDetail key={detailProps.order.id} {...detailProps} />
           ) : (
-            <p className="text-sm text-alma-ink/55 py-8 text-center">Selecciona una orden para revisarla</p>
+            <p className="text-sm text-ink/55 py-8 text-center">Selecciona una orden para revisarla</p>
           )}
         </aside>
       </div>
@@ -406,7 +406,7 @@ const OrdersBoard = ({ sources, emptyTitle, emptyDescription, emptyIcon, hideCar
 };
 
 const tabTriggerClass =
-  "rounded-xl px-4 py-2 text-[13px] font-semibold text-alma-ink/70 data-[state=active]:bg-alma-oat data-[state=active]:text-alma-ink data-[state=active]:shadow-none data-[state=active]:ring-1 data-[state=active]:ring-inset data-[state=active]:ring-alma-sandstone";
+  "rounded-xl px-4 py-2 text-[13px] font-semibold text-ink/70 data-[state=active]:bg-sunken data-[state=active]:text-ink data-[state=active]:shadow-none data-[state=active]:ring-1 data-[state=active]:ring-inset data-[state=active]:ring-line-strong";
 
 const OrdersVerification = () => (
   <AuthGuard>
@@ -419,11 +419,11 @@ const OrdersVerification = () => (
           ]}
         />
         <div className="mb-6">
-          <h1 className="admin-title text-alma-ink mb-1">Verificación de órdenes</h1>
-          <p className="text-sm text-alma-ink/55">Compara cada monto con su comprobante antes de aprobar</p>
+          <h1 className="admin-title text-ink mb-1">Verificación de órdenes</h1>
+          <p className="text-sm text-ink/55">Compara cada monto con su comprobante antes de aprobar</p>
         </div>
         <Tabs defaultValue="pending">
-          <TabsList className="h-auto rounded-2xl border border-alma-hairline bg-alma-mist p-1">
+          <TabsList className="h-auto rounded-2xl border border-line bg-sunken p-1">
             <TabsTrigger value="pending" className={tabTriggerClass}>Por verificar</TabsTrigger>
             <TabsTrigger value="all" className={tabTriggerClass}>Todas</TabsTrigger>
           </TabsList>

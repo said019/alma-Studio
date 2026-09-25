@@ -16,7 +16,6 @@ import {
   PrimaryButton,
   GhostButton,
   SkeletonRow,
-  ALMA,
 } from "@/components/app/AppShell";
 import { SegmentedTabs } from "@/components/app/widgets";
 import {
@@ -40,14 +39,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { Star, CalendarDays, ChevronDown } from "lucide-react";
 import type { BookingClient } from "@/types/booking";
+import { COLOR, type Tone } from "@/design/tokens";
 
 type TabId = "upcoming" | "past";
 
-const STATUS_TINT: Record<string, keyof typeof ALMA> = {
-  confirmed: "olive",
-  waitlist: "berry",
-  checked_in: "olive",
-  no_show: "destructive",
+const STATUS_TINT: Record<string, Tone> = {
+  confirmed: "success",
+  waitlist: "accent",
+  checked_in: "success",
+  no_show: "danger",
   cancelled: "ink",
 };
 const STATUS_LABEL: Record<string, string> = {
@@ -164,19 +164,19 @@ const MyBookings = () => {
     const canReview = isPast && b.status === "checked_in" && !hasReview;
     const hasActions = isCancellable || canReview || hasReview;
     return (
-      <div key={b.id} className="px-1 py-4" style={{ borderTop: `1px solid ${ALMA.border}` }}>
+      <div key={b.id} className="px-1 py-4" style={{ borderTop: `1px solid ${COLOR.line}` }}>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
-            <div className="text-[0.95rem] font-medium leading-snug" style={{ color: ALMA.ink }}>
+            <div className="text-[0.95rem] font-medium leading-snug" style={{ color: COLOR.ink }}>
               {b.class_type_name ?? "Clase"}
             </div>
-            <div className="nums text-[0.8rem] mt-1" style={{ color: ALMA.ink, opacity: 0.55 }}>
+            <div className="nums text-[0.8rem] mt-1" style={{ color: COLOR.ink, opacity: 0.55 }}>
               {b.start_time ? format(safeParse(b.start_time), "EEE d MMM · HH:mm", { locale: es }) : "Por confirmar"}
               {b.instructor_name ? ` · ${b.instructor_name}` : ""}
             </div>
           </div>
           <div className="shrink-0 pt-0.5">
-            <Tag tint={STATUS_TINT[b.status] ?? "berry"}>
+            <Tag tint={STATUS_TINT[b.status] ?? "accent"}>
               {STATUS_LABEL[b.status] ?? b.status}
             </Tag>
           </div>
@@ -188,7 +188,7 @@ const MyBookings = () => {
                 type="button"
                 onClick={() => setCancelId(b.id)}
                 className="inline-flex min-h-[44px] items-center rounded-full px-5 text-[0.72rem] font-medium uppercase tracking-[0.16em] bg-transparent cursor-pointer transition-colors"
-                style={{ border: `1px solid ${ALMA.border}`, color: ALMA.destructive }}
+                style={{ border: `1px solid ${COLOR.line}`, color: COLOR.danger }}
               >
                 Cancelar reserva
               </button>
@@ -198,12 +198,12 @@ const MyBookings = () => {
                 type="button"
                 onClick={() => setReviewBooking(b)}
                 className="inline-flex min-h-[44px] items-center gap-2 rounded-full px-5 text-[0.72rem] font-medium uppercase tracking-[0.16em] bg-transparent cursor-pointer transition-colors"
-                style={{ border: `1px solid ${ALMA.berry}`, color: ALMA.berry }}
+                style={{ border: `1px solid ${COLOR.accentStrong}`, color: COLOR.accentStrong }}
               >
                 <Star size={12} /> Dejar reseña
               </button>
             )}
-            {hasReview && <Tag tint="olive">Reseña enviada</Tag>}
+            {hasReview && <Tag tint="success">Reseña enviada</Tag>}
           </div>
         )}
       </div>
@@ -269,15 +269,15 @@ const MyBookings = () => {
                     onClick={() => setShowCancelled((v) => !v)}
                     aria-expanded={showCancelled}
                     className="flex w-full min-h-[44px] items-center justify-between bg-transparent border-0 cursor-pointer px-1 py-3"
-                    style={{ borderTop: `1px solid ${ALMA.border}`, borderBottom: showCancelled ? undefined : `1px solid ${ALMA.border}` }}
+                    style={{ borderTop: `1px solid ${COLOR.line}`, borderBottom: showCancelled ? undefined : `1px solid ${COLOR.line}` }}
                   >
-                    <span className="text-[0.72rem] font-medium uppercase tracking-[0.2em]" style={{ color: ALMA.ink, opacity: 0.55 }}>
+                    <span className="text-[0.72rem] font-medium uppercase tracking-[0.2em]" style={{ color: COLOR.ink, opacity: 0.55 }}>
                       Canceladas <span className="nums">{cancelled.length}</span>
                     </span>
                     <ChevronDown
                       size={15}
                       className="transition-transform"
-                      style={{ color: ALMA.ink, opacity: 0.4, transform: showCancelled ? "rotate(180deg)" : "none" }}
+                      style={{ color: COLOR.ink, opacity: 0.4, transform: showCancelled ? "rotate(180deg)" : "none" }}
                     />
                   </button>
                   {showCancelled && (
@@ -295,26 +295,26 @@ const MyBookings = () => {
         <AlertDialog open={!!cancelId} onOpenChange={(o) => !o && setCancelId(null)}>
           <AlertDialogContent
             className="w-[calc(100%-2rem)] rounded-3xl"
-            style={{ backgroundColor: ALMA.cream, borderColor: ALMA.border }}
+            style={{ backgroundColor: COLOR.canvas, borderColor: COLOR.line }}
           >
             <AlertDialogHeader>
-              <AlertDialogTitle className="font-display text-[1.35rem] font-normal leading-snug" style={{ color: ALMA.ink }}>
+              <AlertDialogTitle className="font-display text-[1.35rem] font-normal leading-snug" style={{ color: COLOR.ink }}>
                 ¿Cancelar tu reserva?
               </AlertDialogTitle>
-              <AlertDialogDescription className="text-[0.92rem] leading-[1.6]" style={{ color: ALMA.ink, opacity: 0.65 }}>
+              <AlertDialogDescription className="text-[0.92rem] leading-[1.6]" style={{ color: COLOR.ink, opacity: 0.65 }}>
                 Si faltan más de 12 horas, tu clase regresa a tu paquete. Con menos tiempo, cuenta como falta.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter className="gap-2">
               <AlertDialogCancel
                 className="h-11 rounded-full px-5 text-[0.74rem] font-medium uppercase tracking-[0.18em]"
-                style={{ backgroundColor: "transparent", borderColor: ALMA.border, color: ALMA.ink }}
+                style={{ backgroundColor: "transparent", borderColor: COLOR.line, color: COLOR.ink }}
               >
                 Volver
               </AlertDialogCancel>
               <AlertDialogAction
                 className="h-11 rounded-full px-5 text-[0.74rem] font-medium uppercase tracking-[0.18em]"
-                style={{ backgroundColor: ALMA.destructive, color: ALMA.cream }}
+                style={{ backgroundColor: COLOR.danger, color: COLOR.canvas }}
                 onClick={() => cancelId && cancelMutation.mutate(cancelId)}
               >
                 Sí, cancelar
@@ -337,16 +337,16 @@ const MyBookings = () => {
         >
           <DialogContent
             className="rounded-3xl"
-            style={{ backgroundColor: ALMA.cream, borderColor: ALMA.border }}
+            style={{ backgroundColor: COLOR.canvas, borderColor: COLOR.line }}
           >
             <DialogHeader>
-              <DialogTitle className="font-display text-[1.3rem] font-normal leading-snug" style={{ color: ALMA.ink }}>
+              <DialogTitle className="font-display text-[1.3rem] font-normal leading-snug" style={{ color: COLOR.ink }}>
                 Reseña · {reviewBooking?.class_type_name}
               </DialogTitle>
             </DialogHeader>
             <div className="space-y-5 py-2">
               <div>
-                <p className="text-[0.72rem] font-medium uppercase tracking-[0.22em] mb-2" style={{ color: ALMA.ink, opacity: 0.6 }}>
+                <p className="text-[0.72rem] font-medium uppercase tracking-[0.22em] mb-2" style={{ color: COLOR.ink, opacity: 0.6 }}>
                   Calificación
                 </p>
                 <div className="flex gap-1">
@@ -363,8 +363,8 @@ const MyBookings = () => {
                         size={26}
                         strokeWidth={1.5}
                         style={{
-                          color: s <= rating ? ALMA.berry : ALMA.sandstone,
-                          fill: s <= rating ? ALMA.berry : "transparent",
+                          color: s <= rating ? COLOR.accentStrong : COLOR.inkMuted,
+                          fill: s <= rating ? COLOR.accentStrong : "transparent",
                         }}
                       />
                     </button>
@@ -379,7 +379,7 @@ const MyBookings = () => {
                 />
               ) : reviewTags.length > 0 ? (
                 <div>
-                  <p className="text-[0.72rem] font-medium uppercase tracking-[0.22em] mb-2" style={{ color: ALMA.ink, opacity: 0.6 }}>
+                  <p className="text-[0.72rem] font-medium uppercase tracking-[0.22em] mb-2" style={{ color: COLOR.ink, opacity: 0.6 }}>
                     ¿Qué te gustó?
                   </p>
                   <div className="flex flex-wrap gap-2">
@@ -396,9 +396,9 @@ const MyBookings = () => {
                           }
                           className="rounded-full px-3 py-1.5 text-[0.74rem] cursor-pointer transition-colors"
                           style={{
-                            backgroundColor: isSel ? `${ALMA.berry}1a` : "transparent",
-                            border: `1px solid ${isSel ? ALMA.berry : ALMA.border}`,
-                            color: isSel ? ALMA.berry : ALMA.ink,
+                            backgroundColor: isSel ? `${COLOR.ink}1a` : "transparent",
+                            border: `1px solid ${isSel ? COLOR.accentStrong : COLOR.line}`,
+                            color: isSel ? COLOR.accentStrong : COLOR.ink,
                             fontWeight: isSel ? 600 : 400,
                           }}
                         >
@@ -410,7 +410,7 @@ const MyBookings = () => {
                 </div>
               ) : null}
               <div>
-                <p className="text-[0.72rem] font-medium uppercase tracking-[0.22em] mb-2" style={{ color: ALMA.ink, opacity: 0.6 }}>
+                <p className="text-[0.72rem] font-medium uppercase tracking-[0.22em] mb-2" style={{ color: COLOR.ink, opacity: 0.6 }}>
                   Comentario (opcional)
                 </p>
                 <Textarea

@@ -191,18 +191,18 @@ const TemplateCard = ({
   };
 
   return (
-    <div className={`rounded-xl border border-alma-hairline bg-alma-mist overflow-hidden ${!enabled ? "opacity-60" : ""}`}>
+    <div className={`rounded-xl border border-line bg-sunken overflow-hidden ${!enabled ? "opacity-60" : ""}`}>
       {dialog}
       <button
         onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center justify-between gap-2 p-4 text-left transition-colors hover:bg-alma-oat/30"
+        className="w-full flex items-center justify-between gap-2 p-4 text-left transition-colors hover:bg-sunken/30"
         aria-expanded={open}
       >
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <code className="text-[11px] px-1.5 py-0.5 rounded bg-alma-oat/60 text-alma-berry font-mono">{templateKey}</code>
+            <code className="text-[11px] px-1.5 py-0.5 rounded bg-sunken/60 text-ink font-mono">{templateKey}</code>
             {isModified && (
-              <Badge variant="outline" className="border-transparent bg-alma-oat text-alma-ink text-[10px] h-4">
+              <Badge variant="outline" className="border-transparent bg-sunken text-ink text-[10px] h-4">
                 editado
               </Badge>
             )}
@@ -212,23 +212,23 @@ const TemplateCard = ({
               </Badge>
             )}
           </div>
-          <p className="text-sm font-medium text-alma-ink mt-1 truncate">{template.subject}</p>
-          <p className="text-xs text-alma-ink/55 mt-0.5 truncate">{template.body.slice(0, 90)}…</p>
+          <p className="text-sm font-medium text-ink mt-1 truncate">{template.subject}</p>
+          <p className="text-xs text-ink/55 mt-0.5 truncate">{template.body.slice(0, 90)}…</p>
         </div>
         <ChevronDown
           size={15}
-          className={`shrink-0 text-alma-ink/55 transition-transform duration-200 ${open ? "" : "-rotate-90"}`}
+          className={`shrink-0 text-ink/55 transition-transform duration-200 ${open ? "" : "-rotate-90"}`}
           aria-hidden="true"
         />
       </button>
       {open && (
-        <div className="border-t border-alma-hairline p-4 space-y-4">
+        <div className="border-t border-line p-4 space-y-4">
           <div className="space-y-1.5">
             <Label className="text-xs">Subject (asunto interno)</Label>
             <Input
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
-              className="bg-alma-canvas"
+              className="bg-canvas"
             />
           </div>
           <div className="space-y-1.5">
@@ -237,17 +237,17 @@ const TemplateCard = ({
               value={body}
               onChange={(e) => setBody(e.target.value)}
               rows={4}
-              className="bg-alma-canvas resize-none font-mono text-sm"
+              className="bg-canvas resize-none font-mono text-sm"
             />
             {variables.length > 0 && (
               <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                <span className="text-[11px] text-alma-ink/55">Variables:</span>
+                <span className="text-[11px] text-ink/55">Variables:</span>
                 {variables.map((v) => (
                   <button
                     key={v}
                     type="button"
                     onClick={() => insertVariable(v)}
-                    className="rounded border border-alma-hairline bg-alma-canvas px-1.5 py-0.5 text-[11px] font-mono text-alma-ink/80 transition-colors hover:bg-alma-oat/60"
+                    className="rounded border border-line bg-canvas px-1.5 py-0.5 text-[11px] font-mono text-ink/80 transition-colors hover:bg-sunken/60"
                   >
                     {`{${v}}`}
                   </button>
@@ -257,10 +257,10 @@ const TemplateCard = ({
           </div>
 
           {preview && (
-            <div className="rounded-xl border border-alma-sandstone/60 bg-alma-oat/30 p-3">
-              <p className="text-[10px] uppercase tracking-widest text-alma-berry mb-1.5">Preview con datos de muestra</p>
-              <p className="text-sm font-medium text-alma-ink">{preview.subject}</p>
-              <p className="text-sm text-alma-ink/70 mt-1 whitespace-pre-wrap">{preview.body}</p>
+            <div className="rounded-xl border border-line-strong/60 bg-sunken/30 p-3">
+              <p className="text-[10px] uppercase tracking-widest text-ink mb-1.5">Preview con datos de muestra</p>
+              <p className="text-sm font-medium text-ink">{preview.subject}</p>
+              <p className="text-sm text-ink/70 mt-1 whitespace-pre-wrap">{preview.body}</p>
             </div>
           )}
 
@@ -269,7 +269,7 @@ const TemplateCard = ({
               onClick={handleSave}
               disabled={!dirty || saving}
               size="sm"
-              className="bg-alma-ink text-alma-canvas hover:bg-alma-ink-deep"
+              className="bg-ink text-canvas hover:bg-inverse"
             >
               {saving ? <Loader2 size={13} className="mr-1.5 animate-spin" /> : <Save size={13} className="mr-1.5" />}
               Guardar
@@ -279,7 +279,7 @@ const TemplateCard = ({
               disabled={previewing}
               variant="ghost"
               size="sm"
-              className="text-alma-ink/70 hover:text-alma-ink"
+              className="text-ink/70 hover:text-ink"
             >
               {previewing ? <Loader2 size={13} className="mr-1.5 animate-spin" /> : <Eye size={13} className="mr-1.5" />}
               Preview
@@ -289,7 +289,7 @@ const TemplateCard = ({
               disabled={sendingTest || dirty}
               variant="ghost"
               size="sm"
-              className="text-alma-ink/70 hover:text-alma-ink"
+              className="text-ink/70 hover:text-ink"
               title={dirty ? "Guarda primero los cambios antes de enviar prueba" : "Mandar WhatsApp de prueba a un teléfono"}
             >
               {sendingTest ? <Loader2 size={13} className="mr-1.5 animate-spin" /> : <Send size={13} className="mr-1.5" />}
@@ -300,7 +300,7 @@ const TemplateCard = ({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 text-alma-ink/55 hover:text-alma-ink"
+                  className="h-8 w-8 text-ink/55 hover:text-ink"
                   disabled={toggling}
                   aria-label="Más acciones del template"
                 >
@@ -456,8 +456,8 @@ const WhatsAppTemplatesPage = () => {
           />
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-6">
             <div className="min-w-0">
-              <h1 className="admin-title font-semibold text-alma-ink">Templates de WhatsApp</h1>
-              <p className="mt-1 text-sm text-alma-ink/70">
+              <h1 className="admin-title font-semibold text-ink">Templates de WhatsApp</h1>
+              <p className="mt-1 text-sm text-ink/70">
                 Edita el copy de las{allKeys.length > 0 ? <> <span className="nums">{allKeys.length}</span></> : null} notificaciones automáticas. Los cambios aplican al instante.
               </p>
             </div>
@@ -474,11 +474,11 @@ const WhatsAppTemplatesPage = () => {
           </div>
 
           {/* ── Destinatarios de avisos administrativos ───────────────── */}
-          <div className="rounded-xl border border-alma-hairline bg-alma-mist p-5 mb-6">
-            <p className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-alma-ink/60 mb-1">
+          <div className="rounded-xl border border-line bg-sunken p-5 mb-6">
+            <p className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-ink/60 mb-1">
               Avisos a la dueña / staff
             </p>
-            <p className="text-xs text-alma-ink/70 mb-3">
+            <p className="text-xs text-ink/70 mb-3">
               Teléfonos que reciben los WhatsApps administrativos (ej. <code className="font-mono">admin_new_booking</code>). Agrega tu número y el de quien quieras que reciba estas alertas. Formato: <code className="font-mono nums">+524441234567</code>.
             </p>
             <div className="flex gap-2">
@@ -487,13 +487,13 @@ const WhatsAppTemplatesPage = () => {
                 onChange={(e) => setPhoneInput(e.target.value)}
                 placeholder="+524441234567"
                 onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addAdminPhone(); } }}
-                className="bg-alma-canvas nums"
+                className="bg-canvas nums"
               />
               <Button
                 onClick={addAdminPhone}
                 disabled={!phoneInput.trim() || updatePhonesMutation.isPending}
                 size="sm"
-                className="bg-alma-ink text-alma-canvas hover:bg-alma-ink-deep"
+                className="bg-ink text-canvas hover:bg-inverse"
               >
                 Agregar
               </Button>
@@ -504,18 +504,18 @@ const WhatsAppTemplatesPage = () => {
                 <button type="button" className="underline underline-offset-2" onClick={() => refetchSettings()}>Reintentar</button>
               </p>
             ) : adminPhones.length === 0 ? (
-              <p className="mt-3 text-xs text-alma-ink/55">
+              <p className="mt-3 text-xs text-ink/55">
                 Sin teléfonos configurados. Mientras tanto, los avisos van a usuarias con rol admin que tengan teléfono.
               </p>
             ) : (
               <div className="mt-3 flex flex-wrap gap-2">
                 {adminPhones.map((p) => (
-                  <span key={p} className="inline-flex items-center gap-1.5 rounded-full border border-alma-hairline bg-alma-canvas px-2.5 py-1 text-xs text-alma-ink">
+                  <span key={p} className="inline-flex items-center gap-1.5 rounded-full border border-line bg-canvas px-2.5 py-1 text-xs text-ink">
                     <code className="font-mono nums">{p}</code>
                     <button
                       type="button"
                       onClick={() => removeAdminPhone(p)}
-                      className="text-alma-ink/45 transition-colors hover:text-destructive"
+                      className="text-ink/45 transition-colors hover:text-destructive"
                       aria-label={`Quitar ${p}`}
                     >
                       <X size={12} />
@@ -554,9 +554,9 @@ const WhatsAppTemplatesPage = () => {
                   return (
                     <TabsTrigger key={cat.id} value={cat.id} className="text-xs">
                       {cat.label}
-                      <span className="ml-1.5 text-[10px] text-alma-ink/50 nums">{cat.keys.length}</span>
+                      <span className="ml-1.5 text-[10px] text-ink/50 nums">{cat.keys.length}</span>
                       {editedCount > 0 && (
-                        <span className="ml-1 inline-block h-1.5 w-1.5 rounded-full bg-alma-berry" />
+                        <span className="ml-1 inline-block h-1.5 w-1.5 rounded-full bg-ink" />
                       )}
                     </TabsTrigger>
                   );

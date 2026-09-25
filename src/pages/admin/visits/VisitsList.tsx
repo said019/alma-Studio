@@ -130,21 +130,21 @@ const VisitsList = () => {
           />
           <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h1 className="admin-title font-semibold text-alma-ink">Invitadas / Visitas</h1>
-              <p className="mt-1 text-sm text-alma-ink/55">
+              <h1 className="admin-title font-semibold text-ink">Invitadas / Visitas</h1>
+              <p className="mt-1 text-sm text-ink/55">
                 Registro de acompañantes y sus cuestionarios iniciales. El cuestionario se reusa la próxima vez que vengan.
               </p>
             </div>
             <Button
               onClick={() => { resetForm(); setFormOpen(true); }}
-              className="bg-alma-ink text-alma-canvas hover:bg-alma-ink-deep"
+              className="bg-ink text-canvas hover:bg-inverse"
             >
               <Plus size={14} className="mr-1.5" /> Nueva invitada
             </Button>
           </div>
 
           <div className="relative mb-4">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-alma-ink/40" />
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink/40" />
             <Input
               className="pl-8"
               value={search}
@@ -165,10 +165,10 @@ const VisitsList = () => {
               onRetry={() => refetch()}
             />
           ) : guests.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-alma-sandstone/70 p-8 text-center">
-              <UserPlus size={32} className="mx-auto text-alma-stone mb-3" />
-              <p className="text-sm text-alma-ink/70">Aún no hay invitadas registradas.</p>
-              <p className="mt-1 text-xs text-alma-ink/55">
+            <div className="rounded-2xl border border-dashed border-line-strong/70 p-8 text-center">
+              <UserPlus size={32} className="mx-auto text-ink-muted mb-3" />
+              <p className="text-sm text-ink/70">Aún no hay invitadas registradas.</p>
+              <p className="mt-1 text-xs text-ink/55">
                 Se registran automáticamente al asignarlas a una clase, o aquí con <strong>"Nueva invitada"</strong>.
               </p>
             </div>
@@ -177,39 +177,39 @@ const VisitsList = () => {
               {guests.map((g) => (
                 <div
                   key={g.id}
-                  className="rounded-2xl border border-alma-hairline bg-alma-mist p-4"
+                  className="rounded-2xl border border-line bg-sunken p-4"
                 >
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <p className="font-medium text-alma-ink">{g.display_name}</p>
+                        <p className="font-medium text-ink">{g.display_name}</p>
                         {g.active_pack ? (
-                          <Badge variant="outline" className="nums border-transparent bg-alma-oat text-alma-ink text-[10px] font-medium">
+                          <Badge variant="outline" className="nums border-transparent bg-sunken text-ink text-[10px] font-medium">
                             {g.active_pack.classes_remaining ?? "—"} clase{g.active_pack.classes_remaining === 1 ? "" : "s"} · {g.active_pack.plan_name}
                           </Badge>
                         ) : (
-                          <Badge variant="outline" className="border-alma-hairline bg-transparent text-alma-ink/55 text-[10px] font-medium">
+                          <Badge variant="outline" className="border-line bg-transparent text-ink/55 text-[10px] font-medium">
                             Sin pack activo
                           </Badge>
                         )}
                       </div>
-                      <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-alma-ink/60">
+                      <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-ink/60">
                         {g.phone && <span className="nums flex items-center gap-1"><Phone size={11} /> {g.phone}</span>}
                         {g.email && <span className="flex items-center gap-1"><Mail size={11} /> {g.email}</span>}
-                        {g.host_name && <span>Trajo: <strong className="text-alma-ink/80">{g.host_name}</strong></span>}
+                        {g.host_name && <span>Trajo: <strong className="text-ink/80">{g.host_name}</strong></span>}
                       </div>
                       <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
                         {g.practiced_barre_before === true && (
-                          <span className="rounded-full border border-alma-hairline bg-alma-canvas px-2 py-0.5 text-alma-ink/60">
+                          <span className="rounded-full border border-line bg-canvas px-2 py-0.5 text-ink/60">
                             Con experiencia previa
                           </span>
                         )}
                         {g.accepted_waiver_at ? (
-                          <span className="inline-flex items-center gap-1 text-alma-olive">
+                          <span className="inline-flex items-center gap-1 text-success">
                             <ShieldCheck size={12} /> Waiver firmado
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 text-alma-berry">
+                          <span className="inline-flex items-center gap-1 text-ink">
                             <ShieldAlert size={12} /> Waiver pendiente
                           </span>
                         )}
@@ -227,7 +227,7 @@ const VisitsList = () => {
                         <p className="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-destructive">
                           Lesión o condición física
                         </p>
-                        <p className="mt-0.5 whitespace-pre-wrap break-words text-xs leading-relaxed text-alma-ink/80">
+                        <p className="mt-0.5 whitespace-pre-wrap break-words text-xs leading-relaxed text-ink/80">
                           {g.injury_details || "Sin detalles registrados. Confirma con ella antes de la clase."}
                         </p>
                       </div>
@@ -259,8 +259,8 @@ const VisitsList = () => {
                 <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="ej. ana@correo.com" />
               </div>
 
-              <div className="rounded-xl border border-alma-hairline bg-alma-mist p-3 space-y-3">
-                <p className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-alma-ink/60">Cuestionario</p>
+              <div className="rounded-xl border border-line bg-sunken p-3 space-y-3">
+                <p className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-ink/60">Cuestionario</p>
                 <div className="flex items-center justify-between gap-2">
                   <Label className="text-sm">¿Tiene lesión o condición física?</Label>
                   <Switch checked={hasInjury} onCheckedChange={setHasInjury} />
@@ -272,7 +272,7 @@ const VisitsList = () => {
                   <Label className="text-sm">¿Ha practicado pilates antes?</Label>
                   <Switch checked={practicedBefore} onCheckedChange={setPracticedBefore} />
                 </div>
-                <div className="flex items-start justify-between gap-2 border-t border-alma-hairline pt-2.5">
+                <div className="flex items-start justify-between gap-2 border-t border-line pt-2.5">
                   <Label className="text-xs leading-relaxed">
                     Confirma que la invitada leyó y aceptó los términos y riesgos de la clase.
                   </Label>
@@ -287,7 +287,7 @@ const VisitsList = () => {
               <Button
                 onClick={() => saveMutation.mutate()}
                 disabled={!canSubmit || saveMutation.isPending}
-                className="bg-alma-ink text-alma-canvas hover:bg-alma-ink-deep"
+                className="bg-ink text-canvas hover:bg-inverse"
               >
                 {saveMutation.isPending ? (
                   <><Loader2 size={14} className="mr-2 animate-spin" /> Guardando…</>

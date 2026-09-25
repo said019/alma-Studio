@@ -21,7 +21,6 @@ import {
   GhostButton,
   ActionRow,
   SkeletonRow,
-  ALMA,
 } from "@/components/app/AppShell";
 import {
   CalendarDays,
@@ -32,6 +31,7 @@ import {
 } from "lucide-react";
 import type { ClientMembership } from "@/types/membership";
 import type { BookingClient } from "@/types/booking";
+import { COLOR } from "@/design/tokens";
 
 const formatBookingTime = (iso: string | null | undefined) => {
   if (!iso) return "Por confirmar";
@@ -54,12 +54,12 @@ const AccountRow = ({
 }) => (
   <div
     className="grid grid-cols-[1fr_auto] items-baseline gap-4 py-2.5"
-    style={{ borderTop: `1px solid ${ALMA.sandstone}` }}
+    style={{ borderTop: `1px solid ${COLOR.lineStrong}` }}
   >
-    <span className="text-[0.72rem] uppercase tracking-[0.18em]" style={{ color: ALMA.ink, opacity: 0.6 }}>
+    <span className="text-[0.72rem] uppercase tracking-[0.18em]" style={{ color: COLOR.ink, opacity: 0.6 }}>
       {label}
     </span>
-    <span className="nums text-[1.05rem] font-medium text-right" style={{ color: accent ? ALMA.berry : ALMA.ink }}>
+    <span className="nums text-[1.05rem] font-medium text-right" style={{ color: accent ? COLOR.accentStrong : COLOR.ink }}>
       {value}
     </span>
   </div>
@@ -161,7 +161,7 @@ const Dashboard = () => {
                 </>
               }
               rightLabel="Ver detalle"
-              tint="berry"
+              tint="accent"
             />
           ) : (
             <ActionRow
@@ -170,7 +170,7 @@ const Dashboard = () => {
               title="Reserva tu próxima clase"
               meta="Grupos pequeños, cada clase es distinta."
               rightLabel="Reservar"
-              tint="stone"
+              tint="muted"
             />
           )}
         </div>
@@ -180,9 +180,9 @@ const Dashboard = () => {
           <Section title="Tu próximo logro">
             <div
               className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 py-4 px-1"
-              style={{ borderBottom: `1px solid ${ALMA.border}` }}
+              style={{ borderBottom: `1px solid ${COLOR.line}` }}
             >
-              <p className="text-[0.92rem] leading-[1.6]" style={{ color: ALMA.ink, opacity: 0.65 }}>
+              <p className="text-[0.92rem] leading-[1.6]" style={{ color: COLOR.ink, opacity: 0.65 }}>
                 No pudimos cargar tu progreso de logros.
               </p>
               <GhostButton onClick={() => refetchMilestones()}>Reintentar</GhostButton>
@@ -193,7 +193,7 @@ const Dashboard = () => {
             title="Tu próximo logro"
             trailing={
               FEATURES.walletExtras && (
-                <Link to="/app/wallet/rewards" className="no-underline" style={{ color: ALMA.berry }}>
+                <Link to="/app/wallet/rewards" className="no-underline" style={{ color: COLOR.accentStrong }}>
                   Ver todos
                 </Link>
               )
@@ -204,36 +204,36 @@ const Dashboard = () => {
                 to="/app/wallet/rewards"
                 data-lift
                 className="block no-underline rounded-3xl p-5 sm:p-6"
-                style={{ backgroundColor: ALMA.cream, border: `1px solid ${ALMA.border}` }}
+                style={{ backgroundColor: COLOR.canvas, border: `1px solid ${COLOR.line}` }}
               >
                 <div className="flex items-start gap-4">
                   <span
                     className="grid h-12 w-12 place-items-center rounded-2xl shrink-0"
-                    style={{ backgroundColor: ALMA.blush, color: ALMA.berry }}
+                    style={{ backgroundColor: COLOR.sunken, color: COLOR.accentStrong }}
                   >
                     <Award size={20} strokeWidth={1.8} />
                   </span>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-baseline justify-between gap-2 flex-wrap">
-                      <h3 className="font-display leading-tight" style={{ color: ALMA.ink, fontSize: "1.25rem" }}>
+                      <h3 className="font-display leading-tight" style={{ color: COLOR.ink, fontSize: "1.25rem" }}>
                         {ms.next_milestone.name}
                       </h3>
-                      <span className="nums text-[0.72rem] font-medium uppercase tracking-[0.18em]" style={{ color: ALMA.berry }}>
+                      <span className="nums text-[0.72rem] font-medium uppercase tracking-[0.18em]" style={{ color: COLOR.accentStrong }}>
                         +{ms.next_milestone.award_points} pts
                       </span>
                     </div>
                     <div className="mt-3">
                       <div className="flex items-center justify-between gap-3 text-[0.74rem]">
-                        <span className="nums" style={{ color: ALMA.ink, opacity: 0.7 }}>
-                          <strong style={{ color: ALMA.berry }}>{ms.lifetime_classes}</strong> de {ms.next_milestone.classes_required} clases
+                        <span className="nums" style={{ color: COLOR.ink, opacity: 0.7 }}>
+                          <strong style={{ color: COLOR.accentStrong }}>{ms.lifetime_classes}</strong> de {ms.next_milestone.classes_required} clases
                         </span>
-                        <span className="nums font-medium" style={{ color: ALMA.berry }}>
+                        <span className="nums font-medium" style={{ color: COLOR.accentStrong }}>
                           Te faltan {ms.next_remaining ?? 0}
                         </span>
                       </div>
                       <div
                         className="mt-2 h-1.5 rounded-full overflow-hidden"
-                        style={{ backgroundColor: ALMA.blush }}
+                        style={{ backgroundColor: COLOR.sunken }}
                         role="progressbar"
                         aria-valuemin={0}
                         aria-valuemax={ms.next_milestone.classes_required}
@@ -243,7 +243,7 @@ const Dashboard = () => {
                           className="h-full rounded-full"
                           style={{
                             width: `${Math.min(100, Math.round((ms.lifetime_classes / Math.max(1, ms.next_milestone.classes_required)) * 100))}%`,
-                            backgroundColor: ALMA.berry,
+                            backgroundColor: COLOR.ink,
                           }}
                         />
                       </div>
@@ -258,23 +258,23 @@ const Dashboard = () => {
         {/* ── Membresía + wallet: pieza editorial y fila secundaria ── */}
         <Section title="Tu cuenta">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-            <div className="lg:col-span-7 rounded-3xl p-5 sm:p-6" style={{ backgroundColor: ALMA.blush }}>
+            <div className="lg:col-span-7 rounded-3xl p-5 sm:p-6" style={{ backgroundColor: COLOR.sunken }}>
               <div className="flex items-center justify-between gap-3 mb-3">
-                <span className="text-[0.72rem] font-medium uppercase tracking-[0.24em]" style={{ color: ALMA.berry }}>
+                <span className="text-[0.72rem] font-medium uppercase tracking-[0.24em]" style={{ color: COLOR.accentStrong }}>
                   Membresía
                 </span>
                 {!membershipError && membership && classLimit !== null && (
-                  <Tag tint="olive">Activa</Tag>
+                  <Tag tint="success">Activa</Tag>
                 )}
               </div>
               {loadingMembership ? (
                 <SkeletonRow height={120} />
               ) : membershipError ? (
                 <>
-                  <h3 className="font-display leading-tight" style={{ color: ALMA.ink, fontSize: "1.25rem" }}>
+                  <h3 className="font-display leading-tight" style={{ color: COLOR.ink, fontSize: "1.25rem" }}>
                     No pudimos cargar tu membresía
                   </h3>
-                  <p className="mt-2 text-[0.92rem] leading-[1.6]" style={{ color: ALMA.ink, opacity: 0.65 }}>
+                  <p className="mt-2 text-[0.92rem] leading-[1.6]" style={{ color: COLOR.ink, opacity: 0.65 }}>
                     Revisa tu conexión y vuelve a intentarlo.
                   </p>
                   <div className="mt-5">
@@ -283,7 +283,7 @@ const Dashboard = () => {
                 </>
               ) : membership ? (
                 <>
-                  <h3 className="font-display leading-tight" style={{ color: ALMA.ink, fontSize: "clamp(1.45rem, 2.2vw, 1.8rem)" }}>
+                  <h3 className="font-display leading-tight" style={{ color: COLOR.ink, fontSize: "clamp(1.45rem, 2.2vw, 1.8rem)" }}>
                     {planName}
                   </h3>
                   <div className="mt-4">
@@ -305,10 +305,10 @@ const Dashboard = () => {
                 </>
               ) : (
                 <>
-                  <h3 className="font-display leading-tight" style={{ color: ALMA.ink, fontSize: "clamp(1.45rem, 2.2vw, 1.8rem)" }}>
+                  <h3 className="font-display leading-tight" style={{ color: COLOR.ink, fontSize: "clamp(1.45rem, 2.2vw, 1.8rem)" }}>
                     Sin paquete activo
                   </h3>
-                  <p className="mt-2 text-[0.92rem] leading-[1.6]" style={{ color: ALMA.ink, opacity: 0.65 }}>
+                  <p className="mt-2 text-[0.92rem] leading-[1.6]" style={{ color: COLOR.ink, opacity: 0.65 }}>
                     Cuando actives un paquete, cada clase que tomas cuenta para tu constancia y reservas en un tap.
                   </p>
                   <div className="mt-5">
@@ -321,13 +321,13 @@ const Dashboard = () => {
             {walletError ? (
               <div
                 className="lg:col-span-5 rounded-3xl p-5 sm:p-6 flex flex-col justify-between gap-5"
-                style={{ backgroundColor: ALMA.cream, border: `1px solid ${ALMA.border}` }}
+                style={{ backgroundColor: COLOR.canvas, border: `1px solid ${COLOR.line}` }}
               >
                 <div>
-                  <span className="text-[0.72rem] font-medium uppercase tracking-[0.24em]" style={{ color: ALMA.berry }}>
+                  <span className="text-[0.72rem] font-medium uppercase tracking-[0.24em]" style={{ color: COLOR.accentStrong }}>
                     Wallet
                   </span>
-                  <p className="mt-2 text-[0.92rem] leading-[1.6]" style={{ color: ALMA.ink, opacity: 0.65 }}>
+                  <p className="mt-2 text-[0.92rem] leading-[1.6]" style={{ color: COLOR.ink, opacity: 0.65 }}>
                     No pudimos cargar tus puntos.
                   </p>
                 </div>
@@ -340,10 +340,10 @@ const Dashboard = () => {
                 to="/app/wallet"
                 data-lift
                 className="lg:col-span-5 rounded-3xl p-5 sm:p-6 no-underline flex flex-col justify-between gap-5"
-                style={{ backgroundColor: ALMA.cream, border: `1px solid ${ALMA.border}`, color: ALMA.ink }}
+                style={{ backgroundColor: COLOR.canvas, border: `1px solid ${COLOR.line}`, color: COLOR.ink }}
               >
                 <div>
-                  <span className="text-[0.72rem] font-medium uppercase tracking-[0.24em]" style={{ color: ALMA.berry }}>
+                  <span className="text-[0.72rem] font-medium uppercase tracking-[0.24em]" style={{ color: COLOR.accentStrong }}>
                     Wallet
                   </span>
                   {loadingWallet ? (
@@ -353,18 +353,18 @@ const Dashboard = () => {
                   ) : (
                     <div
                       className="mt-3 grid grid-cols-[1fr_auto] items-baseline gap-4 py-2.5"
-                      style={{ borderTop: `1px solid ${ALMA.border}` }}
+                      style={{ borderTop: `1px solid ${COLOR.line}` }}
                     >
-                      <span className="text-[0.72rem] uppercase tracking-[0.18em]" style={{ color: ALMA.ink, opacity: 0.6 }}>
+                      <span className="text-[0.72rem] uppercase tracking-[0.18em]" style={{ color: COLOR.ink, opacity: 0.6 }}>
                         Puntos
                       </span>
-                      <span className="nums font-display text-2xl leading-none" style={{ color: ALMA.ink }}>
+                      <span className="nums font-display text-2xl leading-none" style={{ color: COLOR.ink }}>
                         {walletPoints}
                       </span>
                     </div>
                   )}
                 </div>
-                <div className="flex items-center justify-between text-[0.74rem]" style={{ color: ALMA.berry }}>
+                <div className="flex items-center justify-between text-[0.74rem]" style={{ color: COLOR.accentStrong }}>
                   <span className="uppercase tracking-[0.18em]">Ver recompensas</span>
                   <WalletIcon size={16} strokeWidth={1.8} />
                 </div>
@@ -375,14 +375,14 @@ const Dashboard = () => {
 
         {/* ── Próximas clases (si hay más de la destacada) ── */}
         {!loadingBookings && !bookingsError && upcoming.length > 1 && (
-          <Section title="También en tu agenda" trailing={<Link to="/app/bookings" className="no-underline" style={{ color: ALMA.berry }}>Ver todas</Link>}>
+          <Section title="También en tu agenda" trailing={<Link to="/app/bookings" className="no-underline" style={{ color: COLOR.accentStrong }}>Ver todas</Link>}>
             <ListGroup>
               {upcoming.slice(1).map((b) => (
                 <ListRow
                   key={b.id}
                   to="/app/bookings"
                   icon={<CalendarDays size={17} strokeWidth={1.7} />}
-                  iconTint="berry"
+                  iconTint="accent"
                   title={b.class_type_name ?? "Clase"}
                   description={
                     <>
@@ -392,9 +392,9 @@ const Dashboard = () => {
                   }
                   trailing={
                     b.status === "waitlist" ? (
-                      <Tag tint="berry">En espera</Tag>
+                      <Tag tint="accent">En espera</Tag>
                     ) : (
-                      <Tag tint="olive">Confirmada</Tag>
+                      <Tag tint="success">Confirmada</Tag>
                     )
                   }
                 />
@@ -421,7 +421,7 @@ const Dashboard = () => {
             <ListRow
               to="/app/bookings"
               icon={<ClipboardList size={17} strokeWidth={1.7} />}
-              iconTint="berry"
+              iconTint="accent"
               title="Mis reservas"
               description="Próximas y pasadas"
             />
@@ -429,7 +429,7 @@ const Dashboard = () => {
               <ListRow
                 to="/app/wallet/rewards"
                 icon={<Award size={17} strokeWidth={1.7} />}
-                iconTint="berry"
+                iconTint="accent"
                 title="Recompensas"
                 description="Canjea tus puntos"
               />
@@ -437,14 +437,14 @@ const Dashboard = () => {
             <ListRow
               to="/app/orders"
               icon={<ShoppingBag size={17} strokeWidth={1.7} />}
-              iconTint="berry"
+              iconTint="accent"
               title="Mis compras"
               description="Tus pagos y paquetes"
             />
           </ListGroup>
         </Section>
 
-        <p className="mt-12 lg:mt-16 text-[0.74rem]" style={{ color: ALMA.ink, opacity: 0.45 }}>
+        <p className="mt-12 lg:mt-16 text-[0.74rem]" style={{ color: COLOR.ink, opacity: 0.45 }}>
           Buena clase, {firstName}.
         </p>
       </AppShell>

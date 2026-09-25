@@ -15,12 +15,12 @@ import {
   ErrorState,
   SkeletonRow,
   GhostButton,
-  ALMA,
 } from "@/components/app/AppShell";
 import {
   Bell, BellOff,
   CalendarCheck2, CreditCard, Info, Trophy, Sparkles, Coins, Gift,
 } from "lucide-react";
+import { COLOR } from "@/design/tokens";
 
 type Category =
   | "booking" | "membership" | "marketing"
@@ -128,7 +128,7 @@ const Notifications = () => {
                     asButton={!!n.link}
                     onClick={n.link ? () => navigate(n.link!) : undefined}
                     icon={CATEGORY_ICON[n.category] ?? <Bell size={17} strokeWidth={1.7} />}
-                    iconTint="berry"
+                    iconTint="accent"
                     title={
                       <span style={{ fontWeight: n.unread ? 600 : 500, opacity: n.unread ? 1 : 0.75 }}>
                         {n.title}
@@ -137,13 +137,13 @@ const Notifications = () => {
                     description={
                       <>
                         {n.body}
-                        <span className="nums" style={{ color: ALMA.ink, opacity: 0.4 }}> · {formatTime(n.time)}</span>
+                        <span className="nums" style={{ color: COLOR.ink, opacity: 0.4 }}> · {formatTime(n.time)}</span>
                       </>
                     }
                     trailing={n.unread ? (
                       <span
                         className="h-2 w-2 rounded-full"
-                        style={{ backgroundColor: ALMA.berry }}
+                        style={{ backgroundColor: COLOR.ink }}
                         aria-label="Sin leer"
                       />
                     ) : undefined}
@@ -165,7 +165,7 @@ const Notifications = () => {
           )}
         </Section>
 
-        <p className="mt-10 text-[0.74rem]" style={{ color: ALMA.ink, opacity: 0.45 }}>
+        <p className="mt-10 text-[0.74rem]" style={{ color: COLOR.ink, opacity: 0.45 }}>
           Configura cuáles avisos recibes desde Perfil, en Preferencias.
         </p>
       </AppShell>

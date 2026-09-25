@@ -13,7 +13,6 @@ import {
   PrimaryButton,
   SkeletonRow,
   ErrorState,
-  ALMA,
 } from "@/components/app/AppShell";
 import { InfoBanner } from "@/components/app/widgets";
 import { useToast } from "@/hooks/use-toast";
@@ -26,6 +25,7 @@ import {
   Copy,
   Check,
 } from "lucide-react";
+import { COLOR } from "@/design/tokens";
 
 /* Logos oficiales sin recolorear: la "G" de Google con sus colores
    oficiales y la manzana de Apple en blanco, ambos sobre el badge
@@ -80,7 +80,7 @@ const formatShortDate = (value?: string | null) => {
 };
 
 /* Hairline interna del pase drenched */
-const PASS_HAIRLINE = "1px solid rgba(250,249,246,0.14)";
+const PASS_HAIRLINE = `1px solid ${COLOR.onInverse}24`;
 
 const Wallet = () => {
   const { toast } = useToast();
@@ -222,31 +222,31 @@ const Wallet = () => {
             <article
               className="overflow-hidden rounded-[1.75rem]"
               style={{
-                backgroundColor: ALMA.inkDeep,
-                color: ALMA.cream,
-                boxShadow: "0 18px 48px -12px rgba(36,27,26,0.18)",
+                backgroundColor: COLOR.inverse,
+                color: COLOR.canvas,
+                boxShadow: `0 18px 48px -12px ${COLOR.ink}2e`,
               }}
             >
               {/* Wordmark + estado */}
               <header className="flex items-start justify-between gap-4 px-6 pb-5 pt-6 sm:px-7">
                 <div className="min-w-0">
-                  <p className="font-display text-[1.4rem] leading-none" style={{ color: ALMA.cream }}>
-                    Alma <span className="font-display-italic">Movement</span>
+                  <p className="font-display text-[1.4rem] leading-none" style={{ color: COLOR.canvas }}>
+                    Alma <span className="font-display">Movement</span>
                   </p>
                   <p
                     className="mt-2 text-[0.72rem] uppercase tracking-[0.22em]"
-                    style={{ color: ALMA.cream, opacity: 0.6 }}
+                    style={{ color: COLOR.canvas, opacity: 0.6 }}
                   >
                     Pase del estudio
                   </p>
                 </div>
                 <span
                   className="inline-flex shrink-0 items-center gap-1.5 pt-1 text-[0.72rem] font-medium uppercase tracking-[0.18em]"
-                  style={{ color: ALMA.cream, opacity: metrics.hasMembership ? 0.92 : 0.6 }}
+                  style={{ color: COLOR.canvas, opacity: metrics.hasMembership ? 0.92 : 0.6 }}
                 >
                   <span
                     className="inline-block h-1.5 w-1.5 rounded-full"
-                    style={{ backgroundColor: metrics.hasMembership ? ALMA.olive : "rgba(250,249,246,0.4)" }}
+                    style={{ backgroundColor: metrics.hasMembership ? COLOR.success : `${COLOR.onInverse}66` }}
                   />
                   {metrics.hasMembership ? "Activo" : "Sin paquete"}
                 </span>
@@ -254,16 +254,16 @@ const Wallet = () => {
 
               {/* Titular y plan */}
               <div className="px-6 py-5 sm:px-7" style={{ borderTop: PASS_HAIRLINE }}>
-                <p className="text-[0.72rem] uppercase tracking-[0.22em]" style={{ color: ALMA.cream, opacity: 0.55 }}>
+                <p className="text-[0.72rem] uppercase tracking-[0.22em]" style={{ color: COLOR.canvas, opacity: 0.55 }}>
                   Titular
                 </p>
                 <p
                   className="font-display mt-1.5 leading-tight"
-                  style={{ color: ALMA.cream, fontSize: "clamp(1.35rem, 4.5vw, 1.6rem)" }}
+                  style={{ color: COLOR.canvas, fontSize: "clamp(1.35rem, 4.5vw, 1.6rem)" }}
                 >
                   {wallet?.user_name || "Tu pase"}
                 </p>
-                <p className="mt-1 text-[0.84rem]" style={{ color: ALMA.cream, opacity: 0.7 }}>
+                <p className="mt-1 text-[0.84rem]" style={{ color: COLOR.canvas, opacity: 0.7 }}>
                   {metrics.planName}
                 </p>
               </div>
@@ -276,12 +276,12 @@ const Wallet = () => {
                     className="min-w-0 py-4"
                     style={i > 0 ? { borderLeft: PASS_HAIRLINE, paddingLeft: "1rem" } : undefined}
                   >
-                    <p className="text-[0.72rem] uppercase tracking-[0.18em]" style={{ color: ALMA.cream, opacity: 0.55 }}>
+                    <p className="text-[0.72rem] uppercase tracking-[0.18em]" style={{ color: COLOR.canvas, opacity: 0.55 }}>
                       {s.label}
                     </p>
                     <p
                       className="nums font-display mt-1.5 truncate leading-none"
-                      style={{ color: ALMA.cream, fontSize: "1.3rem" }}
+                      style={{ color: COLOR.canvas, fontSize: "1.3rem" }}
                     >
                       {s.value}
                     </p>
@@ -292,10 +292,10 @@ const Wallet = () => {
               {/* Próxima clase como dato del pase, sin caja anidada */}
               {wallet?.next_booking && (
                 <div className="px-6 py-4 sm:px-7" style={{ borderTop: PASS_HAIRLINE }}>
-                  <p className="text-[0.72rem] uppercase tracking-[0.22em]" style={{ color: ALMA.cream, opacity: 0.55 }}>
+                  <p className="text-[0.72rem] uppercase tracking-[0.22em]" style={{ color: COLOR.canvas, opacity: 0.55 }}>
                     Próxima clase
                   </p>
-                  <p className="mt-1 truncate text-[0.92rem]" style={{ color: ALMA.cream }}>
+                  <p className="mt-1 truncate text-[0.92rem]" style={{ color: COLOR.canvas }}>
                     {wallet.next_booking.class_name || "Clase"}
                     <span className="nums" style={{ opacity: 0.7 }}>
                       {" "}· {formatShortDate(wallet.next_booking.date)}, {String(wallet.next_booking.start_time || "").slice(0, 5)}
@@ -308,24 +308,24 @@ const Wallet = () => {
               {wallet?.qr_code && (
                 <div
                   className="flex items-center gap-5 px-6 py-5 sm:px-7"
-                  style={{ backgroundColor: ALMA.cream, color: ALMA.ink }}
+                  style={{ backgroundColor: COLOR.canvas, color: COLOR.ink }}
                 >
                   <QRCodeSVG
                     value={wallet.qr_code}
                     size={96}
-                    bgColor={ALMA.cream}
-                    fgColor={ALMA.inkDeep}
+                    bgColor={COLOR.canvas}
+                    fgColor={COLOR.inverse}
                     className="shrink-0"
                   />
                   <div className="min-w-0">
                     <p
                       className="flex items-center gap-1.5 text-[0.72rem] font-medium uppercase tracking-[0.2em]"
-                      style={{ color: ALMA.berry }}
+                      style={{ color: COLOR.accentStrong }}
                     >
                       <ScanQrCode size={13} />
                       Check-in en recepción
                     </p>
-                    <p className="mt-1.5 text-[0.82rem] leading-[1.5]" style={{ color: ALMA.ink, opacity: 0.65 }}>
+                    <p className="mt-1.5 text-[0.82rem] leading-[1.5]" style={{ color: COLOR.ink, opacity: 0.65 }}>
                       Muéstralo al llegar. Si te lo piden por chat, cópialo y mándalo.
                     </p>
                     <button
@@ -334,8 +334,8 @@ const Wallet = () => {
                       className="mt-3 inline-flex min-h-[44px] cursor-pointer items-center gap-2 rounded-full border-0 px-4 text-[0.74rem] font-medium uppercase tracking-[0.16em] transition-colors"
                       style={
                         codeCopied
-                          ? { backgroundColor: ALMA.olive, color: ALMA.cream }
-                          : { backgroundColor: ALMA.ink, color: ALMA.cream }
+                          ? { backgroundColor: COLOR.success, color: COLOR.canvas }
+                          : { backgroundColor: COLOR.ink, color: COLOR.canvas }
                       }
                     >
                       {codeCopied
@@ -355,7 +355,7 @@ const Wallet = () => {
             {gwLoading || gwRetrying ? (
               <div
                 className="flex min-h-[52px] items-center justify-center gap-3 rounded-full"
-                style={{ backgroundColor: ALMA.mist, color: ALMA.ink, opacity: 0.65 }}
+                style={{ backgroundColor: COLOR.sunken, color: COLOR.ink, opacity: 0.65 }}
               >
                 <RefreshCw size={15} className="animate-spin" />
                 <span className="text-[0.84rem]">Cargando Google Wallet…</span>
@@ -375,7 +375,7 @@ const Wallet = () => {
               <button
                 onClick={handleGoogleRetry}
                 className="flex min-h-[52px] cursor-pointer items-center justify-center gap-3 rounded-full bg-transparent transition-colors"
-                style={{ border: `1px dashed ${ALMA.sandstone}`, color: ALMA.ink, opacity: 0.75 }}
+                style={{ border: `1px dashed ${COLOR.lineStrong}`, color: COLOR.ink, opacity: 0.75 }}
               >
                 <span className="text-[0.84rem]">Reintentar Google Wallet</span>
                 <RefreshCw size={13} />
@@ -427,7 +427,7 @@ const Wallet = () => {
         {!isLoading && !isError && !metrics.hasMembership && (
           <Section>
             <InfoBanner
-              tone="stone"
+              tone="muted"
               title="Aún no activas un paquete."
               description="Compra uno y tu pase se activa automáticamente."
               action={<PrimaryButton size="sm" to="/app/checkout">Ver paquetes</PrimaryButton>}

@@ -55,11 +55,11 @@ const MEMBERSHIP_STATUS: Record<string, string> = {
 };
 
 const memStatusCls = (status: string) => {
-  if (status === "active") return "border-transparent bg-alma-olive/15 text-alma-olive hover:bg-alma-olive/15";
-  if (status === "paused") return "border-transparent bg-alma-oat text-alma-ink hover:bg-alma-oat";
+  if (status === "active") return "border-transparent bg-success/15 text-success hover:bg-success/15";
+  if (status === "paused") return "border-transparent bg-sunken text-ink hover:bg-sunken";
   if (status === "pending_activation" || status === "pending_payment")
-    return "border-alma-sandstone/70 bg-transparent text-alma-berry hover:bg-transparent";
-  return "border-transparent bg-alma-ink/10 text-alma-ink/60 hover:bg-alma-ink/10";
+    return "border-line-strong/70 bg-transparent text-ink hover:bg-transparent";
+  return "border-transparent bg-ink/10 text-ink/60 hover:bg-ink/10";
 };
 
 const BOOKING_STATUS: Record<string, string> = {
@@ -80,12 +80,12 @@ const PAYMENT_METHOD: Record<string, string> = {
 };
 
 // ── Clases compartidas (tema claro nativo) ─────────────────────────────────────
-const fieldCls = "bg-alma-canvas border-alma-sandstone/60 text-alma-ink placeholder:text-alma-ink/40";
-const outlineBtnCls = "border-alma-sandstone/70 bg-transparent text-alma-ink hover:bg-alma-mist hover:text-alma-ink";
-const primaryBtnCls = "bg-alma-ink-deep text-alma-canvas hover:bg-alma-ink";
-const headCls = "text-alma-ink/55 font-semibold text-xs uppercase tracking-wider";
+const fieldCls = "bg-canvas border-line-strong/60 text-ink placeholder:text-ink/40";
+const outlineBtnCls = "border-line-strong/70 bg-transparent text-ink hover:bg-sunken hover:text-ink";
+const primaryBtnCls = "bg-inverse text-canvas hover:bg-ink";
+const headCls = "text-ink/55 font-semibold text-xs uppercase tracking-wider";
 const quickActionCls =
-  "inline-flex items-center gap-1.5 rounded-full border border-alma-sandstone/70 px-3.5 py-2 text-xs font-medium text-alma-ink no-underline transition-colors hover:bg-alma-mist";
+  "inline-flex items-center gap-1.5 rounded-full border border-line-strong/70 px-3.5 py-2 text-xs font-medium text-ink no-underline transition-colors hover:bg-sunken";
 
 const EmptyBlock = ({ Icon, title, description }: {
   Icon: ComponentType<LucideProps>;
@@ -93,12 +93,12 @@ const EmptyBlock = ({ Icon, title, description }: {
   description: string;
 }) => (
   <div className="flex flex-col items-center gap-3 py-12 px-6 text-center">
-    <span className="grid h-12 w-12 place-items-center rounded-2xl bg-alma-oat text-alma-berry">
+    <span className="grid h-12 w-12 place-items-center rounded-2xl bg-sunken text-ink">
       <Icon size={20} strokeWidth={1.8} />
     </span>
     <div>
-      <p className="font-display text-lg text-alma-ink">{title}</p>
-      <p className="text-sm text-alma-ink/55 mt-1 max-w-[44ch]">{description}</p>
+      <p className="font-display text-lg text-ink">{title}</p>
+      <p className="text-sm text-ink/55 mt-1 max-w-[44ch]">{description}</p>
     </div>
   </div>
 );
@@ -109,12 +109,12 @@ const Pager = ({ page, setPage, total }: { page: number; setPage: (p: number) =>
   const pages = Math.ceil(total / PAGE_SIZE);
   if (pages <= 1) return null;
   return (
-    <div className="flex items-center justify-between border-t border-alma-hairline px-4 py-2">
-      <span className="text-xs text-alma-ink/55 nums">Página {page + 1} de {pages} · {total} filas</span>
+    <div className="flex items-center justify-between border-t border-line px-4 py-2">
+      <span className="text-xs text-ink/55 nums">Página {page + 1} de {pages} · {total} filas</span>
       <div className="flex gap-1">
         <Button
           variant="ghost" size="icon"
-          className="h-8 w-8 text-alma-ink/70 hover:bg-alma-mist hover:text-alma-ink"
+          className="h-8 w-8 text-ink/70 hover:bg-sunken hover:text-ink"
           disabled={page === 0}
           onClick={() => setPage(page - 1)}
           aria-label="Página anterior"
@@ -123,7 +123,7 @@ const Pager = ({ page, setPage, total }: { page: number; setPage: (p: number) =>
         </Button>
         <Button
           variant="ghost" size="icon"
-          className="h-8 w-8 text-alma-ink/70 hover:bg-alma-mist hover:text-alma-ink"
+          className="h-8 w-8 text-ink/70 hover:bg-sunken hover:text-ink"
           disabled={page >= pages - 1}
           onClick={() => setPage(page + 1)}
           aria-label="Página siguiente"
@@ -136,7 +136,7 @@ const Pager = ({ page, setPage, total }: { page: number; setPage: (p: number) =>
 };
 
 const TableCard = ({ children }: { children: ReactNode }) => (
-  <div className="rounded-xl border border-alma-hairline overflow-hidden bg-alma-canvas">{children}</div>
+  <div className="rounded-xl border border-line overflow-hidden bg-canvas">{children}</div>
 );
 
 const ClientDetail = () => {
@@ -286,7 +286,7 @@ const ClientDetail = () => {
         <div className="admin-page max-w-5xl">
           <Link
             to="/admin/clients"
-            className="mb-4 inline-flex items-center gap-1.5 text-xs font-medium uppercase tracking-[0.14em] text-alma-ink/55 no-underline transition-colors hover:text-alma-ink"
+            className="mb-4 inline-flex items-center gap-1.5 text-xs font-medium uppercase tracking-[0.14em] text-ink/55 no-underline transition-colors hover:text-ink"
           >
             <ArrowLeft size={13} /> Clientas
           </Link>
@@ -301,10 +301,10 @@ const ClientDetail = () => {
               {/* ── Header de expediente ── */}
               {isLoading ? (
                 <div className="mb-7 flex items-center gap-4">
-                  <Skeleton className="h-14 w-14 rounded-full bg-alma-oat/60" />
+                  <Skeleton className="h-14 w-14 rounded-full bg-sunken/60" />
                   <div className="space-y-2">
-                    <Skeleton className="h-7 w-56 bg-alma-oat/60" />
-                    <Skeleton className="h-4 w-40 bg-alma-oat/60" />
+                    <Skeleton className="h-7 w-56 bg-sunken/60" />
+                    <Skeleton className="h-4 w-40 bg-sunken/60" />
                   </div>
                 </div>
               ) : (
@@ -314,12 +314,12 @@ const ClientDetail = () => {
                       {u?.photoUrl ? (
                         <ZoomableImage src={u.photoUrl} alt={u.displayName ?? "Cliente"} overlayLabel="Ver" className="h-14 w-14 overflow-hidden rounded-full" />
                       ) : (
-                        <span className="grid h-14 w-14 place-items-center rounded-full bg-alma-oat font-display text-lg text-alma-ink">
+                        <span className="grid h-14 w-14 place-items-center rounded-full bg-sunken font-display text-lg text-ink">
                           {initialsOf(u?.displayName)}
                         </span>
                       )}
                       <button type="button" onClick={() => photoInputRef.current?.click()}
-                        className="absolute -bottom-1 -right-1 grid h-6 w-6 place-items-center rounded-full bg-alma-ink text-alma-canvas shadow-sm hover:bg-alma-ink-deep"
+                        className="absolute -bottom-1 -right-1 grid h-6 w-6 place-items-center rounded-full bg-ink text-canvas shadow-sm hover:bg-inverse"
                         aria-label="Cambiar foto">
                         <Camera size={12} />
                       </button>
@@ -327,8 +327,8 @@ const ClientDetail = () => {
                         onChange={(e) => { const f = e.target.files?.[0]; if (f) photoMutation.mutate(f); e.target.value = ""; }} />
                     </div>
                     <div>
-                      <h1 className="admin-title font-display text-alma-ink">{u?.displayName}</h1>
-                      <p className="mt-0.5 text-sm text-alma-ink/55">
+                      <h1 className="admin-title font-display text-ink">{u?.displayName}</h1>
+                      <p className="mt-0.5 text-sm text-ink/55">
                         {u?.email}
                         {u?.phone ? <span className="nums"> · {u.phone}</span> : null}
                       </p>
@@ -336,19 +336,19 @@ const ClientDetail = () => {
                         {activeMem ? (
                           <>
                             <Badge className={memStatusCls("active")}>{activeMem.planName} · Activa</Badge>
-                            <Badge variant="outline" className="border-alma-sandstone/70 text-alma-ink hover:bg-transparent">
+                            <Badge variant="outline" className="border-line-strong/70 text-ink hover:bg-transparent">
                               {isUnlimited(activeMem.classesRemaining)
                                 ? "Clases ilimitadas"
                                 : <><span className="nums">{activeMem.classesRemaining}</span>&nbsp;clases restantes</>}
                             </Badge>
                             {activeMem.classCategory === "mixto" && !isUnlimited(activeMem.classesRemaining) && (
-                              <Badge variant="outline" className="border-alma-sandstone/70 text-alma-ink hover:bg-transparent">
+                              <Badge variant="outline" className="border-line-strong/70 text-ink hover:bg-transparent">
                                 Studio&nbsp;<span className="nums">{activeMem.studioRemaining ?? 0}</span>&nbsp;· R/T&nbsp;<span className="nums">{activeMem.rtRemaining ?? 0}</span>
                               </Badge>
                             )}
                           </>
                         ) : (
-                          <Badge variant="outline" className="border-alma-hairline text-alma-ink/55 hover:bg-transparent">
+                          <Badge variant="outline" className="border-line text-ink/55 hover:bg-transparent">
                             Sin membresía activa
                           </Badge>
                         )}
@@ -385,48 +385,48 @@ const ClientDetail = () => {
 
                 {/* ── Perfil ── */}
                 <TabsContent value="profile" className="mt-4">
-                  {isLoading ? <Skeleton className="h-40 w-full bg-alma-oat/60" /> : (
+                  {isLoading ? <Skeleton className="h-40 w-full bg-sunken/60" /> : (
                     <div className="space-y-5">
                       <div className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
-                        <div className="text-alma-ink/70">
-                          <span className="font-medium text-alma-ink">Fecha de nacimiento:</span>{" "}
+                        <div className="text-ink/70">
+                          <span className="font-medium text-ink">Fecha de nacimiento:</span>{" "}
                           <span className="nums">{fmtBirthdate(u?.dateOfBirth)}</span>
                         </div>
-                        <div className="text-alma-ink/70">
-                          <span className="font-medium text-alma-ink">Emergencia:</span>{" "}
+                        <div className="text-ink/70">
+                          <span className="font-medium text-ink">Emergencia:</span>{" "}
                           {u?.emergencyContactName ?? "—"} <span className="nums">{u?.emergencyContactPhone ?? ""}</span>
                         </div>
-                        <div className="col-span-full text-alma-ink/70">
-                          <span className="font-medium text-alma-ink">Notas de salud:</span> {u?.healthNotes ?? "—"}
+                        <div className="col-span-full text-ink/70">
+                          <span className="font-medium text-ink">Notas de salud:</span> {u?.healthNotes ?? "—"}
                         </div>
                       </div>
 
-                      <div className="rounded-xl border border-alma-hairline bg-alma-mist p-4 space-y-3">
-                        <h3 className="text-sm font-semibold text-alma-ink">Cuestionario de ingreso</h3>
+                      <div className="rounded-xl border border-line bg-sunken p-4 space-y-3">
+                        <h3 className="text-sm font-semibold text-ink">Cuestionario de ingreso</h3>
                         {u?.onboardingCompleted === false ? (
-                          <p className="text-sm text-alma-ink/55">
+                          <p className="text-sm text-ink/55">
                             La clienta aún no ha respondido el cuestionario.
                           </p>
                         ) : (
-                          <div className="space-y-3 text-sm text-alma-ink/70">
+                          <div className="space-y-3 text-sm text-ink/70">
                             <div className="flex items-center gap-2">
-                              <span className="font-medium text-alma-ink">¿Tiene lesión o condición?</span>
+                              <span className="font-medium text-ink">¿Tiene lesión o condición?</span>
                               {u?.hasInjury == null ? (
-                                <span className="text-alma-ink/45">—</span>
+                                <span className="text-ink/45">—</span>
                               ) : u?.hasInjury ? (
                                 <Badge variant="destructive">Sí, revisar</Badge>
                               ) : (
-                                <Badge variant="outline" className="border-alma-sandstone/60 text-alma-ink/70 hover:bg-transparent">No</Badge>
+                                <Badge variant="outline" className="border-line-strong/60 text-ink/70 hover:bg-transparent">No</Badge>
                               )}
                             </div>
                             {u?.hasInjury && (
                               <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3">
                                 <p className="mb-1 text-xs font-medium text-destructive">Lesión / condición reportada</p>
-                                <p className="whitespace-pre-wrap text-alma-ink">{u?.injuryDetails || "Sin detalle."}</p>
+                                <p className="whitespace-pre-wrap text-ink">{u?.injuryDetails || "Sin detalle."}</p>
                               </div>
                             )}
                             <div>
-                              <span className="font-medium text-alma-ink">¿Había practicado pilates antes?</span>{" "}
+                              <span className="font-medium text-ink">¿Había practicado pilates antes?</span>{" "}
                               {u?.practicedBarreBefore == null
                                 ? "—"
                                 : u?.practicedBarreBefore
@@ -456,7 +456,7 @@ const ClientDetail = () => {
                     <TableCard>
                       <Table>
                         <TableHeader>
-                          <TableRow className="border-alma-hairline hover:bg-transparent">
+                          <TableRow className="border-line hover:bg-transparent">
                             <TableHead className={headCls}>Plan</TableHead>
                             <TableHead className={headCls}>Estado</TableHead>
                             <TableHead className={headCls}>Inicio</TableHead>
@@ -467,20 +467,20 @@ const ClientDetail = () => {
                         </TableHeader>
                         <TableBody>
                           {membershipRows.slice(memPage * PAGE_SIZE, (memPage + 1) * PAGE_SIZE).map((m: any) => (
-                            <TableRow key={m.id} className="border-alma-hairline hover:bg-alma-mist">
-                              <TableCell className="font-medium text-alma-ink">{m.planName ?? m.planId}</TableCell>
+                            <TableRow key={m.id} className="border-line hover:bg-sunken">
+                              <TableCell className="font-medium text-ink">{m.planName ?? m.planId}</TableCell>
                               <TableCell>
                                 <Badge className={memStatusCls(m.status)}>{MEMBERSHIP_STATUS[m.status] ?? m.status}</Badge>
                               </TableCell>
-                              <TableCell className="text-alma-ink/70 nums">{m.startDate ? formatDate(m.startDate) : "—"}</TableCell>
-                              <TableCell className="text-alma-ink/70 nums">{m.endDate ? formatDate(m.endDate) : "—"}</TableCell>
-                              <TableCell className="text-alma-ink/70">
+                              <TableCell className="text-ink/70 nums">{m.startDate ? formatDate(m.startDate) : "—"}</TableCell>
+                              <TableCell className="text-ink/70 nums">{m.endDate ? formatDate(m.endDate) : "—"}</TableCell>
+                              <TableCell className="text-ink/70">
                                 {isUnlimited(m.classesRemaining) ? "Ilimitadas" : <span className="nums">{m.classesRemaining}</span>}
                               </TableCell>
                               <TableCell className="text-right">
                                 <Button
                                   variant="ghost" size="sm"
-                                  className="h-7 text-xs text-alma-ink/70 hover:bg-alma-oat/60 hover:text-alma-ink"
+                                  className="h-7 text-xs text-ink/70 hover:bg-sunken/60 hover:text-ink"
                                   onClick={() => openEditMem(m)}
                                 >
                                   <Pencil size={12} className="mr-1" /> Editar
@@ -511,7 +511,7 @@ const ClientDetail = () => {
                     <TableCard>
                       <Table>
                         <TableHeader>
-                          <TableRow className="border-alma-hairline hover:bg-transparent">
+                          <TableRow className="border-line hover:bg-transparent">
                             <TableHead className={headCls}>Clase</TableHead>
                             <TableHead className={headCls}>Fecha</TableHead>
                             <TableHead className={headCls}>Estado</TableHead>
@@ -519,11 +519,11 @@ const ClientDetail = () => {
                         </TableHeader>
                         <TableBody>
                           {bookingRows.slice(bookPage * PAGE_SIZE, (bookPage + 1) * PAGE_SIZE).map((b: any) => (
-                            <TableRow key={b.id} className="border-alma-hairline hover:bg-alma-mist">
-                              <TableCell className="font-medium text-alma-ink">{b.className ?? b.classId}</TableCell>
-                              <TableCell className="text-alma-ink/70 nums">{b.startTime ? formatDateTime(b.startTime) : "—"}</TableCell>
+                            <TableRow key={b.id} className="border-line hover:bg-sunken">
+                              <TableCell className="font-medium text-ink">{b.className ?? b.classId}</TableCell>
+                              <TableCell className="text-ink/70 nums">{b.startTime ? formatDateTime(b.startTime) : "—"}</TableCell>
                               <TableCell>
-                                <Badge variant="outline" className="border-alma-sandstone/60 text-alma-ink/70 hover:bg-transparent">
+                                <Badge variant="outline" className="border-line-strong/60 text-ink/70 hover:bg-transparent">
                                   {BOOKING_STATUS[b.status] ?? b.status}
                                 </Badge>
                               </TableCell>
@@ -552,7 +552,7 @@ const ClientDetail = () => {
                     <TableCard>
                       <Table>
                         <TableHeader>
-                          <TableRow className="border-alma-hairline hover:bg-transparent">
+                          <TableRow className="border-line hover:bg-transparent">
                             <TableHead className={headCls}>Monto</TableHead>
                             <TableHead className={headCls}>Plan</TableHead>
                             <TableHead className={headCls}>Método</TableHead>
@@ -563,13 +563,13 @@ const ClientDetail = () => {
                           {paymentRows.slice(payPage * PAGE_SIZE, (payPage + 1) * PAGE_SIZE).map((p: any) => {
                             const createdAt = p.createdAt ?? p.created_at;
                             return (
-                              <TableRow key={p.id} className="border-alma-hairline hover:bg-alma-mist">
-                                <TableCell className="font-medium text-alma-ink nums">
+                              <TableRow key={p.id} className="border-line hover:bg-sunken">
+                                <TableCell className="font-medium text-ink nums">
                                   {formatMXN(Number(p.total_amount ?? p.amount ?? 0))}
                                 </TableCell>
-                                <TableCell className="text-alma-ink/70">{p.planName ?? p.plan_name ?? "—"}</TableCell>
-                                <TableCell className="text-alma-ink/70">{PAYMENT_METHOD[p.method] ?? p.method ?? "—"}</TableCell>
-                                <TableCell className="text-alma-ink/70 nums">{createdAt ? formatDate(createdAt) : "—"}</TableCell>
+                                <TableCell className="text-ink/70">{p.planName ?? p.plan_name ?? "—"}</TableCell>
+                                <TableCell className="text-ink/70">{PAYMENT_METHOD[p.method] ?? p.method ?? "—"}</TableCell>
+                                <TableCell className="text-ink/70 nums">{createdAt ? formatDate(createdAt) : "—"}</TableCell>
                               </TableRow>
                             );
                           })}
@@ -588,8 +588,8 @@ const ClientDetail = () => {
                     <>
                       <div className="flex flex-wrap items-end gap-4">
                         <div>
-                          <div className="font-display text-4xl text-alma-ink nums">{loyaltyBalance}</div>
-                          <p className="text-sm text-alma-ink/55">puntos acumulados</p>
+                          <div className="font-display text-4xl text-ink nums">{loyaltyBalance}</div>
+                          <p className="text-sm text-ink/55">puntos acumulados</p>
                         </div>
                         <Button
                           size="sm"
@@ -602,10 +602,10 @@ const ClientDetail = () => {
                           {recalcMutation.isPending ? "Recalculando…" : "Recalcular desde membresías"}
                         </Button>
                       </div>
-                      <div className="max-w-sm space-y-3 rounded-xl border border-alma-hairline bg-alma-mist p-4">
-                        <p className="text-sm font-semibold text-alma-ink">Ajustar puntos manualmente</p>
+                      <div className="max-w-sm space-y-3 rounded-xl border border-line bg-sunken p-4">
+                        <p className="text-sm font-semibold text-ink">Ajustar puntos manualmente</p>
                         <div className="space-y-1">
-                          <Label className="text-xs text-alma-ink/70">Puntos (número positivo)</Label>
+                          <Label className="text-xs text-ink/70">Puntos (número positivo)</Label>
                           <Input
                             type="number"
                             min="1"
@@ -616,7 +616,7 @@ const ClientDetail = () => {
                           />
                         </div>
                         <div className="space-y-1">
-                          <Label className="text-xs text-alma-ink/70">Motivo</Label>
+                          <Label className="text-xs text-ink/70">Motivo</Label>
                           <Input
                             className={fieldCls}
                             placeholder="Ej: Membresía no contabilizada"
@@ -653,20 +653,20 @@ const ClientDetail = () => {
                   {waiverError ? (
                     <ErrorState title="No pudimos cargar la responsiva" onRetry={() => refetchWaiver()} />
                   ) : !waiver ? (
-                    <div className="rounded-xl border border-alma-hairline bg-alma-mist p-6 text-sm text-alma-ink/55">
+                    <div className="rounded-xl border border-line bg-sunken p-6 text-sm text-ink/55">
                       Esta clienta aún no ha firmado su responsiva. La firmará al reservar su primera clase.
                     </div>
                   ) : (
                     <div className="space-y-5">
-                      <div className="rounded-xl border border-alma-hairline bg-alma-mist p-5">
+                      <div className="rounded-xl border border-line bg-sunken p-5">
                         <div className="mb-3 flex items-center justify-between gap-3">
-                          <h3 className="text-base font-semibold text-alma-ink">Responsiva y consentimiento informado</h3>
+                          <h3 className="text-base font-semibold text-ink">Responsiva y consentimiento informado</h3>
                           <div className="flex items-center gap-2">
-                            <Badge className="border-transparent bg-alma-olive/15 text-alma-olive hover:bg-alma-olive/15">Firmada</Badge>
+                            <Badge className="border-transparent bg-success/15 text-success hover:bg-success/15">Firmada</Badge>
                             <Button
                               size="sm"
                               variant="outline"
-                              className="border-alma-sandstone/70 bg-transparent text-alma-ink hover:bg-alma-canvas"
+                              className="border-line-strong/70 bg-transparent text-ink hover:bg-canvas"
                               onClick={async () => {
                                 try {
                                   const res = await api.get(`/admin/users/${id}/waiver/pdf`, { responseType: "blob" });
@@ -690,20 +690,20 @@ const ClientDetail = () => {
                             ["Uso de imagen", waiver.image_consent ? "Sí autorizado" : "No autorizado"],
                             ["Firmada el", waiver.signed_at ? formatDate(waiver.signed_at) : "—"],
                           ].map(([k, v]) => (
-                            <div key={k} className="flex justify-between gap-4 border-b border-alma-hairline/60 py-1.5">
-                              <dt className="text-alma-ink/55">{k}</dt>
-                              <dd className="text-right text-alma-ink nums">{v}</dd>
+                            <div key={k} className="flex justify-between gap-4 border-b border-line/60 py-1.5">
+                              <dt className="text-ink/55">{k}</dt>
+                              <dd className="text-right text-ink nums">{v}</dd>
                             </div>
                           ))}
                         </dl>
                       </div>
                       {waiver.signature_data && (
-                        <div className="rounded-xl border border-alma-hairline bg-alma-mist p-5">
-                          <p className="mb-3 text-xs uppercase tracking-wider text-alma-ink/55">Firma</p>
+                        <div className="rounded-xl border border-line bg-sunken p-5">
+                          <p className="mb-3 text-xs uppercase tracking-wider text-ink/55">Firma</p>
                           <img
                             src={waiver.signature_data}
                             alt="Firma de la clienta"
-                            className="max-h-32 rounded-lg border border-alma-hairline bg-alma-canvas p-2"
+                            className="max-h-32 rounded-lg border border-line bg-canvas p-2"
                           />
                         </div>
                       )}
@@ -717,31 +717,31 @@ const ClientDetail = () => {
 
         {/* ── Editar membresía (créditos / estado / vencimiento) ── */}
         <Dialog open={!!editMem} onOpenChange={(v) => !v && setEditMem(null)}>
-          <DialogContent className="max-w-md bg-alma-canvas border-alma-hairline text-alma-ink">
+          <DialogContent className="max-w-md bg-canvas border-line text-ink">
             <DialogHeader>
-              <DialogTitle className="font-display text-alma-ink">Editar membresía</DialogTitle>
+              <DialogTitle className="font-display text-ink">Editar membresía</DialogTitle>
             </DialogHeader>
             {editMem && (
               <div className="space-y-4">
-                <p className="text-sm text-alma-ink/55">
+                <p className="text-sm text-ink/55">
                   {editMem.planName ?? editMem.planId}
                 </p>
 
-                <div className="flex items-center justify-between gap-4 rounded-xl border border-alma-hairline bg-alma-mist px-4 py-3">
+                <div className="flex items-center justify-between gap-4 rounded-xl border border-line bg-sunken px-4 py-3">
                   <div>
-                    <Label htmlFor="mem-unlimited" className="text-sm font-medium text-alma-ink">Clases ilimitadas</Label>
-                    <p className="text-xs text-alma-ink/55">La clienta reserva sin tope de créditos.</p>
+                    <Label htmlFor="mem-unlimited" className="text-sm font-medium text-ink">Clases ilimitadas</Label>
+                    <p className="text-xs text-ink/55">La clienta reserva sin tope de créditos.</p>
                   </div>
                   <Switch
                     id="mem-unlimited"
                     checked={editUnlimited}
                     onCheckedChange={setEditUnlimited}
-                    className="data-[state=checked]:bg-alma-ink data-[state=unchecked]:bg-alma-sandstone/60"
+                    className="data-[state=checked]:bg-ink data-[state=unchecked]:bg-line/60"
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <Label className="text-xs text-alma-ink/70">Clases restantes</Label>
+                  <Label className="text-xs text-ink/70">Clases restantes</Label>
                   <Input
                     type="number"
                     min="0"
@@ -752,18 +752,18 @@ const ClientDetail = () => {
                     value={editUnlimited ? "" : editCredits}
                     onChange={(e) => setEditCredits(e.target.value)}
                   />
-                  <p className="text-xs text-alma-ink/50">
+                  <p className="text-xs text-ink/50">
                     Ajusta los créditos de la clienta (sirve para paquetes por semana o por mes).
                   </p>
                 </div>
 
                 <div className="space-y-1">
-                  <Label className="text-xs text-alma-ink/70">Estado</Label>
+                  <Label className="text-xs text-ink/70">Estado</Label>
                   <Select value={editStatus} onValueChange={setEditStatus}>
                     <SelectTrigger className={fieldCls}><SelectValue /></SelectTrigger>
-                    <SelectContent className="bg-alma-canvas border-alma-hairline text-alma-ink">
+                    <SelectContent className="bg-canvas border-line text-ink">
                       {Object.entries(MEMBERSHIP_STATUS).map(([v, label]) => (
-                        <SelectItem key={v} value={v} className="text-alma-ink focus:bg-alma-mist">{label}</SelectItem>
+                        <SelectItem key={v} value={v} className="text-ink focus:bg-sunken">{label}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -771,7 +771,7 @@ const ClientDetail = () => {
 
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <Label className="text-xs text-alma-ink/70">Inicio</Label>
+                    <Label className="text-xs text-ink/70">Inicio</Label>
                     <Input
                       type="date"
                       className={cn(fieldCls, "nums")}
@@ -780,7 +780,7 @@ const ClientDetail = () => {
                     />
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-xs text-alma-ink/70">Vence</Label>
+                    <Label className="text-xs text-ink/70">Vence</Label>
                     <Input
                       type="date"
                       className={cn(fieldCls, "nums")}
@@ -790,7 +790,7 @@ const ClientDetail = () => {
                   </div>
                 </div>
                 {editMem?.durationDays && editStartDate && (
-                  <p className="text-xs text-alma-ink/50">
+                  <p className="text-xs text-ink/50">
                     Vencimiento calculado automáticamente ({editMem.durationDays} días desde el inicio).
                     Puedes ajustarlo manualmente.
                   </p>

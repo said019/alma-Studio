@@ -56,16 +56,16 @@ type CampaignLog = {
 };
 
 const STATUS_PILL: Record<Campaign["status"], { label: string; className: string }> = {
-  queued: { label: "En cola", className: "border-alma-hairline bg-alma-mist text-alma-ink/70" },
-  sending: { label: "Enviando", className: "border-alma-sandstone bg-alma-oat text-alma-ink" },
-  completed: { label: "Completada", className: "border-alma-olive/40 bg-alma-olive/10 text-alma-olive" },
+  queued: { label: "En cola", className: "border-line bg-sunken text-ink/70" },
+  sending: { label: "Enviando", className: "border-line-strong bg-sunken text-ink" },
+  completed: { label: "Completada", className: "border-success/40 bg-success/10 text-success" },
   failed: { label: "Falló", className: "border-destructive/40 bg-destructive/10 text-destructive" },
 };
 
 const LOG_PILL: Record<CampaignLog["status"], { label: string; className: string; Icon: any }> = {
-  pending: { label: "Pendiente", className: "text-alma-ink/40", Icon: Loader2 },
-  sent: { label: "Enviado", className: "text-alma-olive", Icon: CheckCircle2 },
-  skipped: { label: "Omitido", className: "text-alma-ink/55", Icon: MinusCircle },
+  pending: { label: "Pendiente", className: "text-ink/40", Icon: Loader2 },
+  sent: { label: "Enviado", className: "text-success", Icon: CheckCircle2 },
+  skipped: { label: "Omitido", className: "text-ink/55", Icon: MinusCircle },
   failed: { label: "Falló", className: "text-destructive", Icon: XCircle },
 };
 
@@ -172,14 +172,14 @@ const CampaignsPage = () => {
         <div className="admin-page max-w-5xl space-y-6">
           {/* ── Header ── */}
           <div>
-            <h1 className="admin-title font-display leading-none text-alma-ink">Campañas WhatsApp</h1>
-            <p className="mt-1.5 text-sm text-alma-ink/55">
+            <h1 className="admin-title font-display leading-none text-ink">Campañas WhatsApp</h1>
+            <p className="mt-1.5 text-sm text-ink/55">
               Manda promos a un segmento de alumnas. Respeta opt-out y tarda ~1.3s por mensaje.
             </p>
           </div>
 
           {/* ── Compose ── */}
-          <div className="space-y-4 rounded-2xl border border-alma-hairline bg-alma-mist p-5">
+          <div className="space-y-4 rounded-2xl border border-line bg-sunken p-5">
             {segmentsError ? (
               <ErrorState
                 title="No pudimos cargar los segmentos"
@@ -189,23 +189,23 @@ const CampaignsPage = () => {
             ) : (
               <>
                 <div>
-                  <Label className="mb-1.5 block text-[0.72rem] uppercase tracking-widest text-alma-ink/70">
+                  <Label className="mb-1.5 block text-[0.72rem] uppercase tracking-widest text-ink/70">
                     Nombre interno
                   </Label>
                   <Input
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="Ej. Reactivación mayo"
-                    className="bg-alma-canvas"
+                    className="bg-canvas"
                   />
                 </div>
 
                 <div>
-                  <Label className="mb-1.5 block text-[0.72rem] uppercase tracking-widest text-alma-ink/70">
+                  <Label className="mb-1.5 block text-[0.72rem] uppercase tracking-widest text-ink/70">
                     Segmento
                   </Label>
                   <Select value={segment} onValueChange={(v) => { setSegment(v); setPreviewData(null); }}>
-                    <SelectTrigger className="bg-alma-canvas">
+                    <SelectTrigger className="bg-canvas">
                       <SelectValue placeholder="Elige a quién mandar…" />
                     </SelectTrigger>
                     <SelectContent>
@@ -213,7 +213,7 @@ const CampaignsPage = () => {
                         <SelectItem key={key} value={key}>
                           <span className="flex items-center gap-2">
                             <span>{info.label}</span>
-                            <Badge variant="outline" className="nums border-alma-sandstone text-[10px] text-alma-ink/60">
+                            <Badge variant="outline" className="nums border-line-strong text-[10px] text-ink/60">
                               {info.count}
                             </Badge>
                           </span>
@@ -222,14 +222,14 @@ const CampaignsPage = () => {
                     </SelectContent>
                   </Select>
                   {segment && segments[segment] && (
-                    <p className="nums mt-1.5 text-[11px] text-alma-ink/55">
+                    <p className="nums mt-1.5 text-[11px] text-ink/55">
                       {segments[segment].count} alumna{segments[segment].count === 1 ? "" : "s"} en este segmento
                     </p>
                   )}
                 </div>
 
                 <div>
-                  <Label className="mb-1.5 block text-[0.72rem] uppercase tracking-widest text-alma-ink/70">
+                  <Label className="mb-1.5 block text-[0.72rem] uppercase tracking-widest text-ink/70">
                     Mensaje
                   </Label>
                   <Textarea
@@ -237,16 +237,16 @@ const CampaignsPage = () => {
                     onChange={(e) => setMessage(e.target.value)}
                     placeholder="Hola {firstName}, esta semana te tenemos…"
                     rows={4}
-                    className="resize-none bg-alma-canvas"
+                    className="resize-none bg-canvas"
                   />
                   <div className="mt-1.5 flex flex-wrap gap-1.5 text-[11px]">
-                    <span className="text-alma-ink/55">Variables:</span>
+                    <span className="text-ink/55">Variables:</span>
                     {["{firstName}", "{days}"].map((v) => (
                       <button
                         key={v}
                         type="button"
                         onClick={() => setMessage((m) => m + v)}
-                        className="rounded border border-alma-hairline bg-alma-canvas px-1.5 py-0.5 text-alma-ink/70 transition-colors hover:bg-alma-oat/50 hover:text-alma-ink"
+                        className="rounded border border-line bg-canvas px-1.5 py-0.5 text-ink/70 transition-colors hover:bg-sunken/50 hover:text-ink"
                       >
                         {v}
                       </button>
@@ -256,22 +256,22 @@ const CampaignsPage = () => {
 
                 {/* ── Preview result ── */}
                 {previewData && (
-                  <div className="rounded-xl border border-alma-sandstone bg-alma-oat/40 p-4">
+                  <div className="rounded-xl border border-line-strong bg-sunken/40 p-4">
                     <div className="flex flex-wrap items-center gap-3 text-sm">
-                      <span className="text-alma-ink">
+                      <span className="text-ink">
                         <strong className="nums">{previewData.sendable}</strong> alumnas recibirán el mensaje
                       </span>
-                      <span className="nums text-xs text-alma-ink/55">
+                      <span className="nums text-xs text-ink/55">
                         · {previewData.opted_out} opt-out · {previewData.no_phone} sin tel
                       </span>
                     </div>
                     {previewData.first_names.length > 0 && (
-                      <p className="mt-2 text-[11px] text-alma-ink/60">
+                      <p className="mt-2 text-[11px] text-ink/60">
                         Empezando por: {previewData.first_names.join(", ")}
                         {previewData.total > previewData.first_names.length && "…"}
                       </p>
                     )}
-                    <p className="nums mt-2 text-[11px] text-alma-ink/55">
+                    <p className="nums mt-2 text-[11px] text-ink/55">
                       Tiempo estimado: ~{Math.ceil(previewData.sendable * 1.3 / 60)} min
                     </p>
                   </div>
@@ -282,7 +282,7 @@ const CampaignsPage = () => {
                     onClick={() => previewMutation.mutate()}
                     disabled={!canPreview || previewMutation.isPending}
                     variant="outline"
-                    className="border-alma-sandstone"
+                    className="border-line-strong"
                     data-press
                   >
                     {previewMutation.isPending ? <Loader2 size={14} className="mr-2 animate-spin" /> : <Eye size={14} className="mr-2" />}
@@ -298,10 +298,10 @@ const CampaignsPage = () => {
           </div>
 
           {/* ── History ── */}
-          <div className="rounded-2xl border border-alma-hairline bg-alma-mist p-5">
+          <div className="rounded-2xl border border-line bg-sunken p-5">
             <div className="mb-4 flex items-center gap-2">
-              <History size={16} className="text-alma-ink/55" />
-              <h2 className="font-display text-base font-semibold text-alma-ink">Historial</h2>
+              <History size={16} className="text-ink/55" />
+              <h2 className="font-display text-base font-semibold text-ink">Historial</h2>
             </div>
             {campaignsError ? (
               <ErrorState
@@ -312,9 +312,9 @@ const CampaignsPage = () => {
               <div className="space-y-2">{[1, 2, 3].map((i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
             ) : campaigns.length === 0 ? (
               <div className="py-6 text-center">
-                <Send size={24} className="mx-auto mb-2 text-alma-ink/35" />
-                <p className="text-sm font-medium text-alma-ink">Aún no has mandado ninguna campaña</p>
-                <p className="mt-1 text-xs text-alma-ink/55">
+                <Send size={24} className="mx-auto mb-2 text-ink/35" />
+                <p className="text-sm font-medium text-ink">Aún no has mandado ninguna campaña</p>
+                <p className="mt-1 text-xs text-ink/55">
                   Compón la primera arriba: elige segmento, escribe el mensaje y previsualiza.
                 </p>
               </div>
@@ -322,7 +322,7 @@ const CampaignsPage = () => {
               <div className="-mx-2 overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="text-[0.72rem] uppercase tracking-widest text-alma-ink/50">
+                    <tr className="text-[0.72rem] uppercase tracking-widest text-ink/50">
                       <th className="px-2 py-2 text-left font-normal">Nombre</th>
                       <th className="px-2 py-2 text-left font-normal">Segmento</th>
                       <th className="px-2 py-2 text-right font-normal">Total</th>
@@ -336,24 +336,24 @@ const CampaignsPage = () => {
                       <tr
                         key={c.id}
                         onClick={() => setOpenCampaign(c)}
-                        className="cursor-pointer border-t border-alma-hairline transition-colors hover:bg-alma-oat/30"
+                        className="cursor-pointer border-t border-line transition-colors hover:bg-sunken/30"
                       >
-                        <td className="max-w-[200px] truncate px-2 py-3 text-alma-ink">{c.name}</td>
-                        <td className="max-w-[160px] truncate px-2 py-3 text-xs text-alma-ink/60">
+                        <td className="max-w-[200px] truncate px-2 py-3 text-ink">{c.name}</td>
+                        <td className="max-w-[160px] truncate px-2 py-3 text-xs text-ink/60">
                           {segments[c.segment]?.label || c.segment}
                         </td>
-                        <td className="nums px-2 py-3 text-right text-alma-ink/70">{c.total_targets}</td>
+                        <td className="nums px-2 py-3 text-right text-ink/70">{c.total_targets}</td>
                         <td className="nums px-2 py-3 text-right">
-                          <span className="text-alma-olive">{c.total_sent}</span>
+                          <span className="text-success">{c.total_sent}</span>
                           {c.total_failed > 0 && <span className="ml-1 text-destructive">+{c.total_failed}f</span>}
-                          {c.total_skipped > 0 && <span className="ml-1 text-alma-ink/50">+{c.total_skipped}s</span>}
+                          {c.total_skipped > 0 && <span className="ml-1 text-ink/50">+{c.total_skipped}s</span>}
                         </td>
                         <td className="px-2 py-3 text-right">
                           <span className={cn("inline-block rounded-full border px-2 py-0.5 text-[10px] font-medium", STATUS_PILL[c.status].className)}>
                             {STATUS_PILL[c.status].label}
                           </span>
                         </td>
-                        <td className="nums whitespace-nowrap px-2 py-3 text-right text-[11px] text-alma-ink/50">
+                        <td className="nums whitespace-nowrap px-2 py-3 text-right text-[11px] text-ink/50">
                           {formatDateTime(c.created_at)}
                         </td>
                       </tr>
@@ -369,22 +369,22 @@ const CampaignsPage = () => {
         <Dialog open={!!openCampaign} onOpenChange={(o) => !o && setOpenCampaign(null)}>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
-              <DialogTitle className="font-display text-alma-ink">{openCampaign?.name}</DialogTitle>
+              <DialogTitle className="font-display text-ink">{openCampaign?.name}</DialogTitle>
             </DialogHeader>
             {openCampaign && (
               <div className="space-y-3">
                 <div className="grid grid-cols-4 gap-2 text-center">
-                  <div className="rounded-lg border border-alma-hairline bg-alma-mist p-2">
-                    <p className="text-[0.68rem] uppercase tracking-wide text-alma-ink/55">Total</p>
-                    <p className="font-display nums text-lg text-alma-ink">{openCampaign.total_targets}</p>
+                  <div className="rounded-lg border border-line bg-sunken p-2">
+                    <p className="text-[0.68rem] uppercase tracking-wide text-ink/55">Total</p>
+                    <p className="font-display nums text-lg text-ink">{openCampaign.total_targets}</p>
                   </div>
-                  <div className="rounded-lg border border-alma-olive/30 bg-alma-olive/10 p-2">
-                    <p className="text-[0.68rem] uppercase tracking-wide text-alma-olive">Enviadas</p>
-                    <p className="font-display nums text-lg text-alma-olive">{openCampaign.total_sent}</p>
+                  <div className="rounded-lg border border-success/30 bg-success/10 p-2">
+                    <p className="text-[0.68rem] uppercase tracking-wide text-success">Enviadas</p>
+                    <p className="font-display nums text-lg text-success">{openCampaign.total_sent}</p>
                   </div>
-                  <div className="rounded-lg border border-alma-hairline bg-alma-mist p-2">
-                    <p className="text-[0.68rem] uppercase tracking-wide text-alma-ink/55">Omitidas</p>
-                    <p className="font-display nums text-lg text-alma-ink/70">{openCampaign.total_skipped}</p>
+                  <div className="rounded-lg border border-line bg-sunken p-2">
+                    <p className="text-[0.68rem] uppercase tracking-wide text-ink/55">Omitidas</p>
+                    <p className="font-display nums text-lg text-ink/70">{openCampaign.total_skipped}</p>
                   </div>
                   <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-2">
                     <p className="text-[0.68rem] uppercase tracking-wide text-destructive">Fallidas</p>
@@ -397,22 +397,22 @@ const CampaignsPage = () => {
                     onRetry={() => refetchLogs()}
                   />
                 ) : (
-                  <div className="max-h-[400px] overflow-y-auto rounded-lg border border-alma-hairline">
+                  <div className="max-h-[400px] overflow-y-auto rounded-lg border border-line">
                     <table className="w-full text-xs">
                       <tbody>
                         {logs.map((log) => {
                           const pill = LOG_PILL[log.status];
                           const Icon = pill.Icon;
                           return (
-                            <tr key={log.id} className="border-t border-alma-hairline first:border-t-0">
+                            <tr key={log.id} className="border-t border-line first:border-t-0">
                               <td className="w-7 px-3 py-2">
                                 <Icon size={12} className={cn(pill.className, log.status === "pending" && "animate-spin")} />
                               </td>
-                              <td className="max-w-[140px] truncate px-2 py-2 text-alma-ink">
+                              <td className="max-w-[140px] truncate px-2 py-2 text-ink">
                                 {log.display_name || "—"}
                               </td>
-                              <td className="nums px-2 py-2 text-[10px] text-alma-ink/50">{log.phone || "—"}</td>
-                              <td className="px-2 py-2 text-[10px] text-alma-ink/55">{log.reason || ""}</td>
+                              <td className="nums px-2 py-2 text-[10px] text-ink/50">{log.phone || "—"}</td>
+                              <td className="px-2 py-2 text-[10px] text-ink/55">{log.reason || ""}</td>
                             </tr>
                           );
                         })}

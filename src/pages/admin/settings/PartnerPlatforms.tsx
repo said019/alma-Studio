@@ -55,21 +55,21 @@ const PartnerPlatforms = () => {
         <div className="admin-page max-w-2xl">
           <div className="mb-2 flex items-center gap-2">
             <span className="rounded-md px-2 py-1 text-xs font-bold tracking-tight" style={{ backgroundColor: WELLHUB.primary, color: WELLHUB.on }}>Wellhub</span>
-            <h1 className="admin-title font-semibold text-alma-ink">Plataformas</h1>
+            <h1 className="admin-title font-semibold text-ink">Plataformas</h1>
           </div>
-          <p className="text-sm text-alma-ink/60 mb-6">
+          <p className="text-sm text-ink/60 mb-6">
             La URL de webhook registrada en Wellhub es la del gateway compartido:
             <code className="ml-1 break-all text-xs">{GATEWAY_URL}</code>
           </p>
 
           {isLoading ? (
-            <p className="text-alma-ink/60">Cargando…</p>
+            <p className="text-ink/60">Cargando…</p>
           ) : (
-            <div className="space-y-5 rounded-xl border border-alma-hairline bg-alma-mist p-6" style={{ borderLeft: `4px solid ${WELLHUB.primary}` }}>
+            <div className="space-y-5 rounded-xl border border-line bg-sunken p-6" style={{ borderLeft: `4px solid ${WELLHUB.primary}` }}>
               <div className="flex items-center justify-between">
                 <div>
                   <Label>Activo</Label>
-                  <p className="text-xs text-alma-ink/55">Interruptor maestro de la integración</p>
+                  <p className="text-xs text-ink/55">Interruptor maestro de la integración</p>
                 </div>
                 <Switch checked={!!form.is_enabled} onCheckedChange={(v) => set("is_enabled", v)} />
               </div>
@@ -77,7 +77,7 @@ const PartnerPlatforms = () => {
               <div className="space-y-1.5">
                 <Label>Environment</Label>
                 <select
-                  className="w-full rounded-md border border-alma-hairline bg-white px-3 py-2 text-sm"
+                  className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm"
                   value={form.environment || "production"}
                   onChange={(e) => set("environment", e.target.value)}
                 >
@@ -99,7 +99,7 @@ const PartnerPlatforms = () => {
 
               <div className="space-y-1.5">
                 <Label>Product ID (Wellhub)</Label>
-                <p className="text-xs text-alma-ink/55">El ID del producto que representa tus clases en Wellhub (si te lo dieron).</p>
+                <p className="text-xs text-ink/55">El ID del producto que representa tus clases en Wellhub (si te lo dieron).</p>
                 <Input value={form.extra_config?.product_id || ""} onChange={(e) => setExtra("product_id", e.target.value)} />
               </div>
 
@@ -113,7 +113,7 @@ const PartnerPlatforms = () => {
               </div>
 
               <details className="text-sm">
-                <summary className="cursor-pointer text-alma-ink/70">URLs base y resumen diario (opcional)</summary>
+                <summary className="cursor-pointer text-ink/70">URLs base y resumen diario (opcional)</summary>
                 <div className="mt-3 space-y-3">
                   {([
                     ["access_base_url", "Access base URL (override)"],

@@ -50,9 +50,9 @@ const PartnerCheckins = () => {
         <div className="admin-page max-w-5xl">
           <div className="mb-6 flex items-center gap-2">
             <span className="rounded-md px-2 py-1 text-xs font-bold tracking-tight" style={{ backgroundColor: WELLHUB.primary, color: WELLHUB.on }}>Wellhub</span>
-            <h1 className="admin-title font-semibold text-alma-ink">Check-ins de convenio</h1>
+            <h1 className="admin-title font-semibold text-ink">Check-ins de convenio</h1>
           </div>
-          <div className="overflow-hidden rounded-xl border border-alma-hairline bg-alma-mist">
+          <div className="overflow-hidden rounded-xl border border-line bg-sunken">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -66,16 +66,16 @@ const PartnerCheckins = () => {
               </TableHeader>
               <TableBody>
                 {isLoading ? (
-                  <TableRow><TableCell colSpan={6} className="text-alma-ink/60">Cargando…</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={6} className="text-ink/60">Cargando…</TableCell></TableRow>
                 ) : rows.length === 0 ? (
-                  <TableRow><TableCell colSpan={6} className="text-alma-ink/60">Aún no hay check-ins de convenio.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={6} className="text-ink/60">Aún no hay check-ins de convenio.</TableCell></TableRow>
                 ) : rows.map((c) => (
                   <TableRow key={c.id}>
-                    <TableCell className="font-medium text-alma-ink">{c.user_name ?? c.wellhub_id ?? "—"}</TableCell>
+                    <TableCell className="font-medium text-ink">{c.user_name ?? c.wellhub_id ?? "—"}</TableCell>
                     <TableCell>{c.class_name ?? "—"}{c.class_date ? ` · ${formatDate(c.class_date)}` : ""}</TableCell>
                     <TableCell><Badge variant={STATUS_VARIANT[c.status] ?? "outline"}>{c.status}</Badge></TableCell>
-                    <TableCell className="text-alma-ink/70 text-sm">{c.method}</TableCell>
-                    <TableCell className="nums text-sm text-alma-ink/70">{formatDate(c.created_at)}</TableCell>
+                    <TableCell className="text-ink/70 text-sm">{c.method}</TableCell>
+                    <TableCell className="nums text-sm text-ink/70">{formatDate(c.created_at)}</TableCell>
                     <TableCell>
                       {c.status !== "confirmed" && (
                         <Button size="sm" variant="outline" onClick={() => confirm.mutate(c.id)} disabled={confirm.isPending}>

@@ -1,12 +1,13 @@
 // Layout compartido de las páginas legales (Términos, Privacidad, Cancelación).
 // Nav simple sin blur (cream sólido + hairline), H1 serif en title-case,
 // cuerpo de lectura a 70ch y footer corto con enlaces cruzados.
-// Colores SIEMPRE desde la paleta canónica ALMA (nada de paletas locales).
+// Colores SIEMPRE desde los tokens de src/design/tokens.ts (nada de paletas locales).
 import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { ALMA } from "@/components/app/tokens";
+
 import { STUDIO } from "@/lib/studio";
 import api from "@/lib/api";
+import { COLOR } from "@/design/tokens";
 
 const LEGAL_PAGES = [
   { path: "/legal/terminos", label: "Términos y condiciones" },
@@ -52,25 +53,25 @@ export const LegalSkeleton = () => (
   <div aria-hidden="true" className="animate-pulse motion-reduce:animate-none space-y-9">
     {[0, 1, 2].map((block) => (
       <div key={block} className="space-y-3">
-        <div className="h-4 w-44 rounded-sm" style={{ backgroundColor: ALMA.blush }} />
-        <div className="h-3 w-full rounded-sm" style={{ backgroundColor: ALMA.mist }} />
-        <div className="h-3 w-[92%] rounded-sm" style={{ backgroundColor: ALMA.mist }} />
-        <div className="h-3 w-[78%] rounded-sm" style={{ backgroundColor: ALMA.mist }} />
+        <div className="h-4 w-44 rounded-sm" style={{ backgroundColor: COLOR.sunken }} />
+        <div className="h-3 w-full rounded-sm" style={{ backgroundColor: COLOR.sunken }} />
+        <div className="h-3 w-[92%] rounded-sm" style={{ backgroundColor: COLOR.sunken }} />
+        <div className="h-3 w-[78%] rounded-sm" style={{ backgroundColor: COLOR.sunken }} />
       </div>
     ))}
   </div>
 );
 
-/** Subtítulo de sección: serif text-lg (Fraunces vía h2 base). */
+/** Subtítulo de sección: text-lg en Unbounded (font-display). */
 export const LegalH2 = ({ children }: { children: ReactNode }) => (
-  <h2 className="font-display text-lg mt-10 mb-3" style={{ color: ALMA.ink }}>
+  <h2 className="font-display text-lg mt-10 mb-3" style={{ color: COLOR.ink }}>
     {children}
   </h2>
 );
 
 /** Línea de "Última actualización" destacada en ink. */
 export const LegalUpdated = ({ children }: { children: ReactNode }) => (
-  <p className="font-semibold" style={{ color: ALMA.ink }}>
+  <p className="font-semibold" style={{ color: COLOR.ink }}>
     Última actualización: {children}
   </p>
 );
@@ -88,41 +89,41 @@ export const LegalDynamicBody = ({ text }: { text: string }) => (
 export const LegalContact = () => (
   <ul className="list-none space-y-1 p-0 m-0">
     <li>
-      <strong className="font-semibold" style={{ color: ALMA.ink }}>Email:</strong>{" "}
+      <strong className="font-semibold" style={{ color: COLOR.ink }}>Email:</strong>{" "}
       <a
         href="mailto:info@almamovement.mx"
         className="underline underline-offset-2"
-        style={{ color: ALMA.berry }}
+        style={{ color: COLOR.accentStrong }}
       >
         info@almamovement.mx
       </a>
     </li>
     <li>
-      <strong className="font-semibold" style={{ color: ALMA.ink }}>WhatsApp:</strong>{" "}
+      <strong className="font-semibold" style={{ color: COLOR.ink }}>WhatsApp:</strong>{" "}
       <a
         href={`https://wa.me/${STUDIO.whatsapp}`}
         target="_blank"
         rel="noopener noreferrer"
         className="underline underline-offset-2"
-        style={{ color: ALMA.berry }}
+        style={{ color: COLOR.accentStrong }}
       >
         escríbenos por WhatsApp
       </a>
     </li>
     {STUDIO.phone && (
       <li>
-        <strong className="font-semibold" style={{ color: ALMA.ink }}>Teléfono:</strong> {STUDIO.phone}
+        <strong className="font-semibold" style={{ color: COLOR.ink }}>Teléfono:</strong> {STUDIO.phone}
       </li>
     )}
     <li>
-      <strong className="font-semibold" style={{ color: ALMA.ink }}>Dirección:</strong> {STUDIO.address}
+      <strong className="font-semibold" style={{ color: COLOR.ink }}>Dirección:</strong> {STUDIO.address}
     </li>
   </ul>
 );
 
 type LegalLayoutProps = {
   current: LegalPath;
-  /** H1 en title-case; admite acentos con .font-display-italic. */
+  /** H1 en title-case; admite acentos con .font-display. */
   title: ReactNode;
   children: ReactNode;
 };
@@ -131,16 +132,16 @@ const LegalLayout = ({ current, title, children }: LegalLayoutProps) => {
   const crossLinks = LEGAL_PAGES.filter((page) => page.path !== current);
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ backgroundColor: ALMA.cream, color: ALMA.ink }}>
+    <div className="min-h-screen flex flex-col" style={{ backgroundColor: COLOR.canvas, color: COLOR.ink }}>
       {/* Nav simple: wordmark serif → inicio. Cream sólido, sin blur. */}
       <nav
         className="sticky top-0 z-50 px-6 lg:px-[60px] py-4"
-        style={{ backgroundColor: ALMA.cream, borderBottom: `1px solid ${ALMA.border}` }}
+        style={{ backgroundColor: COLOR.canvas, borderBottom: `1px solid ${COLOR.line}` }}
       >
         <Link
           to="/"
           className="font-display text-[1.15rem] tracking-tight no-underline transition-opacity hover:opacity-75"
-          style={{ color: ALMA.ink, fontWeight: 420 }}
+          style={{ color: COLOR.ink, fontWeight: 420 }}
         >
           Alma Movement
         </Link>
@@ -149,25 +150,25 @@ const LegalLayout = ({ current, title, children }: LegalLayoutProps) => {
       <main className="w-full max-w-3xl mx-auto flex-1 px-6 pt-14 pb-20">
         <p
           className="flex items-center gap-[10px] text-[0.7rem] uppercase tracking-[0.28em] font-medium mb-4"
-          style={{ color: ALMA.berry }}
+          style={{ color: COLOR.accentStrong }}
         >
-          <span className="inline-block h-px w-[30px]" style={{ backgroundColor: ALMA.sandstone }} />
+          <span className="inline-block h-px w-[30px]" style={{ backgroundColor: COLOR.line }} />
           Legal
         </p>
         <h1
           className="font-display leading-[1.06] mb-10"
-          style={{ fontSize: "clamp(2.2rem, 4.6vw, 3.4rem)", fontWeight: 420, color: ALMA.ink }}
+          style={{ fontSize: "clamp(2.2rem, 4.6vw, 3.4rem)", fontWeight: 420, color: COLOR.ink }}
         >
           {title}
         </h1>
 
-        <div className="max-w-[70ch] text-[0.95rem] leading-[1.8]" style={{ color: ALMA.berry }}>
+        <div className="max-w-[70ch] text-[0.95rem] leading-[1.8]" style={{ color: COLOR.accentStrong }}>
           {children}
         </div>
       </main>
 
       {/* Footer corto: cruces a las otras legales + volver al inicio. */}
-      <footer className="px-6 lg:px-[60px] py-8" style={{ borderTop: `1px solid ${ALMA.border}` }}>
+      <footer className="px-6 lg:px-[60px] py-8" style={{ borderTop: `1px solid ${COLOR.line}` }}>
         <div className="max-w-3xl mx-auto flex flex-col gap-4 sm:flex-row sm:items-baseline sm:justify-between text-[0.82rem]">
           <nav className="flex flex-wrap gap-x-6 gap-y-2">
             {crossLinks.map((page) => (
@@ -175,7 +176,7 @@ const LegalLayout = ({ current, title, children }: LegalLayoutProps) => {
                 key={page.path}
                 to={page.path}
                 className="no-underline transition-colors hover:underline"
-                style={{ color: ALMA.berry }}
+                style={{ color: COLOR.accentStrong }}
               >
                 {page.label}
               </Link>
@@ -183,12 +184,12 @@ const LegalLayout = ({ current, title, children }: LegalLayoutProps) => {
             <Link
               to="/"
               className="no-underline font-medium transition-colors hover:underline"
-              style={{ color: ALMA.ink }}
+              style={{ color: COLOR.ink }}
             >
               Volver al inicio
             </Link>
           </nav>
-          <p className="m-0" style={{ color: ALMA.berry, opacity: 0.75 }}>
+          <p className="m-0" style={{ color: COLOR.accentStrong, opacity: 0.75 }}>
             © 2026 Alma Movement
           </p>
         </div>

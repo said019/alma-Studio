@@ -1,37 +1,7 @@
-/* ──────────────────────────────────────────────────────────────
-   ALMA MOVEMENT — TIPOGRAFÍAS BASE
-   Fraunces (variable) → display / titulares (font-display, h1-h6)
-   Jost                → body / UI
-   Carga vía <link> con preconnect en index.html (no @import).
-   Alilato (propietaria) queda solo como detalle opcional.
-   ────────────────────────────────────────────────────────────── */
+/* HIVE — base. Tokens: src/design/tokens.ts · Spec: docs/superpowers/specs/2026-09-24-hive-sistema-visual-design.md */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-/* ── font-face: fuente propietaria desde public/fonts/ ── */
-@font-face {
-  font-family: 'Alilato';
-  src: url('/fonts/Alilato-ExtraLight.ttf') format('truetype');
-  font-weight: 200 400;
-  font-style: normal;
-  font-display: swap;
-}
-
-/* ──────────────────────────────────────────────────────────────
-   PALETA ALMA MOVEMENT — canónica (brand kit greige + espresso)
-   canvas    #FAF9F6  Feather White — fondo principal
-   mist      #F4F1EA  Porcelain Mist — superficies suaves
-   oat       #E6DAC8  Creamed Oat — bloques tintados, pills
-   sandstone #CBB9A4  Soft Sandstone — bordes fuertes, detalle
-   stone     #A48D78  Desert Rock — acento decorativo (solo texto grande)
-   berry     #6E5A46  taupe profundo — acento con AA en texto pequeño
-   ink       #43392F  espresso — texto y CTAs sólidos
-   ink-deep  #241B1A  espresso profundo — secciones drenched
-   hairline  #E0D5C6  divisores
-   olive     #5F6B4A  SOLO éxito/confirmación (funcional, no decorativo)
-   destructive #B23A48
-   ────────────────────────────────────────────────────────────── */
 
 /* ──────────────────────────────────────────────────────────────
    EMIL'S EASING CURVES (animations.dev)
@@ -40,9 +10,9 @@
    feel intentional.
    ────────────────────────────────────────────────────────────── */
 :root {
-  --ease-alma-out: cubic-bezier(0.23, 1, 0.32, 1);
-  --ease-alma-in-out: cubic-bezier(0.77, 0, 0.175, 1);
-  --ease-alma-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 /* Press-feedback: any [data-press] gets a subtle scale on :active.
@@ -51,12 +21,12 @@
   transform: scale(0.97);
 }
 [data-press] {
-  transition: transform 160ms var(--ease-alma-out);
+  transition: transform 160ms var(--ease-out);
 }
 
 /* Stagger entrance: any [data-stagger-item] inside [data-stagger]
    fades up with cascading delay. CSS-only, hardware-accelerated. */
-@keyframes alma-fade-up {
+@keyframes fade-up {
   from {
     opacity: 0;
     transform: translateY(8px);
@@ -69,7 +39,7 @@
 [data-stagger] [data-stagger-item] {
   opacity: 0;
   transform: translateY(8px);
-  animation: alma-fade-up 360ms var(--ease-alma-out) forwards;
+  animation: fade-up 360ms var(--ease-out) forwards;
 }
 [data-stagger] [data-stagger-item]:nth-child(1) { animation-delay: 40ms; }
 [data-stagger] [data-stagger-item]:nth-child(2) { animation-delay: 80ms; }
@@ -84,7 +54,7 @@
 /* Hover-lift: applied to anything with [data-lift]. Cards, list items.
    Per Emil: subtle translateY + shadow shift signals tappable. */
 [data-lift] {
-  transition: transform 280ms var(--ease-alma-out), box-shadow 280ms var(--ease-alma-out);
+  transition: transform 280ms var(--ease-out), box-shadow 280ms var(--ease-out);
   will-change: transform;
 }
 [data-lift]:hover {
@@ -92,30 +62,30 @@
 }
 
 /* Scale-in: dialogs, popovers. Emil-curve. */
-@keyframes alma-scale-in {
+@keyframes scale-in {
   from { opacity: 0; transform: scale(0.96); }
   to   { opacity: 1; transform: scale(1); }
 }
 [data-scale-in] {
-  animation: alma-scale-in 320ms var(--ease-alma-drawer) forwards;
+  animation: scale-in 320ms var(--ease-drawer) forwards;
 }
 
 /* Slide-up: bottom sheets, mobile toasts. */
-@keyframes alma-slide-up {
+@keyframes slide-up {
   from { opacity: 0; transform: translateY(16px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 [data-slide-up] {
-  animation: alma-slide-up 380ms var(--ease-alma-drawer) forwards;
+  animation: slide-up 380ms var(--ease-drawer) forwards;
 }
 
 /* Fade-in simple sin movimiento (para imágenes lazy). */
-@keyframes alma-fade-in {
+@keyframes fade-in {
   from { opacity: 0; }
   to   { opacity: 1; }
 }
 [data-fade-in] {
-  animation: alma-fade-in 480ms var(--ease-alma-out) forwards;
+  animation: fade-in 480ms var(--ease-out) forwards;
 }
 
 /* IntersectionObserver-friendly: aplica [data-reveal] al element y
@@ -123,39 +93,11 @@
 [data-reveal] {
   opacity: 0;
   transform: translateY(12px);
-  transition: opacity 600ms var(--ease-alma-out), transform 600ms var(--ease-alma-out);
+  transition: opacity 600ms var(--ease-out), transform 600ms var(--ease-out);
 }
 [data-reveal].is-visible {
   opacity: 1;
   transform: translateY(0);
-}
-
-/* Tratamiento fotográfico editorial — unifica fotos casuales/brillantes en
-   un look cálido y moody tipo Frame: menos saturación, más contraste, tinte
-   espresso. Se aplica a toda foto de la landing/app. */
-.alma-photo {
-  filter: grayscale(0.78) sepia(0.52) saturate(0.82) brightness(0.82) contrast(1.13);
-  transition: filter 700ms var(--ease-alma-out);
-}
-/* Capa cálida espresso por encima de la foto (multiply) para profundidad y
-   cohesión de color. El contenedor debe ser position:relative + overflow. */
-.alma-photo-tint::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: #2a1e1b;
-  mix-blend-mode: multiply;
-  opacity: 0.3;
-}
-/* Viñeta sutil para dar foco y peso editorial a fotos grandes. */
-.alma-photo-vignette::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  pointer-events: none;
-  background: radial-gradient(120% 100% at 50% 35%, transparent 55%, rgba(36,27,26,0.34) 100%);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -177,36 +119,33 @@
        botones (causa de fechas/valores que se veían en blanco). */
     color-scheme: light;
 
-    /* Paleta canónica: brand kit greige cálido + espresso */
-    --background: 45 29% 97%;            /* #FAF9F6 canvas */
-    --foreground: 30 18% 22%;            /* #43392F ink */
+    /* HIVE — valores de src/design/tokens.ts en HSL (los lee shadcn). */
+    --background: 60 4% 95%;             /* canvas #F4F4F3 */
+    --foreground: 0 0% 7%;               /* ink #111111 */
 
-    --card: 42 31% 94%;                  /* #F4F1EA mist */
-    --card-foreground: 30 18% 22%;
+    --card: 0 0% 100%;                   /* surface #FFFFFF */
+    --card-foreground: 0 0% 7%;
 
-    --popover: 42 31% 94%;
-    --popover-foreground: 30 18% 22%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 7%;
 
-    /* Primario: espresso (botones oscuros estilo Frame) */
-    --primary: 30 18% 22%;               /* #43392F */
-    --primary-foreground: 45 29% 97%;
+    --primary: 0 0% 7%;                  /* ink */
+    --primary-foreground: 60 4% 95%;     /* canvas */
 
-    --secondary: 36 38% 84%;             /* #E6DAC8 oat */
-    --secondary-foreground: 30 18% 22%;
+    --secondary: 60 2% 92%;              /* sunken #EAEAE9 */
+    --secondary-foreground: 0 0% 7%;
 
-    --muted: 42 31% 94%;                 /* #F4F1EA mist */
-    --muted-foreground: 30 22% 35%;      /* #6E5A46 berry (AA) */
+    --muted: 60 2% 92%;                  /* sunken */
+    --muted-foreground: 60 1% 35%;       /* inkMuted #5B5B59 */
 
-    /* Acento: oat #E6DAC8 */
-    --accent: 36 38% 84%;
-    --accent-foreground: 30 18% 22%;
+    /* shadcn ya no define la variable de acento: en HIVE ese nombre es el coral (tailwind.config.ts). */
 
-    --destructive: 353 51% 46%;          /* #B23A48 */
-    --destructive-foreground: 45 29% 97%;
+    --destructive: 349 64% 39%;          /* danger #A3243B */
+    --destructive-foreground: 60 4% 95%;
 
-    --border: 35 30% 83%;                /* #E0D5C6 hairline */
-    --input: 35 30% 83%;
-    --ring: 30 22% 35%;                  /* #6E5A46 */
+    --border: 60 3% 87%;                 /* line #DEDEDC */
+    --input: 60 1% 54%;                  /* lineStrong #8A8A88 (3:1) */
+    --ring: 0 0% 7%;                     /* ink */
 
     --radius: 0.75rem;
   }
@@ -219,62 +158,22 @@
 
   body {
     @apply bg-background text-foreground;
-    font-family: 'Jost', system-ui, sans-serif;
+    font-family: 'Manrope', system-ui, sans-serif;
     overflow-x: hidden;
     /* Evita el rebote (rubber-band) en iOS/PWA que despega el bottom-nav fijo. */
     overscroll-behavior-y: none;
   }
 
-  /* Serif protagonista: todos los titulares son Fraunces editorial. */
+  /* Titulares: Unbounded. Los grandes van en mayúsculas desde cada pieza. */
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Fraunces', Georgia, serif;
-    font-optical-sizing: auto;
-    font-weight: 500;
+    font-family: 'Unbounded', system-ui, sans-serif;
+    font-weight: 600;
     letter-spacing: -0.01em;
   }
 
-  .font-gulfs {
-    font-family: 'Fraunces', Georgia, serif;
-    font-optical-sizing: auto;
-    font-weight: 500;
-  }
-
-  .font-alilato {
-    font-family: 'Alilato', 'Jost', sans-serif;
-  }
-
-  /* Alias legacy: .font-bebas = Fraunces con opsz de titular. El token
-     de tailwind.config.ts apunta a la misma familia (sin conflicto). */
-  .font-bebas {
-    font-family: 'Fraunces', Georgia, serif;
-    font-optical-sizing: auto;
-    font-variation-settings: 'opsz' 110;
-    font-weight: 500;
-    letter-spacing: -0.015em;
-  }
-
-  .font-syne {
-    font-family: 'Jost', system-ui, sans-serif;
-    font-weight: 600;
-  }
-
-  .font-dm {
-    font-family: 'Jost', system-ui, sans-serif;
-  }
-
-  /* Display serif editorial (Fraunces) — lujo cálido, dirección Frame.
-     opsz alto para titulares; line-height apretado lo fija cada uso. */
   .font-display {
-    font-family: 'Fraunces', Georgia, serif;
-    font-optical-sizing: auto;
-    font-variation-settings: 'opsz' 120, 'SOFT' 0, 'WONK' 0;
-    letter-spacing: -0.015em;
-  }
-  .font-display-italic {
-    font-family: 'Fraunces', Georgia, serif;
-    font-style: italic;
-    font-optical-sizing: auto;
-    font-variation-settings: 'opsz' 90;
+    font-family: 'Unbounded', system-ui, sans-serif;
+    font-style: normal;
     letter-spacing: -0.01em;
   }
 

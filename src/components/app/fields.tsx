@@ -8,24 +8,28 @@ import {
   type TextareaHTMLAttributes,
 } from "react";
 import { AlertCircle, Check, Eye, EyeOff } from "lucide-react";
-import { ALMA } from "@/components/app/tokens";
+import { COLOR } from "@/design/tokens";
+
 
 /* ═══════════════════════════════════════════════════════════
    Campos de formulario — lenguaje único de la app de clienta.
-   Cream + hairline, focus ring berry visible (WCAG 2.4.7),
-   error en destructive con icono. Lo usan ProfileEdit y
+   Surface + borde lineStrong, foco ring-ink visible (WCAG 2.4.7),
+   error en danger con icono. Lo usan ProfileEdit y
    ChangePassword; cualquier form nuevo debe importar de aquí.
    ═══════════════════════════════════════════════════════════ */
 
+/* Campos: fondo blanco, borde lineStrong (3:1), foco negro con halo coral
+   suave y error en danger que dice qué pasa (spec §4.4). */
 const CONTROL =
-  "w-full rounded-2xl px-4 py-3 text-[0.95rem] outline-none transition-shadow " +
-  "focus-visible:ring-2 focus-visible:ring-alma-berry focus-visible:ring-offset-2 focus-visible:ring-offset-alma-canvas " +
-  "placeholder:text-alma-ink/35 disabled:opacity-60";
+  "w-full rounded-xl px-4 py-3 text-[0.95rem] outline-none transition-shadow " +
+  "focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-0 " +
+  "focus-visible:shadow-[0_0_0_5px_theme(colors.accent.soft)] " +
+  "placeholder:text-ink-muted disabled:opacity-60";
 
 const controlStyle = (hasError?: boolean): CSSProperties => ({
-  backgroundColor: ALMA.cream,
-  color: ALMA.ink,
-  border: `1px solid ${hasError ? ALMA.destructive : ALMA.border}`,
+  backgroundColor: COLOR.surface,
+  color: COLOR.ink,
+  border: `1.5px solid ${hasError ? COLOR.danger : COLOR.lineStrong}`,
   minHeight: 48,
 });
 
@@ -34,8 +38,8 @@ const idFromLabel = (label: string) =>
 
 export const FieldError = ({ msg }: { msg?: string }) =>
   msg ? (
-    <p className="flex items-center gap-1.5 text-[0.78rem]" style={{ color: ALMA.destructive }}>
-      <AlertCircle size={13} />
+    <p className="flex items-center gap-1.5 text-[0.8125rem] font-semibold" style={{ color: COLOR.danger }}>
+      <AlertCircle size={14} />
       {msg}
     </p>
   ) : null;
@@ -48,20 +52,17 @@ type FieldShellProps = {
   children: ReactNode;
 };
 
+/* Etiqueta con el rol "label" del spec §3.3: 12 px, mayúsculas, +0.12em. */
 const FieldShell = ({ label, htmlFor, error, hint, children }: FieldShellProps) => (
   <div className="flex flex-col gap-1.5">
-    <label
-      htmlFor={htmlFor}
-      className="text-[0.72rem] font-medium uppercase tracking-[0.18em]"
-      style={{ color: ALMA.ink, opacity: 0.62 }}
-    >
+    <label htmlFor={htmlFor} className="text-[0.75rem] font-bold uppercase tracking-[0.12em]" style={{ color: COLOR.inkMuted }}>
       {label}
     </label>
     {children}
     {error ? (
       <FieldError msg={error} />
     ) : hint ? (
-      <p className="text-[0.78rem]" style={{ color: ALMA.ink, opacity: 0.55 }}>
+      <p className="text-[0.8125rem]" style={{ color: COLOR.inkMuted }}>
         {hint}
       </p>
     ) : null}
@@ -172,8 +173,8 @@ export const PasswordField = forwardRef<HTMLInputElement, PasswordFieldProps>(
             aria-pressed={show}
             aria-label={show ? "Ocultar contraseña" : "Mostrar contraseña"}
             onClick={() => setShow((v) => !v)}
-            className="absolute right-1 top-1/2 -translate-y-1/2 grid h-11 w-11 place-items-center rounded-full bg-transparent border-0 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-alma-berry"
-            style={{ color: ALMA.ink, opacity: 0.55 }}
+            className="absolute right-1 top-1/2 -translate-y-1/2 grid h-11 w-11 place-items-center rounded-full bg-transparent border-0 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong"
+            style={{ color: COLOR.ink, opacity: 0.55 }}
           >
             {show ? <EyeOff size={16} /> : <Eye size={16} />}
           </button>
@@ -198,15 +199,15 @@ export const PasswordRules = ({ password = "" }: { password?: string }) => {
       {rules.map((r) => (
         <li
           key={r.label}
-          className="flex items-center gap-2 text-[0.74rem]"
-          style={{ color: r.ok ? ALMA.olive : ALMA.ink, opacity: r.ok ? 1 : 0.55 }}
+          className="flex items-center gap-2 text-[0.75rem]"
+          style={{ color: r.ok ? COLOR.success : COLOR.ink, opacity: r.ok ? 1 : 0.55 }}
         >
           <span
             className="grid h-4 w-4 place-items-center rounded-full transition-colors"
             style={{
-              backgroundColor: r.ok ? ALMA.olive : "transparent",
-              border: `1px solid ${r.ok ? ALMA.olive : ALMA.border}`,
-              color: ALMA.cream,
+              backgroundColor: r.ok ? COLOR.success : "transparent",
+              border: `1px solid ${r.ok ? COLOR.success : COLOR.line}`,
+              color: COLOR.canvas,
             }}
           >
             {r.ok && <Check size={9} strokeWidth={3.5} />}

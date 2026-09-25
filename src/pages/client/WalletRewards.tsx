@@ -12,11 +12,11 @@ import {
   ErrorState,
   PrimaryButton,
   SkeletonRow,
-  ALMA,
 } from "@/components/app/AppShell";
 import { BackLink } from "@/components/app/widgets";
 import { useToast } from "@/hooks/use-toast";
 import { Gift, Trophy, Check } from "lucide-react";
+import { COLOR } from "@/design/tokens";
 
 type Milestone = {
   id: string;
@@ -112,7 +112,7 @@ const WalletRewards = () => {
           title={<>Tus recompensas</>}
           titleAccent="del estudio."
           actions={
-            <Tag tint="berry">
+            <Tag tint="accent">
               <span className="nums">{myPoints.toLocaleString("es-MX")}</span> pts
             </Tag>
           }
@@ -133,44 +133,44 @@ const WalletRewards = () => {
               <Section title="Tu próximo logro">
                 <div
                   className="rounded-3xl p-5 sm:p-6"
-                  style={{ backgroundColor: ALMA.cream, border: `1px solid ${ALMA.border}` }}
+                  style={{ backgroundColor: COLOR.canvas, border: `1px solid ${COLOR.line}` }}
                 >
                   <div className="flex items-start gap-4">
                     <span
                       className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl"
-                      style={{ backgroundColor: ALMA.blush, color: ALMA.berry }}
+                      style={{ backgroundColor: COLOR.sunken, color: COLOR.accentStrong }}
                     >
                       <Trophy size={20} strokeWidth={1.7} />
                     </span>
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-baseline justify-between gap-2">
-                        <h3 className="font-display leading-tight" style={{ color: ALMA.ink, fontSize: "1.25rem" }}>
+                        <h3 className="font-display leading-tight" style={{ color: COLOR.ink, fontSize: "1.25rem" }}>
                           {ms.next_milestone.name}
                         </h3>
-                        <span className="nums text-[0.72rem] uppercase tracking-[0.18em]" style={{ color: ALMA.berry }}>
+                        <span className="nums text-[0.72rem] uppercase tracking-[0.18em]" style={{ color: COLOR.accentStrong }}>
                           +{ms.next_milestone.award_points} pts
                         </span>
                       </div>
                       {ms.next_milestone.description && (
-                        <p className="mt-1 text-[0.84rem] leading-[1.55]" style={{ color: ALMA.ink, opacity: 0.65 }}>
+                        <p className="mt-1 text-[0.84rem] leading-[1.55]" style={{ color: COLOR.ink, opacity: 0.65 }}>
                           {ms.next_milestone.description}
                         </p>
                       )}
                       <div className="mt-4">
                         <div className="flex items-center justify-between text-[0.74rem]">
-                          <span className="nums" style={{ color: ALMA.ink, opacity: 0.7 }}>
-                            <strong style={{ color: ALMA.berry }}>{ms.lifetime_classes}</strong> de {ms.next_milestone.classes_required} clases
+                          <span className="nums" style={{ color: COLOR.ink, opacity: 0.7 }}>
+                            <strong style={{ color: COLOR.accentStrong }}>{ms.lifetime_classes}</strong> de {ms.next_milestone.classes_required} clases
                           </span>
-                          <span className="nums font-medium" style={{ color: ALMA.berry }}>
+                          <span className="nums font-medium" style={{ color: COLOR.accentStrong }}>
                             Te faltan {ms.next_remaining ?? 0}
                           </span>
                         </div>
-                        <div className="mt-2 h-1.5 overflow-hidden rounded-full" style={{ backgroundColor: ALMA.blush }}>
+                        <div className="mt-2 h-1.5 overflow-hidden rounded-full" style={{ backgroundColor: COLOR.sunken }}>
                           <div
                             className="h-full rounded-full transition-[width] duration-700 ease-[cubic-bezier(0.23,1,0.32,1)]"
                             style={{
                               width: `${Math.min(100, Math.round((ms.lifetime_classes / Math.max(1, ms.next_milestone.classes_required)) * 100))}%`,
-                              backgroundColor: ALMA.berry,
+                              backgroundColor: COLOR.ink,
                             }}
                           />
                         </div>
@@ -180,8 +180,8 @@ const WalletRewards = () => {
 
                   {/* Logros conseguidos */}
                   {ms.milestones.some((m) => m.achieved) && (
-                    <div className="mt-5 pt-5" style={{ borderTop: `1px solid ${ALMA.border}` }}>
-                      <p className="mb-3 text-[0.72rem] uppercase tracking-[0.22em]" style={{ color: ALMA.ink, opacity: 0.55 }}>
+                    <div className="mt-5 pt-5" style={{ borderTop: `1px solid ${COLOR.line}` }}>
+                      <p className="mb-3 text-[0.72rem] uppercase tracking-[0.22em]" style={{ color: COLOR.ink, opacity: 0.55 }}>
                         Tus logros desbloqueados
                       </p>
                       <div className="flex flex-wrap gap-2">
@@ -189,7 +189,7 @@ const WalletRewards = () => {
                           <span
                             key={m.id}
                             className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[0.74rem]"
-                            style={{ backgroundColor: ALMA.blush, color: ALMA.berry }}
+                            style={{ backgroundColor: COLOR.sunken, color: COLOR.accentStrong }}
                           >
                             <Check size={12} />
                             {m.name}
@@ -204,12 +204,12 @@ const WalletRewards = () => {
 
             {ms && !ms.next_milestone && ms.milestones.length > 0 && ms.milestones.every((m) => m.achieved) && (
               <Section title="Logros completos">
-                <div className="rounded-3xl p-6 text-center" style={{ backgroundColor: ALMA.blush }}>
-                  <Trophy size={28} strokeWidth={1.7} style={{ color: ALMA.berry, margin: "0 auto" }} />
-                  <p className="font-display mt-3" style={{ color: ALMA.ink, fontSize: "1.25rem" }}>
+                <div className="rounded-3xl p-6 text-center" style={{ backgroundColor: COLOR.sunken }}>
+                  <Trophy size={28} strokeWidth={1.7} style={{ color: COLOR.accentStrong, margin: "0 auto" }} />
+                  <p className="font-display mt-3" style={{ color: COLOR.ink, fontSize: "1.25rem" }}>
                     Has desbloqueado todos los logros.
                   </p>
-                  <p className="mt-1 text-[0.84rem]" style={{ color: ALMA.ink, opacity: 0.65 }}>
+                  <p className="mt-1 text-[0.84rem]" style={{ color: COLOR.ink, opacity: 0.65 }}>
                     Gracias por tu constancia. Nos encanta verte en cada clase.
                   </p>
                 </div>
@@ -241,19 +241,19 @@ const WalletRewards = () => {
                       <div
                         key={r.id}
                         className="flex items-center justify-between gap-4 px-1 py-4"
-                        style={{ borderTop: `1px solid ${ALMA.border}` }}
+                        style={{ borderTop: `1px solid ${COLOR.line}` }}
                       >
                         <div className="min-w-0">
-                          <h3 className="font-display leading-tight" style={{ color: ALMA.ink, fontSize: "1.1rem" }}>
+                          <h3 className="font-display leading-tight" style={{ color: COLOR.ink, fontSize: "1.1rem" }}>
                             {r.name}
                           </h3>
                           {r.description && (
-                            <p className="mt-1 text-[0.82rem] leading-[1.5]" style={{ color: ALMA.ink, opacity: 0.6 }}>
+                            <p className="mt-1 text-[0.82rem] leading-[1.5]" style={{ color: COLOR.ink, opacity: 0.6 }}>
                               {r.description}
                             </p>
                           )}
-                          <p className="mt-1.5 text-[0.78rem]" style={{ color: ALMA.ink }}>
-                            <span className="nums font-medium" style={{ color: ALMA.berry }}>
+                          <p className="mt-1.5 text-[0.78rem]" style={{ color: COLOR.ink }}>
+                            <span className="nums font-medium" style={{ color: COLOR.accentStrong }}>
                               {cost.toLocaleString("es-MX")} pts
                             </span>
                             {stockLeft != null && (
@@ -277,7 +277,7 @@ const WalletRewards = () => {
                           ) : (
                             <p
                               className="text-[0.72rem] uppercase tracking-[0.16em]"
-                              style={{ color: ALMA.ink, opacity: 0.55 }}
+                              style={{ color: COLOR.ink, opacity: 0.55 }}
                             >
                               {outOfStock ? (
                                 "Agotada"

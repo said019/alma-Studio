@@ -235,7 +235,7 @@ const DiscountCodes = () => {
             ]}
           />
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
-            <h1 className="admin-title font-semibold text-alma-ink">Códigos de descuento</h1>
+            <h1 className="admin-title font-semibold text-ink">Códigos de descuento</h1>
             <Button size="sm" onClick={openCreate}><Plus size={14} className="mr-1" />Nuevo código</Button>
           </div>
 
@@ -245,7 +245,7 @@ const DiscountCodes = () => {
               onRetry={() => refetch()}
             />
           ) : !isLoading && codes.length === 0 ? (
-            <div className="rounded-xl border border-alma-hairline bg-alma-mist px-6">
+            <div className="rounded-xl border border-line bg-sunken px-6">
               <EmptyState
                 icon={<TicketPercent size={20} strokeWidth={1.8} />}
                 title="Aún no hay códigos de descuento"
@@ -255,7 +255,7 @@ const DiscountCodes = () => {
               />
             </div>
           ) : (
-            <div className="rounded-xl border border-alma-hairline bg-alma-mist overflow-hidden">
+            <div className="rounded-xl border border-line bg-sunken overflow-hidden">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -276,20 +276,20 @@ const DiscountCodes = () => {
                     ))
                     : codes.map((c) => (
                       <TableRow key={c.id}>
-                        <TableCell className="font-mono font-bold text-alma-ink">{c.code}</TableCell>
-                        <TableCell className="nums text-alma-ink">
+                        <TableCell className="font-mono font-bold text-ink">{c.code}</TableCell>
+                        <TableCell className="nums text-ink">
                           {c.discountType === "percent" ? `${c.discountValue}%` : formatMXN(c.discountValue)}
                         </TableCell>
-                        <TableCell className="text-sm text-alma-ink/70">{CHANNEL_LABELS[c.channel] ?? "Todos"}</TableCell>
-                        <TableCell className="text-sm text-alma-ink/70">
+                        <TableCell className="text-sm text-ink/70">{CHANNEL_LABELS[c.channel] ?? "Todos"}</TableCell>
+                        <TableCell className="text-sm text-ink/70">
                           {c.planName
                             ? c.planName
                             : c.classCategory
                               ? `Categoría ${CATEGORY_LABELS[c.classCategory]}`
                               : "Todos los planes"}
                         </TableCell>
-                        <TableCell className="nums text-alma-ink/70">{c.usesCount}/{c.maxUses ?? "∞"}</TableCell>
-                        <TableCell className="nums text-sm text-alma-ink/70">{c.expiresAt ? formatDate(c.expiresAt) : "—"}</TableCell>
+                        <TableCell className="nums text-ink/70">{c.usesCount}/{c.maxUses ?? "∞"}</TableCell>
+                        <TableCell className="nums text-sm text-ink/70">{c.expiresAt ? formatDate(c.expiresAt) : "—"}</TableCell>
                         <TableCell><Badge variant={c.isActive ? "default" : "secondary"}>{c.isActive ? "Activo" : "Inactivo"}</Badge></TableCell>
                         <TableCell>
                           <DropdownMenu>
@@ -315,9 +315,9 @@ const DiscountCodes = () => {
             if (!next) setEditing(null);
           }}
         >
-          <DialogContent className="max-w-md border-alma-hairline bg-alma-canvas">
+          <DialogContent className="max-w-md border-line bg-canvas">
             <DialogHeader>
-              <DialogTitle className="font-display text-alma-ink">{editing ? "Editar código" : "Nuevo código"}</DialogTitle>
+              <DialogTitle className="font-display text-ink">{editing ? "Editar código" : "Nuevo código"}</DialogTitle>
             </DialogHeader>
             <form
               noValidate

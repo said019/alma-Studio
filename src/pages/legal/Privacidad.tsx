@@ -16,7 +16,7 @@ const Privacidad = () => {
       current="/legal/privacidad"
       title={
         <>
-          Aviso de <span className="font-display-italic">privacidad</span>
+          Aviso de <span className="font-display">privacidad</span>
         </>
       }
     >
