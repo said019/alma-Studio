@@ -113,42 +113,118 @@
 }
 
 @layer base {
-  :root {
-    /* La app es de tema claro únicamente. Esto evita que el "modo oscuro
-       automático" del navegador/sistema invierta el texto de inputs y
-       botones (causa de fechas/valores que se veían en blanco). */
+  /* HIVE — copia de src/design/tokens.ts (LIGHT / DARK). Tripletas RGB para
+     Tailwind (rgb(var(--c-x) / a)) y HSL para shadcn. El tema lo fija
+     <html data-theme> (src/design/theme.ts e index.html). El selector del tema
+     claro también vale en una sección anidada (p. ej. /sistema). */
+  :root,
+  [data-theme="light"] {
     color-scheme: light;
+    --c-canvas: 242 239 234;
+    --c-surface: 255 255 255;
+    --c-sunken: 232 227 220;
+    --c-line: 221 214 205;
+    --c-line-strong: 138 127 115;
+    --c-ink: 26 23 20;
+    --c-ink-muted: 107 98 89;
+    --c-ink-faint: 138 127 115;
+    --c-accent: 207 138 107;
+    --c-accent-deep: 169 96 63;
+    --c-on-accent: 26 23 20;
+    --c-accent-soft: 243 222 211;
+    --c-accent-strong: 154 82 54;
+    --c-success: 46 107 80;
+    --c-danger: 163 36 59;
+    --c-inverse: 26 23 20;
+    --c-inverse-raised: 38 34 30;
+    --c-on-inverse: 242 239 234;
+    --c-on-inverse-muted: 166 156 145;
+    --c-shadow: 26 23 20;
+    --shadow-alpha: 0.08;
 
-    /* HIVE — valores de src/design/tokens.ts en HSL (los lee shadcn). */
     --background: 38 24% 93%;            /* canvas #F2EFEA */
     --foreground: 30 13% 9%;             /* ink #1A1714 */
-
     --card: 0 0% 100%;                   /* surface #FFFFFF */
     --card-foreground: 30 13% 9%;
-
     --popover: 0 0% 100%;
     --popover-foreground: 30 13% 9%;
-
     --primary: 30 13% 9%;                /* ink */
     --primary-foreground: 38 24% 93%;    /* canvas */
-
     --secondary: 35 21% 89%;             /* sunken #E8E3DC */
     --secondary-foreground: 30 13% 9%;
-
-    --muted: 35 21% 89%;                 /* sunken */
+    --muted: 35 21% 89%;
     --muted-foreground: 30 9% 38%;       /* inkMuted #6B6259 */
-
-    /* shadcn ya no define la variable de acento: en HIVE ese nombre es la terracota (tailwind.config.ts). */
-
+    /* shadcn ya no define la variable de acento: en HIVE ese nombre es la terracota. */
     --destructive: 349 64% 39%;          /* danger #A3243B */
     --destructive-foreground: 38 24% 93%;
-
     --border: 34 19% 84%;                /* line #DDD6CD */
     --input: 31 9% 50%;                  /* lineStrong #8A7F73 (3:1) */
     --ring: 30 13% 9%;                   /* ink */
 
     --radius: 0.75rem;
   }
+
+  [data-theme="dark"] {
+    color-scheme: dark;
+    --c-canvas: 20 18 16;
+    --c-surface: 30 27 24;
+    --c-sunken: 23 20 18;
+    --c-line: 46 42 38;
+    --c-line-strong: 111 102 93;
+    --c-ink: 242 239 234;
+    --c-ink-muted: 166 156 145;
+    --c-ink-faint: 138 127 115;
+    --c-accent: 207 138 107;
+    --c-accent-deep: 169 96 63;
+    --c-on-accent: 20 18 16;
+    --c-accent-soft: 58 42 34;
+    --c-accent-strong: 221 160 132;
+    --c-success: 143 203 168;
+    --c-danger: 240 163 155;
+    --c-inverse: 242 239 234;
+    --c-inverse-raised: 255 255 255;
+    --c-on-inverse: 20 18 16;
+    --c-on-inverse-muted: 107 98 89;
+    --c-shadow: 0 0 0;
+    --shadow-alpha: 0.45;
+
+    --background: 30 11% 7%;             /* canvas #141210 */
+    --foreground: 38 24% 93%;            /* ink #F2EFEA */
+    --card: 30 11% 11%;                  /* surface #1E1B18 */
+    --card-foreground: 38 24% 93%;
+    --popover: 30 11% 11%;
+    --popover-foreground: 38 24% 93%;
+    --primary: 38 24% 93%;               /* ink */
+    --primary-foreground: 30 11% 7%;     /* canvas */
+    --secondary: 24 12% 8%;              /* sunken #171412 */
+    --secondary-foreground: 38 24% 93%;
+    --muted: 24 12% 8%;
+    --muted-foreground: 31 11% 61%;      /* inkMuted #A69C91 */
+    --destructive: 6 74% 77%;            /* danger #F0A39B */
+    --destructive-foreground: 30 11% 7%;
+    --border: 30 10% 16%;                /* line #2E2A26 */
+    --input: 30 9% 40%;                  /* lineStrong #6F665D (3:1) */
+    --ring: 38 24% 93%;                  /* ink */
+  }
+}
+
+/* Tratamientos de la app oscura (spec 2026-09-25 §3.3 reglas 4 y 5). Hechos con
+   las variables del tema: nada de color escrito a mano. */
+@layer utilities {
+  .bg-accent-gradient { background-image: linear-gradient(135deg, rgb(var(--c-accent)), rgb(var(--c-accent-deep))); }
+  .shadow-accent-glow { box-shadow: 0 0 22px rgb(var(--c-accent) / 0.3); }
+  .shadow-float { box-shadow: 0 8px 24px rgb(var(--c-shadow) / var(--shadow-alpha)); }
+  .bg-app-glow {
+    background-image:
+      radial-gradient(110% 55% at 0% 0%, rgb(var(--c-accent-deep) / 0.24), transparent 62%),
+      radial-gradient(80% 40% at 100% 70%, rgb(var(--c-accent-deep) / 0.1), transparent 70%);
+  }
+  .bg-pedestal-glow { background-image: radial-gradient(circle, rgb(var(--c-accent) / 0.38), transparent 65%); }
+  .bg-pedestal-base {
+    background-image: radial-gradient(ellipse at 50% 30%, rgb(var(--c-surface)), rgb(var(--c-canvas)) 70%);
+    box-shadow: inset 0 -1px 0 rgb(var(--c-accent) / 0.55);
+  }
+  .clip-hex { clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%); }
 }
 
 @layer base {

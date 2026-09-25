@@ -1,12 +1,14 @@
 import { useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { COLOR } from "@/design/tokens";
+import { useTheme } from "@/design/theme";
 
 
 // 404 editorial: tipografía sola (numeral gigante + serif cálido),
 // sin foto para mantener la página ligera y limpia.
 const NotFound = () => {
   const location = useLocation();
+  useTheme("dark", location.pathname);
 
   useEffect(() => {
     console.error("404 Error: User attempted to access non-existent route:", location.pathname);

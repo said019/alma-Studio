@@ -1,8 +1,10 @@
 import type { Config } from "tailwindcss";
-import { COLOR } from "./src/design/tokens";
+
+/** Color por variable del tema (src/index.css): rgb(var(--c-x) / alfa). */
+const v = (name: string) => `rgb(var(--c-${name}) / <alpha-value>)`;
 
 export default {
-  darkMode: ["class"],
+  darkMode: ["selector", '[data-theme="dark"]'],
   content: ["./pages/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}", "./app/**/*.{ts,tsx}", "./src/**/*.{ts,tsx}"],
   prefix: "",
   theme: {
@@ -26,25 +28,26 @@ export default {
         popover: { DEFAULT: "hsl(var(--popover))", foreground: "hsl(var(--popover-foreground))" },
         card: { DEFAULT: "hsl(var(--card))", foreground: "hsl(var(--card-foreground))" },
 
-        /* HIVE — tokens por función (src/design/tokens.ts). */
-        canvas: COLOR.canvas,
-        surface: COLOR.surface,
-        sunken: COLOR.sunken,
-        line: { DEFAULT: COLOR.line, strong: COLOR.lineStrong },
-        ink: { DEFAULT: COLOR.ink, muted: COLOR.inkMuted },
+        /* HIVE — tokens por función; el valor sale del tema (src/design/tokens.ts). */
+        canvas: v("canvas"),
+        surface: v("surface"),
+        sunken: v("sunken"),
+        line: { DEFAULT: v("line"), strong: v("line-strong") },
+        ink: { DEFAULT: v("ink"), muted: v("ink-muted"), faint: v("ink-faint") },
         accent: {
-          DEFAULT: COLOR.accent,
-          soft: COLOR.accentSoft,
-          strong: COLOR.accentStrong,
-          foreground: COLOR.onAccent,
+          DEFAULT: v("accent"),
+          deep: v("accent-deep"),
+          soft: v("accent-soft"),
+          strong: v("accent-strong"),
+          foreground: v("on-accent"),
         },
-        success: COLOR.success,
-        danger: COLOR.danger,
+        success: v("success"),
+        danger: v("danger"),
         inverse: {
-          DEFAULT: COLOR.inverse,
-          raised: COLOR.inverseRaised,
-          foreground: COLOR.onInverse,
-          muted: COLOR.onInverseMuted,
+          DEFAULT: v("inverse"),
+          raised: v("inverse-raised"),
+          foreground: v("on-inverse"),
+          muted: v("on-inverse-muted"),
         },
       },
       borderRadius: {
