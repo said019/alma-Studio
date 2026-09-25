@@ -91,7 +91,7 @@ const ProfilePreferences = () => {
           trailing={
             <span
               aria-live="polite"
-              className="text-[0.72rem] uppercase tracking-[0.18em]"
+              className="text-[0.75rem] uppercase tracking-[0.18em]"
               style={{ color: COLOR.ink, opacity: 0.5 }}
             >
               {mutation.isPending ? "Guardando…" : ""}

@@ -29,7 +29,7 @@ const NotFound = () => {
 
       <main className="flex flex-1 items-center justify-center px-6 py-16">
         <div className="max-w-xl text-center">
-          <p className="text-[0.68rem] uppercase tracking-[0.32em] font-medium mb-2" style={{ color: COLOR.accentStrong }}>
+          <p className="text-[0.75rem] uppercase tracking-[0.32em] font-medium mb-2" style={{ color: COLOR.accentStrong }}>
             Estudio de Pilates · Juriquilla
           </p>
           <p

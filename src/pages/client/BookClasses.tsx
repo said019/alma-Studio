@@ -394,7 +394,7 @@ const BookClasses = () => {
                       : "text-ink-muted")
                   }
                 >
-                  <span className="text-[0.72rem] uppercase tracking-[0.12em]">
+                  <span className="text-[0.75rem] uppercase tracking-[0.12em]">
                     {DAY_LABELS[i]}
                   </span>
                   <span
@@ -443,7 +443,7 @@ const BookClasses = () => {
           <>
             {/* ── Lista editorial del día elegido (móvil) ── */}
             <div id="day-panel" role="tabpanel" className="lg:hidden">
-              <h2 className="mt-5 text-[0.72rem] font-medium uppercase tracking-[0.24em] text-ink-muted">
+              <h2 className="mt-5 text-[0.75rem] font-medium uppercase tracking-[0.24em] text-ink-muted">
                 {format(selectedDay, "EEEE d 'de' MMMM", { locale: es })}
               </h2>
               {loadingClasses ? (
@@ -485,7 +485,7 @@ const BookClasses = () => {
                     className={"min-w-0 " + (i > 0 ? "pl-3 border-l border-line " : "") + (i < 6 ? "pr-3" : "")}
                   >
                     <div className="flex items-baseline gap-1.5 pb-2">
-                      <span className={"text-[0.72rem] uppercase tracking-[0.18em] " + (today ? "text-accent-strong" : "text-ink-muted")}>
+                      <span className={"text-[0.75rem] uppercase tracking-[0.18em] " + (today ? "text-accent-strong" : "text-ink-muted")}>
                         {DAY_LABELS[i]}
                       </span>
                       <span className={"nums font-display text-[1.15rem] leading-none " + (today ? "text-accent-strong" : "text-ink")}>
@@ -543,7 +543,7 @@ const ClassRow = ({ cls, state, onPick }: ClassRowProps) => {
     <>
       <div className="w-[3.2rem]">
         <p className="nums font-display text-[1.1rem] leading-none text-ink">{cls.timeLabel}</p>
-        {cls.endLabel && <p className="nums mt-1 text-[0.72rem] leading-none text-ink-muted">{cls.endLabel}</p>}
+        {cls.endLabel && <p className="nums mt-1 text-[0.75rem] leading-none text-ink-muted">{cls.endLabel}</p>}
       </div>
       <div className="min-w-0">
         <p className="text-[0.94rem] font-medium leading-tight truncate text-ink">{cls.name}</p>
@@ -610,13 +610,13 @@ const ClassCell = ({ cls, state, onPick }: ClassRowProps) => {
     <>
       <p className="nums font-display text-[0.95rem] leading-none text-ink">{cls.timeLabel}</p>
       <p className="mt-1 text-[0.82rem] font-medium leading-snug text-ink">{cls.name}</p>
-      <p className="mt-0.5 flex items-center gap-1.5 text-[0.72rem] text-ink-muted">
+      <p className="mt-0.5 flex items-center gap-1.5 text-[0.75rem] text-ink-muted">
         {cls.instructorPhoto && (
           <img src={cls.instructorPhoto} alt="" className="shrink-0 rounded-full object-cover w-4 h-4 border border-line" />
         )}
         <span className="truncate">{meta}</span>
       </p>
-      <p className="mt-1 text-[0.72rem] uppercase tracking-[0.12em] text-accent-strong">
+      <p className="mt-1 text-[0.75rem] uppercase tracking-[0.12em] text-accent-strong">
         {CAT_LABEL[cls.classCat]}
       </p>
       <p className={"nums mt-1.5 text-[0.75rem] font-medium " + (isFull ? "text-ink-muted" : showReservarBtn ? "text-accent-strong" : state.toneClass)}>

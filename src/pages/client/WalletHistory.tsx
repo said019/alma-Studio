@@ -89,7 +89,7 @@ const WalletHistory = () => {
           )}
         </Section>
 
-        <p className="mt-10 text-[0.74rem] text-ink-muted">
+        <p className="mt-10 text-[0.75rem] text-ink-muted">
           Los puntos se acreditan al cierre de cada visita.
         </p>
       </AppShell>

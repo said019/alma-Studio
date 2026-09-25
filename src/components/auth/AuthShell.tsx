@@ -127,7 +127,7 @@ export const AuthShell = ({
           </div>
 
           <div className="max-w-[440px]">
-            <span className="text-[0.72rem] font-medium uppercase tracking-[0.32em] text-ink-muted">
+            <span className="text-[0.75rem] font-medium uppercase tracking-[0.32em] text-ink-muted">
               {brandEyebrow}
             </span>
             <h2
@@ -178,7 +178,7 @@ export const AuthShell = ({
             )}
           </div>
 
-          <div className="hidden lg:flex items-center justify-between text-[0.72rem] uppercase tracking-[0.22em] text-ink-muted">
+          <div className="hidden lg:flex items-center justify-between text-[0.75rem] uppercase tracking-[0.22em] text-ink-muted">
             <span>Move with intention</span>
             <span>Juriquilla, Querétaro, MX</span>
           </div>
@@ -189,7 +189,7 @@ export const AuthShell = ({
       <main className="relative flex flex-col justify-center px-6 sm:px-10 lg:px-14 py-10 lg:py-12">
         <div className="mx-auto w-full max-w-[460px]">
           <div className="mb-9">
-            <span className="inline-flex items-center gap-2 text-[0.72rem] font-medium uppercase tracking-[0.32em] text-accent-strong">
+            <span className="inline-flex items-center gap-2 text-[0.75rem] font-medium uppercase tracking-[0.32em] text-accent-strong">
               <span className="inline-block h-px w-5 bg-ink" />
               {formEyebrow}
             </span>
@@ -218,7 +218,7 @@ export const AuthShell = ({
 
           {footer && <div className="mt-8">{footer}</div>}
 
-          <p className="mt-10 text-[0.72rem] uppercase tracking-[0.2em] text-ink-muted">
+          <p className="mt-10 text-[0.75rem] uppercase tracking-[0.2em] text-ink-muted">
             © <span className="nums">{new Date().getFullYear()}</span> HIVE Pilates Studio
           </p>
         </div>
@@ -288,7 +288,7 @@ export const AuthPasswordField = forwardRef<HTMLInputElement, AuthPasswordFieldP
           {forgotLink && (
             <Link
               to={forgotLink}
-              className="rounded-md text-[0.74rem] no-underline transition-opacity hover:opacity-75 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong text-accent-strong"
+              className="rounded-md text-[0.75rem] no-underline transition-opacity hover:opacity-75 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong text-accent-strong"
             >
               ¿Olvidaste?
             </Link>
@@ -457,7 +457,7 @@ export const AuthDivider = ({ label }: { label?: string }) => (
   <div className="my-7 flex items-center gap-4">
     <span className="flex-1 h-px bg-line" />
     {label && (
-      <span className="text-[0.72rem] uppercase tracking-[0.22em] text-ink-muted">
+      <span className="text-[0.75rem] uppercase tracking-[0.22em] text-ink-muted">
         {label}
       </span>
     )}
@@ -478,7 +478,7 @@ type AuthCheckboxProps = {
 
 export const AuthCheckbox = ({ checked, onChange, children, error }: AuthCheckboxProps) => (
   <div className="flex flex-col gap-1">
-    <label className="flex items-start gap-3 cursor-pointer group">
+    <label className="flex min-h-[44px] items-start gap-3 cursor-pointer group">
       <button
         type="button"
         role="checkbox"
@@ -518,7 +518,7 @@ export const AuthPasswordRules = ({ password = "" }: { password?: string }) => {
   return (
     <ul className="mt-1 grid grid-cols-1 sm:grid-cols-3 gap-y-1 gap-x-4 list-none p-0 m-0">
       {rules.map((r) => (
-        <li key={r.label} className={"flex items-center gap-2 text-[0.74rem] " + (r.ok ? "text-success" : "text-ink-muted")}>
+        <li key={r.label} className={"flex items-center gap-2 text-[0.75rem] " + (r.ok ? "text-success" : "text-ink-muted")}>
           <span
             className={
               "grid h-4 w-4 place-items-center rounded-full border text-canvas transition-colors " +

@@ -75,7 +75,7 @@ const Responsiva = () => {
             {/* Summary card */}
             <div className="rounded-3xl p-5 sm:p-7" style={{ backgroundColor: COLOR.sunken }}>
               <p
-                className="text-[0.72rem] font-medium uppercase tracking-[0.24em] mb-1.5"
+                className="text-[0.75rem] font-medium uppercase tracking-[0.24em] mb-1.5"
                 style={{ color: COLOR.accentStrong }}
               >
                 Firmada

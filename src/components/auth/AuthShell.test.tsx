@@ -1,7 +1,7 @@
-import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, it, expect, vi } from "vitest";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { AuthShell, AuthField } from "./AuthShell";
+import { AuthShell, AuthField, AuthCheckbox } from "./AuthShell";
 import { describeZone } from "@/design/zoneGuard";
 
 describeZone([
@@ -84,5 +84,15 @@ describe("AuthField — alineado con fields.tsx (spec §4.4, ruling F6)", () => 
     const label = screen.getByText("Correo");
     expect(label.className).toMatch(/text-\[0\.75rem\]/);
     expect(label.className).toMatch(/text-ink-muted\b/);
+  });
+});
+
+describe("AuthCheckbox — objetivo táctil", () => {
+  it("toda la fila activa la casilla y mide al menos 44 px", () => {
+    const onChange = vi.fn();
+    render(<AuthCheckbox checked={false} onChange={onChange}>Acepto la responsiva</AuthCheckbox>);
+    fireEvent.click(screen.getByText("Acepto la responsiva"));
+    expect(onChange).toHaveBeenCalledWith(true);
+    expect(screen.getByText("Acepto la responsiva").closest("label")!.className).toContain("min-h-[44px]");
   });
 });

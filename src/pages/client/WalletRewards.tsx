@@ -140,7 +140,7 @@ const WalletRewards = () => {
                         <h3 className="font-display text-[1.25rem] leading-tight text-ink">
                           {ms.next_milestone.name}
                         </h3>
-                        <span className="nums text-[0.72rem] uppercase tracking-[0.18em] text-accent-strong">
+                        <span className="nums text-[0.75rem] uppercase tracking-[0.18em] text-accent-strong">
                           +{ms.next_milestone.award_points} pts
                         </span>
                       </div>
@@ -150,7 +150,7 @@ const WalletRewards = () => {
                         </p>
                       )}
                       <div className="mt-4">
-                        <div className="flex items-center justify-between text-[0.74rem]">
+                        <div className="flex items-center justify-between text-[0.75rem]">
                           <span className="nums text-ink-muted">
                             <strong className="text-accent-strong">{ms.lifetime_classes}</strong> de {ms.next_milestone.classes_required} clases
                           </span>
@@ -173,14 +173,14 @@ const WalletRewards = () => {
                   {/* Logros conseguidos */}
                   {ms.milestones.some((m) => m.achieved) && (
                     <div className="mt-5 border-t border-line pt-5">
-                      <p className="mb-3 text-[0.72rem] uppercase tracking-[0.22em] text-ink-muted">
+                      <p className="mb-3 text-[0.75rem] uppercase tracking-[0.22em] text-ink-muted">
                         Tus logros desbloqueados
                       </p>
                       <div className="flex flex-wrap gap-2">
                         {ms.milestones.filter((m) => m.achieved).map((m) => (
                           <span
                             key={m.id}
-                            className="inline-flex items-center gap-1.5 rounded-full bg-sunken px-3 py-1.5 text-[0.74rem] text-accent-strong"
+                            className="inline-flex items-center gap-1.5 rounded-full bg-sunken px-3 py-1.5 text-[0.75rem] text-accent-strong"
                           >
                             <Check size={12} />
                             {m.name}
@@ -265,7 +265,7 @@ const WalletRewards = () => {
                               Canjear
                             </PrimaryButton>
                           ) : (
-                            <p className="text-[0.72rem] uppercase tracking-[0.16em] text-ink-muted">
+                            <p className="text-[0.75rem] uppercase tracking-[0.16em] text-ink-muted">
                               {outOfStock ? (
                                 "Agotada"
                               ) : (

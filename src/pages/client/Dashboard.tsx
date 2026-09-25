@@ -51,7 +51,7 @@ const AccountRow = ({
   valueClassName?: string;
 }) => (
   <div className="grid grid-cols-[1fr_auto] items-baseline gap-4 py-2.5 border-t border-line-strong">
-    <span className="text-[0.72rem] uppercase tracking-[0.18em] text-ink-muted">
+    <span className="text-[0.75rem] uppercase tracking-[0.18em] text-ink-muted">
       {label}
     </span>
     <span className={`nums text-right ${valueClassName}`}>
@@ -230,11 +230,11 @@ const Dashboard = () => {
                     <h3 className="font-display leading-tight text-ink text-[1.25rem]">
                       {ms.next_milestone.name}
                     </h3>
-                    <span className="nums text-[0.72rem] font-medium uppercase tracking-[0.18em] text-accent-strong">
+                    <span className="nums text-[0.75rem] font-medium uppercase tracking-[0.18em] text-accent-strong">
                       +{ms.next_milestone.award_points} pts
                     </span>
                   </div>
-                  <div className="mt-2 flex items-center justify-between gap-3 text-[0.74rem]">
+                  <div className="mt-2 flex items-center justify-between gap-3 text-[0.75rem]">
                     <span className="nums text-ink-muted">
                       <strong className="text-accent-strong">{ms.lifetime_classes}</strong> de {ms.next_milestone.classes_required} clases
                     </span>
@@ -253,7 +253,7 @@ const Dashboard = () => {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
             <div className="lg:col-span-7 rounded-[20px] border border-line bg-surface dark:bg-surface/70 p-5 sm:p-6">
               <div className="flex items-center justify-between gap-3 mb-3">
-                <span className="text-[0.72rem] font-medium uppercase tracking-[0.24em] text-accent-strong">
+                <span className="text-[0.75rem] font-medium uppercase tracking-[0.24em] text-accent-strong">
                   Membresía
                 </span>
                 {!membershipError && membership && classLimit !== null && (
@@ -318,7 +318,7 @@ const Dashboard = () => {
             {walletError ? (
               <div className="lg:col-span-5 rounded-[20px] border border-line bg-surface dark:bg-surface/70 p-5 sm:p-6 flex flex-col justify-between gap-5">
                 <div>
-                  <span className="text-[0.72rem] font-medium uppercase tracking-[0.24em] text-accent-strong">
+                  <span className="text-[0.75rem] font-medium uppercase tracking-[0.24em] text-accent-strong">
                     Wallet
                   </span>
                   <p className="mt-2 text-[0.92rem] leading-[1.6] text-ink-muted">
@@ -336,7 +336,7 @@ const Dashboard = () => {
                 className="lg:col-span-5 rounded-[20px] border border-line bg-surface dark:bg-surface/70 p-5 sm:p-6 no-underline flex flex-col justify-between gap-5 text-ink"
               >
                 <div>
-                  <span className="text-[0.72rem] font-medium uppercase tracking-[0.24em] text-accent-strong">
+                  <span className="text-[0.75rem] font-medium uppercase tracking-[0.24em] text-accent-strong">
                     Wallet
                   </span>
                   {loadingWallet ? (
@@ -345,7 +345,7 @@ const Dashboard = () => {
                     </div>
                   ) : (
                     <div className="mt-3 grid grid-cols-[1fr_auto] items-baseline gap-4 py-2.5 border-t border-line">
-                      <span className="text-[0.72rem] uppercase tracking-[0.18em] text-ink-muted">
+                      <span className="text-[0.75rem] uppercase tracking-[0.18em] text-ink-muted">
                         Puntos
                       </span>
                       <span className="nums font-display text-2xl leading-none text-ink">
@@ -354,7 +354,7 @@ const Dashboard = () => {
                     </div>
                   )}
                 </div>
-                <div className="flex items-center justify-between text-[0.74rem] text-accent-strong">
+                <div className="flex items-center justify-between text-[0.75rem] text-accent-strong">
                   <span className="uppercase tracking-[0.18em]">Ver recompensas</span>
                   <WalletIcon size={16} strokeWidth={1.8} />
                 </div>
@@ -434,7 +434,7 @@ const Dashboard = () => {
           </ListGroup>
         </Section>
 
-        <p className="mt-12 lg:mt-16 text-[0.74rem] text-ink-muted">
+        <p className="mt-12 lg:mt-16 text-[0.75rem] text-ink-muted">
           Buena clase, {firstName}.
         </p>
       </AppShell>

@@ -225,7 +225,7 @@ const Wallet = () => {
                 <BrandLogo variant="lockup" size={28} className="text-accent" />
                 <span
                   className={
-                    "inline-flex shrink-0 items-center gap-1.5 pt-1 text-[0.72rem] font-medium uppercase tracking-[0.18em] " +
+                    "inline-flex shrink-0 items-center gap-1.5 pt-1 text-[0.75rem] font-medium uppercase tracking-[0.18em] " +
                     (metrics.hasMembership ? "text-success" : "text-ink-faint")
                   }
                 >
@@ -239,7 +239,7 @@ const Wallet = () => {
 
               {/* Titular y plan */}
               <div className="border-t border-line px-6 py-5 sm:px-7">
-                <p className="text-[0.72rem] uppercase tracking-[0.22em] text-ink-muted">Titular</p>
+                <p className="text-[0.75rem] uppercase tracking-[0.22em] text-ink-muted">Titular</p>
                 <p className="font-display mt-1.5 text-[length:clamp(1.35rem,4.5vw,1.6rem)] leading-tight text-ink">
                   {wallet?.user_name || "Tu pase"}
                 </p>
@@ -250,7 +250,7 @@ const Wallet = () => {
               <div className="grid grid-cols-3 border-t border-line px-6 sm:px-7">
                 {passStats.map((s, i) => (
                   <div key={s.label} className={"min-w-0 py-4 " + (i > 0 ? "border-l border-line pl-4" : "")}>
-                    <p className="text-[0.72rem] uppercase tracking-[0.18em] text-ink-muted">{s.label}</p>
+                    <p className="text-[0.75rem] uppercase tracking-[0.18em] text-ink-muted">{s.label}</p>
                     <p
                       className={
                         "nums font-display mt-1.5 truncate text-[1.3rem] leading-none " +
@@ -266,7 +266,7 @@ const Wallet = () => {
               {/* Próxima clase como dato del pase, sin caja anidada */}
               {wallet?.next_booking && (
                 <div className="border-t border-line px-6 py-4 sm:px-7">
-                  <p className="text-[0.72rem] uppercase tracking-[0.22em] text-ink-muted">Próxima clase</p>
+                  <p className="text-[0.75rem] uppercase tracking-[0.22em] text-ink-muted">Próxima clase</p>
                   <p className="mt-1 truncate text-[0.92rem] text-ink">
                     {wallet.next_booking.class_name || "Clase"}
                     <span className="nums text-ink-muted">
@@ -288,7 +288,7 @@ const Wallet = () => {
                     />
                   </div>
                   <div className="min-w-0">
-                    <p className="flex items-center gap-1.5 text-[0.72rem] font-medium uppercase tracking-[0.2em] text-accent-strong">
+                    <p className="flex items-center gap-1.5 text-[0.75rem] font-medium uppercase tracking-[0.2em] text-accent-strong">
                       <ScanQrCode size={13} />
                       Check-in en recepción
                     </p>
@@ -299,7 +299,7 @@ const Wallet = () => {
                       type="button"
                       onClick={handleCopyCode}
                       className={
-                        "mt-3 inline-flex min-h-[44px] cursor-pointer items-center gap-2 rounded-full border-0 px-4 text-[0.74rem] font-medium uppercase tracking-[0.16em] transition-colors " +
+                        "mt-3 inline-flex min-h-[44px] cursor-pointer items-center gap-2 rounded-full border-0 px-4 text-[0.75rem] font-medium uppercase tracking-[0.16em] transition-colors " +
                         (codeCopied ? "bg-success text-canvas" : "bg-ink text-canvas")
                       }
                     >

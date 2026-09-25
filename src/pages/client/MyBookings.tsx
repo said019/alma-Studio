@@ -190,7 +190,7 @@ const MyBookings = () => {
               <button
                 type="button"
                 onClick={() => setReviewBooking(b)}
-                className="inline-flex min-h-[44px] items-center gap-2 rounded-full border border-accent-strong px-5 text-[0.72rem] font-medium uppercase tracking-[0.16em] bg-transparent cursor-pointer text-accent-strong transition-colors"
+                className="inline-flex min-h-[44px] items-center gap-2 rounded-full border border-accent-strong px-5 text-[0.75rem] font-medium uppercase tracking-[0.16em] bg-transparent cursor-pointer text-accent-strong transition-colors"
               >
                 <Star size={12} /> Dejar reseña
               </button>
@@ -267,7 +267,7 @@ const MyBookings = () => {
                       (showCancelled ? "" : " border-b")
                     }
                   >
-                    <span className="text-[0.72rem] font-medium uppercase tracking-[0.2em] text-ink-muted">
+                    <span className="text-[0.75rem] font-medium uppercase tracking-[0.2em] text-ink-muted">
                       Canceladas <span className="nums">{cancelled.length}</span>
                     </span>
                     <ChevronDown
@@ -299,11 +299,11 @@ const MyBookings = () => {
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter className="gap-2">
-              <AlertDialogCancel className="h-11 rounded-full px-5 text-[0.74rem] font-medium uppercase tracking-[0.18em]">
+              <AlertDialogCancel className="h-11 rounded-full px-5 text-[0.75rem] font-medium uppercase tracking-[0.18em]">
                 Volver
               </AlertDialogCancel>
               <AlertDialogAction
-                className="h-11 rounded-full px-5 text-[0.74rem] font-medium uppercase tracking-[0.18em] bg-danger text-canvas hover:bg-danger/90"
+                className="h-11 rounded-full px-5 text-[0.75rem] font-medium uppercase tracking-[0.18em] bg-danger text-canvas hover:bg-danger/90"
                 onClick={() => cancelId && cancelMutation.mutate(cancelId)}
               >
                 Sí, cancelar
@@ -332,7 +332,7 @@ const MyBookings = () => {
             </DialogHeader>
             <div className="space-y-5 py-2">
               <div>
-                <p className="text-[0.72rem] font-medium uppercase tracking-[0.22em] mb-2 text-ink-muted">
+                <p className="text-[0.75rem] font-medium uppercase tracking-[0.22em] mb-2 text-ink-muted">
                   Calificación
                 </p>
                 <div className="flex gap-1">
@@ -363,7 +363,7 @@ const MyBookings = () => {
                 />
               ) : reviewTags.length > 0 ? (
                 <div>
-                  <p className="text-[0.72rem] font-medium uppercase tracking-[0.22em] mb-2 text-ink-muted">
+                  <p className="text-[0.75rem] font-medium uppercase tracking-[0.22em] mb-2 text-ink-muted">
                     ¿Qué te gustó?
                   </p>
                   <div className="flex flex-wrap gap-2">
@@ -379,7 +379,7 @@ const MyBookings = () => {
                             )
                           }
                           className={
-                            "rounded-full border px-3 py-1.5 text-[0.74rem] cursor-pointer transition-colors " +
+                            "rounded-full border px-3 py-1.5 text-[0.75rem] cursor-pointer transition-colors " +
                             (isSel
                               ? "bg-ink/10 border-accent-strong text-accent-strong font-semibold"
                               : "border-line text-ink font-normal")
@@ -393,7 +393,7 @@ const MyBookings = () => {
                 </div>
               ) : null}
               <div>
-                <p className="text-[0.72rem] font-medium uppercase tracking-[0.22em] mb-2 text-ink-muted">
+                <p className="text-[0.75rem] font-medium uppercase tracking-[0.22em] mb-2 text-ink-muted">
                   Comentario (opcional)
                 </p>
                 <Textarea

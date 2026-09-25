@@ -29,7 +29,7 @@ const YesNoField = ({
   <div className="flex flex-col gap-2.5">
     <span
       id={`${id}-label`}
-      className="text-[0.72rem] font-medium uppercase tracking-[0.18em] leading-[1.8] text-accent-strong"
+      className="text-[0.75rem] font-medium uppercase tracking-[0.18em] leading-[1.8] text-accent-strong"
     >
       {label}
     </span>

@@ -186,7 +186,7 @@ const Profile = () => {
           </ListGroup>
         </Section>
 
-        <p className="nums mt-12 text-[0.72rem] uppercase tracking-[0.18em]" style={{ color: COLOR.ink, opacity: 0.4 }}>
+        <p className="nums mt-12 text-[0.75rem] uppercase tracking-[0.18em]" style={{ color: COLOR.ink, opacity: 0.4 }}>
           Versión Alma · {new Date().getFullYear()}
         </p>
       </AppShell>

@@ -126,11 +126,11 @@ const PlanRow = ({
             {recommended && <Tag tint="accent">Recomendado</Tag>}
             <Tag tint="ink">{CATEGORY_LABEL[category]}</Tag>
             {isUnlimited ? (
-              <span className="text-[0.72rem] uppercase tracking-[0.18em] text-ink-muted">
+              <span className="text-[0.75rem] uppercase tracking-[0.18em] text-ink-muted">
                 Ilimitado
               </span>
             ) : Number(classLimit) > 0 ? (
-              <span className="nums text-[0.72rem] uppercase tracking-[0.18em] text-ink-muted">
+              <span className="nums text-[0.75rem] uppercase tracking-[0.18em] text-ink-muted">
                 {classLimit} {Number(classLimit) === 1 ? "clase" : "clases"}
               </span>
             ) : null}
@@ -139,7 +139,7 @@ const PlanRow = ({
             {plan.name}
           </h3>
           {durationDays > 0 && (
-            <p className="text-[0.74rem] mt-0.5 text-ink-muted">
+            <p className="text-[0.75rem] mt-0.5 text-ink-muted">
               {durationDays} días de vigencia
               {nonTransferable && " · No transferible"}
               {nonRepeatable && " · No repetible"}
@@ -148,7 +148,7 @@ const PlanRow = ({
         </div>
         <div className="text-right">
           {hasOpening && (
-            <div className="nums text-[0.72rem] line-through text-ink-muted">
+            <div className="nums text-[0.75rem] line-through text-ink-muted">
               ${formatMoneyMX(regularPrice)}
             </div>
           )}
@@ -156,15 +156,15 @@ const PlanRow = ({
             ${formatMoneyMX(effectivePrice)}
           </div>
           {hasOpening ? (
-            <div className="text-[0.72rem] uppercase tracking-[0.18em] mt-1 text-accent-strong">
+            <div className="text-[0.75rem] uppercase tracking-[0.18em] mt-1 text-accent-strong">
               apertura
             </div>
           ) : perClass ? (
-            <div className="nums text-[0.72rem] mt-1 text-accent-strong">
+            <div className="nums text-[0.75rem] mt-1 text-accent-strong">
               ${formatMoneyMX(perClass)} por clase
             </div>
           ) : (
-            <div className="text-[0.72rem] uppercase tracking-[0.18em] mt-1 text-ink-muted">
+            <div className="text-[0.75rem] uppercase tracking-[0.18em] mt-1 text-ink-muted">
               MXN
             </div>
           )}
@@ -458,7 +458,7 @@ const Checkout = () => {
                     <span className="grid h-9 w-9 place-items-center rounded-full bg-canvas text-accent-strong">
                       <TagIcon size={14} />
                     </span>
-                    <span className="text-[0.72rem] uppercase tracking-[0.18em] text-ink-muted">
+                    <span className="text-[0.75rem] uppercase tracking-[0.18em] text-ink-muted">
                       Código de descuento
                     </span>
                   </div>
@@ -507,11 +507,11 @@ const Checkout = () => {
           >
             <div className="mx-auto flex max-w-[680px] items-center gap-3 rounded-2xl border border-line bg-canvas p-3 pl-5 shadow-float">
               <div className="min-w-0 flex-1">
-                <p className="truncate text-[0.6rem] uppercase tracking-[0.18em] text-ink-muted">
+                <p className="truncate text-[0.75rem] uppercase tracking-[0.18em] text-ink-muted">
                   {selectedPlan.name}
                 </p>
                 <p className="nums font-display leading-none text-ink" style={{ fontSize: "1.35rem" }}>
-                  ${formatMoneyMX(finalAmount)} <span className="text-[0.58rem] uppercase tracking-[0.16em] text-ink-muted">MXN</span>
+                  ${formatMoneyMX(finalAmount)} <span className="text-[0.75rem] uppercase tracking-[0.16em] text-ink-muted">MXN</span>
                 </p>
               </div>
               <PrimaryButton onClick={() => setStep("method")} className="shrink-0">
@@ -527,7 +527,7 @@ const Checkout = () => {
             <button
               type="button"
               onClick={() => setStep("select")}
-              className="inline-flex min-h-[44px] items-center gap-2 text-[0.74rem] uppercase tracking-[0.2em] mb-5 bg-transparent border-0 cursor-pointer text-ink-muted"
+              className="inline-flex min-h-[44px] items-center gap-2 text-[0.75rem] uppercase tracking-[0.2em] mb-5 bg-transparent border-0 cursor-pointer text-ink-muted"
             >
               <ArrowLeft size={13} /> Cambiar plan
             </button>
@@ -656,7 +656,7 @@ const Checkout = () => {
               </p>
               {(orderNumber || orderId) && (
                 <div className="inline-flex flex-col gap-1 px-5 py-3 rounded-2xl mt-5 border border-line bg-canvas">
-                  <span className="text-[0.72rem] uppercase tracking-[0.24em] text-ink-muted">
+                  <span className="text-[0.75rem] uppercase tracking-[0.24em] text-ink-muted">
                     Número de orden
                   </span>
                   <span className="nums font-mono text-[1.1rem] tracking-widest font-medium text-accent-strong">

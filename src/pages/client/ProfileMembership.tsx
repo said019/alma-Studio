@@ -109,12 +109,12 @@ const ProfileMembership = () => {
             <Section>
               <div className="rounded-3xl p-5 sm:p-7" style={{ backgroundColor: COLOR.sunken }}>
                 <div className="flex items-baseline justify-between gap-4 pb-3" style={{ borderBottom: `1px solid ${COLOR.line}` }}>
-                  <span className="text-[0.72rem] font-medium uppercase tracking-[0.24em]" style={{ color: COLOR.accentStrong }}>
+                  <span className="text-[0.75rem] font-medium uppercase tracking-[0.24em]" style={{ color: COLOR.accentStrong }}>
                     {CATEGORY_LABEL[String(membership.classCategory ?? "all")] ?? "Todas las disciplinas"}
                   </span>
                   <span className="nums font-display" style={{ color: COLOR.accentStrong, fontSize: "clamp(1.6rem, 2.6vw, 2.1rem)" }}>
                     {isUnlimited ? "∞" : Number(membership.classes_remaining ?? 0)}{" "}
-                    <span className="text-[0.72rem] font-sans uppercase tracking-[0.18em]" style={{ color: COLOR.ink, opacity: 0.55 }}>
+                    <span className="text-[0.75rem] font-sans uppercase tracking-[0.18em]" style={{ color: COLOR.ink, opacity: 0.55 }}>
                       por usar
                     </span>
                   </span>
@@ -155,7 +155,7 @@ const ProfileMembership = () => {
                     <div className="nums font-display" style={{ color: COLOR.accentStrong, fontSize: "clamp(1.8rem, 4vw, 2.4rem)" }}>
                       {Number(membership.studioRemaining ?? 0)}
                     </div>
-                    <div className="text-[0.64rem] uppercase tracking-[0.16em] mt-1" style={{ color: COLOR.ink, opacity: 0.6 }}>
+                    <div className="text-[0.75rem] uppercase tracking-[0.16em] mt-1" style={{ color: COLOR.ink, opacity: 0.6 }}>
                       Studio · Mat · Barre · Sculpt
                     </div>
                   </div>
@@ -163,7 +163,7 @@ const ProfileMembership = () => {
                     <div className="nums font-display" style={{ color: COLOR.accentStrong, fontSize: "clamp(1.8rem, 4vw, 2.4rem)" }}>
                       {Number(membership.rtRemaining ?? 0)}
                     </div>
-                    <div className="text-[0.64rem] uppercase tracking-[0.16em] mt-1" style={{ color: COLOR.ink, opacity: 0.6 }}>
+                    <div className="text-[0.75rem] uppercase tracking-[0.16em] mt-1" style={{ color: COLOR.ink, opacity: 0.6 }}>
                       Reformer · Tower
                     </div>
                   </div>

@@ -163,7 +163,7 @@ const Notifications = () => {
           )}
         </Section>
 
-        <p className="mt-10 text-[0.74rem] text-ink-muted">
+        <p className="mt-10 text-[0.75rem] text-ink-muted">
           Configura cuáles avisos recibes desde Perfil, en Preferencias.
         </p>
       </AppShell>

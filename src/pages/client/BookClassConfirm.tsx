@@ -237,7 +237,7 @@ const BookClassConfirm = () => {
                     key={i}
                     className={"grid grid-cols-[auto_1fr] items-baseline gap-4 py-3.5 border-t border-line " + (i === arr.length - 1 ? "border-b" : "")}
                   >
-                    <span className="nums text-[0.72rem] font-medium tracking-[0.18em] text-accent-strong">
+                    <span className="nums text-[0.75rem] font-medium tracking-[0.18em] text-accent-strong">
                       {String(i + 1).padStart(2, "0")}
                     </span>
                     <span className="text-[0.92rem] leading-[1.55] text-ink-muted">

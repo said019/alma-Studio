@@ -110,7 +110,7 @@ const OrderDetail = () => {
             <Section>
               <div className="rounded-3xl p-5 sm:p-7" style={{ backgroundColor: COLOR.sunken }}>
                 <div className="flex flex-wrap items-baseline justify-between gap-3 pb-3" style={{ borderBottom: `1px solid ${COLOR.line}` }}>
-                  <span className="text-[0.72rem] font-medium uppercase tracking-[0.24em]" style={{ color: COLOR.accentStrong }}>
+                  <span className="text-[0.75rem] font-medium uppercase tracking-[0.24em]" style={{ color: COLOR.accentStrong }}>
                     Total
                   </span>
                   <span className="font-display nums leading-none" style={{ color: COLOR.ink, fontSize: "clamp(1.85rem, 3vw, 2.6rem)" }}>

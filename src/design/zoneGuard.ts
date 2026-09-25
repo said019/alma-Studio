@@ -28,6 +28,11 @@ export const opacidadesSinCss = (l: string) =>
     .filter(([c, nombre, n]) => !(c.startsWith("text-") && TALLAS_DE_TEXTO.test(nombre)) && !OPACIDADES.has(Number(n)))
     .map(([c]) => c);
 
+/** Texto de menos de 12 px (spec: mínimo 12 px, `text-[0.75rem]`). */
+const TALLA = /\btext-\[(\d*\.?\d+)(rem|px)\]/g;
+export const textosChicos = (l: string) =>
+  [...l.matchAll(TALLA)].filter(([, n, u]) => (u === "rem" ? Number(n) * 16 : Number(n)) < 12).map(([c]) => c);
+
 export const lineasCon = (src: string, pred: (l: string) => boolean) =>
   src.split("\n").map((l, i) => [l, i + 1] as const).filter(([l]) => pred(l)).map(([, n]) => n);
 
@@ -47,6 +52,9 @@ export function describeZone(files: string[], opciones: { permitir?: RegExp } = 
     });
     it("sólo usa opacidades que Tailwind genera", () => {
       expect(lineasCon(src, (l) => opacidadesSinCss(l).length > 0)).toEqual([]);
+    });
+    it("no escribe texto de menos de 12 px", () => {
+      expect(lineasCon(src, (l) => textosChicos(l).length > 0)).toEqual([]);
     });
     it("nunca pone text-ink sobre un fondo terracota", () => {
       expect(lineasCon(src, (l) => FONDO_TERRACOTA.test(l) && TINTA.test(l))).toEqual([]);

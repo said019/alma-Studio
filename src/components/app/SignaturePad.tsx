@@ -181,7 +181,7 @@ export const SignaturePad = ({ onChange }: SignaturePadProps) => {
       <button
         type="button"
         onClick={handleClear}
-        className="self-end text-[0.74rem] uppercase tracking-[0.18em] transition-opacity hover:opacity-100"
+        className="self-end text-[0.75rem] uppercase tracking-[0.18em] transition-opacity hover:opacity-100"
         style={{ background: "transparent", border: 0, color: COLOR.ink, opacity: 0.5, cursor: "pointer", padding: "2px 0" }}
       >
         Borrar
