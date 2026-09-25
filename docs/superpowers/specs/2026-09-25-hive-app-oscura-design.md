@@ -282,24 +282,42 @@ Los nombres de archivo no cambian.
 
 ## 9. Implementación técnica
 
+**Por qué clases y no variables en línea:** jsdom (el entorno de pruebas) descarta `var(--x)` en estilos en línea (`color`, `background`, `border`), lo que quedó comprobado. Si `COLOR` pasara a ser referencias a variables, las pruebas perderían de vista los colores. Por eso el color de la app viaja en **clases de Tailwind** que leen variables CSS por tema. Tailwind 3.4 las resuelve con transparencias (`bg-surface/70`), degradados y `theme()` (también comprobado).
+
 - **`src/design/tokens.ts`:**
-  - `LIGHT` y `DARK`, dos tablas con las mismas claves (hex `#RRGGBB`).
-  - `COLOR` pasa a ser el mapa de referencias CSS por token (`rgb(var(--c-canvas))`) para estilos en línea.
-  - Un ayudante `alpha(token, opacidad)` devuelve `rgb(var(--c-x) / 0.55)` y reemplaza las 55 concatenaciones `${COLOR.x}NN` (en 18 archivos).
-  - `TONE_STYLE` y `resolveTone` siguen igual por nombre.
+  - `LIGHT` y `DARK`, dos tablas hex con las mismas claves.
+  - `COLOR` sigue existiendo y **es `LIGHT`**, en hex, para el panel y las zonas claras: sus estilos en línea y sus pruebas no cambian, sólo sus valores.
+  - `TONE_STYLE` / `resolveTone` (hex, claro) se conservan para el panel.
+  - Se agrega `TONE_CLASS` / `resolveToneClass`: el mismo tono expresado en clases, para las piezas que viven en los dos temas.
 - **`src/index.css`:**
-  - Variables `--c-<token>` como tripletas RGB en `:root` (claro) y en `[data-theme="dark"]` (oscuro).
-  - Las variables HSL de shadcn, definidas por tema a partir de las mismas tablas.
-  - Una prueba verifica que coincidan con `tokens.ts`, como hoy.
-- **`tailwind.config.ts`:** cada color es `rgb(var(--c-x) / <alpha-value>)`, para que `bg-surface/70` y similares sigan funcionando en los dos temas.
-- **Cambio de tema:** un hook `useTheme("dark" | "light")` en `AppShell`, `AuthShell`, `NotFound` y `AdminLayout` fija `document.documentElement.dataset.theme` y `<meta name="theme-color">`.
-- **Pruebas que comparan colores:**
-  - jsdom no resuelve variables CSS. Las pruebas que hoy comparan hex con `toHaveStyle` pasan a comparar la referencia del token (`COLOR.accent`), o la variable resuelta mediante una hoja de estilos de prueba que define las variables del tema.
-  - El contraste se prueba sobre las tablas hex.
+  - Variables `--c-<token>` como tripletas RGB en `:root` (claro) y en `[data-theme="dark"]` (oscuro), más las HSL de shadcn por tema.
+  - Utilidades `bg-accent-gradient`, `shadow-accent-glow` y `bg-app-glow`, hechas con esas variables.
+- **`tailwind.config.ts`:**
+  - Cada color es `rgb(var(--c-x) / <alpha-value>)`; se agrega `accent.deep`.
+  - `darkMode: ["selector", '[data-theme="dark"]']`, para que `dark:` active los tratamientos propios de la app (degradado, translucidez, resplandor).
+- **Cambio de tema:**
+  - `src/design/theme.ts` expone `useTheme(tema)`, que fija `<html data-theme>` y `<meta name="theme-color">` antes de pintar.
+  - Un script en `index.html` fija el tema según la ruta antes de que cargue React: `/app` y `/auth` → oscuro. Así no parpadea al entrar.
+  - Lo usan `AppShell`, `AuthShell` y `NotFound` (oscuro) y `AdminLayout` (claro).
+- **Zona de la app** (`src/components/app`, `src/components/auth`, `src/pages/client`, `src/pages/auth`, `NotFound`):
+  - Sin `COLOR` en estilos en línea: los colores van en clases por función.
+  - Para los raros casos que necesitan un color en línea (anillos SVG, degradados cónicos) existe `cssColor(token, alfa?)`, que devuelve `rgb(var(--c-x) / a)`.
+  - Las 55 concatenaciones `${COLOR.x}NN` de la zona de la app desaparecen con la reescritura (pasan a `/NN` en la clase); las del panel se quedan en hex claro.
+- **Piezas compartidas con el panel** (`ErrorState`, `EmptyState`, `PrimaryButton`, campos):
+  - Funcionan en los dos temas: el color sale de las variables.
+  - Lo exclusivo de la app va con `dark:`. Por ejemplo, `PrimaryButton` es tinta en el panel y degradado terracota en la app.
+- **Pruebas:**
+  - En la zona de la app se verifican clases, no colores calculados.
+  - El contraste se verifica sobre las tablas hex de los dos temas.
+  - Una prueba confirma que las variables CSS de cada tema coinciden con su tabla.
 - **Guardias** (se conservan y se amplían):
-  - Ningún color escrito a mano fuera de `src/design/`, incluido `rgba()` y `#RRGGBBAA`.
-  - Sin texto claro sobre terracota en los dos temas.
-  - **Nuevas:** `LIGHT` y `DARK` tienen exactamente las mismas claves; no aparece #FA936A; en la zona de la app (`src/pages/client`, `src/components/app`, `src/components/auth`) no hay `bg-white`, `text-white`, `bg-black`, `text-black` ni `#fff`/`#000` que ignoren el tema.
+  - Ningún color escrito a mano fuera de `src/design/`.
+  - Sin texto claro sobre terracota.
+  - **Nuevas:**
+    - `LIGHT` y `DARK` tienen las mismas claves.
+    - No aparece #FA936A.
+    - La zona de la app no importa `COLOR`.
+    - En la zona de la app no hay `bg-white`, `text-white`, `bg-black`, `text-black`, `#fff`/`#000` ni `text-ink` junto a un fondo terracota (en oscuro `ink` es claro).
 - **`/sistema`:** muestra cada token y cada pieza en los dos temas, lado a lado.
 
 ## 10. Verificación
@@ -319,7 +337,7 @@ Los nombres de archivo no cambian.
 ## 11. Riesgos
 
 1. **Pruebas por valor:**
-   - 29 aserciones `toHaveStyle`, en 6 archivos de prueba, comparan colores por hex y hay que reescribirlas.
+   - 29 aserciones `toHaveStyle`, en 6 archivos de prueba, comparan colores por hex. Las de la zona de la app pasan a verificar clases; las del panel siguen en hex.
    - Mitigación: primero la maquinaria de temas con sus pruebas, después las pantallas.
 2. **Blancos y negros fijos:**
    - Las pantallas con blancos o negros propios se verían mal en oscuro.
