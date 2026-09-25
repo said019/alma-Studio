@@ -1,4 +1,12 @@
 import "@testing-library/jest-dom";
+import { configure } from "@testing-library/react";
+
+// Bajo carga (suite completa, CI) el render inicial de una pantalla puede
+// tardar más que el default de 1000ms de testing-library, y una prueba
+// tronaba por lentitud del entorno, no por un defecto real (Task 9 del
+// review). En vez de poner un timeout explícito por cada `findBy` lento, se
+// sube una sola vez aquí para toda la suite.
+configure({ asyncUtilTimeout: 3000 });
 
 Object.defineProperty(window, "matchMedia", {
   writable: true,

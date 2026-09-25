@@ -170,6 +170,55 @@ const SwitchRow = ({
   </div>
 );
 
+// Una tarjeta de plan, para reutilizar dentro de cada categoría conocida y
+// en el cajón "Otros" (M8).
+function PlanCard({ p, onEdit, onToggleActive, onDelete }: {
+  p: Plan; onEdit: (p: Plan) => void; onToggleActive: (p: Plan) => void; onDelete: (p: Plan) => void;
+}) {
+  const rules = [
+    p.isNonTransferable && "No transferible",
+    p.isNonRepeatable && "No repetible",
+    p.morningOnly && "Sólo mañanas",
+    p.isVisitPack && "Paquete de visitas",
+  ].filter(Boolean) as string[];
+  return (
+    <article className={cn("flex flex-col gap-2.5 rounded-2xl border border-line bg-surface p-5", !p.isActive && "opacity-60")}>
+      <div className="flex items-start justify-between gap-2">
+        <h3 className="text-[15px] font-extrabold leading-snug">{p.name}</h3>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" aria-label={`Acciones de ${p.name}`}><MoreHorizontal size={18} /></Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent>
+            <DropdownMenuItem onClick={() => onEdit(p)}>Editar</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onToggleActive(p)}>
+              {p.isActive ? "Desactivar" : "Activar"}
+            </DropdownMenuItem>
+            <DropdownMenuItem className="text-destructive" onClick={() => onDelete(p)}>
+              Eliminar
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+      <div className="flex flex-wrap items-baseline gap-2.5">
+        <span className="nums font-display text-[1.625rem] font-semibold leading-none">{formatMXN(Number(p.price))}</span>
+        {p.openingPrice != null && <span className="nums text-[0.75rem] font-bold text-ink-muted">Apertura {formatMXN(Number(p.openingPrice))}</span>}
+      </div>
+      <p className="text-[13px] text-ink-muted">
+        {p.classLimit == null ? "Ilimitado" : `${p.classLimit} ${p.classLimit === 1 ? "clase" : "clases"}`} · {p.durationDays} días
+      </p>
+      <div className="flex min-h-[24px] flex-wrap gap-1.5">
+        {rules.map((r) => <span key={r} className="rounded-full border border-line px-2.5 py-0.5 text-[0.75rem] font-bold text-ink-muted">{r}</span>)}
+      </div>
+      <div className="border-t border-line pt-2.5">
+        {p.isActive ? <StatusDot tone="success">Activo</StatusDot> : <StatusDot tone="muted">Inactivo</StatusDot>}
+      </div>
+    </article>
+  );
+}
+
+const KNOWN_CATEGORIES = new Set(CATEGORIES.map((c) => c.value));
+
 const PlansList = () => {
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -260,67 +309,57 @@ const PlansList = () => {
           ) : isLoading ? (
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-48 rounded-2xl" />)}</div>
           ) : (
-            CATEGORIES.map((cat) => {
-              const list = plans.filter((p) => (p.classCategory ?? "studio") === cat.value);
-              if (!list.length) return null;
-              return (
-                <section key={cat.value} className="flex flex-col gap-3">
-                  <div className="flex items-baseline gap-2.5">
-                    <h2 className="text-base font-extrabold">{cat.label}</h2>
-                    <span className="text-[13px] text-ink-muted">{list.length} {list.length === 1 ? "plan" : "planes"}</span>
-                  </div>
-                  <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                    {list.map((p) => {
-                      const rules = [
-                        p.isNonTransferable && "No transferible",
-                        p.isNonRepeatable && "No repetible",
-                        p.morningOnly && "Sólo mañanas",
-                        p.isVisitPack && "Paquete de visitas",
-                      ].filter(Boolean) as string[];
-                      return (
-                        <article key={p.id} className={cn("flex flex-col gap-2.5 rounded-2xl border border-line bg-surface p-5", !p.isActive && "opacity-60")}>
-                          <div className="flex items-start justify-between gap-2">
-                            <h3 className="text-[15px] font-extrabold leading-snug">{p.name}</h3>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" aria-label={`Acciones de ${p.name}`}><MoreHorizontal size={18} /></Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent>
-                                <DropdownMenuItem onClick={() => openEdit(p)}>Editar</DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={() => updateMutation.mutate({ ...p, isActive: !p.isActive })}
-                                >
-                                  {p.isActive ? "Desactivar" : "Activar"}
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  className="text-destructive"
-                                  onClick={() => requestDelete(p)}
-                                >
-                                  Eliminar
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
-                          <div className="flex flex-wrap items-baseline gap-2.5">
-                            <span className="nums font-display text-[1.625rem] font-semibold leading-none">{formatMXN(Number(p.price))}</span>
-                            {p.openingPrice != null && <span className="nums text-[0.75rem] font-bold text-ink-muted">Apertura {formatMXN(Number(p.openingPrice))}</span>}
-                          </div>
-                          <p className="text-[13px] text-ink-muted">
-                            {p.classLimit == null ? "Ilimitado" : `${p.classLimit} ${p.classLimit === 1 ? "clase" : "clases"}`} · {p.durationDays} días
-                          </p>
-                          <div className="flex min-h-[24px] flex-wrap gap-1.5">
-                            {rules.map((r) => <span key={r} className="rounded-full border border-line px-2.5 py-0.5 text-[0.75rem] font-bold text-ink-muted">{r}</span>)}
-                          </div>
-                          <div className="border-t border-line pt-2.5">
-                            {p.isActive ? <StatusDot tone="success">Activo</StatusDot> : <StatusDot tone="muted">Inactivo</StatusDot>}
-                          </div>
-                        </article>
-                      );
-                    })}
-                  </div>
-                </section>
-              );
-            })
+            <>
+              {CATEGORIES.map((cat) => {
+                const list = plans.filter((p) => (p.classCategory ?? "studio") === cat.value);
+                if (!list.length) return null;
+                return (
+                  <section key={cat.value} className="flex flex-col gap-3">
+                    <div className="flex items-baseline gap-2.5">
+                      <h2 className="text-base font-extrabold">{cat.label}</h2>
+                      <span className="text-[13px] text-ink-muted">{list.length} {list.length === 1 ? "plan" : "planes"}</span>
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                      {list.map((p) => (
+                        <PlanCard
+                          key={p.id}
+                          p={p}
+                          onEdit={openEdit}
+                          onToggleActive={(plan) => updateMutation.mutate({ ...plan, isActive: !plan.isActive })}
+                          onDelete={requestDelete}
+                        />
+                      ))}
+                    </div>
+                  </section>
+                );
+              })}
+              {/* Categoría no reconocida (por ejemplo "" heredada de datos
+                  viejos): antes desaparecía del todo y no había forma de
+                  editarla ni borrarla (M8). */}
+              {(() => {
+                const others = plans.filter((p) => !KNOWN_CATEGORIES.has((p.classCategory ?? "studio") as CategoryValue));
+                if (!others.length) return null;
+                return (
+                  <section key="otros" className="flex flex-col gap-3">
+                    <div className="flex items-baseline gap-2.5">
+                      <h2 className="text-base font-extrabold">Otros</h2>
+                      <span className="text-[13px] text-ink-muted">{others.length} {others.length === 1 ? "plan" : "planes"}</span>
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                      {others.map((p) => (
+                        <PlanCard
+                          key={p.id}
+                          p={p}
+                          onEdit={openEdit}
+                          onToggleActive={(plan) => updateMutation.mutate({ ...plan, isActive: !plan.isActive })}
+                          onDelete={requestDelete}
+                        />
+                      ))}
+                    </div>
+                  </section>
+                );
+              })()}
+            </>
           )}
         </AdminPage>
 
