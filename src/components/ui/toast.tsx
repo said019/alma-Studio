@@ -22,14 +22,20 @@ const ToastViewport = React.forwardRef<
 ));
 ToastViewport.displayName = ToastPrimitives.Viewport.displayName;
 
+/* F1 — superficie clara (spec §4.7: bordes en vez de sombras; una sombra
+   suave sólo en lo que flota). Fondo surface, borde line para toda
+   variante; el color por variante (danger/success/ink) lo pone Toaster.tsx
+   en el título y la franja. Ningún coral en toasts (ruling F1). */
 const toastVariants = cva(
-  "group pointer-events-auto relative flex w-full items-center justify-between space-x-4 overflow-hidden rounded-2xl border p-5 pr-8 shadow-2xl transition-all data-[swipe=cancel]:translate-x-0 data-[swipe=end]:translate-x-[var(--radix-toast-swipe-end-x)] data-[swipe=move]:translate-x-[var(--radix-toast-swipe-move-x)] data-[swipe=move]:transition-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[swipe=end]:animate-out data-[state=closed]:fade-out-80 data-[state=closed]:slide-out-to-right-full data-[state=open]:slide-in-from-top-full data-[state=open]:sm:slide-in-from-bottom-full",
+  "group pointer-events-auto relative flex w-full items-center justify-between space-x-4 overflow-hidden rounded-2xl border border-line bg-surface p-5 pr-8 text-ink shadow-[0_8px_24px_theme(colors.ink.DEFAULT/8%)] transition-all data-[swipe=cancel]:translate-x-0 data-[swipe=end]:translate-x-[var(--radix-toast-swipe-end-x)] data-[swipe=move]:translate-x-[var(--radix-toast-swipe-move-x)] data-[swipe=move]:transition-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[swipe=end]:animate-out data-[state=closed]:fade-out-80 data-[state=closed]:slide-out-to-right-full data-[state=open]:slide-in-from-top-full data-[state=open]:sm:slide-in-from-bottom-full",
   {
     variants: {
       variant: {
-        default: "border-white/10 bg-inverse text-inverse-foreground",
-        destructive:
-          "destructive group border-accent/30 bg-inverse text-inverse-foreground",
+        default: "",
+        // Marcador "destructive" en el group: lo usan ToastAction/ToastClose
+        // para variar hover/foco sin volver a poner coral.
+        destructive: "destructive",
+        success: "",
       },
     },
     defaultVariants: {
@@ -61,6 +67,8 @@ const ToastAction = React.forwardRef<
 ));
 ToastAction.displayName = ToastPrimitives.Action.displayName;
 
+/* F1 — cerrar en inkMuted (6.18:1, visible) siempre, sin depender de hover;
+   nunca coral. */
 const ToastClose = React.forwardRef<
   React.ElementRef<typeof ToastPrimitives.Close>,
   React.ComponentPropsWithoutRef<typeof ToastPrimitives.Close>
@@ -68,7 +76,7 @@ const ToastClose = React.forwardRef<
   <ToastPrimitives.Close
     ref={ref}
     className={cn(
-      "absolute right-2 top-2 rounded-md p-1 text-foreground/50 opacity-0 transition-opacity group-hover:opacity-100 group-[.destructive]:text-accent-strong/70 hover:text-foreground group-[.destructive]:hover:text-accent-strong focus:opacity-100 focus:outline-none focus:ring-2 group-[.destructive]:focus:ring-accent group-[.destructive]:focus:ring-offset-inverse",
+      "absolute right-2 top-2 rounded-md p-1 text-ink-muted transition-colors hover:text-ink focus:outline-none focus:ring-2 focus:ring-ink focus:ring-offset-2",
       className,
     )}
     toast-close=""
@@ -102,6 +110,7 @@ type ToastActionElement = React.ReactElement<typeof ToastAction>;
 export {
   type ToastProps,
   type ToastActionElement,
+  toastVariants,
   ToastProvider,
   ToastViewport,
   Toast,
