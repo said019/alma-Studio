@@ -31,7 +31,7 @@
   - Archivos: `src/pages/client/*`, `src/pages/auth/*`, `src/pages/NotFound.tsx`, `src/components/app/*`, `src/components/auth/*`, `src/components/brand/HexPedestal.tsx`, `src/components/account/ChangePassword.tsx` y `src/components/ui/toaster.tsx`.
   - Sin `COLOR`, sin `resolveTone`/`TONE_STYLE` (en su lugar `resolveToneClass`/`TONE_CLASS`) y sin colores de color en `style={{…}}`. `style` se admite sólo para medidas y posiciones.
   - El único color en línea permitido es `cssColor(token, alfa?)` (anillos SVG, degradados cónicos), y `DARK`/`LIGHT` sólo donde una librería exige hex, como el QR.
-  - La guardia `src/design/app-zone.test.ts` lo exige archivo por archivo.
+  - La guardia `describeZone([...])` de `src/design/zoneGuard.ts` lo exige. Cada tarea la llama desde su propia prueba con sus archivos, y la Tarea 12 la aplica a la zona entera en `src/design/app-zone.test.ts`.
 - **Tabla de conversión (estilo en línea de hoy → clase en la zona de la app):**
 
   | Hoy | Ahora |
@@ -59,7 +59,7 @@
   | Íconos inactivos, marcadores de posición, deshabilitado | `text-ink-faint` |
 
 - **Procedimiento de pantalla** (tareas 6 a 12):
-  1. Agregar los archivos a `MIGRADOS` en `src/design/app-zone.test.ts` y correrlo: **RED**, listando lo que falta.
+  1. En la prueba de la tarea, llamar `describeZone([...archivos de la tarea])` (import de `@/design/zoneGuard`) y correrla: **RED**, listando lo que falta.
   2. Convertir con la tabla y rehacer según el "Diseño" de la tarea.
   3. Cambiar los textos "Alma" que la tarea lista.
   3b. La guardia revisa **por línea** que un fondo terracota no comparta línea con `text-ink`. Si un ternario junta la rama activa (terracota) con la inactiva (`hover:text-ink`), las ramas van en líneas separadas.
@@ -91,7 +91,7 @@
 4. **Cristal sobre resplandor:** el texto sobre tarjetas `bg-surface/70` encima del resplandor más fuerte debe seguir en ≥4.5:1. → Prueba en la Tarea 1.
 5. **Colores que sobreviven en línea:**
    - Un `style={{ color: … }}` o `COLOR.x` que quede en una pantalla de la app se vería claro sobre negro, y ninguna prueba de estilos lo vería en jsdom.
-   - → Guardia `app-zone` archivo por archivo, con la zona completa exigida en la Tarea 12.
+   - → Guardia `describeZone` en la prueba de cada tarea, con la zona completa exigida en la Tarea 12.
 
 ---
 
@@ -104,6 +104,24 @@ cd "/Users/saidromero/Alma Studio/alma-hive-app"
 git log --oneline -1                      # 7367b46 o posterior en hive-app
 npx vitest run 2>&1 | grep -E "Test Files|Tests "   # esperado: 20 files / 156 tests
 ```
+
+## Ejecución en paralelo (pedido del usuario: varios subagentes)
+
+Olas, cada una sobre la anterior ya fusionada en `hive-app`:
+
+| Ola | Tareas | En paralelo | Archivos que tocan (disjuntos dentro de la ola) |
+|---|---|---|---|
+| 1 | 1 | — | tokens, index.css (HSL claras), scripts, public |
+| 2 | 2 | — | index.css, tailwind, theme, zoneGuard, App, NotFound, index.html, manifest |
+| 3 | 3 · 4 · 5 | sí | 3: AppShell, HexPedestal, pieces/tones tests · 4: widgets · 5: fields, ChangePassword, ui/toaster, toast, switch, input, select |
+| 4 | 6 · 7 · 8 · 9 · 10 · 11 | sí | 6: auth · 7: Dashboard · 8: BookClasses, BookClassConfirm · 9: MyBookings, Orders, Notifications · 10: Wallet*, index.css (una utilidad) · 11: Checkout, UploadDropzone |
+| 5 | 12 | — | perfil, responsiva, 404, ocultas y `app-zone.test.ts` (zona completa) |
+| 6 | 13 | — | /sistema, DESIGN.md |
+| 7 | 14 | — | verificación |
+
+- Cada tarea paralela trabaja en su propio worktree, que sale del `hive-app` del momento. Al aprobarse su revisión, su rama se rebasa sobre `hive-app` y se fusiona con avance rápido.
+- Como ninguna tarea de la misma ola comparte archivo, los rebases son limpios.
+- Ninguna tarea de las olas 3 y 4 edita un archivo común de pruebas: cada una declara su guardia con `describeZone` en su propia prueba.
 
 ---
 
@@ -553,6 +571,8 @@ Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
 - Modify: `src/pages/NotFound.tsx` (sólo el hook de tema)
 - Modify: `index.html`, `public/site.webmanifest`
 - Modify: `src/design/wiring.test.ts` (archivo completo)
+- Create: `src/design/zoneGuard.ts`
+- Test: `src/design/zoneGuard.test.ts`
 
 **Interfaces:**
 - Consumes: `LIGHT`, `DARK`, `THEMES`, `Theme`, `cssVarName` (Tarea 1).
@@ -561,6 +581,7 @@ Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
   - La variante `dark:`, activa bajo `[data-theme="dark"]`.
   - Utilidades nuevas: `bg-accent-gradient`, `shadow-accent-glow`, `bg-app-glow`, `bg-pedestal-glow`, `bg-pedestal-base`, `clip-hex` y `shadow-float`.
   - En `theme.ts`: `applyTheme(theme)`, `useTheme(theme, key?)`, `themeForPath(path): Theme`, `RouteTheme()` y `THEME_COLOR: Record<Theme, string>`.
+  - En `zoneGuard.ts`: `describeZone(files: string[], opciones?: { permitir?: RegExp })`. Lo usan las pruebas de las tareas 3 a 12. `permitir` salta las líneas que coinciden, como los botones oficiales de wallet.
 
 - [ ] **Step 1: Escribir las pruebas**
 
@@ -928,6 +949,88 @@ export function RouteTheme() {
 }
 ```
 
+- [ ] **Step 5b: Ayudante de la guardia de zona**
+
+Primero la prueba, `src/design/zoneGuard.test.ts`:
+
+```ts
+import { describe, it, expect } from "vitest";
+import { FONDO_TERRACOTA, TINTA, FIJOS, COLOR_EN_LINEA } from "./zoneGuard";
+
+const terracotaConTinta = (l: string) => FONDO_TERRACOTA.test(l) && TINTA.test(l);
+
+describe("reglas de la guardia de zona", () => {
+  it("marca text-ink junto a un fondo terracota (en oscuro ink es claro)", () => {
+    expect(terracotaConTinta('className="bg-accent-gradient text-ink"')).toBe(true);
+    expect(terracotaConTinta('className="bg-accent text-ink font-bold"')).toBe(true);
+    expect(terracotaConTinta('className="bg-accent-gradient text-accent-foreground"')).toBe(false);
+    expect(terracotaConTinta('className="bg-accent-soft text-ink"')).toBe(false);
+    expect(terracotaConTinta('className="bg-accent text-ink-muted"')).toBe(false);
+  });
+  it("marca blancos y negros fijos", () => {
+    expect(FIJOS.test('className="bg-white"')).toBe(true);
+    expect(FIJOS.test('fill="#fff"')).toBe(true);
+    expect(FIJOS.test('className="bg-surface text-ink"')).toBe(false);
+  });
+  it("marca color en estilos en línea", () => {
+    expect(COLOR_EN_LINEA.test("style={{ color: x }}")).toBe(true);
+    expect(COLOR_EN_LINEA.test("style={{ backgroundColor: y, height: 4 }}")).toBe(true);
+    expect(COLOR_EN_LINEA.test("style={{ height: 4 }}")).toBe(false);
+  });
+});
+```
+
+Run: `npx vitest run src/design/zoneGuard.test.ts`. Expected: FAIL, porque el módulo no existe.
+
+Después, `src/design/zoneGuard.ts`:
+
+```ts
+import { describe, it, expect } from "vitest";
+import fs from "fs";
+import path from "path";
+
+/**
+ * Guardia de la zona de la app (spec 2026-09-25 §9): el color va en clases por
+ * tema. Cada prueba de pieza o pantalla llama `describeZone([...sus archivos])`;
+ * la Tarea 12 la aplica a la zona entera (src/design/app-zone.test.ts).
+ */
+const root = path.resolve(__dirname, "..", "..");
+export const read = (f: string) => fs.readFileSync(path.join(root, f), "utf8");
+
+/** Fondo terracota en la misma línea que text-ink: en oscuro ink es claro (regla 1). */
+export const FONDO_TERRACOTA = /\b(?:bg-accent(?![\w-])|bg-accent-gradient|from-accent(?![\w-]))/;
+export const TINTA = /\btext-ink(?![\w-])/;
+/** Blancos y negros fijos que ignoran el tema. */
+export const FIJOS = /\b(?:bg|text|border|ring|from|to|via)-(?:white|black)\b|#(?:fff|000)\b/i;
+/** Color en estilo en línea: jsdom no lo ve y no sigue al tema. */
+export const COLOR_EN_LINEA = /style=\{\{[^}]*\b(?:color|backgroundColor|background|borderColor|border|boxShadow|fill|stroke)\s*:/;
+
+export const lineasCon = (src: string, pred: (l: string) => boolean) =>
+  src.split("\n").map((l, i) => [l, i + 1] as const).filter(([l]) => pred(l)).map(([, n]) => n);
+
+export function describeZone(files: string[], opciones: { permitir?: RegExp } = {}) {
+  const libre = (l: string) => !(opciones.permitir && opciones.permitir.test(l));
+  describe.each(files)("zona de la app: %s", (f) => {
+    const src = read(f);
+    it("no usa COLOR ni los tonos en hex", () => {
+      expect(src).not.toMatch(/\bCOLOR\b/);
+      expect(src).not.toMatch(/\bresolveTone\(|\bTONE_STYLE\b/);
+    });
+    it("no pone colores en estilos en línea", () => {
+      expect(lineasCon(src, (l) => libre(l) && COLOR_EN_LINEA.test(l) && !/cssColor\(/.test(l))).toEqual([]);
+    });
+    it("no usa blancos ni negros fijos", () => {
+      expect(lineasCon(src, (l) => libre(l) && FIJOS.test(l))).toEqual([]);
+    });
+    it("nunca pone text-ink sobre un fondo terracota", () => {
+      expect(lineasCon(src, (l) => FONDO_TERRACOTA.test(l) && TINTA.test(l))).toEqual([]);
+    });
+  });
+}
+```
+
+Run: `npx vitest run src/design/zoneGuard.test.ts`. Expected: PASS.
+
 - [ ] **Step 6: Montar el tema**
 
 - En `src/App.tsx`, agregar `import { RouteTheme } from "@/design/theme";` y, dentro de `<BrowserRouter>`, justo antes de `<Routes>`, `<RouteTheme />`.
@@ -993,70 +1096,16 @@ Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
 **Files:**
 - Modify: `src/components/app/AppShell.tsx` (archivo completo)
 - Create: `src/components/brand/HexPedestal.tsx`
-- Create: `src/design/app-zone.test.ts`
 - Modify: `src/components/app/pieces.test.tsx` y `src/components/app/tones.test.tsx` (archivos completos)
 
 **Interfaces:**
-- Consumes: `resolveToneClass`, `TONE_CLASS`, `Tone` (Tarea 1); clases y utilidades (Tarea 2).
+- Consumes: `resolveToneClass`, `TONE_CLASS`, `Tone` (Tarea 1); clases, utilidades y `describeZone` (Tarea 2).
 - Produces:
   - Las mismas exportaciones de `AppShell.tsx` con las mismas props.
   - `GhostButton` gana la prop opcional `tone?: "default" | "danger"`.
   - `HexPedestal({ size?: "sm" | "lg"; icon?: ReactNode; tone?: "accent" | "danger" })`.
-  - `MIGRADOS: string[]` en `app-zone.test.ts`: las tareas 4 a 12 le agregan archivos.
 
-- [ ] **Step 1: Guardia de la zona de la app**
-
-`src/design/app-zone.test.ts`:
-
-```ts
-import { describe, it, expect } from "vitest";
-import fs from "fs";
-import path from "path";
-
-/**
- * Zona de la app (spec 2026-09-25 §9): el color va en clases por tema.
- * Cada tarea agrega aquí los archivos que migra; la Tarea 12 exige la zona entera.
- */
-export const MIGRADOS: string[] = [
-  "src/components/app/AppShell.tsx",
-  "src/components/brand/HexPedestal.tsx",
-];
-
-const root = path.resolve(__dirname, "..", "..");
-const read = (f: string) => fs.readFileSync(path.join(root, f), "utf8");
-
-// Fondo terracota en la misma línea que text-ink: en oscuro ink es claro (regla 1).
-const FONDO_TERRACOTA = /\b(?:bg-accent(?![\w-])|bg-accent-gradient|from-accent(?![\w-]))/;
-const TINTA = /\btext-ink(?![\w-])/;
-// Blancos y negros fijos que ignoran el tema.
-const FIJOS = /\b(?:bg|text|border|ring|from|to|via)-(?:white|black)\b|#(?:fff|000)\b/i;
-// Color en estilo en línea (jsdom no lo ve y no sigue al tema).
-const COLOR_EN_LINEA = /style=\{\{[^}]*\b(?:color|backgroundColor|background|borderColor|border|boxShadow|fill|stroke)\s*:/;
-
-describe.each(MIGRADOS)("zona de la app: %s", (f) => {
-  const src = read(f);
-  it("no usa COLOR ni los tonos en hex", () => {
-    expect(src).not.toMatch(/\bCOLOR\b/);
-    expect(src).not.toMatch(/\bresolveTone\(|\bTONE_STYLE\b/);
-  });
-  it("no pone colores en estilos en línea", () => {
-    const malas = src.split("\n").map((l, i) => [l, i + 1] as const).filter(([l]) => COLOR_EN_LINEA.test(l) && !/cssColor\(/.test(l));
-    expect(malas.map(([, n]) => n)).toEqual([]);
-  });
-  it("no usa blancos ni negros fijos", () => {
-    expect(src).not.toMatch(FIJOS);
-  });
-  it("nunca pone text-ink sobre un fondo terracota", () => {
-    const malas = src.split("\n").map((l, i) => [l, i + 1] as const).filter(([l]) => FONDO_TERRACOTA.test(l) && TINTA.test(l));
-    expect(malas.map(([, n]) => n)).toEqual([]);
-  });
-});
-```
-
-Run: `npx vitest run src/design/app-zone.test.ts`
-Expected: FAIL. `AppShell.tsx` usa `COLOR` y `HexPedestal.tsx` no existe.
-
-- [ ] **Step 2: Escribir las pruebas de las piezas**
+- [ ] **Step 1: Escribir las pruebas de las piezas**
 
 `src/components/app/pieces.test.tsx` (reemplaza el archivo):
 
@@ -1068,6 +1117,9 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   AppShell, PageHeader, PrimaryButton, GhostButton, EmptyState, ErrorState, ListGroup, ListRow, ActionRow, SkeletonRow,
 } from "./AppShell";
+import { describeZone } from "@/design/zoneGuard";
+
+describeZone(["src/components/app/AppShell.tsx", "src/components/brand/HexPedestal.tsx"]);
 
 const wrap = (ui: React.ReactNode, route = "/app") =>
   render(
@@ -1241,12 +1293,12 @@ describe("piezas con tono (clases por tema)", () => {
 });
 ```
 
-- [ ] **Step 3: Correr y ver que fallan**
+- [ ] **Step 2: Correr y ver que fallan**
 
-Run: `npx vitest run src/components/app src/design/app-zone.test.ts`
-Expected: FAIL. `GhostButton` no acepta `tone`, no existe `[data-app-glow]`, `PageHeader` sigue siendo un bloque coral y la guardia marca `COLOR`.
+Run: `npx vitest run src/components/app`
+Expected: FAIL. `GhostButton` no acepta `tone`, no existe `[data-app-glow]`, `PageHeader` sigue siendo un bloque coral y la guardia de zona marca `COLOR` (y `HexPedestal.tsx` no existe).
 
-- [ ] **Step 4: `src/components/brand/HexPedestal.tsx`**
+- [ ] **Step 3: `src/components/brand/HexPedestal.tsx`**
 
 ```tsx
 import type { ReactNode } from "react";
@@ -1282,7 +1334,7 @@ export function HexPedestal({ size = "sm", icon, tone = "accent" }: HexPedestalP
 }
 ```
 
-- [ ] **Step 5: Reescribir `src/components/app/AppShell.tsx`**
+- [ ] **Step 4: Reescribir `src/components/app/AppShell.tsx`**
 
 Reemplazar el archivo completo:
 
@@ -1313,7 +1365,7 @@ import { HexPedestal } from "@/components/brand/HexPedestal";
 /* ═══════════════════════════════════════════════════════════
    AppShell — /app en oscuro (spec 2026-09-25 §5).
    El color viaja en clases por función (bg-canvas, text-ink…) que leen las
-   variables del tema; nada de color en línea (guardia src/design/app-zone.test.ts).
+   variables del tema; nada de color en línea (guardia describeZone, src/design/zoneGuard.ts).
    ═══════════════════════════════════════════════════════════ */
 
 type NavItem = {
@@ -1823,7 +1875,7 @@ export const ErrorState = ({
 );
 ```
 
-- [ ] **Step 6: Pruebas, tipos y build**
+- [ ] **Step 5: Pruebas, tipos y build**
 
 Run:
 
@@ -1835,10 +1887,10 @@ VITE_API_URL=/api npx vite build 2>&1 | tail -2
 ```
 
 Expected:
-- Todo en verde, incluidas `pieces`, `tones` y la guardia `app-zone` de los dos archivos; `tsc` vacío y el build bien.
+- Todo en verde, incluidas `pieces`, `tones` y la guardia de zona de los dos archivos; `tsc` vacío y el build bien.
 - La guardia existente "ninguna pieza compartida pone texto claro sobre coral" sigue en verde. Las líneas con `bg-accent` llevan `text-accent-foreground`; `dark:bg-accent-gradient` no cuenta como `bg-accent`.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
 git add -A src/components/app src/components/brand src/design
@@ -1861,7 +1913,6 @@ Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
 **Files:**
 - Modify: `src/components/app/widgets.tsx` (archivo completo)
 - Test: `src/components/app/widgets.test.tsx`
-- Modify: `src/design/app-zone.test.ts` (agrega `src/components/app/widgets.tsx` a `MIGRADOS`)
 
 **Interfaces:**
 - Consumes: `resolveToneClass`, `Tone` (Tarea 1).
@@ -1869,7 +1920,7 @@ Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
 
 - [ ] **Step 1: Escribir la prueba**
 
-Agregar `"src/components/app/widgets.tsx"` a `MIGRADOS`. Crear `src/components/app/widgets.test.tsx`:
+Crear `src/components/app/widgets.test.tsx`, que declara su guardia de zona:
 
 ```tsx
 import { describe, it, expect } from "vitest";
@@ -1877,6 +1928,9 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { SegmentedTabs, StatusPill, InfoBanner, Stepper, DataRow, StickyCta } from "./widgets";
 import { TONE_CLASS } from "@/design/tokens";
+import { describeZone } from "@/design/zoneGuard";
+
+describeZone(["src/components/app/widgets.tsx"]);
 
 const wrap = (ui: React.ReactNode) => render(<MemoryRouter>{ui}</MemoryRouter>);
 const has = (el: Element, cls: string) => expect(el.className.split(/\s+/)).toContain(cls);
@@ -1921,7 +1975,7 @@ describe("widgets (clases por tema)", () => {
 });
 ```
 
-Run: `npx vitest run src/components/app/widgets.test.tsx src/design/app-zone.test.ts`
+Run: `npx vitest run src/components/app/widgets.test.tsx`
 Expected: FAIL. `widgets.tsx` usa `COLOR` y estilos en línea.
 
 - [ ] **Step 2: Reescribir `src/components/app/widgets.tsx`**
@@ -2149,7 +2203,6 @@ Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
 - Modify: `src/components/ui/toaster.tsx`, `src/components/ui/toast.tsx` (sombra), `src/components/ui/switch.tsx`, `src/components/ui/input.tsx`, `src/components/ui/select.tsx`
 - Modify: `src/components/app/fields.test.tsx`, `src/components/ui/toaster.test.tsx`, `src/components/ui/toast.test.tsx`
 - Test: `src/components/ui/switch.test.tsx`
-- Modify: `src/design/app-zone.test.ts` (`MIGRADOS` += `src/components/app/fields.tsx`, `src/components/account/ChangePassword.tsx`, `src/components/ui/toaster.tsx`)
 
 **Interfaces:**
 - Consumes: clases y utilidades (Tareas 1 y 2).
@@ -2159,12 +2212,15 @@ Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
 
 - [ ] **Step 1: Escribir las pruebas**
 
-Agregar los tres archivos a `MIGRADOS`. Reemplazar `src/components/app/fields.test.tsx`:
+Reemplazar `src/components/app/fields.test.tsx` (declara la guardia de zona de los tres archivos que migra la tarea):
 
 ```tsx
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { Field, PasswordField, PasswordRules } from "./fields";
+import { describeZone } from "@/design/zoneGuard";
+
+describeZone(["src/components/app/fields.tsx", "src/components/account/ChangePassword.tsx", "src/components/ui/toaster.tsx"]);
 
 const has = (el: Element, cls: string) => expect(el.className.split(/\s+/)).toContain(cls);
 
@@ -2221,7 +2277,7 @@ En `src/components/ui/toaster.test.tsx` y `src/components/ui/toast.test.tsx`, ca
 
 Conservar lo que cada prueba verifica.
 
-Run: `npx vitest run src/components/app/fields.test.tsx src/components/ui src/design/app-zone.test.ts`
+Run: `npx vitest run src/components/app/fields.test.tsx src/components/ui`
 Expected: FAIL. `controlStyle` sigue en línea, el switch no tiene la variante `dark:` y `toaster` usa `COLOR`.
 
 - [ ] **Step 2: `src/components/app/fields.tsx`**
@@ -2297,7 +2353,6 @@ Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
 - Modify: `src/components/auth/AuthShell.tsx`
 - Modify: `src/pages/auth/Login.tsx`, `Register.tsx`, `ForgotPassword.tsx`, `ResetPassword.tsx`, `Onboarding.tsx`
 - Modify: `src/components/auth/AuthShell.test.tsx` (aserciones a clases)
-- Modify: `src/design/app-zone.test.ts` (`MIGRADOS` += los 6 archivos)
 
 **Interfaces:**
 - Consumes: `controlClass` (Tarea 5), `HexPedestal` y `PrimaryButton` (Tarea 3), `BrandLogo`.
@@ -2321,7 +2376,7 @@ Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
 
 - [ ] **Step 1: Pruebas en rojo**
 
-Agregar los 6 archivos a `MIGRADOS` y correr la guardia; debe salir en RED. En `AuthShell.test.tsx`, reescribir las aserciones de color por valor a clases, sin cambiar lo que verifican:
+En `AuthShell.test.tsx`, llamar `describeZone(["src/components/auth/AuthShell.tsx", "src/pages/auth/Login.tsx", "src/pages/auth/Register.tsx", "src/pages/auth/ForgotPassword.tsx", "src/pages/auth/ResetPassword.tsx", "src/pages/auth/Onboarding.tsx"])` (import de `@/design/zoneGuard`). Después, reescribir las aserciones de color por valor a clases, sin cambiar lo que verifican:
 - El lockup del enlace lleva `text-accent`.
 - La marca de agua lleva `text-accent` y está oculta a lectores de pantalla.
 - El campo lleva `bg-surface` `dark:bg-sunken` `border-line-strong` `border-[1.5px]`.
@@ -2340,7 +2395,7 @@ Agregar además:
 
 `renderShell` es el helper de render que ya use el archivo; si no existe, crearlo con las 5 props obligatorias.
 
-Run: `npx vitest run src/components/auth src/design/app-zone.test.ts`
+Run: `npx vitest run src/components/auth`
 Expected: FAIL.
 
 - [ ] **Step 2: Implementar el diseño y los textos**
@@ -2380,7 +2435,6 @@ Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
 
 **Files:**
 - Modify: `src/pages/client/Dashboard.tsx`
-- Modify: `src/design/app-zone.test.ts` (`MIGRADOS` += `src/pages/client/Dashboard.tsx`)
 - Test: `src/pages/client/Dashboard.dark.test.ts`
 
 **Diseño (spec §6.1):**
@@ -2396,14 +2450,17 @@ Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
 
 - [ ] **Step 1: Prueba en rojo**
 
-Agregar el archivo a `MIGRADOS`. Crear `src/pages/client/Dashboard.dark.test.ts`:
+Crear `src/pages/client/Dashboard.dark.test.ts`, que declara su guardia de zona:
 
 ```ts
 import { describe, it, expect } from "vitest";
 import fs from "fs";
 import path from "path";
+import { describeZone } from "@/design/zoneGuard";
 
 const src = fs.readFileSync(path.resolve(__dirname, "Dashboard.tsx"), "utf8");
+
+describeZone(["src/pages/client/Dashboard.tsx"]);
 
 describe("Inicio en oscuro (spec 2026-09-25 §6.1)", () => {
   it("encabezado Tu semana / en HIVE.", () => {
@@ -2421,7 +2478,7 @@ describe("Inicio en oscuro (spec 2026-09-25 §6.1)", () => {
 });
 ```
 
-Run: `npx vitest run src/pages/client/Dashboard.dark.test.ts src/design/app-zone.test.ts`
+Run: `npx vitest run src/pages/client/Dashboard.dark.test.ts`
 Expected: FAIL.
 
 - [ ] **Step 2: Implementar** siguiendo el Procedimiento de pantalla. `Dashboard.rings.test.ts` debe seguir en verde.
@@ -2449,7 +2506,6 @@ Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
 
 **Files:**
 - Modify: `src/pages/client/BookClasses.tsx`, `src/pages/client/BookClassConfirm.tsx`
-- Modify: `src/design/app-zone.test.ts` (`MIGRADOS` += los dos)
 - Test: `src/pages/client/BookClasses.dark.test.ts`
 
 **Diseño (spec §6.2 y §6.3):**
@@ -2478,15 +2534,18 @@ Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
 
 - [ ] **Step 1: Prueba en rojo**
 
-Agregar los archivos a `MIGRADOS`. Crear `src/pages/client/BookClasses.dark.test.ts`:
+Crear `src/pages/client/BookClasses.dark.test.ts`, que declara su guardia de zona:
 
 ```ts
 import { describe, it, expect } from "vitest";
 import fs from "fs";
 import path from "path";
+import { describeZone } from "@/design/zoneGuard";
 
 const book = fs.readFileSync(path.resolve(__dirname, "BookClasses.tsx"), "utf8");
 const confirm = fs.readFileSync(path.resolve(__dirname, "BookClassConfirm.tsx"), "utf8");
+
+describeZone(["src/pages/client/BookClasses.tsx", "src/pages/client/BookClassConfirm.tsx"]);
 
 describe("Reservar en oscuro (spec 2026-09-25 §6.2)", () => {
   it("encabezado Reserva tu / próxima clase.", () => {
@@ -2506,7 +2565,7 @@ describe("Confirmar clase (spec 2026-09-25 §6.3)", () => {
 });
 ```
 
-Run: `npx vitest run src/pages/client src/design/app-zone.test.ts`
+Run: `npx vitest run src/pages/client`
 Expected: FAIL (pruebas nuevas y guardia).
 
 - [ ] **Step 2: Implementar** siguiendo el Procedimiento de pantalla (BookClasses 50 usos de `COLOR`; BookClassConfirm 21).
@@ -2536,7 +2595,6 @@ Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
 
 **Files:**
 - Modify: `src/pages/client/MyBookings.tsx`, `src/pages/client/Orders.tsx`, `src/pages/client/Notifications.tsx`
-- Modify: `src/design/app-zone.test.ts` (`MIGRADOS` += los tres)
 - Test: `src/pages/client/MyBookings.dark.test.ts`
 
 **Diseño (spec §6.4, §6.7 y §6.9):**
@@ -2554,14 +2612,17 @@ Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
 
 - [ ] **Step 1: Prueba en rojo**
 
-Agregar los tres archivos a `MIGRADOS`. Crear `src/pages/client/MyBookings.dark.test.ts`:
+Crear `src/pages/client/MyBookings.dark.test.ts`, que declara su guardia de zona:
 
 ```ts
 import { describe, it, expect } from "vitest";
 import fs from "fs";
 import path from "path";
+import { describeZone } from "@/design/zoneGuard";
 
 const r = (f: string) => fs.readFileSync(path.resolve(__dirname, f), "utf8");
+
+describeZone(["src/pages/client/MyBookings.tsx", "src/pages/client/Orders.tsx", "src/pages/client/Notifications.tsx"]);
 
 describe("Mis clases, órdenes y notificaciones (spec 2026-09-25 §6.4, 6.7, 6.9)", () => {
   it("Tus clases / en HIVE.", () => {
@@ -2577,7 +2638,7 @@ describe("Mis clases, órdenes y notificaciones (spec 2026-09-25 §6.4, 6.7, 6.9
 });
 ```
 
-Run: `npx vitest run src/pages/client src/design/app-zone.test.ts`
+Run: `npx vitest run src/pages/client`
 Expected: FAIL.
 
 - [ ] **Step 2: Implementar** siguiendo el Procedimiento de pantalla (MyBookings 33 usos de `COLOR`; Notifications 3; Orders 0, pero revisar sus estilos).
@@ -2607,7 +2668,6 @@ Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
 **Files:**
 - Modify: `src/pages/client/Wallet.tsx`, `src/pages/client/WalletHistory.tsx`, `src/pages/client/WalletRewards.tsx`
 - Modify: `src/index.css` (una utilidad `bg-pass-glow` en `@layer utilities`)
-- Modify: `src/design/app-zone.test.ts` (`MIGRADOS` += los tres)
 - Test: `src/pages/client/Wallet.dark.test.ts`
 
 **Diseño (spec §6.5):**
@@ -2633,14 +2693,20 @@ En `src/index.css`, dentro de `@layer utilities`:
   .bg-pass-glow { background-image: radial-gradient(120% 80% at 100% 0%, rgb(var(--c-accent-deep) / 0.3), transparent 60%); }
 ```
 
-Agregar los tres archivos a `MIGRADOS`. Crear `src/pages/client/Wallet.dark.test.ts`:
+Crear `src/pages/client/Wallet.dark.test.ts`, que declara su guardia de zona:
 
 ```ts
 import { describe, it, expect } from "vitest";
 import fs from "fs";
 import path from "path";
+import { describeZone } from "@/design/zoneGuard";
 
 const src = fs.readFileSync(path.resolve(__dirname, "Wallet.tsx"), "utf8");
+
+describeZone(["src/pages/client/Wallet.tsx", "src/pages/client/WalletHistory.tsx", "src/pages/client/WalletRewards.tsx"], {
+  // Botones oficiales de Apple/Google Wallet: sus colores son de la marca (lista de permitidos en guards.test.ts).
+  permitir: /#(?:000000|FFFFFF|4285F4|EA4335|FBBC05|34A853)/i,
+});
 
 describe("Wallet en oscuro (spec 2026-09-25 §6.5)", () => {
   it("el pase lleva el lockup HIVE y el resplandor", () => {
@@ -2659,7 +2725,7 @@ describe("Wallet en oscuro (spec 2026-09-25 §6.5)", () => {
 });
 ```
 
-Run: `npx vitest run src/pages/client/Wallet.dark.test.ts src/design/app-zone.test.ts`
+Run: `npx vitest run src/pages/client/Wallet.dark.test.ts`
 Expected: FAIL.
 
 - [ ] **Step 2: Implementar** siguiendo el Procedimiento de pantalla (Wallet 30 usos de `COLOR`; WalletRewards 26; WalletHistory 9).
@@ -2688,7 +2754,6 @@ Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
 
 **Files:**
 - Modify: `src/pages/client/Checkout.tsx`, `src/components/app/UploadDropzone.tsx`
-- Modify: `src/design/app-zone.test.ts` (`MIGRADOS` += los dos)
 - Test: `src/pages/client/Checkout.dark.test.ts`
 
 **Diseño (spec §6.6):**
@@ -2703,14 +2768,17 @@ Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
 
 - [ ] **Step 1: Prueba en rojo**
 
-Agregar los archivos a `MIGRADOS`. Crear `src/pages/client/Checkout.dark.test.ts`:
+Crear `src/pages/client/Checkout.dark.test.ts`, que declara su guardia de zona:
 
 ```ts
 import { describe, it, expect } from "vitest";
 import fs from "fs";
 import path from "path";
+import { describeZone } from "@/design/zoneGuard";
 
 const src = fs.readFileSync(path.resolve(__dirname, "Checkout.tsx"), "utf8");
+
+describeZone(["src/pages/client/Checkout.tsx", "src/components/app/UploadDropzone.tsx"]);
 
 describe("Checkout en oscuro (spec 2026-09-25 §6.6)", () => {
   it("el plan elegido lleva borde terracota y fondo terracota suave", () => {
@@ -2723,7 +2791,7 @@ describe("Checkout en oscuro (spec 2026-09-25 §6.6)", () => {
 });
 ```
 
-Run: `npx vitest run src/pages/client/Checkout.dark.test.ts src/design/app-zone.test.ts`
+Run: `npx vitest run src/pages/client/Checkout.dark.test.ts`
 Expected: FAIL.
 
 - [ ] **Step 2: Implementar** siguiendo el Procedimiento de pantalla (Checkout 87 usos de `COLOR`; UploadDropzone 12). Es la pantalla más grande: convertir sección por sección y correr la guardia entre cada una.
@@ -2754,7 +2822,7 @@ Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
 - Modify: `src/pages/client/Profile.tsx`, `ProfileEdit.tsx`, `ProfilePreferences.tsx`, `Responsiva.tsx`, `ProfileMembership.tsx`, `ProfileSecurity.tsx`, `OrderDetail.tsx`
 - Modify: `src/components/app/ResponsivaDialog.tsx`, `src/components/app/SignaturePad.tsx`, `src/components/app/Lightbox.tsx` (revisión)
 - Modify: `src/pages/NotFound.tsx`
-- Modify: `src/design/app-zone.test.ts` (`MIGRADOS` += todos los anteriores, y una prueba de zona completa)
+- Create: `src/design/app-zone.test.ts` (la guardia sobre la zona entera y los textos Alma)
 
 **Diseño:**
 - **Perfil (spec §6.8):**
@@ -2780,24 +2848,35 @@ Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
 
 - [ ] **Step 1: Guardia de zona completa, en rojo**
 
-Agregar todos los archivos de esta tarea a `MIGRADOS`. Al final de `src/design/app-zone.test.ts`, agregar:
+Crear `src/design/app-zone.test.ts`, que aplica la guardia a **toda** la zona (las pruebas de las tareas 3 a 11 ya cubren sus archivos; ésta además atrapa lo que ninguna tarea declaró):
 
 ```ts
-describe("la zona de la app está completa", () => {
-  const listar = (dir: string): string[] =>
-    fs.readdirSync(path.join(root, dir), { withFileTypes: true }).flatMap((e) => {
-      const p = `${dir}/${e.name}`;
-      if (e.isDirectory()) return listar(p);
-      return /\.tsx?$/.test(e.name) && !/\.test\.tsx?$/.test(e.name) ? [p] : [];
-    });
-  const ZONA = [
-    ...listar("src/pages/client"), ...listar("src/pages/auth"), ...listar("src/components/app"), ...listar("src/components/auth"),
-    "src/pages/NotFound.tsx", "src/components/brand/HexPedestal.tsx", "src/components/account/ChangePassword.tsx", "src/components/ui/toaster.tsx",
-  ].sort();
-  it("todo archivo de la zona está migrado", () => {
-    expect(ZONA.filter((f) => !MIGRADOS.includes(f))).toEqual([]);
+import { describe, it, expect } from "vitest";
+import fs from "fs";
+import path from "path";
+import { describeZone, read } from "./zoneGuard";
+
+const root = path.resolve(__dirname, "..", "..");
+const listar = (dir: string): string[] =>
+  fs.readdirSync(path.join(root, dir), { withFileTypes: true }).flatMap((e) => {
+    const p = `${dir}/${e.name}`;
+    if (e.isDirectory()) return listar(p);
+    return /\.tsx?$/.test(e.name) && !/\.test\.tsx?$/.test(e.name) ? [p] : [];
   });
-  it("no quedan textos Alma en la zona, salvo los que decide el sub-proyecto A", () => {
+
+/** Zona de la app (spec 2026-09-25 §9): todo lo que se ve en oscuro. */
+export const ZONA = [
+  ...listar("src/pages/client"), ...listar("src/pages/auth"), ...listar("src/components/app"), ...listar("src/components/auth"),
+  "src/pages/NotFound.tsx", "src/components/brand/HexPedestal.tsx", "src/components/account/ChangePassword.tsx", "src/components/ui/toaster.tsx",
+].sort();
+
+describeZone(ZONA, {
+  // Botones oficiales de Apple/Google Wallet: sus colores son de la marca (lista de permitidos en guards.test.ts).
+  permitir: /#(?:000000|FFFFFF|4285F4|EA4335|FBBC05|34A853)/i,
+});
+
+describe("textos de la zona", () => {
+  it("no quedan textos Alma, salvo los que decide el sub-proyecto A", () => {
     const PERMITIDOS = [/Responsiva y consentimiento informado firmado con Alma Movement/, /alma-pass\.pkpass/, /paleta Alma/];
     const malos = ZONA.flatMap((f) =>
       read(f).split("\n").map((l, i) => [l, i + 1] as const)
@@ -2809,7 +2888,7 @@ describe("la zona de la app está completa", () => {
 ```
 
 Run: `npx vitest run src/design/app-zone.test.ts`
-Expected: FAIL. Salen los archivos que faltan y los textos "Alma".
+Expected: FAIL. Salen los archivos de esta tarea que aún usan `COLOR` y los textos "Alma".
 
 - [ ] **Step 2: Implementar** siguiendo el Procedimiento de pantalla, archivo por archivo: ResponsivaDialog 33 usos de `COLOR`, ProfileMembership 27, Responsiva 12, NotFound 10, SignaturePad 9, OrderDetail 8, Profile 7, ProfilePreferences 5; los demás, revisión.
 
@@ -2824,7 +2903,7 @@ VITE_API_URL=/api npx vite build 2>&1 | tail -2
 grep -rn "COLOR" src/pages/client src/pages/auth src/components/app src/components/auth src/pages/NotFound.tsx --include='*.tsx' | grep -v "\.test\." || echo "✓ zona sin COLOR"
 ```
 
-Expected: todo en verde, incluidas las dos pruebas de zona completa; `tsc` vacío; build bien; `✓ zona sin COLOR`.
+Expected: todo en verde, incluida la guardia de la zona entera; `tsc` vacío; build bien; `✓ zona sin COLOR`.
 
 - [ ] **Step 4: Commit**
 
@@ -2832,8 +2911,8 @@ Expected: todo en verde, incluidas las dos pruebas de zona completa; `tsc` vací
 git add -A src
 git commit -m "feat(hive): perfil, responsiva, 404 y pantallas ocultas en oscuro
 
-Toda la zona de la app lleva el color en clases por tema; la guardia exige
-la zona completa y ningún texto Alma salvo los que decide el sub-proyecto A
+Toda la zona de la app lleva el color en clases por tema; la guardia se
+aplica a la zona entera y no deja ningún texto Alma salvo los que decide el sub-proyecto A
 (subtítulo legal de la responsiva y el nombre del archivo del pase).
 
 Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
