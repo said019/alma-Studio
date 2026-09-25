@@ -17,7 +17,7 @@ import {
   GhostButton,
   SkeletonRow,
 } from "@/components/app/AppShell";
-import { SegmentedTabs } from "@/components/app/widgets";
+import { SegmentedTabs, StatusPill } from "@/components/app/widgets";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -39,7 +39,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { Star, CalendarDays, ChevronDown } from "lucide-react";
 import type { BookingClient } from "@/types/booking";
-import { COLOR, type Tone } from "@/design/tokens";
+import { type Tone } from "@/design/tokens";
 
 type TabId = "upcoming" | "past";
 
@@ -164,41 +164,33 @@ const MyBookings = () => {
     const canReview = isPast && b.status === "checked_in" && !hasReview;
     const hasActions = isCancellable || canReview || hasReview;
     return (
-      <div key={b.id} className="px-1 py-4" style={{ borderTop: `1px solid ${COLOR.line}` }}>
+      <div key={b.id} className="px-1 py-4 border-t border-line">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
-            <div className="text-[0.95rem] font-medium leading-snug" style={{ color: COLOR.ink }}>
+            <div className="text-[0.95rem] font-medium leading-snug text-ink">
               {b.class_type_name ?? "Clase"}
             </div>
-            <div className="nums text-[0.8rem] mt-1" style={{ color: COLOR.ink, opacity: 0.55 }}>
+            <div className="nums text-[0.8rem] mt-1 text-ink-muted">
               {b.start_time ? format(safeParse(b.start_time), "EEE d MMM · HH:mm", { locale: es }) : "Por confirmar"}
               {b.instructor_name ? ` · ${b.instructor_name}` : ""}
             </div>
           </div>
           <div className="shrink-0 pt-0.5">
-            <Tag tint={STATUS_TINT[b.status] ?? "accent"}>
-              {STATUS_LABEL[b.status] ?? b.status}
-            </Tag>
+            <StatusPill label={STATUS_LABEL[b.status] ?? b.status} tone={STATUS_TINT[b.status] ?? "accent"} />
           </div>
         </div>
         {hasActions && (
           <div className="mt-3 flex flex-wrap items-center gap-2">
             {isCancellable && (
-              <button
-                type="button"
-                onClick={() => setCancelId(b.id)}
-                className="inline-flex min-h-[44px] items-center rounded-full px-5 text-[0.72rem] font-medium uppercase tracking-[0.16em] bg-transparent cursor-pointer transition-colors"
-                style={{ border: `1px solid ${COLOR.line}`, color: COLOR.danger }}
-              >
+              <GhostButton tone="danger" onClick={() => setCancelId(b.id)}>
                 Cancelar reserva
-              </button>
+              </GhostButton>
             )}
             {canReview && (
               <button
                 type="button"
                 onClick={() => setReviewBooking(b)}
-                className="inline-flex min-h-[44px] items-center gap-2 rounded-full px-5 text-[0.72rem] font-medium uppercase tracking-[0.16em] bg-transparent cursor-pointer transition-colors"
-                style={{ border: `1px solid ${COLOR.accentStrong}`, color: COLOR.accentStrong }}
+                className="inline-flex min-h-[44px] items-center gap-2 rounded-full border border-accent-strong px-5 text-[0.72rem] font-medium uppercase tracking-[0.16em] bg-transparent cursor-pointer text-accent-strong transition-colors"
               >
                 <Star size={12} /> Dejar reseña
               </button>
@@ -216,7 +208,7 @@ const MyBookings = () => {
         <PageHeader
           eyebrow="Mis reservas"
           title={<>Tus clases</>}
-          titleAccent="en Alma."
+          titleAccent="en HIVE."
         />
 
         <SegmentedTabs<TabId>
@@ -257,27 +249,31 @@ const MyBookings = () => {
                   />
                 )
               ) : (
-                <ListGroup>
-                  {list.map(renderBookingRow)}
-                </ListGroup>
+                <div className={tab === "past" ? "opacity-60" : undefined}>
+                  <ListGroup>
+                    {list.map(renderBookingRow)}
+                  </ListGroup>
+                </div>
               )}
 
               {tab === "past" && cancelled.length > 0 && (
-                <div className="mt-10">
+                <div className="mt-10 opacity-60">
                   <button
                     type="button"
                     onClick={() => setShowCancelled((v) => !v)}
                     aria-expanded={showCancelled}
-                    className="flex w-full min-h-[44px] items-center justify-between bg-transparent border-0 cursor-pointer px-1 py-3"
-                    style={{ borderTop: `1px solid ${COLOR.line}`, borderBottom: showCancelled ? undefined : `1px solid ${COLOR.line}` }}
+                    className={
+                      "flex w-full min-h-[44px] items-center justify-between bg-transparent cursor-pointer px-1 py-3 border-t border-line" +
+                      (showCancelled ? "" : " border-b")
+                    }
                   >
-                    <span className="text-[0.72rem] font-medium uppercase tracking-[0.2em]" style={{ color: COLOR.ink, opacity: 0.55 }}>
+                    <span className="text-[0.72rem] font-medium uppercase tracking-[0.2em] text-ink-muted">
                       Canceladas <span className="nums">{cancelled.length}</span>
                     </span>
                     <ChevronDown
                       size={15}
-                      className="transition-transform"
-                      style={{ color: COLOR.ink, opacity: 0.4, transform: showCancelled ? "rotate(180deg)" : "none" }}
+                      className="text-ink-faint transition-transform"
+                      style={{ transform: showCancelled ? "rotate(180deg)" : "none" }}
                     />
                   </button>
                   {showCancelled && (
@@ -293,28 +289,21 @@ const MyBookings = () => {
 
         {/* Cancel confirm */}
         <AlertDialog open={!!cancelId} onOpenChange={(o) => !o && setCancelId(null)}>
-          <AlertDialogContent
-            className="w-[calc(100%-2rem)] rounded-3xl"
-            style={{ backgroundColor: COLOR.canvas, borderColor: COLOR.line }}
-          >
+          <AlertDialogContent className="w-[calc(100%-2rem)] rounded-3xl bg-canvas border-line">
             <AlertDialogHeader>
-              <AlertDialogTitle className="font-display text-[1.35rem] font-normal leading-snug" style={{ color: COLOR.ink }}>
+              <AlertDialogTitle className="font-display text-[1.35rem] font-normal leading-snug text-ink">
                 ¿Cancelar tu reserva?
               </AlertDialogTitle>
-              <AlertDialogDescription className="text-[0.92rem] leading-[1.6]" style={{ color: COLOR.ink, opacity: 0.65 }}>
+              <AlertDialogDescription className="text-[0.92rem] leading-[1.6] text-ink-muted">
                 Si faltan más de 12 horas, tu clase regresa a tu paquete. Con menos tiempo, cuenta como falta.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter className="gap-2">
-              <AlertDialogCancel
-                className="h-11 rounded-full px-5 text-[0.74rem] font-medium uppercase tracking-[0.18em]"
-                style={{ backgroundColor: "transparent", borderColor: COLOR.line, color: COLOR.ink }}
-              >
+              <AlertDialogCancel className="h-11 rounded-full px-5 text-[0.74rem] font-medium uppercase tracking-[0.18em]">
                 Volver
               </AlertDialogCancel>
               <AlertDialogAction
-                className="h-11 rounded-full px-5 text-[0.74rem] font-medium uppercase tracking-[0.18em]"
-                style={{ backgroundColor: COLOR.danger, color: COLOR.canvas }}
+                className="h-11 rounded-full px-5 text-[0.74rem] font-medium uppercase tracking-[0.18em] bg-danger text-canvas hover:bg-danger/90"
                 onClick={() => cancelId && cancelMutation.mutate(cancelId)}
               >
                 Sí, cancelar
@@ -335,18 +324,15 @@ const MyBookings = () => {
             }
           }}
         >
-          <DialogContent
-            className="rounded-3xl"
-            style={{ backgroundColor: COLOR.canvas, borderColor: COLOR.line }}
-          >
+          <DialogContent className="rounded-3xl bg-canvas border-line">
             <DialogHeader>
-              <DialogTitle className="font-display text-[1.3rem] font-normal leading-snug" style={{ color: COLOR.ink }}>
+              <DialogTitle className="font-display text-[1.3rem] font-normal leading-snug text-ink">
                 Reseña · {reviewBooking?.class_type_name}
               </DialogTitle>
             </DialogHeader>
             <div className="space-y-5 py-2">
               <div>
-                <p className="text-[0.72rem] font-medium uppercase tracking-[0.22em] mb-2" style={{ color: COLOR.ink, opacity: 0.6 }}>
+                <p className="text-[0.72rem] font-medium uppercase tracking-[0.22em] mb-2 text-ink-muted">
                   Calificación
                 </p>
                 <div className="flex gap-1">
@@ -362,10 +348,8 @@ const MyBookings = () => {
                       <Star
                         size={26}
                         strokeWidth={1.5}
-                        style={{
-                          color: s <= rating ? COLOR.accentStrong : COLOR.inkMuted,
-                          fill: s <= rating ? COLOR.accentStrong : "transparent",
-                        }}
+                        className={s <= rating ? "text-accent-strong" : "text-ink-muted"}
+                        fill={s <= rating ? "currentColor" : "none"}
                       />
                     </button>
                   ))}
@@ -379,7 +363,7 @@ const MyBookings = () => {
                 />
               ) : reviewTags.length > 0 ? (
                 <div>
-                  <p className="text-[0.72rem] font-medium uppercase tracking-[0.22em] mb-2" style={{ color: COLOR.ink, opacity: 0.6 }}>
+                  <p className="text-[0.72rem] font-medium uppercase tracking-[0.22em] mb-2 text-ink-muted">
                     ¿Qué te gustó?
                   </p>
                   <div className="flex flex-wrap gap-2">
@@ -394,13 +378,12 @@ const MyBookings = () => {
                               isSel ? prev.filter((t) => t !== tag.id) : [...prev, tag.id]
                             )
                           }
-                          className="rounded-full px-3 py-1.5 text-[0.74rem] cursor-pointer transition-colors"
-                          style={{
-                            backgroundColor: isSel ? `${COLOR.ink}1a` : "transparent",
-                            border: `1px solid ${isSel ? COLOR.accentStrong : COLOR.line}`,
-                            color: isSel ? COLOR.accentStrong : COLOR.ink,
-                            fontWeight: isSel ? 600 : 400,
-                          }}
+                          className={
+                            "rounded-full border px-3 py-1.5 text-[0.74rem] cursor-pointer transition-colors " +
+                            (isSel
+                              ? "bg-ink/10 border-accent-strong text-accent-strong font-semibold"
+                              : "border-line text-ink font-normal")
+                          }
                         >
                           {tag.name}
                         </button>
@@ -410,7 +393,7 @@ const MyBookings = () => {
                 </div>
               ) : null}
               <div>
-                <p className="text-[0.72rem] font-medium uppercase tracking-[0.22em] mb-2" style={{ color: COLOR.ink, opacity: 0.6 }}>
+                <p className="text-[0.72rem] font-medium uppercase tracking-[0.22em] mb-2 text-ink-muted">
                   Comentario (opcional)
                 </p>
                 <Textarea
