@@ -195,7 +195,7 @@ const WalletRewards = () => {
 
             {ms && !ms.next_milestone && ms.milestones.length > 0 && ms.milestones.every((m) => m.achieved) && (
               <Section title="Logros completos">
-                <div className="rounded-3xl bg-sunken p-6 text-center">
+                <div className="rounded-3xl border border-line bg-sunken p-6 text-center">
                   <Trophy size={28} strokeWidth={1.7} className="mx-auto text-accent-strong" />
                   <p className="font-display mt-3 text-[1.25rem] text-ink">
                     Has desbloqueado todos los logros.

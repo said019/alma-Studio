@@ -61,7 +61,7 @@ const Profile = () => {
         />
 
         {/* ── Header card ── */}
-        <div className="rounded-3xl p-5 sm:p-7 flex items-center gap-5 bg-sunken">
+        <div className="rounded-3xl p-5 sm:p-7 flex items-center gap-5 border border-line bg-sunken">
           <div className="relative grid h-20 w-20 sm:h-24 sm:w-24 place-items-center rounded-full overflow-hidden text-[1.2rem] font-bold shrink-0 bg-inverse text-inverse-foreground">
             {(user?.photoUrl ?? user?.photo_url) ? (
               <img

@@ -443,7 +443,7 @@ const Checkout = () => {
 
             {selectedPlan && (
               <Section title="Resumen">
-                <div className="rounded-3xl p-5 sm:p-6 space-y-4 bg-sunken">
+                <div className="rounded-3xl p-5 sm:p-6 space-y-4 border border-line bg-sunken">
                   <div>
                     <DataRow label="Paquete" value={selectedPlan.name} />
                     <DataRow label="Precio" value={`$${formatMoneyMX(selectedEffective)} MXN`} />
@@ -533,7 +533,7 @@ const Checkout = () => {
             </button>
 
             <Section>
-              <div className="rounded-2xl p-4 flex items-center justify-between gap-3 bg-sunken">
+              <div className="rounded-2xl p-4 flex items-center justify-between gap-3 border border-line bg-sunken">
                 <span className="text-[0.92rem] text-ink">{selectedPlan?.name}</span>
                 <span className="font-display nums text-accent-strong" style={{ fontSize: "1.3rem" }}>
                   ${formatMoneyMX(finalAmount)} MXN
@@ -644,7 +644,7 @@ const Checkout = () => {
         {/* ── Step 3b: Cash ── */}
         {step === "cash" && (
           <Section>
-            <div className="rounded-3xl p-7 sm:p-10 text-center bg-sunken">
+            <div className="rounded-3xl p-7 sm:p-10 text-center border border-line bg-sunken">
               <span className="grid h-14 w-14 mx-auto place-items-center rounded-2xl mb-4 bg-ink text-canvas">
                 <Banknote size={22} />
               </span>
@@ -699,7 +699,7 @@ const Checkout = () => {
         {/* ── Step 5: Done ── */}
         {step === "done" && (
           <Section>
-            <div className="rounded-3xl p-7 sm:p-10 text-center bg-sunken">
+            <div className="rounded-3xl p-7 sm:p-10 text-center border border-line bg-sunken">
               <span className="grid h-14 w-14 mx-auto place-items-center rounded-2xl mb-4 bg-success text-canvas">
                 <CheckCircle2 size={22} />
               </span>
@@ -721,7 +721,7 @@ const Checkout = () => {
         {/* ── Stripe return: success ── */}
         {step === "stripe-success" && (
           <Section>
-            <div className="rounded-3xl p-7 sm:p-10 text-center bg-sunken">
+            <div className="rounded-3xl p-7 sm:p-10 text-center border border-line bg-sunken">
               <span className="grid h-14 w-14 mx-auto place-items-center rounded-2xl mb-4 bg-success text-canvas">
                 <CheckCircle2 size={22} />
               </span>
@@ -743,7 +743,7 @@ const Checkout = () => {
         {/* ── Stripe return: cancelled ── */}
         {step === "stripe-cancelled" && (
           <Section>
-            <div className="rounded-3xl p-7 sm:p-10 text-center bg-sunken">
+            <div className="rounded-3xl p-7 sm:p-10 text-center border border-line bg-sunken">
               <span className="grid h-14 w-14 mx-auto place-items-center rounded-2xl mb-4 bg-line text-canvas">
                 <ArrowLeft size={22} />
               </span>

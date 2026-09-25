@@ -107,7 +107,7 @@ const ProfileMembership = () => {
             />
 
             <Section>
-              <div className="rounded-3xl p-5 sm:p-7 bg-sunken">
+              <div className="rounded-3xl p-5 sm:p-7 border border-line bg-sunken">
                 <div className="flex items-baseline justify-between gap-4 pb-3 border-b border-line">
                   <span className="text-[0.75rem] font-medium uppercase tracking-[0.24em] text-accent-strong">
                     {CATEGORY_LABEL[String(membership.classCategory ?? "all")] ?? "Todas las disciplinas"}
