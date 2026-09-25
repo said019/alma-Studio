@@ -55,6 +55,8 @@ const PERMITIDAS: Record<Theme, [ColorToken, ColorToken, number][]> = {
     ["onAccent", "accent", TEXT], ["ink", "accentSoft", TEXT], ["success", "surface", TEXT], ["danger", "surface", TEXT],
     ["lineStrong", "canvas", CONTROL], ["lineStrong", "surface", CONTROL], ["onInverse", "inverse", TEXT],
     ["inkFaint", "canvas", CONTROL], ["inkFaint", "surface", CONTROL],
+    // Pares que el panel sigue usando (texto secundario sobre inverse, texto sobre success/danger, terracota sobre inverse).
+    ["onInverseMuted", "inverse", TEXT], ["canvas", "success", TEXT], ["canvas", "danger", TEXT], ["accent", "inverse", TEXT],
   ],
 };
 const PROHIBIDAS: Record<Theme, [ColorToken, ColorToken][]> = {
