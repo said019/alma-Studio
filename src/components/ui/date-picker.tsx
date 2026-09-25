@@ -87,8 +87,10 @@ export const DatePicker = ({
           onChange={(e) => onChange?.(e.target.value)}
           style={{ colorScheme: "light", color: COLOR.ink }}
           className={cn(
-            "w-full rounded-xl border border-white/[0.08] bg-white/[0.03] py-2.5 pl-9 pr-3 text-sm text-white/90",
-            "focus:border-line-strong/40 focus:bg-line-strong/[0.03] focus:outline-none",
+            // F7 — disparador sobre fondo claro: border-line-strong (1.5px,
+            // como los campos) y fondo surface, no el tema oscuro del calendario.
+            "w-full rounded-xl border-[1.5px] border-line-strong bg-surface py-2.5 pl-9 pr-3 text-sm",
+            "focus:border-ink focus:outline-none",
             "disabled:pointer-events-none disabled:opacity-50",
           )}
           aria-label={placeholder}
@@ -106,9 +108,10 @@ export const DatePicker = ({
         onClick={() => setOpen((o) => !o)}
         style={{ colorScheme: "light" }}
         className={cn(
-          "flex w-full items-center gap-2.5 rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2.5 text-sm transition-all",
-          "hover:border-line-strong/30 focus:outline-none",
-          open ? "border-line-strong/40 bg-line-strong/[0.03]" : "",
+          // F7 — mismo motivo que el input móvil: border-line-strong + surface.
+          "flex w-full items-center gap-2.5 rounded-xl border-[1.5px] border-line-strong bg-surface px-3 py-2.5 text-sm transition-all",
+          "hover:border-ink focus:outline-none",
+          open ? "border-ink bg-sunken" : "",
           disabled && "opacity-50 pointer-events-none",
         )}
       >
@@ -121,7 +124,7 @@ export const DatePicker = ({
         </span>
         <ChevronRight
           size={13}
-          className={cn("text-white/20 transition-transform", open && "rotate-90")}
+          className={cn("text-ink-muted/50 transition-transform", open && "rotate-90")}
         />
       </button>
 

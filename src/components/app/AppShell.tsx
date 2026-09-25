@@ -23,7 +23,7 @@ import { BrandLogo } from "@/components/brand/BrandLogo";
 
 /* ═══════════════════════════════════════════════════════════
    AppShell — /app layout: sidebar desktop + bottom-nav mobile
-   Active state: single berry tint, no rainbow.
+   Active state: single accent (coral) tint, no rainbow.
    ═══════════════════════════════════════════════════════════ */
 
 type NavItem = {
@@ -541,8 +541,10 @@ export const PrimaryButton = ({ children, loading, loadingLabel, size = "md", to
 };
 
 export const GhostButton = ({ children, to, onClick, disabled, type = "button", className: extra }: CommonBtnProps) => {
-  const className = `inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full px-5 text-[0.85rem] font-bold no-underline transition-colors hover:bg-sunken ${extra ?? ""}`;
-  const style = { boxShadow: `inset 0 0 0 1.5px ${COLOR.lineStrong}`, color: COLOR.ink, backgroundColor: COLOR.surface };
+  // F7 — el fondo va en la clase (bg-surface), no en línea: un backgroundColor
+  // en style anulaba el hover:bg-sunken (el style attribute siempre gana).
+  const className = `inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full bg-surface px-5 text-[0.85rem] font-bold no-underline transition-colors hover:bg-sunken ${extra ?? ""}`;
+  const style = { boxShadow: `inset 0 0 0 1.5px ${COLOR.lineStrong}`, color: COLOR.ink };
   if (to) return <Link to={to} data-press className={className} style={style} onClick={onClick}>{children}</Link>;
   return <button type={type} data-press className={className} style={style} onClick={onClick} disabled={disabled}>{children}</button>;
 };

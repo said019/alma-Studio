@@ -58,7 +58,16 @@ describe("cableado de tokens", () => {
     expect(html).toMatch(/family=Unbounded/);
     expect(html).toMatch(/family=Manrope/);
     expect(html).not.toMatch(/Fraunces|Jost/);
-    expect(html).toContain('content="#F4F4F3"');
+    // F7 — la barra superior móvil ahora es surface (antes canvas).
+    expect(html).toContain('content="#FFFFFF"');
+  });
+
+  it("F7 — theme-color/status bar: surface arriba, canvas en TileColor y manifest", () => {
+    expect(html).toMatch(/name="theme-color" content="#FFFFFF"/);
+    expect(html).toMatch(/name="msapplication-TileColor" content="#F4F4F3"/);
+    const manifest = JSON.parse(fs.readFileSync(path.join(root, "public/site.webmanifest"), "utf8"));
+    expect(manifest.theme_color).toBe("#FFFFFF");
+    expect(manifest.background_color).toBe("#F4F4F3");
   });
 
   it("el cuerpo usa Manrope y los titulares Unbounded", () => {

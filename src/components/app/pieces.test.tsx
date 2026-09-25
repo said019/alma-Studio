@@ -52,6 +52,13 @@ describe("botones", () => {
     wrap(<><PrimaryButton size="sm">A</PrimaryButton><GhostButton>B</GhostButton></>);
     for (const b of screen.getAllByRole("button")) expect(b.className).toMatch(/min-h-\[(4[4-9]|[5-9]\d)px\]/);
   });
+  it("GhostButton: hover:bg-sunken no queda anulado por backgroundColor en línea (F7)", () => {
+    wrap(<GhostButton>Cancelar</GhostButton>);
+    const b = screen.getByRole("button", { name: "Cancelar" });
+    expect(b.className).toMatch(/\bbg-surface\b/);
+    expect(b.className).toMatch(/\bhover:bg-sunken\b/);
+    expect(b.style.backgroundColor).toBe("");
+  });
 });
 
 describe("otras piezas", () => {

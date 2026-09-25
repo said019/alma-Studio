@@ -14,11 +14,16 @@ asociados a calma. El coral es la única calidez del sistema.
 ## Color
 
 Tokens por función (canvas, surface, sunken, line, line-strong, ink, ink-muted,
-accent, accent-soft, accent-strong, on-accent, success, danger, inverse,
-inverse-raised). Valores y contrastes: `src/design/tokens.ts` y su prueba.
+accent, accent-soft, accent-strong, success, danger, inverse, inverse-raised).
+Valores y contrastes: `src/design/tokens.ts` y su prueba.
+
+Texto sobre un fondo lleva la clase Tailwind con sufijo `-foreground` (token
+`onAccent`/`onInverse`/`onInverseMuted` en `tokens.ts`): sobre `accent` es la
+clase `accent-foreground` (`text-accent-foreground`); sobre `inverse`,
+`inverse-foreground` (o `inverse-muted` para texto secundario, más tenue).
 
 Reglas:
-1. Nunca texto claro sobre coral: sobre `accent` el texto es `on-accent`.
+1. Nunca texto claro sobre coral: sobre `accent` el texto es `accent-foreground`.
 2. El coral no es texto: número, ícono o enlace coral → `accent-strong`.
 3. En el panel, coral = atención (activo, pendiente, lleno), siempre con texto.
 4. Nunca coral sobre coral.
@@ -48,5 +53,14 @@ acción que genera ingreso.
 ## Movimiento y estados
 
 Sólo `transform` y `opacity`, salida suave, sin rebotes; respetar
-`prefers-reduced-motion`. Toda pantalla maneja cargando, vacío y error; un
-fallo de red nunca se disfraza de vacío.
+`prefers-reduced-motion`. Atributos (`src/index.css`): `data-press`,
+`data-reveal`, `data-stagger`, `data-lift`, `data-scale-in`, `data-slide-up`,
+`data-fade-in` — el sistema se conserva con nombres neutros (spec §4.7).
+Toda pantalla maneja cargando, vacío y error; un fallo de red nunca se
+disfraza de vacío.
+
+## Entorno
+
+`npm run brand:assets` y `npm run test:scripts` importan `src/design/tokens.ts`
+directamente y necesitan Node ≥ 22.18 (type stripping nativo); el build de
+producción (`vite build`) no pasa por ahí y no tiene ese requisito.

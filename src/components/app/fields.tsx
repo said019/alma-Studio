@@ -13,8 +13,8 @@ import { COLOR } from "@/design/tokens";
 
 /* ═══════════════════════════════════════════════════════════
    Campos de formulario — lenguaje único de la app de clienta.
-   Cream + hairline, focus ring berry visible (WCAG 2.4.7),
-   error en destructive con icono. Lo usan ProfileEdit y
+   Surface + borde lineStrong, foco ring-ink visible (WCAG 2.4.7),
+   error en danger con icono. Lo usan ProfileEdit y
    ChangePassword; cualquier form nuevo debe importar de aquí.
    ═══════════════════════════════════════════════════════════ */
 

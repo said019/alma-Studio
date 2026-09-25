@@ -62,7 +62,7 @@ export const LegalSkeleton = () => (
   </div>
 );
 
-/** Subtítulo de sección: serif text-lg (Fraunces vía h2 base). */
+/** Subtítulo de sección: text-lg en Unbounded (font-display). */
 export const LegalH2 = ({ children }: { children: ReactNode }) => (
   <h2 className="font-display text-lg mt-10 mb-3" style={{ color: COLOR.ink }}>
     {children}
