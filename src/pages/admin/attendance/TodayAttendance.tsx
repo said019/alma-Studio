@@ -13,8 +13,9 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { Check, Users, Clock, RotateCcw, UserX } from "lucide-react";
+import { Check, Camera, Users, Clock, RotateCcw, UserX } from "lucide-react";
 import { DEFAULT_CLASS_COLOR } from "@/design/classPalette";
+import CheckinScanner from "@/components/admin/CheckinScanner";
 
 interface RosterEntry {
   booking_id: string;
@@ -47,6 +48,7 @@ const TodayAttendance = () => {
 
   // Reloj de recepción: se actualiza cada 30 s, también marca la clase en curso.
   const [now, setNow] = useState(() => new Date());
+  const [scanOpen, setScanOpen] = useState(false);
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 30_000);
     return () => clearInterval(t);
@@ -136,6 +138,10 @@ const TodayAttendance = () => {
               </p>
             </div>
             <div className="flex items-center gap-4">
+              <Button onClick={() => setScanOpen(true)}>
+                <Camera size={16} aria-hidden="true" />
+                Escanear QR del pase
+              </Button>
               <Button
                 variant="outline"
                 onClick={() => refetch()}
@@ -304,6 +310,7 @@ const TodayAttendance = () => {
           )}
         </div>
         {dialog}
+        <CheckinScanner open={scanOpen} onOpenChange={setScanOpen} />
       </AdminLayout>
     </AuthGuard>
   );
