@@ -18,7 +18,7 @@ const SelectTrigger = React.forwardRef<
     ref={ref}
     className={cn(
       // F7 — mismo foco que Input: ring-ink + halo accent-soft (antes sin halo).
-      "flex h-11 w-full items-center justify-between rounded-xl border-[1.5px] border-input bg-surface px-3.5 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ink focus:ring-offset-2 focus:shadow-[0_0_0_5px_theme(colors.accent.soft)] disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1",
+      "flex h-11 w-full items-center justify-between rounded-xl border-[1.5px] border-input bg-surface dark:bg-sunken px-3.5 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ink focus:ring-offset-2 focus:shadow-[0_0_0_5px_theme(colors.accent.soft)] disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1",
       className,
     )}
     {...props}

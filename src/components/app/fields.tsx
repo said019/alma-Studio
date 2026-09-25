@@ -1,14 +1,12 @@
 import {
   forwardRef,
   useState,
-  type CSSProperties,
   type InputHTMLAttributes,
   type ReactNode,
   type SelectHTMLAttributes,
   type TextareaHTMLAttributes,
 } from "react";
 import { AlertCircle, Check, Eye, EyeOff } from "lucide-react";
-import { COLOR } from "@/design/tokens";
 
 
 /* ═══════════════════════════════════════════════════════════
@@ -18,27 +16,25 @@ import { COLOR } from "@/design/tokens";
    ChangePassword; cualquier form nuevo debe importar de aquí.
    ═══════════════════════════════════════════════════════════ */
 
-/* Campos: fondo blanco, borde lineStrong (3:1), foco negro con halo coral
-   suave y error en danger que dice qué pasa (spec §4.4). */
+/* Campos (spec 2026-09-25 §5): surface en claro y hundido en oscuro, borde
+   1.5 px lineStrong (3:1), foco en tinta con halo terracota suave, error en
+   danger que dice qué pasa. Todo en clases por tema. */
 const CONTROL =
-  "w-full rounded-xl px-4 py-3 text-[0.95rem] outline-none transition-shadow " +
+  "w-full min-h-[48px] rounded-xl px-4 py-3 text-[0.95rem] outline-none transition-shadow " +
+  "bg-surface dark:bg-sunken text-ink border-[1.5px] " +
   "focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-0 " +
   "focus-visible:shadow-[0_0_0_5px_theme(colors.accent.soft)] " +
-  "placeholder:text-ink-muted disabled:opacity-60";
+  "placeholder:text-ink-faint disabled:opacity-60";
 
-const controlStyle = (hasError?: boolean): CSSProperties => ({
-  backgroundColor: COLOR.surface,
-  color: COLOR.ink,
-  border: `1.5px solid ${hasError ? COLOR.danger : COLOR.lineStrong}`,
-  minHeight: 48,
-});
+/** Clases de un campo; lo reutiliza AuthShell. */
+export const controlClass = (hasError?: boolean) => `${CONTROL} ${hasError ? "border-danger" : "border-line-strong"}`;
 
 const idFromLabel = (label: string) =>
   "field-" + label.toLowerCase().replace(/[^a-z0-9]+/g, "-");
 
 export const FieldError = ({ msg }: { msg?: string }) =>
   msg ? (
-    <p className="flex items-center gap-1.5 text-[0.8125rem] font-semibold" style={{ color: COLOR.danger }}>
+    <p className="flex items-center gap-1.5 text-[0.8125rem] font-semibold text-danger">
       <AlertCircle size={14} />
       {msg}
     </p>
@@ -55,14 +51,14 @@ type FieldShellProps = {
 /* Etiqueta con el rol "label" del spec §3.3: 12 px, mayúsculas, +0.12em. */
 const FieldShell = ({ label, htmlFor, error, hint, children }: FieldShellProps) => (
   <div className="flex flex-col gap-1.5">
-    <label htmlFor={htmlFor} className="text-[0.75rem] font-bold uppercase tracking-[0.12em]" style={{ color: COLOR.inkMuted }}>
+    <label htmlFor={htmlFor} className="text-[0.75rem] font-bold uppercase tracking-[0.12em] text-ink-muted">
       {label}
     </label>
     {children}
     {error ? (
       <FieldError msg={error} />
     ) : hint ? (
-      <p className="text-[0.8125rem]" style={{ color: COLOR.inkMuted }}>
+      <p className="text-[0.8125rem] text-ink-muted">
         {hint}
       </p>
     ) : null}
@@ -85,8 +81,7 @@ export const Field = forwardRef<HTMLInputElement, FieldProps>(
           ref={ref}
           id={fieldId}
           aria-invalid={error ? true : undefined}
-          className={CONTROL + " " + (className ?? "")}
-          style={controlStyle(!!error)}
+          className={controlClass(!!error) + " " + (className ?? "")}
           {...rest}
         />
       </FieldShell>
@@ -111,8 +106,7 @@ export const SelectField = forwardRef<HTMLSelectElement, SelectFieldProps>(
           ref={ref}
           id={fieldId}
           aria-invalid={error ? true : undefined}
-          className={CONTROL + " " + (className ?? "")}
-          style={controlStyle(!!error)}
+          className={controlClass(!!error) + " " + (className ?? "")}
           {...rest}
         >
           {children}
@@ -139,8 +133,7 @@ export const TextAreaField = forwardRef<HTMLTextAreaElement, TextAreaFieldProps>
           ref={ref}
           id={fieldId}
           aria-invalid={error ? true : undefined}
-          className={CONTROL + " min-h-[110px] resize-y " + (className ?? "")}
-          style={controlStyle(!!error)}
+          className={controlClass(!!error) + " min-h-[110px] resize-y " + (className ?? "")}
           {...rest}
         />
       </FieldShell>
@@ -164,8 +157,7 @@ export const PasswordField = forwardRef<HTMLInputElement, PasswordFieldProps>(
             id={fieldId}
             type={show ? "text" : "password"}
             aria-invalid={error ? true : undefined}
-            className={CONTROL + " pr-14 " + (className ?? "")}
-            style={controlStyle(!!error)}
+            className={controlClass(!!error) + " pr-14 " + (className ?? "")}
             {...rest}
           />
           <button
@@ -173,8 +165,7 @@ export const PasswordField = forwardRef<HTMLInputElement, PasswordFieldProps>(
             aria-pressed={show}
             aria-label={show ? "Ocultar contraseña" : "Mostrar contraseña"}
             onClick={() => setShow((v) => !v)}
-            className="absolute right-1 top-1/2 -translate-y-1/2 grid h-11 w-11 place-items-center rounded-full bg-transparent border-0 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong"
-            style={{ color: COLOR.ink, opacity: 0.55 }}
+            className="absolute right-1 top-1/2 -translate-y-1/2 grid h-11 w-11 place-items-center rounded-full bg-transparent border-0 cursor-pointer text-ink-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink"
           >
             {show ? <EyeOff size={16} /> : <Eye size={16} />}
           </button>
@@ -199,16 +190,10 @@ export const PasswordRules = ({ password = "" }: { password?: string }) => {
       {rules.map((r) => (
         <li
           key={r.label}
-          className="flex items-center gap-2 text-[0.75rem]"
-          style={{ color: r.ok ? COLOR.success : COLOR.ink, opacity: r.ok ? 1 : 0.55 }}
+          className={"flex items-center gap-2 text-[0.75rem] " + (r.ok ? "text-success" : "text-ink-muted")}
         >
           <span
-            className="grid h-4 w-4 place-items-center rounded-full transition-colors"
-            style={{
-              backgroundColor: r.ok ? COLOR.success : "transparent",
-              border: `1px solid ${r.ok ? COLOR.success : COLOR.line}`,
-              color: COLOR.canvas,
-            }}
+            className={"grid h-4 w-4 place-items-center rounded-full border text-canvas transition-colors " + (r.ok ? "bg-success border-success" : "bg-transparent border-line")}
           >
             {r.ok && <Check size={9} strokeWidth={3.5} />}
           </span>
