@@ -23,6 +23,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { useToast } from "@/hooks/use-toast";
 import { formatDateTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { useCanSeeFinance } from "@/lib/roles";
 import {
   Loader2,
   Send,
@@ -121,8 +122,13 @@ function SettingsSection({ settingKey, fields, groups }: { settingKey: string; f
       return api.put(`/settings/${settingKey}`, { value: { ...base, ...patch } });
     },
     onSuccess: () => {
+      // No se toca `loaded`: si lo reseteamos aquí, el efecto de sincronía ve
+      // todavía el `data` viejo (el refetch de abajo aún no llega) y regresa
+      // el formulario a los valores de antes de guardar (I1). En vez de eso,
+      // `original` pasa a ser lo recién guardado — así la barra desaparece y
+      // un segundo guardado (de otro campo) no pisa este.
+      setOriginal(values);
       qc.invalidateQueries({ queryKey: ["settings", settingKey] });
-      setLoaded(false);
       toast({ title: "Configuración guardada" });
     },
     onError: () => toast({ title: "Error al guardar", variant: "destructive" }),
@@ -225,8 +231,10 @@ const BankInfoSettings = () => {
         account_number: accountNumber.replace(/\D/g, ""),
       }),
     onSuccess: () => {
+      // Igual que en SettingsSection (I1): no resetear `loaded` aquí, o el
+      // formulario regresa a los valores de antes de guardar mientras llega
+      // el refetch. Los campos locales ya tienen lo recién guardado.
       qc.invalidateQueries({ queryKey: ["bank-info"] });
-      setLoaded(false);
       toast({ title: "Datos de transferencia guardados" });
     },
     onError: (e: any) =>
@@ -940,8 +948,13 @@ const SETTINGS_TABS = [
 ] as const;
 
 const SettingsPage = () => {
+  // La pestaña Pagos es sólo de quien ve dinero (spec §8, I3): GET
+  // /admin/bank-info es ownerMiddleware y a recepción le sale un falso
+  // "revisa tu conexión". Un ?tab=payments escrito a mano cae a General.
+  const canSeeFinance = useCanSeeFinance();
+  const visibleTabs = SETTINGS_TABS.filter((t) => t.value !== "payments" || canSeeFinance);
   const [tabParam, setTab] = useSearchParamState("tab");
-  const tab = SETTINGS_TABS.some((t) => t.value === tabParam) ? tabParam! : "general";
+  const tab = visibleTabs.some((t) => t.value === tabParam) ? tabParam! : "general";
   return (
     <AuthGuard>
       <AdminLayout>
@@ -953,7 +966,7 @@ const SettingsPage = () => {
           />
           <Tabs value={tab} onValueChange={(v) => setTab(v === "general" ? null : v)} orientation="vertical" className="grid items-start gap-7 lg:grid-cols-[220px_minmax(0,1fr)]">
             <TabsList className="flex h-auto flex-wrap justify-start gap-1 bg-transparent p-0 lg:flex-col lg:items-stretch">
-              {SETTINGS_TABS.map(({ value, label, icon: Icon }) => (
+              {visibleTabs.map(({ value, label, icon: Icon }) => (
                 <TabsTrigger key={value} value={value} className="justify-start gap-3 rounded-xl px-3.5 data-[state=active]:border data-[state=active]:border-line data-[state=active]:bg-surface data-[state=active]:text-ink">
                   <Icon size={18} aria-hidden="true" />
                   {label}
