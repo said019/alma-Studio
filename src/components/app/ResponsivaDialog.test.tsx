@@ -23,3 +23,20 @@ describe("ResponsivaDialog: velo (I2)", () => {
     expect(velo.className).not.toMatch(/bg-inverse|backdrop-blur/);
   });
 });
+
+describe("ResponsivaDialog: marcas de obligatorio (M6)", () => {
+  it('"Nombre completo *" conserva el id derivado de siempre', () => {
+    abrir();
+    expect(screen.getByLabelText("Nombre completo *").id).toBe("field-nombre-completo");
+  });
+  it('"Uso de imagen" y "Tu firma" llevan su asterisco', () => {
+    abrir();
+    expect(screen.getByText("Uso de imagen (sección 4) *")).toBeInTheDocument();
+    expect(screen.getByText("Tu firma *")).toBeInTheDocument();
+  });
+  it("teléfono y correo siguen opcionales, sin asterisco", () => {
+    abrir();
+    expect(screen.getByLabelText("Teléfono").id).toBe("field-tel-fono");
+    expect(screen.getByLabelText("Correo")).toBeInTheDocument();
+  });
+});

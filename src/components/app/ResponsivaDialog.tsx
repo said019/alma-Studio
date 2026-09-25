@@ -136,8 +136,10 @@ export const ResponsivaDialog = ({
             <p className="font-display text-ink text-[1.2rem] m-0">Tus datos</p>
 
             {/* Nombre */}
+            {/* id explícito: el " *" no debe cambiar el id que Field deriva de la etiqueta. */}
             <Field
-              label="Nombre completo"
+              id="field-nombre-completo"
+              label="Nombre completo *"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
               placeholder="Tu nombre completo"
@@ -166,7 +168,7 @@ export const ResponsivaDialog = ({
 
             {/* Uso de imagen */}
             <div>
-              <label className={LABEL_CLASS}>Uso de imagen (sección 4)</label>
+              <label className={LABEL_CLASS}>Uso de imagen (sección 4) *</label>
               <div className="flex gap-2.5">
                 {(
                   [
@@ -196,7 +198,7 @@ export const ResponsivaDialog = ({
 
             {/* Signature pad — baldosa clara (bg-inverse), trazo oscuro fijo: ver SignaturePad.tsx. */}
             <div>
-              <label className={LABEL_CLASS}>Tu firma</label>
+              <label className={LABEL_CLASS}>Tu firma *</label>
               <SignaturePad onChange={setSignatureData} />
             </div>
 
