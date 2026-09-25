@@ -49,6 +49,8 @@ describe("Pasar lista", () => {
     montar();
     const tower = await screen.findByRole("region", { name: "Tower 13:00" });
     expect(within(tower).queryByRole("button", { name: "Check-in de Sofía Gómez" })).toBeNull();
+    expect(within(tower).getByText((content) => content.trim() === "1 pendiente")).toBeInTheDocument();
+    expect(within(tower).queryAllByText((_, el) => /asistió|asistieron/i.test(el?.textContent ?? "")).length).toBe(0);
     fireEvent.click(within(tower).getByRole("button", { name: "Abrir lista de Tower" }));
     expect(within(tower).getByRole("button", { name: "Check-in de Sofía Gómez" })).toBeInTheDocument();
   });

@@ -56,10 +56,19 @@ function ClassCard({ cls, clock, open, onToggle, current = false, past = false, 
         )}
         {!past && s.full && <Badge variant="attention">Llena</Badge>}
         <span className="nums text-sm font-extrabold">
-          {s.attended} {s.attended === 1 ? "asistió" : "asistieron"}
-          {past
-            ? s.noShow > 0 ? ` · ${s.noShow} ${s.noShow === 1 ? "falta" : "faltas"}` : ""
-            : <> · <span className={s.pending > 0 ? "text-accent-strong" : undefined}>{s.pending} {s.pending === 1 ? "pendiente" : "pendientes"}</span></>}
+          {current ? (
+            <>
+              {s.attended} {s.attended === 1 ? "asistió" : "asistieron"} ·{" "}
+              <span className={s.pending > 0 ? "text-accent-strong" : undefined}>{s.pending} {s.pending === 1 ? "pendiente" : "pendientes"}</span>
+            </>
+          ) : past ? (
+            <>
+              {s.attended} {s.attended === 1 ? "asistió" : "asistieron"}
+              {s.noShow > 0 ? ` · ${s.noShow} ${s.noShow === 1 ? "falta" : "faltas"}` : ""}
+            </>
+          ) : (
+            <span className={s.pending > 0 ? "text-accent-strong" : undefined}>{s.pending} {s.pending === 1 ? "pendiente" : "pendientes"}</span>
+          )}
         </span>
         {onToggle && (
           <Button variant="outline" size="icon" aria-expanded={open} aria-label={open ? `Cerrar lista de ${name}` : `Abrir lista de ${name}`} onClick={onToggle}>
