@@ -3559,7 +3559,13 @@ app.get("/api/classes", async (req, res) => {
                SELECT COUNT(*)::int FROM bookings b
                 WHERE b.class_id = c.id
                   AND b.status IN ('confirmed','checked_in')
-             ), 0) AS live_current_bookings
+             ), 0) AS live_current_bookings,
+             -- Lista de espera viva: la usa el panel para Reservas y Lista de espera.
+             COALESCE((
+               SELECT COUNT(*)::int FROM bookings b
+                WHERE b.class_id = c.id
+                  AND b.status = 'waitlist'
+             ), 0) AS waitlist_count
       FROM classes c
       JOIN class_types ct   ON c.class_type_id  = ct.id
       JOIN instructors i    ON c.instructor_id   = i.id
