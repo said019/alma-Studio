@@ -1,0 +1,198 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Unbounded:wght@500;600;700;800&family=Manrope:wght@400;500;600;700;800&display=swap');
+.intro{font-size:14px;line-height:1.5;max-width:940px;opacity:.85}
+.tones{display:flex;gap:12px;flex-wrap:wrap;margin:16px 0 6px}
+.tone{border-radius:16px;border:1px solid rgba(0,0,0,.1);background:#fff;padding:10px 12px;cursor:pointer;display:flex;gap:10px;align-items:center;min-width:210px;transition:transform .15s}
+.tone:hover{transform:translateY(-1px)}
+.tone.selected{outline:3px solid #B8765A;outline-offset:2px}
+.tone .dot{width:40px;height:40px;border-radius:50%;flex:none}
+.tone b{display:block;font:700 13px/1.2 'Manrope'}
+.tone span{font:500 11.5px/1.35 'Manrope';opacity:.7}
+.tone.ref{cursor:default;opacity:.7}
+.stage4{--t1:#CF8A6B;--t2:#A9603F;display:flex;gap:18px;justify-content:center;flex-wrap:wrap;margin-top:18px;padding:26px 10px;border-radius:24px;background:#0B0A09}
+
+/* teléfono */
+.ph{width:272px;height:600px;border-radius:36px;position:relative;overflow:hidden;font-family:'Manrope';color:#F2EFEA;
+  background:radial-gradient(110% 55% at 0% 0%,color-mix(in srgb,var(--t2) 24%,transparent),transparent 62%),radial-gradient(80% 40% at 100% 70%,color-mix(in srgb,var(--t2) 10%,transparent),transparent 70%),#141210;
+  border:1px solid rgba(242,239,234,.07);box-shadow:0 18px 40px rgba(0,0,0,.5)}
+.scr{padding:0 14px}
+svg.i{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+/* barra superior real: logo · campana · avatar */
+.tb{display:flex;align-items:center;justify-content:space-between;padding:14px 14px 10px}
+.tb .mark{width:26px;height:30px;color:var(--t1)}
+.tb .r{display:flex;gap:8px;align-items:center}
+.bell{position:relative;width:32px;height:32px;display:grid;place-items:center;color:#F2EFEA}
+.bell b{position:absolute;top:1px;right:0;min-width:15px;height:15px;border-radius:8px;background:linear-gradient(135deg,var(--t1),var(--t2));color:#141210;font:800 9px/15px 'Manrope';text-align:center}
+.av{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;font:800 10px 'Manrope';background:#F2EFEA;color:#141210}
+.greet{font:700 8.5px/1 'Manrope';letter-spacing:.2em;text-transform:uppercase;color:#8A7F73;padding:4px 14px 0}
+/* cabecera (antes bloque coral) */
+.hd{padding:10px 14px 4px}
+.eb{font:700 8.5px/1 'Manrope';letter-spacing:.16em;text-transform:uppercase;color:#8A7F73}
+.t{font:800 24px/1.02 'Unbounded';text-transform:uppercase;letter-spacing:-.01em;margin-top:8px}
+.ta{display:block;font:600 14px/1.2 'Unbounded';text-transform:none;letter-spacing:0;color:var(--t1);margin-top:3px}
+.sub{font:500 10.5px/1.45 'Manrope';color:#B9B0A6;margin-top:8px}
+.glass{background:rgba(242,239,234,.045);border:1px solid rgba(242,239,234,.08);border-radius:18px}
+.k{font:700 8px/1 'Manrope';letter-spacing:.16em;text-transform:uppercase;color:#8A7F73}
+.acc{color:var(--t1)}
+.go{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;color:#141210;background:linear-gradient(135deg,var(--t1),var(--t2));box-shadow:0 0 22px color-mix(in srgb,var(--t1) 32%,transparent);flex:none}
+.seg{display:inline-flex;gap:3px;padding:3px;border-radius:999px;background:rgba(242,239,234,.05);border:1px solid rgba(242,239,234,.08);margin-top:12px}
+.seg span{padding:7px 12px;border-radius:999px;font:700 10px/1 'Manrope';color:#B9B0A6}
+.seg span.on{background:linear-gradient(135deg,var(--t1),var(--t2));color:#141210}
+.seg span i{font-style:normal;margin-left:5px;opacity:.8}
+.sec{font:700 8.5px/1 'Manrope';letter-spacing:.16em;text-transform:uppercase;color:#8A7F73;margin:16px 0 8px;padding-bottom:8px;border-bottom:1px solid rgba(242,239,234,.08)}
+.pill{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:4px 8px;font:700 9px/1 'Manrope'}
+.pill.ok{color:#8FCBA8;background:rgba(143,203,168,.1);border:1px solid rgba(143,203,168,.25)}
+.pill.ok::before{content:"";width:5px;height:5px;border-radius:50%;background:currentColor}
+/* barra inferior real: 5 pestañas con etiqueta */
+.nav{position:absolute;left:0;right:0;bottom:0;height:64px;display:grid;grid-template-columns:repeat(5,1fr);background:rgba(20,18,16,.92);border-top:1px solid rgba(242,239,234,.07);padding:6px 2px 8px}
+.nav a{display:flex;flex-direction:column;align-items:center;gap:4px;font:600 9px/1 'Manrope';color:#8A7F73;text-decoration:none}
+.nav a .ic{width:40px;height:28px;border-radius:14px;display:grid;place-items:center}
+.nav a.on{color:#F2EFEA;font-weight:800}
+.nav a.on .ic{background:linear-gradient(135deg,var(--t1),var(--t2));color:#141210;box-shadow:0 0 16px color-mix(in srgb,var(--t1) 30%,transparent)}
+
+/* Inicio */
+.next{display:flex;align-items:center;gap:10px;padding:13px 12px 13px 14px;margin-top:14px}
+.next .n{font:700 14px/1.2 'Unbounded';margin-top:7px}
+.next .m{font:500 10px 'Manrope';color:#B9B0A6;margin-top:4px}
+.memb{padding:13px 14px}
+.memb .top{display:flex;justify-content:space-between;align-items:center}
+.memb .plan{font:700 15px/1.2 'Unbounded';margin-top:8px}
+.memb .rowx{display:flex;justify-content:space-between;align-items:baseline;border-top:1px solid rgba(242,239,234,.08);margin-top:10px;padding-top:9px}
+.memb .rowx b{font:800 18px 'Unbounded'}
+/* Reservar */
+.days{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;padding:12px 10px 10px;border-bottom:1px solid rgba(242,239,234,.07)}
+.days div{text-align:center;padding:6px 0 7px;border-radius:12px;font:600 7.5px/1 'Manrope';letter-spacing:.06em;color:#8A7F73;position:relative}
+.days div b{display:block;font:700 14px/1 'Unbounded';color:#F2EFEA;margin-top:4px}
+.days div.on{background:linear-gradient(135deg,var(--t1),var(--t2));color:#141210}
+.days div.on b{color:#141210}
+.days div.dot::after{content:"";position:absolute;left:50%;bottom:2px;width:4px;height:4px;margin-left:-2px;border-radius:50%;background:var(--t1)}
+.cls{display:grid;grid-template-columns:50px 1fr auto;gap:10px;align-items:center;padding:11px 12px;margin-bottom:7px}
+.cls .h{font:700 12px 'Unbounded';white-space:nowrap}
+.cls .n{font:700 12px/1.2 'Manrope'}
+.cls .m{font:500 9.5px 'Manrope';color:#8A7F73;margin-top:2px}
+.cls .av2{font:700 9.5px 'Manrope';margin-top:5px}
+.btn{border-radius:999px;padding:8px 11px;font:800 9.5px/1 'Manrope';color:#141210;background:linear-gradient(135deg,var(--t1),var(--t2))}
+.btn.gh{background:none;color:#8A7F73;border:1px solid rgba(242,239,234,.12)}
+.cls.full{opacity:.5}
+/* Mis clases */
+.bk{padding:13px 14px;margin-top:14px}
+.bk .top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.bk .n{font:700 13px/1.25 'Unbounded'}
+.bk .m{font:500 10px 'Manrope';color:#B9B0A6;margin-top:5px}
+.cancel{display:inline-block;margin-top:12px;border-radius:999px;padding:9px 14px;font:800 9px/1 'Manrope';letter-spacing:.14em;text-transform:uppercase;color:#F0A39B;border:1.5px solid rgba(240,163,155,.45)}
+.past{margin-top:10px;padding:12px 14px;opacity:.55}
+/* Wallet */
+.pass{margin:14px 0 0;border-radius:22px;overflow:hidden;border:1px solid rgba(242,239,234,.1);background:radial-gradient(120% 80% at 100% 0%,color-mix(in srgb,var(--t2) 30%,transparent),transparent 60%),#1B1815}
+.pass .p1{padding:14px;display:flex;justify-content:space-between;align-items:flex-start;border-bottom:1px solid rgba(242,239,234,.08)}
+.lock{display:flex;gap:8px;align-items:center}
+.lock .mark{width:22px;height:25px;color:var(--t1)}
+.lock b{display:block;font:800 13px/1 'Unbounded';letter-spacing:.04em}
+.lock small{display:block;font:700 6.5px/1 'Manrope';letter-spacing:.3em;margin-top:3px;color:#B9B0A6}
+.act{font:800 8px/1 'Manrope';letter-spacing:.16em;color:#8FCBA8}
+.pass .p2{padding:12px 14px;border-bottom:1px solid rgba(242,239,234,.08)}
+.pass .p2 .nm{font:700 14px 'Unbounded';margin-top:6px}
+.pass .p2 .pl{font:500 10px 'Manrope';color:#B9B0A6;margin-top:3px}
+.pass .p3{display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid rgba(242,239,234,.08)}
+.pass .p3 div{padding:10px 12px}
+.pass .p3 div+div{border-left:1px solid rgba(242,239,234,.08)}
+.pass .p3 b{display:block;font:800 14px 'Unbounded';margin-top:6px;white-space:nowrap}
+.pass .p4{padding:11px 14px;display:flex;gap:12px;align-items:center}
+.qr{width:62px;height:62px;border-radius:10px;background:#F2EFEA;padding:6px;display:grid;grid-template-columns:repeat(7,1fr);gap:1px;flex:none}
+.qr i{background:#141210;border-radius:1px}.qr i.w{background:transparent}
+.pass .p4 p{margin:0;font:500 9.5px/1.4 'Manrope';color:#B9B0A6}
+.pass .p4 p b{display:block;font:800 8px/1 'Manrope';letter-spacing:.14em;color:var(--t1);margin-bottom:5px}
+</style>
+
+<h2>B · Oscuro con terracota, sobre la app real</h2>
+<p class="intro">Las mismas pantallas y el mismo menú que la app tiene hoy: barra superior con el logo, la campana y tu avatar; las cinco pestañas de abajo (Inicio, Reservar, Mis clases, Wallet, Perfil) con sus íconos y etiquetas; el selector de semana y de día en Reservar; Próximas/Pasadas en Mis clases; el pase con QR en Wallet. Sin fotos y sin "Alma". <b>Toca un tono para aplicarlo</b> a las cuatro pantallas.</p>
+
+<div class="tones">
+  <div class="tone" data-choice="terracota-suave" onclick="toggleSelect(this);setTone('#D9A286','#B8765A')"><div class="dot" style="background:linear-gradient(135deg,#D9A286,#B8765A)"></div><div><b>Terracota suave</b><span>Más clara y empolvada<br>#D9A286 → #B8765A</span></div></div>
+  <div class="tone" data-choice="terracota" onclick="toggleSelect(this);setTone('#CF8A6B','#A9603F')"><div class="dot" style="background:linear-gradient(135deg,#CF8A6B,#A9603F)"></div><div><b>Terracota</b><span>Barro cocido, la del medio<br>#CF8A6B → #A9603F</span></div></div>
+  <div class="tone" data-choice="terracota-profunda" onclick="toggleSelect(this);setTone('#C47B5C','#96543A')"><div class="dot" style="background:linear-gradient(135deg,#C47B5C,#96543A)"></div><div><b>Terracota profunda</b><span>Más tostada y sobria<br>#C47B5C → #96543A</span></div></div>
+  <div class="tone ref"><div class="dot" style="background:#FA936A"></div><div><b>Hoy en producción</b><span>Naranja brillante<br>#FA936A</span></div></div>
+</div>
+
+<div class="stage4" id="stage4">
+  <!-- 1 · Inicio -->
+  <div class="ph" data-nav="0">
+    <div data-tb></div>
+    <div class="greet">Buenas tardes, Mariana</div>
+    <div class="hd"><div class="eb">Hoy · jueves 24 sep</div><div class="t">Tu semana<span class="ta">en HIVE.</span></div><div class="sub">Tu próxima clase, tu membresía y tus recompensas, en un solo lugar.</div></div>
+    <div class="scr">
+      <div class="glass next"><div style="flex:1"><div class="k acc">Tu próxima clase</div><div class="n">Pilates Reformer</div><div class="m">Mañana · 09:00 · Coach Ana</div></div><div class="go"><svg class="i" viewBox="0 0 24 24"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg></div></div>
+      <div class="sec">Tu cuenta</div>
+      <div class="glass memb"><div class="top"><span class="k acc">Membresía</span><span class="pill ok">Activa</span></div><div class="plan">Mensual · 10 clases</div><div class="rowx"><span class="k">Clases por usar</span><b class="acc">6</b></div><div class="rowx" style="margin-top:6px"><span class="k">Vence</span><b style="font-size:13px">18 oct</b></div></div>
+    </div>
+    <div data-nav-slot></div>
+  </div>
+
+  <!-- 2 · Reservar -->
+  <div class="ph" data-nav="1">
+    <div data-tb></div>
+    <div class="hd"><div class="eb">Semana del 21 al 27 sep</div><div class="t">Reserva tu<span class="ta">próxima clase.</span></div><div class="seg"><span>Anterior</span><span class="on">Actual</span><span>Siguiente</span></div></div>
+    <div class="days"><div>LUN<b>21</b></div><div>MAR<b>22</b></div><div>MIÉ<b>23</b></div><div class="on">JUE<b>24</b></div><div class="dot">VIE<b>25</b></div><div class="dot">SÁB<b>26</b></div><div class="dot">DOM<b>27</b></div></div>
+    <div class="scr">
+      <div class="sec" style="border:0;margin-bottom:4px">Jueves 24 de septiembre</div>
+      <div class="glass cls"><div class="h">07:00</div><div><div class="n">Reformer</div><div class="m">Coach Ana · 50 min</div><div class="av2 acc">4 lugares</div></div><div class="btn">Reservar</div></div>
+      <div class="glass cls"><div class="h">08:00</div><div><div class="n">Mat</div><div class="m">Coach Luis · 50 min</div><div class="av2 acc">Últimos 2</div></div><div class="btn">Reservar</div></div>
+      <div class="glass cls full"><div class="h">18:00</div><div><div class="n">Barre</div><div class="m">Coach Isa · 50 min</div><div class="av2">Llena</div></div><div class="btn gh">Lista</div></div>
+    </div>
+    <div data-nav-slot></div>
+  </div>
+
+  <!-- 3 · Mis clases -->
+  <div class="ph" data-nav="2">
+    <div data-tb></div>
+    <div class="hd"><div class="eb">Mis reservas</div><div class="t">Tus clases<span class="ta">en HIVE.</span></div><div class="seg"><span class="on">Próximas<i>1</i></span><span>Pasadas<i>8</i></span></div></div>
+    <div class="scr">
+      <div class="glass bk"><div class="top"><div class="n">Pilates Reformer</div><span class="pill ok">Confirmada</span></div><div class="m">vie 25 sep · 09:00 · Coach Ana</div><div class="cancel">Cancelar reserva</div></div>
+      <div class="glass past" style="font:500 10px/1.45 Manrope;color:#B9B0A6">Puedes cancelar sin costo hasta 12 horas antes de tu clase.</div>
+    </div>
+    <div data-nav-slot></div>
+  </div>
+
+  <!-- 4 · Wallet -->
+  <div class="ph" data-nav="3">
+    <div data-tb></div>
+    <div class="hd"><div class="eb">Tu pase</div><div class="t">Tu pase<span class="ta">del estudio.</span></div></div>
+    <div class="scr">
+      <div class="pass">
+        <div class="p1"><div class="lock"><svg class="mark" data-mark viewBox="-1 -1 102 117.47"></svg><div><b>HIVE</b><small>PILATES STUDIO</small></div></div><span class="act">● ACTIVO</span></div>
+        <div class="p2"><div class="k">Titular</div><div class="nm">Mariana Ruiz</div><div class="pl">Mensual · 10 clases</div></div>
+        <div class="p3"><div><span class="k">Por usar</span><b class="acc">6</b></div><div><span class="k">Vence</span><b>24 oct</b></div><div><span class="k">Puntos</span><b>120</b></div></div>
+        <div class="p4"><div class="qr" data-qr></div><p><b>CHECK-IN EN RECEPCIÓN</b>Muéstralo al llegar al estudio.</p></div>
+      </div>
+    </div>
+    <div data-nav-slot></div>
+  </div>
+</div>
+
+<script>
+function setTone(a,b){var s=document.getElementById('stage4');s.style.setProperty('--t1',a);s.style.setProperty('--t2',b);}
+(function(){
+  var HEX='50,0 100,28.87 100,86.6 50,115.47 0,86.6 0,28.87';
+  var SP=[[50,-2,50,23.8],[50,117.5,50,91.6],[-2,27.7,18.5,39.55],[102,27.7,81.5,39.55],[-2,87.8,29.4,70.9],[102,87.8,70.6,70.9]];
+  var CUTS=['M34.5,37 C34.5,29 41.5,23.8 50,23.8 C58.5,23.8 65.5,29 65.5,37 Z','M47.5,41.6 L27,41.6 C20.5,41.6 16.6,46.6 16.9,52.6 C17.2,59.4 22.2,65 29,65.2 C34.4,64.9 39.8,61.6 43.6,56.6 C45.9,53.6 47.5,50.4 47.5,47 Z','M52.5,41.6 L73,41.6 C79.5,41.6 83.4,46.6 83.1,52.6 C82.8,59.4 77.8,65 71,65.2 C65.6,64.9 60.2,61.6 56.4,56.6 C54.1,53.6 52.5,50.4 52.5,47 Z','M50,55.3 C52.5,59.5 57,63.2 62.6,65.7 C66.4,67.4 68.4,70.2 68.2,73.4 C68,75.2 67.6,76.8 67,78 L33,78 C32.4,76.8 32,75.2 31.8,73.4 C31.6,70.2 33.6,67.4 37.4,65.7 C43,63.2 47.5,59.5 50,55.3 Z','M34,81.6 L66,81.6 C66,87.2 58.8,91.8 50,91.8 C41.2,91.8 34,87.2 34,81.6 Z'];
+  var n=0;
+  function mark(){n++;var id='hm'+n;return '<defs><mask id="'+id+'" maskUnits="userSpaceOnUse" x="-1" y="-1" width="102" height="117.47"><polygon points="'+HEX+'" fill="#fff"/><g stroke="#000" stroke-width="3.2">'+SP.map(function(s){return '<line x1="'+s[0]+'" y1="'+s[1]+'" x2="'+s[2]+'" y2="'+s[3]+'"/>'}).join('')+'</g><g fill="#000">'+CUTS.map(function(d){return '<path d="'+d+'"/>'}).join('')+'</g></mask></defs><rect x="-1" y="-1" width="102" height="117.47" fill="currentColor" mask="url(#'+id+')"/>';}
+  var I={
+    home:'<path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+    cal:'<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/>',
+    list:'<rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/>',
+    wallet:'<path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/>',
+    user:'<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+    bell:'<path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/>'
+  };
+  function ic(k){return '<svg class="i" viewBox="0 0 24 24">'+I[k]+'</svg>';}
+  var TABS=[['home','Inicio'],['cal','Reservar'],['list','Mis clases'],['wallet','Wallet'],['user','Perfil']];
+  document.querySelectorAll('#stage4 .ph').forEach(function(ph){
+    var on=+ph.getAttribute('data-nav');
+    ph.querySelector('[data-tb]').outerHTML='<div class="tb"><svg class="mark" viewBox="-1 -1 102 117.47">'+mark()+'</svg><div class="r"><div class="bell">'+ic('bell')+'<b>1</b></div><div class="av">MR</div></div></div>';
+    ph.querySelector('[data-nav-slot]').outerHTML='<div class="nav">'+TABS.map(function(t,i){return '<a class="'+(i===on?'on':'')+'"><span class="ic">'+ic(t[0])+'</span>'+t[1]+'</a>';}).join('')+'</div>';
+  });
+  document.querySelectorAll('#stage4 [data-mark]').forEach(function(s){s.innerHTML=mark();});
+  var q=document.querySelector('#stage4 [data-qr]');var pat='1110111101010111101111000001010110011011101010111010100110011000101011110101';
+  for(var j=0;j<49;j++){var c=document.createElement('i');if(pat[j]==='0')c.className='w';q.appendChild(c);}
+})();
+</script>
