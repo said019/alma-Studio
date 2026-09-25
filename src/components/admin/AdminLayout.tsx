@@ -24,10 +24,10 @@ const NAV_GROUPS = [
     collapsible: false,
     items: [
       { path: "/admin/dashboard", label: "Inicio", icon: LayoutDashboard },
-      { path: "/admin/bookings", label: "Reservas", icon: BookOpen },
-      { path: "/admin/classes", label: "Clases", icon: CalendarDays },
-      { path: "/admin/payments", label: "Cobros", icon: DollarSign, ownerOnly: true },
-      { path: "/admin/clients", label: "Personas", icon: Users },
+      { path: "/admin/bookings", label: "Reservas", icon: BookOpen, aliases: ["/admin/pasar-lista"] },
+      { path: "/admin/classes", label: "Clases", icon: CalendarDays, aliases: ["/admin/class-types", "/admin/class-generator"] },
+      { path: "/admin/payments", label: "Cobros", icon: DollarSign, ownerOnly: true, aliases: ["/admin/orders"] },
+      { path: "/admin/clients", label: "Personas", icon: Users, aliases: ["/admin/staff", "/admin/visitas"] },
     ],
   },
   {
@@ -57,10 +57,10 @@ const NAV_GROUPS = [
 
 const MOBILE_QUICK_NAV = [
   { path: "/admin/dashboard", label: "Inicio", icon: LayoutDashboard },
-  { path: "/admin/bookings", label: "Reservas", icon: BookOpen },
-  { path: "/admin/classes", label: "Clases", icon: CalendarDays },
-  { path: "/admin/clients", label: "Personas", icon: Users },
-  { path: "/admin/payments", label: "Cobros", icon: DollarSign, ownerOnly: true },
+  { path: "/admin/bookings", label: "Reservas", icon: BookOpen, aliases: ["/admin/pasar-lista"] },
+  { path: "/admin/classes", label: "Clases", icon: CalendarDays, aliases: ["/admin/class-types", "/admin/class-generator"] },
+  { path: "/admin/clients", label: "Personas", icon: Users, aliases: ["/admin/staff", "/admin/visitas"] },
+  { path: "/admin/payments", label: "Cobros", icon: DollarSign, ownerOnly: true, aliases: ["/admin/orders"] },
 ];
 
 /* Ítem del menú del panel. La sección activa: línea coral a la izquierda
@@ -82,7 +82,7 @@ const ICON_BTN =
 /* Contador de atención. Sobre un fondo coral (pestaña activa del celular) va
    en tinta: nunca coral sobre coral (regla 4). Las clases van en líneas
    separadas por la guardia de texto claro sobre coral. */
-function PendingBadge({ count, onAccent = false, className }: { count: number; onAccent?: boolean; className?: string }) {
+function PendingBadge({ count, onAccent = false, className, srLabel = "pagos por verificar" }: { count: number; onAccent?: boolean; className?: string; srLabel?: string }) {
   if (count <= 0) return null;
   const tone = onAccent
     ? "bg-ink text-canvas"
@@ -90,10 +90,15 @@ function PendingBadge({ count, onAccent = false, className }: { count: number; o
   return (
     <span className={cn("nums grid h-5 min-w-5 place-items-center rounded-full px-1.5 text-[0.75rem] font-extrabold leading-none", tone, className)}>
       {count > 99 ? "99+" : count}
-      <span className="sr-only"> pagos por verificar</span>
+      <span className="sr-only"> {srLabel}</span>
     </span>
   );
 }
+
+// Cada camino con contador dice de qué es (M11): Cobros son pagos por
+// verificar, Bandeja son avisos sin leer — antes el badge de Bandeja repetía
+// "pagos por verificar" aunque no tuviera nada que ver.
+const srLabelFor = (path: string) => (path === "/admin/notifications" ? "avisos sin leer" : "pagos por verificar");
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -129,11 +134,16 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
   const mobileQuickNav = MOBILE_QUICK_NAV.filter((i: any) =>
     (showFinance || !i.ownerOnly) && (!i.feature || (FEATURES as any)[i.feature]));
   const allItems = navGroups.flatMap((g) => g.items);
-  const matchPath = (itemPath: string) => {
+  // Sub-pantallas que no tienen su propio ítem de menú (Verificar, Pasar
+  // lista, Tipos/generador de clase, Coaches) prenden la sección a la que
+  // pertenecen en el sidebar, el nav inferior y el título móvil (M2).
+  const onOwnOrAlias = (base: string, aliases: string[] | undefined, path: string) =>
+    path === base || path.startsWith(base + "/") || (aliases ?? []).some((a) => path === a || path.startsWith(a + "/"));
+  const matchPath = (itemPath: string, aliases?: string[]) => {
     const basePath = itemPath.split("?")[0];
-    return location.pathname === basePath || location.pathname.startsWith(basePath + "/");
+    return onOwnOrAlias(basePath, aliases, location.pathname);
   };
-  const currentItem = allItems.find((i) => matchPath(i.path));
+  const currentItem = allItems.find((i) => matchPath(i.path, (i as { aliases?: string[] }).aliases));
   const isCompact = collapsed && !mobileOpen;
   const isClientFile = /^\/admin\/clients\/[^/]+$/.test(location.pathname);
 
@@ -189,9 +199,10 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
               {!isCompact && group.label && (
                 <p className="px-6 pb-1.5 pt-4 text-[0.75rem] font-bold uppercase tracking-[0.12em] text-ink-muted">{group.label}</p>
               )}
-              {group.items.map(({ path, label, icon: Icon }) => {
-                const active = matchPath(path);
+              {group.items.map(({ path, label, icon: Icon, aliases }) => {
+                const active = matchPath(path, aliases);
                 const badge = badgeFor(path);
+                const srLabel = srLabelFor(path);
                 return (
                   <Link
                     key={path}
@@ -203,10 +214,10 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
                   >
                     <span className="relative inline-flex shrink-0">
                       <Icon size={18} />
-                      {isCompact && <PendingBadge count={badge} className="absolute -right-2.5 -top-2" />}
+                      {isCompact && <PendingBadge count={badge} srLabel={srLabel} className="absolute -right-2.5 -top-2" />}
                     </span>
                     {!isCompact && <span className="truncate text-sm leading-none">{label}</span>}
-                    {!isCompact && <PendingBadge count={badge} className="ml-auto" />}
+                    {!isCompact && <PendingBadge count={badge} srLabel={srLabel} className="ml-auto" />}
                   </Link>
                 );
               })}
@@ -271,7 +282,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
           <nav aria-label="Secciones" className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface pb-safe lg:hidden">
             <ul className="grid" style={{ gridTemplateColumns: `repeat(${mobileQuickNav.length}, minmax(0, 1fr))` }}>
               {mobileQuickNav.map((item) => {
-                const active = matchPath(item.path);
+                const active = matchPath(item.path, item.aliases);
                 return (
                   <li key={item.path}>
                     <Link
