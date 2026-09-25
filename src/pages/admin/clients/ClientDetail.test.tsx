@@ -91,4 +91,21 @@ describe("Ficha de clienta", () => {
     fireEvent.click(await screen.findByRole("button", { name: /Editar datos/ }));
     expect(await screen.findByText("Editar clienta")).toBeInTheDocument();
   });
+
+  it("Ver todas en Próximas clases selecciona la pestaña Reservas", async () => {
+    loginAs("admin");
+    routeApi(mockApi, tabla());
+    renderAdmin(<ClientDetail />, { route: "/admin/clients/u1", path: "/admin/clients/:id" });
+    const prox = await screen.findByRole("region", { name: "Próximas clases" });
+    fireEvent.click(within(prox).getByRole("button", { name: /Ver todas/ }));
+    expect(screen.getByRole("tab", { name: /Reservas/ })).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("el botón de cambiar foto mide 44 px", async () => {
+    loginAs("admin");
+    routeApi(mockApi, tabla());
+    renderAdmin(<ClientDetail />, { route: "/admin/clients/u1", path: "/admin/clients/:id" });
+    const btn = await screen.findByRole("button", { name: "Cambiar foto" });
+    expect(btn.className).toContain("h-11");
+  });
 });

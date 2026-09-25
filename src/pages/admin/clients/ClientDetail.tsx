@@ -28,7 +28,7 @@ import { useCanSeeFinance } from "@/lib/roles";
 import { FEATURES } from "@/config/features";
 import { waLink } from "@/lib/phone";
 import {
-  ArrowLeft, CalendarDays, Camera, ChevronLeft, ChevronRight, CreditCard,
+  ArrowLeft, ArrowRight, CalendarDays, Camera, ChevronLeft, ChevronRight, CreditCard,
   MessageCircle, Pencil, Phone, Receipt, RefreshCw, type LucideProps,
 } from "lucide-react";
 import { ZoomableImage } from "@/components/app/Lightbox";
@@ -189,7 +189,11 @@ function MembershipCard({ mem, clientId, showFinance, onEdit }: { mem: any; clie
       {end && (
         <p className="text-[13px] text-ink-muted">
           Vence el {format(end, "d 'de' MMMM", { locale: es })}
-          {daysLeft != null && daysLeft >= 0 ? ` · en ${daysLeft} ${daysLeft === 1 ? "día" : "días"}` : ""}
+          {daysLeft != null && daysLeft >= 0
+            ? daysLeft === 0
+              ? " · vence hoy"
+              : ` · en ${daysLeft} ${daysLeft === 1 ? "día" : "días"}`
+            : ""}
         </p>
       )}
       <div className="grid grid-cols-2 gap-2">
@@ -202,7 +206,7 @@ function MembershipCard({ mem, clientId, showFinance, onEdit }: { mem: any; clie
   );
 }
 
-function UpcomingCard({ bookings }: { bookings: any[] }) {
+function UpcomingCard({ bookings, onSeeAll }: { bookings: any[]; onSeeAll: () => void }) {
   const now = Date.now();
   const next = bookings
     .filter((b) => (b.status === "confirmed" || b.status === "waitlist") && b.startTime && new Date(b.startTime).getTime() >= now)
@@ -212,6 +216,14 @@ function UpcomingCard({ bookings }: { bookings: any[] }) {
     <Panel aria-label="Próximas clases" className="px-5 py-4">
       <div className="mb-1 flex items-center justify-between">
         <h2 className="text-[15px] font-extrabold">Próximas clases</h2>
+        <button
+          type="button"
+          onClick={onSeeAll}
+          className="inline-flex min-h-[44px] items-center gap-1.5 text-[13px] font-bold text-ink hover:text-accent-strong"
+        >
+          Ver todas
+          <ArrowRight size={14} aria-hidden="true" />
+        </button>
       </div>
       {next.length === 0 ? (
         <p className="py-2 text-[13px] text-ink-muted">No tiene clases próximas.</p>
@@ -238,6 +250,7 @@ const ClientDetail = () => {
   const qc = useQueryClient();
   const showFinance = useCanSeeFinance();
   const [editOpen, setEditOpen] = useState(false);
+  const [tab, setTab] = useState("profile");
   const [adjPoints, setAdjPoints] = useState("");
   const [adjReason, setAdjReason] = useState("");
 
@@ -410,9 +423,9 @@ const ClientDetail = () => {
                       </span>
                     )}
                     <button type="button" onClick={() => photoInputRef.current?.click()}
-                      className="absolute -bottom-1 -right-1 grid h-7 w-7 place-items-center rounded-full bg-ink text-canvas shadow-sm hover:bg-inverse"
-                      aria-label="Cambiar foto">
-                      <Camera size={14} />
+                      className="absolute -bottom-1 -right-1 grid h-11 w-11 place-items-center rounded-full bg-ink text-canvas shadow-sm hover:bg-inverse"
+                      aria-label="Cambiar foto" title="Cambiar foto">
+                      <Camera size={18} />
                     </button>
                     <input ref={photoInputRef} type="file" accept="image/*" className="hidden"
                       onChange={(e) => { const f = e.target.files?.[0]; if (f) photoMutation.mutate(f); e.target.value = ""; }} />
@@ -460,7 +473,7 @@ const ClientDetail = () => {
               )}
 
               <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
-              <Tabs defaultValue="profile" className="min-w-0">
+              <Tabs value={tab} onValueChange={setTab} className="min-w-0">
                 <TabsList>
                   <TabsTrigger value="profile">Perfil</TabsTrigger>
                   <TabsTrigger value="memberships">Membresías <span className="nums ml-1 text-ink-muted">{membershipRows.length}</span></TabsTrigger>
@@ -805,7 +818,7 @@ const ClientDetail = () => {
 
               <aside className="flex flex-col gap-4">
                 <MembershipCard mem={activeMem} clientId={id!} showFinance={showFinance} onEdit={() => activeMem && openEditMem(activeMem)} />
-                <UpcomingCard bookings={bookingRows} />
+                <UpcomingCard bookings={bookingRows} onSeeAll={() => setTab("bookings")} />
                 <Panel aria-label="Responsiva" className="flex items-center justify-between px-5 py-4">
                   <span className="text-sm font-bold">Responsiva</span>
                   {waiver
