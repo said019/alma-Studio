@@ -198,12 +198,12 @@ const ClassTypesList = () => {
               >
                 <span
                   className={cn(
-                    "h-8 w-8 rounded-full ring-1 ring-line transition-all",
+                    "h-11 w-11 rounded-full ring-1 ring-line transition-all",
                     selected ? "scale-110 ring-2 ring-ink ring-offset-2 ring-offset-canvas" : "opacity-80 hover:opacity-100",
                   )}
                   style={{ backgroundColor: c.value }}
                 />
-                <span className={cn("text-[10px]", selected ? "font-semibold text-ink" : "text-ink/55")}>
+                <span className={cn("text-[0.75rem]", selected ? "font-semibold text-ink" : "text-ink/55")}>
                   {c.label}
                 </span>
               </button>
@@ -250,111 +250,130 @@ const ClassTypesList = () => {
               description="No pudimos cargar los tipos de clase. Revisa tu conexión y vuelve a intentarlo."
               onRetry={() => typesQuery.refetch()}
             />
-          ) : !isLoading && types.length === 0 ? (
-            <EmptyState
-              icon={<Palette size={20} strokeWidth={1.8} />}
-              title="Aún no hay tipos de clase"
-              description="Crea el primer tipo (por ejemplo Reformer o Mat) para poder programar clases en el calendario."
-              ctaLabel="Nuevo tipo"
-              onCta={openCreate}
-            />
           ) : isMobile ? (
-            <div className="space-y-2">
-              {isLoading
-                ? Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-24 w-full rounded-xl" />)
-                : types.map((t) => {
-                    const color = resolveClassColor(t.color);
-                    return (
-                      <div key={t.id} className="rounded-xl border border-line bg-sunken p-3">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className="h-3.5 w-3.5 shrink-0 rounded-full ring-1 ring-line" style={{ backgroundColor: color }} />
-                              <p className="truncate text-sm font-semibold text-ink">{t.name}</p>
+            // Celular: el formulario siempre es el Dialog de abajo (no hay
+            // aside), así que el vacío no necesita nada especial aquí.
+            !isLoading && types.length === 0 ? (
+              <EmptyState
+                icon={<Palette size={20} strokeWidth={1.8} />}
+                title="Aún no hay tipos de clase"
+                description="Crea el primer tipo (por ejemplo Reformer o Mat) para poder programar clases en el calendario."
+                ctaLabel="Nuevo tipo"
+                onCta={openCreate}
+              />
+            ) : (
+              <div className="space-y-2">
+                {isLoading
+                  ? Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-24 w-full rounded-xl" />)
+                  : types.map((t) => {
+                      const color = resolveClassColor(t.color);
+                      return (
+                        <div key={t.id} className="rounded-xl border border-line bg-sunken p-3">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="h-3.5 w-3.5 shrink-0 rounded-full ring-1 ring-line" style={{ backgroundColor: color }} />
+                                <p className="truncate text-sm font-semibold text-ink">{t.name}</p>
+                              </div>
+                              <div className="mt-2 flex flex-wrap gap-1.5">
+                                {renderCategoryBadge(t)}
+                                <Badge variant="outline" className="nums border-line text-ink/70">
+                                  {(t.defaultDuration ?? t.durationMin ?? "?") + " min"}
+                                </Badge>
+                                <Badge variant="outline" className="nums border-line text-ink/70">
+                                  {(t.maxCapacity ?? t.capacity ?? "?") + " cupos"}
+                                </Badge>
+                              </div>
                             </div>
-                            <div className="mt-2 flex flex-wrap gap-1.5">
-                              {renderCategoryBadge(t)}
-                              <Badge variant="outline" className="nums border-line text-ink/70">
-                                {(t.defaultDuration ?? t.durationMin ?? "?") + " min"}
-                              </Badge>
-                              <Badge variant="outline" className="nums border-line text-ink/70">
-                                {(t.maxCapacity ?? t.capacity ?? "?") + " cupos"}
-                              </Badge>
-                            </div>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-11 w-11 min-h-[44px] min-w-[44px]" aria-label={`Acciones de ${t.name}`}>
+                                  <MoreHorizontal size={14} />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent>
+                                <DropdownMenuItem onClick={() => openEdit(t)}>Editar</DropdownMenuItem>
+                                <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(t)}>Eliminar</DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </div>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-11 w-11 min-h-[44px] min-w-[44px]">
-                                <MoreHorizontal size={14} />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent>
-                              <DropdownMenuItem onClick={() => openEdit(t)}>Editar</DropdownMenuItem>
-                              <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(t)}>Eliminar</DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                          <div className="mt-2">
+                            {t.isActive !== false ? <StatusDot tone="success">Activo</StatusDot> : <StatusDot tone="muted">Inactivo</StatusDot>}
+                          </div>
                         </div>
-                        <div className="mt-2">
-                          {t.isActive !== false ? <StatusDot tone="success">Activo</StatusDot> : <StatusDot tone="muted">Inactivo</StatusDot>}
-                        </div>
-                      </div>
-                    );
-                  })}
-            </div>
+                      );
+                    })}
+              </div>
+            )
           ) : (
+            // Escritorio: el vacío y la tabla comparten el mismo layout de
+            // dos columnas, para que "Nuevo tipo" abra el formulario a un
+            // lado también con el catálogo vacío (I2) — antes el <aside>
+            // sólo vivía en la rama de la tabla, así que con 0 tipos no
+            // había dónde mostrarlo.
             <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
-              <Panel className="overflow-hidden">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Tipo</TableHead>
-                      <TableHead>Categoría</TableHead>
-                      <TableHead>Duración</TableHead>
-                      <TableHead>Capacidad</TableHead>
-                      <TableHead>Estado</TableHead>
-                      <TableHead className="w-12" />
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {isLoading
-                      ? Array.from({ length: 4 }).map((_, i) => (
-                          <TableRow key={i}>
-                            {Array.from({ length: 6 }).map((_, j) => (
-                              <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>
-                            ))}
-                          </TableRow>
-                        ))
-                      : types.map((t) => (
-                          <TableRow key={t.id}>
-                            <TableCell>
-                              <span className="inline-flex items-center gap-2 rounded-lg border border-line bg-canvas px-2.5 py-1.5 text-[0.75rem] font-extrabold">
-                                <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: resolveClassColor(t.color) }} />
-                                {t.name}
-                              </span>
-                            </TableCell>
-                            <TableCell>{renderCategoryBadge(t)}</TableCell>
-                            <TableCell className="nums text-ink/70">{(t.defaultDuration ?? t.durationMin ?? "?") + " min"}</TableCell>
-                            <TableCell className="nums text-ink/70">{t.maxCapacity ?? t.capacity ?? "?"} lugares</TableCell>
-                            <TableCell>
-                              {t.isActive !== false ? <StatusDot tone="success">Activo</StatusDot> : <StatusDot tone="muted">Inactivo</StatusDot>}
-                            </TableCell>
-                            <TableCell>
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="icon"><MoreHorizontal size={14} /></Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent>
-                                  <DropdownMenuItem onClick={() => openEdit(t)}>Editar</DropdownMenuItem>
-                                  <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(t)}>Eliminar</DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                  </TableBody>
-                </Table>
-              </Panel>
-              {open && !isMobile && (
+              {!isLoading && types.length === 0 ? (
+                <EmptyState
+                  icon={<Palette size={20} strokeWidth={1.8} />}
+                  title="Aún no hay tipos de clase"
+                  description="Crea el primer tipo (por ejemplo Reformer o Mat) para poder programar clases en el calendario."
+                  ctaLabel="Nuevo tipo"
+                  onCta={openCreate}
+                />
+              ) : (
+                <Panel className="overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Tipo</TableHead>
+                        <TableHead>Categoría</TableHead>
+                        <TableHead>Duración</TableHead>
+                        <TableHead>Capacidad</TableHead>
+                        <TableHead>Estado</TableHead>
+                        <TableHead className="w-12" />
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {isLoading
+                        ? Array.from({ length: 4 }).map((_, i) => (
+                            <TableRow key={i}>
+                              {Array.from({ length: 6 }).map((_, j) => (
+                                <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>
+                              ))}
+                            </TableRow>
+                          ))
+                        : types.map((t) => (
+                            <TableRow key={t.id}>
+                              <TableCell>
+                                <span className="inline-flex items-center gap-2 rounded-lg border border-line bg-canvas px-2.5 py-1.5 text-[0.75rem] font-extrabold">
+                                  <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: resolveClassColor(t.color) }} />
+                                  {t.name}
+                                </span>
+                              </TableCell>
+                              <TableCell>{renderCategoryBadge(t)}</TableCell>
+                              <TableCell className="nums text-ink/70">{(t.defaultDuration ?? t.durationMin ?? "?") + " min"}</TableCell>
+                              <TableCell className="nums text-ink/70">{t.maxCapacity ?? t.capacity ?? "?"} lugares</TableCell>
+                              <TableCell>
+                                {t.isActive !== false ? <StatusDot tone="success">Activo</StatusDot> : <StatusDot tone="muted">Inactivo</StatusDot>}
+                              </TableCell>
+                              <TableCell>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon" aria-label={`Acciones de ${t.name}`}><MoreHorizontal size={14} /></Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent>
+                                    <DropdownMenuItem onClick={() => openEdit(t)}>Editar</DropdownMenuItem>
+                                    <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(t)}>Eliminar</DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                    </TableBody>
+                  </Table>
+                </Panel>
+              )}
+              {open && (
                 <aside
                   aria-label={editing ? "Editar tipo" : "Nuevo tipo de clase"}
                   className="rounded-2xl border border-line bg-surface p-6"

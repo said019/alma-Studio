@@ -38,4 +38,40 @@ describe("Tipos de clase", () => {
     fireEvent.click(within(panel).getByRole("button", { name: "Crear" }));
     await waitFor(() => expect(mockApi.post).toHaveBeenCalledWith("/class-types", expect.objectContaining({ name: "Tower" })));
   });
+
+  it("sin tipos, en escritorio, Nuevo tipo (encabezado) sí abre el formulario (I2)", async () => {
+    routeApi(mockApi, { "/admin/stats": { pendingAlerts: 0 }, "/class-types": { data: [] } });
+    renderAdmin(<ClassTypesList />, { route: "/admin/class-types" });
+    await screen.findByText("Aún no hay tipos de clase");
+    const [header] = screen.getAllByRole("button", { name: "Nuevo tipo" });
+    fireEvent.click(header);
+    expect(await screen.findByRole("complementary", { name: "Nuevo tipo de clase" })).toBeInTheDocument();
+  });
+
+  it("sin tipos, en escritorio, el CTA del vacío también abre el formulario (I2)", async () => {
+    routeApi(mockApi, { "/admin/stats": { pendingAlerts: 0 }, "/class-types": { data: [] } });
+    renderAdmin(<ClassTypesList />, { route: "/admin/class-types" });
+    await screen.findByText("Aún no hay tipos de clase");
+    const botones = screen.getAllByRole("button", { name: "Nuevo tipo" });
+    fireEvent.click(botones[botones.length - 1]); // el CTA del bloque vacío
+    const panel = await screen.findByRole("complementary", { name: "Nuevo tipo de clase" });
+    fireEvent.change(within(panel).getByLabelText("Nombre"), { target: { value: "Mat" } });
+    fireEvent.click(within(panel).getByRole("button", { name: "Crear" }));
+    await waitFor(() => expect(mockApi.post).toHaveBeenCalledWith("/class-types", expect.objectContaining({ name: "Mat" })));
+  });
+
+  it("las etiquetas de color son legibles, los swatches de 44 px y el menú de fila trae aria-label (M9)", async () => {
+    renderAdmin(<ClassTypesList />, { route: "/admin/class-types" });
+    fireEvent.click(await screen.findByRole("button", { name: /Nuevo tipo/ }));
+    const panel = screen.getByRole("complementary", { name: "Nuevo tipo de clase" });
+    const swatchButtons = within(panel).getAllByRole("button", { pressed: false }).filter((b) => b.hasAttribute("title"));
+    expect(swatchButtons.length).toBeGreaterThan(0);
+    for (const btn of swatchButtons) {
+      const swatch = btn.querySelector("span[aria-hidden]") ?? btn.querySelector("span");
+      expect(swatch?.className).toMatch(/h-11 w-11/);
+      const label = btn.querySelector("span:last-child");
+      expect(label?.className).toContain("text-[0.75rem]");
+    }
+    expect(screen.getByRole("button", { name: "Acciones de Reformer Intermedio" })).toBeInTheDocument();
+  });
 });
