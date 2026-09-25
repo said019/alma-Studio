@@ -1,7 +1,7 @@
 import { useState, useRef, type ComponentType, type ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { format, parseISO, startOfDay, differenceInCalendarDays } from "date-fns";
+import { format, parseISO, startOfDay, differenceInCalendarDays, differenceInYears } from "date-fns";
 import { es } from "date-fns/locale";
 import api from "@/lib/api";
 import { AuthGuard } from "@/components/admin/AuthGuard";
@@ -33,15 +33,18 @@ import {
 } from "lucide-react";
 import { ZoomableImage } from "@/components/app/Lightbox";
 
-// Formatea fecha de nacimiento sin que el timezone corra un día: toma solo
-// la parte YYYY-MM-DD y la muestra en es-MX (ej. "19 abr 2000").
+// Formatea fecha de nacimiento con edad (spec §5.13, M5). Fecha civil: se
+// parte con `parseISO`, nunca `new Date(str)`, para no correr un día en
+// zonas al oeste de UTC; la edad sale de esa misma fecha con
+// `differenceInYears` contra hoy.
 const fmtBirthdate = (value?: string | null) => {
   if (!value) return "—";
   const ymd = String(value).slice(0, 10);
-  const m = ymd.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (!m) return value;
-  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
-  return d.toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" });
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return value;
+  const d = parseISO(ymd);
+  const dateLabel = d.toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" });
+  const age = differenceInYears(startOfDay(new Date()), d);
+  return `${dateLabel} · ${age} ${age === 1 ? "año" : "años"}`;
 };
 
 const initialsOf = (name?: string | null) => {
@@ -146,8 +149,38 @@ const TableCard = ({ children }: { children: ReactNode }) => (
   <div className="rounded-xl border border-line overflow-hidden bg-canvas">{children}</div>
 );
 
+// Texto de error compacto para las tarjetas de la columna derecha (misma
+// idea que ErrorState pero sin el bloque grande, que no cabe en 340 px) —
+// spec §5: nunca disfrazar un fallo como vacío (I4).
+const CardError = ({ text, onRetry }: { text: string; onRetry: () => void }) => (
+  <p className="text-xs text-destructive">
+    {text}{" "}
+    <button type="button" className="underline underline-offset-2" onClick={onRetry}>Reintentar</button>
+  </p>
+);
+
 // ── Columna derecha: membresía y próximas clases ────────────────────────────────
-function MembershipCard({ mem, clientId, showFinance, onEdit }: { mem: any; clientId: string; showFinance: boolean; onEdit: () => void }) {
+function MembershipCard({ mem, clientId, showFinance, onEdit, isLoading, isError, onRetry }: {
+  mem: any; clientId: string; showFinance: boolean; onEdit: () => void;
+  isLoading?: boolean; isError?: boolean; onRetry?: () => void;
+}) {
+  if (isLoading) {
+    return (
+      <Panel aria-label="Membresía" className="flex flex-col gap-3 p-5">
+        <Skeleton className="h-4 w-24 bg-sunken/60" />
+        <Skeleton className="h-6 w-40 bg-sunken/60" />
+        <Skeleton className="h-10 w-full bg-sunken/60" />
+      </Panel>
+    );
+  }
+  if (isError) {
+    return (
+      <Panel aria-label="Membresía" className="flex flex-col gap-3 p-5">
+        <p className="text-[0.75rem] font-bold uppercase tracking-[0.12em] text-ink-muted">Membresía</p>
+        <CardError text="No pudimos cargar la membresía." onRetry={() => onRetry?.()} />
+      </Panel>
+    );
+  }
   if (!mem) {
     return (
       <Panel aria-label="Membresía" className="flex flex-col gap-3 p-5">
@@ -208,7 +241,9 @@ function MembershipCard({ mem, clientId, showFinance, onEdit }: { mem: any; clie
   );
 }
 
-function UpcomingCard({ bookings, onSeeAll }: { bookings: any[]; onSeeAll: () => void }) {
+function UpcomingCard({ bookings, onSeeAll, isLoading, isError, onRetry }: {
+  bookings: any[]; onSeeAll: () => void; isLoading?: boolean; isError?: boolean; onRetry?: () => void;
+}) {
   const now = Date.now();
   const next = bookings
     .filter((b) => (b.status === "confirmed" || b.status === "waitlist") && b.startTime && new Date(b.startTime).getTime() >= now)
@@ -227,7 +262,14 @@ function UpcomingCard({ bookings, onSeeAll }: { bookings: any[]; onSeeAll: () =>
           <ArrowRight size={14} aria-hidden="true" />
         </button>
       </div>
-      {next.length === 0 ? (
+      {isLoading ? (
+        <div className="space-y-2 py-1">
+          <Skeleton className="h-5 w-full bg-sunken/60" />
+          <Skeleton className="h-5 w-full bg-sunken/60" />
+        </div>
+      ) : isError ? (
+        <CardError text="No pudimos cargar las próximas clases." onRetry={() => onRetry?.()} />
+      ) : next.length === 0 ? (
         <p className="py-2 text-[13px] text-ink-muted">No tiene clases próximas.</p>
       ) : (
         <ul>
@@ -287,13 +329,13 @@ const ClientDetail = () => {
     enabled: !!id,
   });
 
-  const { data: bookings, isError: bookingsError, refetch: refetchBookings } = useQuery({
+  const { data: bookings, isLoading: bookingsLoading, isError: bookingsError, refetch: refetchBookings } = useQuery({
     queryKey: ["client-bookings", id],
     queryFn: async () => (await api.get(`/bookings?userId=${id}`)).data,
     enabled: !!id,
   });
 
-  const { data: memberships, isError: membershipsError, refetch: refetchMemberships } = useQuery({
+  const { data: memberships, isLoading: membershipsLoading, isError: membershipsError, refetch: refetchMemberships } = useQuery({
     queryKey: ["client-memberships", id],
     queryFn: async () => (await api.get(`/memberships?userId=${id}`)).data,
     enabled: !!id,
@@ -311,7 +353,7 @@ const ClientDetail = () => {
     enabled: !!id,
   });
 
-  const { data: waiverData, isError: waiverError, refetch: refetchWaiver } = useQuery({
+  const { data: waiverData, isLoading: waiverLoading, isError: waiverError, refetch: refetchWaiver } = useQuery({
     queryKey: ["admin-waiver", id],
     queryFn: async () => (await api.get(`/admin/users/${id}/waiver`)).data,
     enabled: !!id,
@@ -819,13 +861,33 @@ const ClientDetail = () => {
               </Tabs>
 
               <aside className="flex flex-col gap-4">
-                <MembershipCard mem={activeMem} clientId={id!} showFinance={showFinance} onEdit={() => activeMem && openEditMem(activeMem)} />
-                <UpcomingCard bookings={bookingRows} onSeeAll={() => setTab("bookings")} />
+                <MembershipCard
+                  mem={activeMem}
+                  clientId={id!}
+                  showFinance={showFinance}
+                  onEdit={() => activeMem && openEditMem(activeMem)}
+                  isLoading={isLoading || membershipsLoading}
+                  isError={membershipsError}
+                  onRetry={refetchMemberships}
+                />
+                <UpcomingCard
+                  bookings={bookingRows}
+                  onSeeAll={() => setTab("bookings")}
+                  isLoading={bookingsLoading}
+                  isError={bookingsError}
+                  onRetry={refetchBookings}
+                />
                 <Panel aria-label="Responsiva" className="flex items-center justify-between px-5 py-4">
                   <span className="text-sm font-bold">Responsiva</span>
-                  {waiver
-                    ? <StatusDot tone="success">Firmada{(waiver.signedAt ?? waiver.signed_at) ? ` ${format(new Date(waiver.signedAt ?? waiver.signed_at), "d MMM", { locale: es })}` : ""}</StatusDot>
-                    : <StatusDot tone="muted">Pendiente</StatusDot>}
+                  {waiverLoading ? (
+                    <Skeleton className="h-5 w-20 bg-sunken/60" />
+                  ) : waiverError ? (
+                    <CardError text="No pudimos cargar la responsiva." onRetry={() => refetchWaiver()} />
+                  ) : waiver ? (
+                    <StatusDot tone="success">Firmada{(waiver.signedAt ?? waiver.signed_at) ? ` ${format(new Date(waiver.signedAt ?? waiver.signed_at), "d MMM", { locale: es })}` : ""}</StatusDot>
+                  ) : (
+                    <StatusDot tone="muted">Pendiente</StatusDot>
+                  )}
                 </Panel>
               </aside>
               </div>

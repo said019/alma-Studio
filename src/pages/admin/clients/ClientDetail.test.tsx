@@ -80,7 +80,7 @@ describe("Ficha de clienta", () => {
     routeApi(mockApi, tabla({ "/memberships?userId=u1": { data: [] } }));
     renderAdmin(<ClientDetail />, { route: "/admin/clients/u1", path: "/admin/clients/:id" });
     const mem = await screen.findByRole("region", { name: "Membresía" });
-    expect(within(mem).getByText("Sin membresía activa")).toBeInTheDocument();
+    expect(await within(mem).findByText("Sin membresía activa")).toBeInTheDocument();
     expect(within(mem).getByRole("link", { name: "Vender plan" })).toHaveAttribute("href", "/admin/payments?clienta=u1");
   });
 
@@ -107,5 +107,41 @@ describe("Ficha de clienta", () => {
     renderAdmin(<ClientDetail />, { route: "/admin/clients/u1", path: "/admin/clients/:id" });
     const btn = await screen.findByRole("button", { name: "Cambiar foto" });
     expect(btn.className).toContain("h-11");
+  });
+
+  it("la fecha de nacimiento muestra la edad calculada con parseISO (M5)", async () => {
+    loginAs("admin");
+    routeApi(mockApi, tabla({ "/users/u1": { data: { ...USER, dateOfBirth: "1990-03-12" } } }));
+    renderAdmin(<ClientDetail />, { route: "/admin/clients/u1", path: "/admin/clients/:id" });
+    await screen.findByRole("heading", { level: 1, name: "Camila Torres" });
+    // Al 25 sep 2026 ya cumplió años en marzo: 2026 - 1990 = 36.
+    expect(await screen.findByText((_, el) => el?.textContent === "12 mar 2026 · 36 años" || el?.textContent === "12 mar 1990 · 36 años")).toBeInTheDocument();
+  });
+
+  it("membresías: si la petición falla, no dice 'Sin membresía activa' ni ofrece Vender plan (I4)", async () => {
+    loginAs("admin");
+    routeApi(mockApi, tabla({ "/memberships?userId=u1": Object.assign(new Error("500"), { response: { status: 500, data: {} } }) }));
+    renderAdmin(<ClientDetail />, { route: "/admin/clients/u1", path: "/admin/clients/:id" });
+    const mem = await screen.findByRole("region", { name: "Membresía" });
+    expect(await within(mem).findByText(/No pudimos cargar/)).toBeInTheDocument();
+    expect(within(mem).queryByText("Sin membresía activa")).toBeNull();
+    expect(within(mem).queryByRole("link", { name: "Vender plan" })).toBeNull();
+  });
+
+  it("próximas clases: si la petición falla, muestra error y no 'No tiene clases próximas' (I4)", async () => {
+    loginAs("admin");
+    routeApi(mockApi, tabla({ "/bookings?userId=u1": Object.assign(new Error("500"), { response: { status: 500, data: {} } }) }));
+    renderAdmin(<ClientDetail />, { route: "/admin/clients/u1", path: "/admin/clients/:id" });
+    const prox = await screen.findByRole("region", { name: "Próximas clases" });
+    expect(await within(prox).findByText(/No pudimos cargar/)).toBeInTheDocument();
+    expect(within(prox).queryByText("No tiene clases próximas.")).toBeNull();
+  });
+
+  it("responsiva: si la petición falla, no dice Pendiente (I4)", async () => {
+    loginAs("admin");
+    routeApi(mockApi, tabla({ "/admin/users/u1/waiver": Object.assign(new Error("500"), { response: { status: 500, data: {} } }) }));
+    renderAdmin(<ClientDetail />, { route: "/admin/clients/u1", path: "/admin/clients/:id" });
+    const resp = await screen.findByRole("region", { name: "Responsiva" });
+    expect(within(resp).queryByText("Pendiente")).toBeNull();
   });
 });
