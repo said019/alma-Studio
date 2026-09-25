@@ -407,7 +407,13 @@ const BookClasses = () => {
                   </span>
                   <span
                     aria-hidden="true"
-                    className={"h-1 w-1 rounded-full bg-accent " + (hasClasses ? "" : "opacity-0")}
+                    className={
+                      "h-1 w-1 rounded-full " +
+                      (selected
+                        ? "bg-accent-foreground"
+                        : "bg-accent") +
+                      (hasClasses ? "" : " opacity-0")
+                    }
                   />
                 </button>
               );
@@ -520,20 +526,21 @@ type ClassRowProps = {
 };
 
 /* Fila editorial móvil: hora grande, clase, instructora, cupos y estado en texto,
-   como tarjeta con la acción (Reservar / Lista de espera) a un costado. */
+   como tarjeta con la acción (Reservar / Lista de espera) a un costado. Las filas
+   interactivas sin acción propia (p. ej. "Reservada") vuelven a ser el botón de
+   toda la fila, como antes de este rediseño: sin botón anidado dentro. */
 const ClassRow = ({ cls, state, onPick }: ClassRowProps) => {
   const isFull = state.interactive && state.label === "Lista de espera";
-  const isBookedRow = state.interactive && state.label === "Reservada";
-  const showReservarBtn = state.interactive && !isFull && !isBookedRow;
+  const showReservarBtn = state.interactive && !isFull && state.label !== "Reservada";
+  const noCta = state.interactive && !isFull && !showReservarBtn;
   const meta = cls.instructor + (cls.durationMin ? ` · ${cls.durationMin} min` : "");
 
-  return (
-    <div
-      className={
-        "grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-[18px] border border-line bg-surface dark:bg-surface/70 p-4 " +
-        (isFull ? "opacity-50" : state.dimmed ? "opacity-55" : "")
-      }
-    >
+  const cardClass =
+    "grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-[18px] border border-line bg-surface dark:bg-surface/70 p-4 " +
+    (isFull ? "opacity-50" : state.dimmed ? "opacity-55" : "");
+
+  const content = (
+    <>
       <div className="w-[3.2rem]">
         <p className="nums font-display text-[1.1rem] leading-none text-ink">{cls.timeLabel}</p>
         {cls.endLabel && <p className="nums mt-1 text-[0.72rem] leading-none text-ink-muted">{cls.endLabel}</p>}
@@ -555,29 +562,52 @@ const ClassRow = ({ cls, state, onPick }: ClassRowProps) => {
       </div>
       <div className="shrink-0">
         {isFull ? (
-          <GhostButton onClick={onPick}>Lista de espera</GhostButton>
+          <GhostButton onClick={onPick}>
+            <span className="sr-only">{cls.name}, {cls.timeLabel}: </span>
+            Lista de espera
+          </GhostButton>
         ) : showReservarBtn ? (
-          <PrimaryButton size="sm" onClick={onPick}>Reservar</PrimaryButton>
+          <PrimaryButton size="sm" onClick={onPick}>
+            <span className="sr-only">{cls.name}, {cls.timeLabel}: </span>
+            Reservar
+          </PrimaryButton>
+        ) : noCta ? (
+          <ChevronRight size={15} className="text-ink-faint" />
         ) : null}
       </div>
-    </div>
+    </>
   );
+
+  if (noCta) {
+    return (
+      <button
+        type="button"
+        data-press
+        onClick={onPick}
+        aria-label={`${cls.name}, ${cls.timeLabel}, ${state.label}`}
+        className={cardClass + " w-full min-h-[44px] cursor-pointer text-left"}
+      >
+        {content}
+      </button>
+    );
+  }
+  return <div className={cardClass}>{content}</div>;
 };
 
-/* Fila compacta para las columnas de la semana en desktop: mismo lenguaje, como tarjeta. */
+/* Fila compacta para las columnas de la semana en desktop: mismo lenguaje, como tarjeta.
+   Igual que ClassRow: sin acción propia, toda la celda vuelve a ser el botón. */
 const ClassCell = ({ cls, state, onPick }: ClassRowProps) => {
   const isFull = state.interactive && state.label === "Lista de espera";
-  const isBookedRow = state.interactive && state.label === "Reservada";
-  const showReservarBtn = state.interactive && !isFull && !isBookedRow;
+  const showReservarBtn = state.interactive && !isFull && state.label !== "Reservada";
+  const noCta = state.interactive && !isFull && !showReservarBtn;
   const meta = cls.instructor + (cls.durationMin ? ` · ${cls.durationMin} min` : "");
 
-  return (
-    <div
-      className={
-        "rounded-[18px] border border-line bg-surface dark:bg-surface/70 p-3 " +
-        (isFull ? "opacity-50" : state.dimmed ? "opacity-55" : "")
-      }
-    >
+  const cardClass =
+    "rounded-[18px] border border-line bg-surface dark:bg-surface/70 p-3 " +
+    (isFull ? "opacity-50" : state.dimmed ? "opacity-55" : "");
+
+  const content = (
+    <>
       <p className="nums font-display text-[0.95rem] leading-none text-ink">{cls.timeLabel}</p>
       <p className="mt-1 text-[0.82rem] font-medium leading-snug text-ink">{cls.name}</p>
       <p className="mt-0.5 flex items-center gap-1.5 text-[0.72rem] text-ink-muted">
@@ -595,14 +625,35 @@ const ClassCell = ({ cls, state, onPick }: ClassRowProps) => {
       {(isFull || showReservarBtn) && (
         <div className="mt-2">
           {isFull ? (
-            <GhostButton className="w-full" onClick={onPick}>Lista de espera</GhostButton>
+            <GhostButton className="w-full" onClick={onPick}>
+              <span className="sr-only">{cls.name}, {cls.timeLabel}: </span>
+              Lista de espera
+            </GhostButton>
           ) : (
-            <PrimaryButton className="w-full" size="sm" onClick={onPick}>Reservar</PrimaryButton>
+            <PrimaryButton className="w-full" size="sm" onClick={onPick}>
+              <span className="sr-only">{cls.name}, {cls.timeLabel}: </span>
+              Reservar
+            </PrimaryButton>
           )}
         </div>
       )}
-    </div>
+    </>
   );
+
+  if (noCta) {
+    return (
+      <button
+        type="button"
+        data-press
+        onClick={onPick}
+        aria-label={`${cls.name}, ${cls.timeLabel}, ${state.label}`}
+        className={cardClass + " block w-full min-h-[44px] cursor-pointer text-left"}
+      >
+        {content}
+      </button>
+    );
+  }
+  return <div className={cardClass}>{content}</div>;
 };
 
 export default BookClasses;
