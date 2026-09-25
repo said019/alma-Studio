@@ -51,7 +51,7 @@ El sistema visual de HIVE (sub-proyecto 1) está en producción desde el 24 sep 
 
 ### 3.1 Tokens
 
-Mismos nombres por función en los dos temas; se agrega `accentDeep` (el final del degradado terracota).
+Mismos nombres por función en los dos temas; se agregan `accentDeep` (el final del degradado terracota) e `inkFaint` (el Smoked Taupe como tinta tenue: íconos inactivos, marcadores de posición, deshabilitado).
 
 | Token | Oscuro (app, acceso, 404) | Claro (panel; landing y legales hasta A) |
 |---|---|---|
@@ -62,6 +62,7 @@ Mismos nombres por función en los dos temas; se agrega `accentDeep` (el final d
 | `lineStrong` | #6F665D | #8A7F73 (Smoked Taupe) |
 | `ink` | #F2EFEA (Ivory Silk) | #1A1714 |
 | `inkMuted` | #A69C91 | #6B6259 |
+| `inkFaint` | #8A7F73 (Smoked Taupe) | #8A7F73 (Smoked Taupe) |
 | `accent` | #CF8A6B | #CF8A6B |
 | `accentDeep` | #A9603F | #A9603F |
 | `onAccent` | #141210 | #1A1714 |
@@ -74,7 +75,12 @@ Mismos nombres por función en los dos temas; se agrega `accentDeep` (el final d
 | `onInverse` | #141210 | #F2EFEA |
 | `onInverseMuted` | #6B6259 | #A69C91 |
 
-El Smoked Taupe #8A7F73 se usa tal cual como `lineStrong` en claro, y en oscuro para íconos inactivos, líneas decorativas y la barra inferior sin seleccionar (4.77:1 sobre canvas). No alcanza 4.5:1 para texto chico en ningún tema, así que el texto secundario usa `inkMuted`.
+El Smoked Taupe #8A7F73 es `lineStrong` en claro e `inkFaint` en los dos temas:
+
+- `inkFaint` sirve para íconos inactivos, marcadores de posición y deshabilitado.
+- Como texto sólo vale sobre `canvas` oscuro (4.77:1), por ejemplo las etiquetas inactivas de la barra inferior.
+- Sobre tarjetas oscuras (4.38:1) y en claro (3.41:1) queda para íconos y líneas.
+- El texto secundario usa `inkMuted`.
 
 ### 3.2 Contraste medido
 
@@ -99,7 +105,9 @@ El Smoked Taupe #8A7F73 se usa tal cual como `lineStrong` en claro, y en oscuro 
 | lineStrong / canvas | 3.32 |
 | lineStrong / surface | 3.05 |
 | onInverse / inverse | 16.29 |
-| taupe #8A7F73 / canvas (íconos) | 4.77 |
+| inkFaint / canvas (etiquetas de la barra) | 4.77 |
+| inkFaint / surface (íconos) | 4.38 |
+| Cristal (`surface` al 70 %) sobre el resplandor más fuerte: ink / inkMuted / accent / accentStrong | 14.28 / 6.07 / 5.85 / 7.36 |
 
 **Oscuro — prohibida:**
 - ink (claro) sobre accent: 2.44.
@@ -121,6 +129,7 @@ El Smoked Taupe #8A7F73 se usa tal cual como `lineStrong` en claro, y en oscuro 
 | danger / surface | 7.31 |
 | lineStrong / canvas | 3.41 |
 | lineStrong / surface | 3.92 |
+| inkFaint / canvas (íconos) | 3.41 |
 | onInverse / inverse | 15.56 |
 
 **Claro — prohibidas:**
