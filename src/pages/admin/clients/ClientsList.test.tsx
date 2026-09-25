@@ -81,4 +81,37 @@ describe("Personas · Clientas", () => {
     fireEvent.click(screen.getByRole("button", { name: "Quitar filtro" }));
     await waitFor(() => expect(screen.getByTestId("location").textContent).toBe("/admin/clients"));
   });
+
+  it("recepción no ve 'Editar' en el menú de la fila (I3)", async () => {
+    loginAs("reception");
+    renderAdmin(<ClientsList />, { route: "/admin/clients" });
+    await screen.findByText("Camila Torres");
+    abrirMenu("Acciones de Camila Torres");
+    expect(await screen.findByRole("menuitem", { name: "Eliminar" })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Editar" })).toBeNull();
+  });
+
+  it("?birthday=month con la petición caída muestra un error, no el vacío de clientas (I4)", async () => {
+    routeApi(mockApi, {
+      "/admin/stats": { pendingAlerts: 0 },
+      "/users?role=client&search=": { data: [CAMILA, FER] },
+      "/plans?active=true": { data: [] },
+      "/admin/birthdays?month=9": Object.assign(new Error("500"), { response: { status: 500, data: {} } }),
+    });
+    renderAdmin(<ClientsList />, { route: "/admin/clients?birthday=month", path: "/admin/clients" });
+    expect(await screen.findByText("No pudimos cargar a las clientas")).toBeInTheDocument();
+    expect(screen.queryByText("Aún no hay clientas registradas")).toBeNull();
+  });
+
+  it("?birthday=month sin cumpleañeras dice que nadie cumple ese mes, no el vacío de clientas (I4)", async () => {
+    routeApi(mockApi, {
+      "/admin/stats": { pendingAlerts: 0 },
+      "/users?role=client&search=": { data: [CAMILA, FER] },
+      "/plans?active=true": { data: [] },
+      "/admin/birthdays?month=9": { data: [] },
+    });
+    renderAdmin(<ClientsList />, { route: "/admin/clients?birthday=month", path: "/admin/clients" });
+    expect(await screen.findByText("Nadie cumple años en septiembre.")).toBeInTheDocument();
+    expect(screen.queryByText("Aún no hay clientas registradas")).toBeNull();
+  });
 });

@@ -32,6 +32,7 @@ import { MessageCircle, Cake, MoreHorizontal, Search, SearchX, UserPlus, UsersRo
 import { useDebounce } from "@/hooks/use-debounce";
 import { cn } from "@/lib/utils";
 import { DatePicker } from "@/components/ui/date-picker";
+import { useCanSeeFinance } from "@/lib/roles";
 
 // ── Schemas ────────────────────────────────────────────────────────────────────
 const manualSchema = z.object({
@@ -95,6 +96,9 @@ const ClientsList = () => {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const { confirm, dialog } = useConfirm();
+  // "Editar" pisa datos que el servidor sólo deja tocar a la dueña
+  // (PUT /users/:id rechaza a los demás roles) — spec §8, I3.
+  const canSeeFinance = useCanSeeFinance();
 
   // Edit sheet
   const [editId, setEditId] = useState<string | null>(null);
@@ -123,9 +127,15 @@ const ClientsList = () => {
 
   const filteredClients = clients;
 
-  const rows: (Client & { sub?: string })[] = birthday === "month"
+  const isBirthdayMode = birthday === "month";
+  const rows: (Client & { sub?: string })[] = isBirthdayMode
     ? (birthdaysQ.data?.data ?? []).map((b) => ({ id: b.id, displayName: b.displayName, email: b.email, phone: b.phone, sub: `Cumple el ${b.day} de ${monthName}` }))
     : filteredClients;
+  // En modo cumpleañeras, la carga/error de `birthdaysQ` es lo que manda: si
+  // no se revisa, una petición caída se ve igual que "cero clientas" (I4).
+  const listIsLoading = isBirthdayMode ? birthdaysQ.isLoading : isLoading;
+  const listIsError = isBirthdayMode ? birthdaysQ.isError : isError;
+  const listRefetch = isBirthdayMode ? birthdaysQ.refetch : refetch;
 
   // Plans for the manual sheet
   const { data: plansData, isError: plansError, refetch: refetchPlans } = useQuery<{ data: Plan[] }>({
@@ -226,15 +236,21 @@ const ClientsList = () => {
 
           {/* Table */}
           <Panel className="overflow-hidden">
-            {isError ? (
+            {listIsError ? (
               <div className="px-6">
                 <ErrorState
                   title="No pudimos cargar a las clientas"
-                  onRetry={() => refetch()}
+                  onRetry={() => listRefetch()}
                 />
               </div>
-            ) : !isLoading && rows.length === 0 ? (
-              search.trim() ? (
+            ) : !listIsLoading && rows.length === 0 ? (
+              isBirthdayMode ? (
+                <EmptyBlock
+                  Icon={Cake}
+                  title={`Nadie cumple años en ${monthName}.`}
+                  description="Cuando alguien cumpla años este mes, aparecerá aquí."
+                />
+              ) : search.trim() ? (
                 <EmptyBlock
                   Icon={SearchX}
                   title="No encontramos a nadie con ese nombre"
@@ -269,7 +285,7 @@ const ClientsList = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {isLoading
+                  {listIsLoading
                     ? Array(5).fill(0).map((_, i) => (
                       <TableRow key={i} className="border-line hover:bg-transparent">
                         {Array(5).fill(0).map((_, j) => (
@@ -313,9 +329,11 @@ const ClientsList = () => {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => setEditId(c.id)}>
-                                  Editar
-                                </DropdownMenuItem>
+                                {canSeeFinance && (
+                                  <DropdownMenuItem onClick={() => setEditId(c.id)}>
+                                    Editar
+                                  </DropdownMenuItem>
+                                )}
                                 <DropdownMenuItem
                                   className="text-danger focus:text-danger"
                                   onClick={() => askDelete(c)}
