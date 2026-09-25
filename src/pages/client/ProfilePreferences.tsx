@@ -16,7 +16,6 @@ import { ShieldCheck } from "lucide-react";
 // track inactivo = --input (lineStrong) y focus ring = --ring (ink).
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import { COLOR } from "@/design/tokens";
 
 type PrefKey = "receiveReminders" | "receivePromotions" | "receiveWeeklySummary";
 type Prefs = Record<PrefKey, boolean>;
@@ -89,11 +88,7 @@ const ProfilePreferences = () => {
 
         <Section
           trailing={
-            <span
-              aria-live="polite"
-              className="text-[0.75rem] uppercase tracking-[0.18em]"
-              style={{ color: COLOR.ink, opacity: 0.5 }}
-            >
+            <span aria-live="polite" className="text-[0.75rem] uppercase tracking-[0.18em] text-ink-muted">
               {mutation.isPending ? "Guardando…" : ""}
             </span>
           }
@@ -102,17 +97,16 @@ const ProfilePreferences = () => {
             {items.map((it, i, arr) => (
               <li
                 key={it.key}
-                className="grid grid-cols-[1fr_auto] items-center gap-5 py-5"
-                style={{
-                  borderTop: `1px solid ${COLOR.line}`,
-                  borderBottom: i === arr.length - 1 ? `1px solid ${COLOR.line}` : undefined,
-                }}
+                className={
+                  "grid grid-cols-[1fr_auto] items-center gap-5 py-5 border-t border-line" +
+                  (i === arr.length - 1 ? " border-b" : "")
+                }
               >
                 <div>
-                  <p className="text-[0.94rem] font-medium leading-tight" style={{ color: COLOR.ink }}>
+                  <p className="text-[0.94rem] font-medium leading-tight text-ink">
                     {it.label}
                   </p>
-                  <p className="mt-1 text-[0.84rem] leading-[1.55]" style={{ color: COLOR.ink, opacity: 0.6 }}>
+                  <p className="mt-1 text-[0.84rem] leading-[1.55] text-ink-muted">
                     {it.desc}
                   </p>
                 </div>
