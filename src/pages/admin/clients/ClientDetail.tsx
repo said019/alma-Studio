@@ -1,7 +1,7 @@
 import { useState, useRef, type ComponentType, type ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { format } from "date-fns";
+import { format, parseISO, startOfDay, differenceInCalendarDays } from "date-fns";
 import { es } from "date-fns/locale";
 import api from "@/lib/api";
 import { AuthGuard } from "@/components/admin/AuthGuard";
@@ -162,8 +162,10 @@ function MembershipCard({ mem, clientId, showFinance, onEdit }: { mem: any; clie
   const unlimited = isUnlimited(mem.classesRemaining);
   const limit = Number(mem.classLimit ?? mem.class_limit) || null;
   const left = Number(mem.classesRemaining) || 0;
-  const end = mem.endDate ? new Date(mem.endDate) : null;
-  const daysLeft = end ? Math.ceil((end.getTime() - Date.now()) / 86_400_000) : null;
+  // Fecha civil: parseISO (no `new Date()`), igual que membership-helpers.ts,
+  // para no pintar un día antes en zonas al oeste de UTC (TZ8).
+  const end = mem.endDate ? parseISO(String(mem.endDate).slice(0, 10)) : null;
+  const daysLeft = end ? differenceInCalendarDays(end, startOfDay(new Date())) : null;
   return (
     <Panel aria-label="Membresía" className="flex flex-col gap-3 p-5">
       <div className="flex items-center justify-between">
