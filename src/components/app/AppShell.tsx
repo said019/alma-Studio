@@ -196,7 +196,7 @@ export const AppShell = ({ children, hideGreeting = false }: AppShellProps) => {
             <Link
               to="/app/profile"
               aria-label="Perfil"
-              className="grid h-10 w-10 place-items-center rounded-full overflow-hidden bg-inverse text-inverse-foreground text-[0.75rem] font-bold no-underline"
+              className="grid h-11 w-11 place-items-center rounded-full overflow-hidden bg-inverse text-inverse-foreground text-[0.75rem] font-bold no-underline"
             >
               {avatar}
             </Link>
