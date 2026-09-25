@@ -138,4 +138,12 @@ describe("guardias contra volver a Alma", () => {
     }
     expect(malos).toEqual([]);
   });
+
+  it("el coral #FA936A no aparece en el código, los scripts ni el HTML (spec 2026-09-25 regla 6)", () => {
+    const extra = ["index.html", "public/site.webmanifest", "src/index.css",
+      ...fs.readdirSync(path.join(root, "scripts")).filter((f) => /\.m?js$/.test(f)).map((f) => `scripts/${f}`)];
+    const archivos = [...sourceFiles().map(rel), ...extra];
+    const malos = archivos.filter((f) => /fa936a/i.test(fs.readFileSync(path.join(root, f), "utf8")));
+    expect(malos).toEqual([]);
+  });
 });

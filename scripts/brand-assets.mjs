@@ -5,28 +5,27 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import sharp from "sharp";
-import { COLOR } from "../src/design/tokens.ts";
+import { DARK, LIGHT } from "../src/design/tokens.ts";
 
 const svgPath = new URL("../src/assets/brand/hive-mark.svg", import.meta.url);
 
-/** fg: color del símbolo · bg: fondo (null = transparente) · pad: margen relativo. */
+/** fg: color del símbolo · bg: fondo (null = transparente) · pad: margen relativo.
+ *  Spec 2026-09-25 §8: ícono y favicon = hexágono terracota sobre el carbón de la app. */
 export const TARGETS = [
-  { file: "favicon-16.png", size: 16, fg: COLOR.ink, bg: COLOR.accent, pad: 0.1 },
-  { file: "favicon-32.png", size: 32, fg: COLOR.ink, bg: COLOR.accent, pad: 0.12 },
-  { file: "apple-touch-icon.png", size: 180, fg: COLOR.ink, bg: COLOR.accent, pad: 0.18 },
-  { file: "icon-192.png", size: 192, fg: COLOR.ink, bg: COLOR.accent, pad: 0.18 },
-  { file: "icon-512.png", size: 512, fg: COLOR.ink, bg: COLOR.accent, pad: 0.18 },
-  { file: "icon-maskable-512.png", size: 512, fg: COLOR.ink, bg: COLOR.accent, pad: 0.28 },
-  // F2 — fondo accent y pad 0.18 (como el ícono de la app): con bg: null
-  // (transparente) el trazo ink desaparecía al componerse sobre clientes de
-  // correo en modo oscuro. El correo ya recorta este PNG en círculo.
-  { file: "email-logo.png", size: 240, fg: COLOR.ink, bg: COLOR.accent, pad: 0.18 },
-  { file: "alma-mark-light.png", size: 512, fg: COLOR.accent, bg: null, pad: 0.06 }, // "light" = para fondos oscuros
+  { file: "favicon-16.png", size: 16, fg: DARK.accent, bg: DARK.canvas, pad: 0.1 },
+  { file: "favicon-32.png", size: 32, fg: DARK.accent, bg: DARK.canvas, pad: 0.12 },
+  { file: "apple-touch-icon.png", size: 180, fg: DARK.accent, bg: DARK.canvas, pad: 0.18 },
+  { file: "icon-192.png", size: 192, fg: DARK.accent, bg: DARK.canvas, pad: 0.18 },
+  { file: "icon-512.png", size: 512, fg: DARK.accent, bg: DARK.canvas, pad: 0.18 },
+  { file: "icon-maskable-512.png", size: 512, fg: DARK.accent, bg: DARK.canvas, pad: 0.28 },
+  // Círculo terracota opaco: se ve en correo claro y oscuro (el correo lo recorta en círculo).
+  { file: "email-logo.png", size: 240, fg: DARK.onAccent, bg: DARK.accent, pad: 0.18 },
+  { file: "alma-mark-light.png", size: 512, fg: DARK.accent, bg: null, pad: 0.06 }, // "light" = para fondos oscuros
   ...[1, 2, 3].flatMap((k) => [
-    { file: `wallet-logo${k > 1 ? `@${k}x` : ""}.png`, size: 220 * k, fg: COLOR.ink, bg: COLOR.canvas, pad: 0.14 },
-    { file: `wallet-logo-black${k > 1 ? `@${k}x` : ""}.png`, size: 220 * k, fg: COLOR.accent, bg: COLOR.inverse, pad: 0.14 },
+    { file: `wallet-logo${k > 1 ? `@${k}x` : ""}.png`, size: 220 * k, fg: LIGHT.ink, bg: LIGHT.canvas, pad: 0.14 },
+    { file: `wallet-logo-black${k > 1 ? `@${k}x` : ""}.png`, size: 220 * k, fg: DARK.accent, bg: DARK.canvas, pad: 0.14 },
     ...["pilates", "jumping", "mixto", "event"].map((cat) => ({
-      file: `wallet-icon-${cat}${k > 1 ? `@${k}x` : ""}.png`, size: 29 * k, fg: COLOR.ink, bg: COLOR.accent, pad: 0.12,
+      file: `wallet-icon-${cat}${k > 1 ? `@${k}x` : ""}.png`, size: 29 * k, fg: DARK.onAccent, bg: DARK.accent, pad: 0.12,
     })),
   ]),
 ];

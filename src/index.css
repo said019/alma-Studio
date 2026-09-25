@@ -120,32 +120,32 @@
     color-scheme: light;
 
     /* HIVE — valores de src/design/tokens.ts en HSL (los lee shadcn). */
-    --background: 60 4% 95%;             /* canvas #F4F4F3 */
-    --foreground: 0 0% 7%;               /* ink #111111 */
+    --background: 38 24% 93%;            /* canvas #F2EFEA */
+    --foreground: 30 13% 9%;             /* ink #1A1714 */
 
     --card: 0 0% 100%;                   /* surface #FFFFFF */
-    --card-foreground: 0 0% 7%;
+    --card-foreground: 30 13% 9%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 7%;
+    --popover-foreground: 30 13% 9%;
 
-    --primary: 0 0% 7%;                  /* ink */
-    --primary-foreground: 60 4% 95%;     /* canvas */
+    --primary: 30 13% 9%;                /* ink */
+    --primary-foreground: 38 24% 93%;    /* canvas */
 
-    --secondary: 60 2% 92%;              /* sunken #EAEAE9 */
-    --secondary-foreground: 0 0% 7%;
+    --secondary: 35 21% 89%;             /* sunken #E8E3DC */
+    --secondary-foreground: 30 13% 9%;
 
-    --muted: 60 2% 92%;                  /* sunken */
-    --muted-foreground: 60 1% 35%;       /* inkMuted #5B5B59 */
+    --muted: 35 21% 89%;                 /* sunken */
+    --muted-foreground: 30 9% 38%;       /* inkMuted #6B6259 */
 
-    /* shadcn ya no define la variable de acento: en HIVE ese nombre es el coral (tailwind.config.ts). */
+    /* shadcn ya no define la variable de acento: en HIVE ese nombre es la terracota (tailwind.config.ts). */
 
     --destructive: 349 64% 39%;          /* danger #A3243B */
-    --destructive-foreground: 60 4% 95%;
+    --destructive-foreground: 38 24% 93%;
 
-    --border: 60 3% 87%;                 /* line #DEDEDC */
-    --input: 60 1% 54%;                  /* lineStrong #8A8A88 (3:1) */
-    --ring: 0 0% 7%;                     /* ink */
+    --border: 34 19% 84%;                /* line #DDD6CD */
+    --input: 31 9% 50%;                  /* lineStrong #8A7F73 (3:1) */
+    --ring: 30 13% 9%;                   /* ink */
 
     --radius: 0.75rem;
   }
