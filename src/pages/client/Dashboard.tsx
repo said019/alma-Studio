@@ -31,7 +31,6 @@ import {
 } from "lucide-react";
 import type { ClientMembership } from "@/types/membership";
 import type { BookingClient } from "@/types/booking";
-import { COLOR } from "@/design/tokens";
 
 const formatBookingTime = (iso: string | null | undefined) => {
   if (!iso) return "Por confirmar";
@@ -41,29 +40,52 @@ const formatBookingTime = (iso: string | null | undefined) => {
   return format(d, "EEE d MMM · HH:mm", { locale: es });
 };
 
-/* Fila editorial label → valor para la pieza de membresía (sobre blush,
-   el hairline sube a sandstone para que se lea). */
+/* Fila editorial label → valor para la pieza de membresía. */
 const AccountRow = ({
   label,
   value,
-  accent = false,
+  valueClassName = "text-[1.05rem] font-medium text-ink",
 }: {
   label: string;
   value: ReactNode;
-  accent?: boolean;
+  valueClassName?: string;
 }) => (
-  <div
-    className="grid grid-cols-[1fr_auto] items-baseline gap-4 py-2.5"
-    style={{ borderTop: `1px solid ${COLOR.lineStrong}` }}
-  >
-    <span className="text-[0.72rem] uppercase tracking-[0.18em]" style={{ color: COLOR.ink, opacity: 0.6 }}>
+  <div className="grid grid-cols-[1fr_auto] items-baseline gap-4 py-2.5 border-t border-line">
+    <span className="text-[0.72rem] uppercase tracking-[0.18em] text-ink-muted">
       {label}
     </span>
-    <span className="nums text-[1.05rem] font-medium text-right" style={{ color: accent ? COLOR.accentStrong : COLOR.ink }}>
+    <span className={`nums text-right ${valueClassName}`}>
       {value}
     </span>
   </div>
 );
+
+/* Anillo de progreso del próximo logro: pista en text-line, avance en
+   text-accent, ambos en stroke="currentColor" para seguir al tema. */
+const RING_R = 26;
+const RING_CIRCUMFERENCE = 2 * Math.PI * RING_R;
+
+const MilestoneRing = ({ value, max }: { value: number; max: number }) => {
+  const pct = max > 0 ? Math.min(1, Math.max(0, value / max)) : 0;
+  const offset = RING_CIRCUMFERENCE * (1 - pct);
+  return (
+    <svg viewBox="0 0 64 64" className="h-14 w-14 shrink-0 -rotate-90" aria-hidden="true">
+      <circle cx="32" cy="32" r={RING_R} fill="none" strokeWidth="6" className="text-line" stroke="currentColor" />
+      <circle
+        cx="32"
+        cy="32"
+        r={RING_R}
+        fill="none"
+        strokeWidth="6"
+        strokeLinecap="round"
+        className="text-accent"
+        stroke="currentColor"
+        strokeDasharray={RING_CIRCUMFERENCE}
+        strokeDashoffset={offset}
+      />
+    </svg>
+  );
+};
 
 const Dashboard = () => {
   const { user } = useAuthStore();
@@ -133,8 +155,8 @@ const Dashboard = () => {
       <AppShell>
         <PageHeader
           eyebrow={`Hoy · ${format(new Date(), "EEEE d MMM", { locale: es })}`}
-          title={<>Tu semana en</>}
-          titleAccent="Alma."
+          title="Tu semana"
+          titleAccent="en HIVE."
           subtitle="Tu próxima clase, tu membresía y tus recompensas, en un solo lugar."
         />
 
@@ -178,11 +200,8 @@ const Dashboard = () => {
         {/* ── Próximo milestone (recompensa por asistencia) ── */}
         {milestonesError ? (
           <Section title="Tu próximo logro">
-            <div
-              className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 py-4 px-1"
-              style={{ borderBottom: `1px solid ${COLOR.line}` }}
-            >
-              <p className="text-[0.92rem] leading-[1.6]" style={{ color: COLOR.ink, opacity: 0.65 }}>
+            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 py-4 px-1 border-b border-line">
+              <p className="text-[0.92rem] leading-[1.6] text-ink-muted">
                 No pudimos cargar tu progreso de logros.
               </p>
               <GhostButton onClick={() => refetchMilestones()}>Reintentar</GhostButton>
@@ -193,7 +212,7 @@ const Dashboard = () => {
             title="Tu próximo logro"
             trailing={
               FEATURES.walletExtras && (
-                <Link to="/app/wallet/rewards" className="no-underline" style={{ color: COLOR.accentStrong }}>
+                <Link to="/app/wallet/rewards" className="no-underline text-accent-strong">
                   Ver todos
                 </Link>
               )
@@ -203,51 +222,25 @@ const Dashboard = () => {
               <Link
                 to="/app/wallet/rewards"
                 data-lift
-                className="block no-underline rounded-3xl p-5 sm:p-6"
-                style={{ backgroundColor: COLOR.canvas, border: `1px solid ${COLOR.line}` }}
+                className="flex items-center gap-4 no-underline rounded-[20px] border border-line bg-surface dark:bg-surface/70 p-5 sm:p-6"
               >
-                <div className="flex items-start gap-4">
-                  <span
-                    className="grid h-12 w-12 place-items-center rounded-2xl shrink-0"
-                    style={{ backgroundColor: COLOR.sunken, color: COLOR.accentStrong }}
-                  >
-                    <Award size={20} strokeWidth={1.8} />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-baseline justify-between gap-2 flex-wrap">
-                      <h3 className="font-display leading-tight" style={{ color: COLOR.ink, fontSize: "1.25rem" }}>
-                        {ms.next_milestone.name}
-                      </h3>
-                      <span className="nums text-[0.72rem] font-medium uppercase tracking-[0.18em]" style={{ color: COLOR.accentStrong }}>
-                        +{ms.next_milestone.award_points} pts
-                      </span>
-                    </div>
-                    <div className="mt-3">
-                      <div className="flex items-center justify-between gap-3 text-[0.74rem]">
-                        <span className="nums" style={{ color: COLOR.ink, opacity: 0.7 }}>
-                          <strong style={{ color: COLOR.accentStrong }}>{ms.lifetime_classes}</strong> de {ms.next_milestone.classes_required} clases
-                        </span>
-                        <span className="nums font-medium" style={{ color: COLOR.accentStrong }}>
-                          Te faltan {ms.next_remaining ?? 0}
-                        </span>
-                      </div>
-                      <div
-                        className="mt-2 h-1.5 rounded-full overflow-hidden"
-                        style={{ backgroundColor: COLOR.sunken }}
-                        role="progressbar"
-                        aria-valuemin={0}
-                        aria-valuemax={ms.next_milestone.classes_required}
-                        aria-valuenow={ms.lifetime_classes}
-                      >
-                        <div
-                          className="h-full rounded-full"
-                          style={{
-                            width: `${Math.min(100, Math.round((ms.lifetime_classes / Math.max(1, ms.next_milestone.classes_required)) * 100))}%`,
-                            backgroundColor: COLOR.ink,
-                          }}
-                        />
-                      </div>
-                    </div>
+                <MilestoneRing value={ms.lifetime_classes} max={ms.next_milestone.classes_required} />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-baseline justify-between gap-2 flex-wrap">
+                    <h3 className="font-display leading-tight text-ink text-[1.25rem]">
+                      {ms.next_milestone.name}
+                    </h3>
+                    <span className="nums text-[0.72rem] font-medium uppercase tracking-[0.18em] text-accent-strong">
+                      +{ms.next_milestone.award_points} pts
+                    </span>
+                  </div>
+                  <div className="mt-2 flex items-center justify-between gap-3 text-[0.74rem]">
+                    <span className="nums text-ink-muted">
+                      <strong className="text-accent-strong">{ms.lifetime_classes}</strong> de {ms.next_milestone.classes_required} clases
+                    </span>
+                    <span className="nums font-medium text-accent-strong">
+                      Te faltan {ms.next_remaining ?? 0}
+                    </span>
                   </div>
                 </div>
               </Link>
@@ -258,9 +251,9 @@ const Dashboard = () => {
         {/* ── Membresía + wallet: pieza editorial y fila secundaria ── */}
         <Section title="Tu cuenta">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-            <div className="lg:col-span-7 rounded-3xl p-5 sm:p-6" style={{ backgroundColor: COLOR.sunken }}>
+            <div className="lg:col-span-7 rounded-[20px] border border-line bg-surface dark:bg-surface/70 p-5 sm:p-6">
               <div className="flex items-center justify-between gap-3 mb-3">
-                <span className="text-[0.72rem] font-medium uppercase tracking-[0.24em]" style={{ color: COLOR.accentStrong }}>
+                <span className="text-[0.72rem] font-medium uppercase tracking-[0.24em] text-accent-strong">
                   Membresía
                 </span>
                 {!membershipError && membership && classLimit !== null && (
@@ -271,10 +264,10 @@ const Dashboard = () => {
                 <SkeletonRow height={120} />
               ) : membershipError ? (
                 <>
-                  <h3 className="font-display leading-tight" style={{ color: COLOR.ink, fontSize: "1.25rem" }}>
+                  <h3 className="font-display leading-tight text-ink text-[1.25rem]">
                     No pudimos cargar tu membresía
                   </h3>
-                  <p className="mt-2 text-[0.92rem] leading-[1.6]" style={{ color: COLOR.ink, opacity: 0.65 }}>
+                  <p className="mt-2 text-[0.92rem] leading-[1.6] text-ink-muted">
                     Revisa tu conexión y vuelve a intentarlo.
                   </p>
                   <div className="mt-5">
@@ -283,11 +276,15 @@ const Dashboard = () => {
                 </>
               ) : membership ? (
                 <>
-                  <h3 className="font-display leading-tight" style={{ color: COLOR.ink, fontSize: "clamp(1.45rem, 2.2vw, 1.8rem)" }}>
+                  <h3 className="font-display leading-tight text-ink text-[length:clamp(1.45rem,2.2vw,1.8rem)]">
                     {planName}
                   </h3>
                   <div className="mt-4">
-                    <AccountRow label="Clases por usar" value={classesRemaining ?? "·"} accent />
+                    <AccountRow
+                      label="Clases por usar"
+                      value={classesRemaining ?? "·"}
+                      valueClassName="font-display text-[2rem] text-accent leading-none"
+                    />
                     <AccountRow label="Total del paquete" value={classLimit ?? "·"} />
                     {membershipEnd && (
                       <AccountRow
@@ -305,10 +302,10 @@ const Dashboard = () => {
                 </>
               ) : (
                 <>
-                  <h3 className="font-display leading-tight" style={{ color: COLOR.ink, fontSize: "clamp(1.45rem, 2.2vw, 1.8rem)" }}>
+                  <h3 className="font-display leading-tight text-ink text-[length:clamp(1.45rem,2.2vw,1.8rem)]">
                     Sin paquete activo
                   </h3>
-                  <p className="mt-2 text-[0.92rem] leading-[1.6]" style={{ color: COLOR.ink, opacity: 0.65 }}>
+                  <p className="mt-2 text-[0.92rem] leading-[1.6] text-ink-muted">
                     Cuando actives un paquete, cada clase que tomas cuenta para tu constancia y reservas en un tap.
                   </p>
                   <div className="mt-5">
@@ -319,15 +316,12 @@ const Dashboard = () => {
             </div>
 
             {walletError ? (
-              <div
-                className="lg:col-span-5 rounded-3xl p-5 sm:p-6 flex flex-col justify-between gap-5"
-                style={{ backgroundColor: COLOR.canvas, border: `1px solid ${COLOR.line}` }}
-              >
+              <div className="lg:col-span-5 rounded-[20px] border border-line bg-surface dark:bg-surface/70 p-5 sm:p-6 flex flex-col justify-between gap-5">
                 <div>
-                  <span className="text-[0.72rem] font-medium uppercase tracking-[0.24em]" style={{ color: COLOR.accentStrong }}>
+                  <span className="text-[0.72rem] font-medium uppercase tracking-[0.24em] text-accent-strong">
                     Wallet
                   </span>
-                  <p className="mt-2 text-[0.92rem] leading-[1.6]" style={{ color: COLOR.ink, opacity: 0.65 }}>
+                  <p className="mt-2 text-[0.92rem] leading-[1.6] text-ink-muted">
                     No pudimos cargar tus puntos.
                   </p>
                 </div>
@@ -339,11 +333,10 @@ const Dashboard = () => {
               <Link
                 to="/app/wallet"
                 data-lift
-                className="lg:col-span-5 rounded-3xl p-5 sm:p-6 no-underline flex flex-col justify-between gap-5"
-                style={{ backgroundColor: COLOR.canvas, border: `1px solid ${COLOR.line}`, color: COLOR.ink }}
+                className="lg:col-span-5 rounded-[20px] border border-line bg-surface dark:bg-surface/70 p-5 sm:p-6 no-underline flex flex-col justify-between gap-5 text-ink"
               >
                 <div>
-                  <span className="text-[0.72rem] font-medium uppercase tracking-[0.24em]" style={{ color: COLOR.accentStrong }}>
+                  <span className="text-[0.72rem] font-medium uppercase tracking-[0.24em] text-accent-strong">
                     Wallet
                   </span>
                   {loadingWallet ? (
@@ -351,20 +344,17 @@ const Dashboard = () => {
                       <SkeletonRow height={44} />
                     </div>
                   ) : (
-                    <div
-                      className="mt-3 grid grid-cols-[1fr_auto] items-baseline gap-4 py-2.5"
-                      style={{ borderTop: `1px solid ${COLOR.line}` }}
-                    >
-                      <span className="text-[0.72rem] uppercase tracking-[0.18em]" style={{ color: COLOR.ink, opacity: 0.6 }}>
+                    <div className="mt-3 grid grid-cols-[1fr_auto] items-baseline gap-4 py-2.5 border-t border-line">
+                      <span className="text-[0.72rem] uppercase tracking-[0.18em] text-ink-muted">
                         Puntos
                       </span>
-                      <span className="nums font-display text-2xl leading-none" style={{ color: COLOR.ink }}>
+                      <span className="nums font-display text-2xl leading-none text-ink">
                         {walletPoints}
                       </span>
                     </div>
                   )}
                 </div>
-                <div className="flex items-center justify-between text-[0.74rem]" style={{ color: COLOR.accentStrong }}>
+                <div className="flex items-center justify-between text-[0.74rem] text-accent-strong">
                   <span className="uppercase tracking-[0.18em]">Ver recompensas</span>
                   <WalletIcon size={16} strokeWidth={1.8} />
                 </div>
@@ -375,7 +365,7 @@ const Dashboard = () => {
 
         {/* ── Próximas clases (si hay más de la destacada) ── */}
         {!loadingBookings && !bookingsError && upcoming.length > 1 && (
-          <Section title="También en tu agenda" trailing={<Link to="/app/bookings" className="no-underline" style={{ color: COLOR.accentStrong }}>Ver todas</Link>}>
+          <Section title="También en tu agenda" trailing={<Link to="/app/bookings" className="no-underline text-accent-strong">Ver todas</Link>}>
             <ListGroup>
               {upcoming.slice(1).map((b) => (
                 <ListRow
@@ -444,7 +434,7 @@ const Dashboard = () => {
           </ListGroup>
         </Section>
 
-        <p className="mt-12 lg:mt-16 text-[0.74rem]" style={{ color: COLOR.ink, opacity: 0.45 }}>
+        <p className="mt-12 lg:mt-16 text-[0.74rem] text-ink-muted">
           Buena clase, {firstName}.
         </p>
       </AppShell>
