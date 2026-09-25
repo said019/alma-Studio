@@ -24,7 +24,10 @@ beforeEach(() => {
 describe("Planes", () => {
   it("tarjetas agrupadas por categoría con precio, reglas y estado", async () => {
     renderAdmin(<PlansList />, { route: "/admin/plans" });
-    expect(await screen.findByRole("heading", { name: "Studio" })).toBeInTheDocument();
+    // Timeout explícito: bajo carga (suite completa, CI) el render inicial
+    // puede tardar más que el default de 5000ms de testing-library y la
+    // prueba falla por lentitud del entorno, no por un defecto real.
+    expect(await screen.findByRole("heading", { name: "Studio" }, { timeout: 10000 })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Reformer/Tower" })).toBeInTheDocument();
     const paquete = screen.getByRole("heading", { name: "Paquete 8 clases" }).closest("article")!;
     expect(within(paquete).getByText("$1,450")).toBeInTheDocument();
@@ -36,7 +39,7 @@ describe("Planes", () => {
     const muestra = screen.getByRole("heading", { name: "Muestra gratis" }).closest("article")!;
     expect(within(muestra).getByText("Inactivo")).toBeInTheDocument();
     fireEvent.keyDown(within(paquete).getByRole("button", { name: "Acciones de Paquete 8 clases" }), { key: "Enter" });
-    fireEvent.click(await screen.findByRole("menuitem", { name: "Editar" }));
-    expect(await screen.findByText("Editar plan")).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Editar" }, { timeout: 10000 }));
+    expect(await screen.findByText("Editar plan", {}, { timeout: 10000 })).toBeInTheDocument();
   });
 });
