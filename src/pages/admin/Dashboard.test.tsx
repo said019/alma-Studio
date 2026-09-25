@@ -122,6 +122,48 @@ describe("Inicio", () => {
     expect(within(pendientes).queryByText("Todo al día")).toBeNull();
   });
 
+  it("Últimas membresías: mientras carga no dice que está vacío (I4)", async () => {
+    loginAs("admin");
+    let resolveRecent!: (v: unknown) => void;
+    const pending = new Promise((res) => { resolveRecent = res; });
+    routeApi(mockApi, tabla());
+    const base = mockApi.get.getMockImplementation()!;
+    mockApi.get.mockImplementation((url: string) => (url === "/memberships?limit=5" ? pending : base(url)));
+    renderAdmin(<Dashboard />, { route: "/admin/dashboard" });
+    await screen.findByRole("region", { name: "Últimas membresías" });
+    expect(screen.queryByText("Aún no hay membresías recientes. Cuando una clienta compre un paquete aparecerá aquí.")).toBeNull();
+    resolveRecent({ data: { data: [{ id: "m9", userName: "Camila Torres", planName: "Paquete 8 clases", status: "active" }] } });
+    expect(await screen.findByText("Camila Torres")).toBeInTheDocument();
+  });
+
+  it("Ingresos · últimos 6 meses: mientras carga no dice que está vacío (I4)", async () => {
+    loginAs("admin");
+    let resolveRevenue!: (v: unknown) => void;
+    const pending = new Promise((res) => { resolveRevenue = res; });
+    routeApi(mockApi, tabla());
+    const base = mockApi.get.getMockImplementation()!;
+    mockApi.get.mockImplementation((url: string) => (url === "/reports/revenue" ? pending : base(url)));
+    renderAdmin(<Dashboard />, { route: "/admin/dashboard" });
+    await screen.findByRole("region", { name: "Ingresos · últimos 6 meses" });
+    expect(screen.queryByText("Aún no hay ingresos registrados. Aquí verás la curva de los últimos meses.")).toBeNull();
+    resolveRevenue({ data: { data: [{ month: "2026-09-01", amount: 86400 }] } });
+    expect(await screen.findByRole("img", { name: /Ingresos de los últimos/ })).toBeInTheDocument();
+  });
+
+  it("Clientas por última visita: mientras carga no dice que está vacío (I4)", async () => {
+    loginAs("admin");
+    let resolveDormant!: (v: unknown) => void;
+    const pending = new Promise((res) => { resolveDormant = res; });
+    routeApi(mockApi, tabla());
+    const base = mockApi.get.getMockImplementation()!;
+    mockApi.get.mockImplementation((url: string) => (url === "/reports/dormant" ? pending : base(url)));
+    renderAdmin(<Dashboard />, { route: "/admin/dashboard" });
+    await screen.findByRole("region", { name: "Clientas por última visita" });
+    expect(screen.queryByText("Aún no hay visitas registradas para esta gráfica.")).toBeNull();
+    resolveDormant({ data: { data: { active_7d: 142, dormant_8_14d: 38, dormant_15_30d: 21, dormant_31_60d: 17, lost_60d: 29 } } });
+    expect(await screen.findByText("60+ días")).toBeInTheDocument();
+  });
+
   it("sin nada pendiente dice Todo al día", async () => {
     loginAs("admin");
     routeApi(mockApi, tabla({

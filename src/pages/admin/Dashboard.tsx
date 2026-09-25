@@ -419,7 +419,9 @@ const Dashboard = () => {
               <Panel aria-label="Últimas membresías">
                 <PanelHeader title="Últimas membresías" trailing={<PanelLink to="/admin/memberships">Todas</PanelLink>} />
                 <div className="px-5 pb-3 lg:px-6">
-                  {recentQ.isError ? (
+                  {recentQ.isLoading ? (
+                    <div className="space-y-2 py-1"><SkeletonRow height={44} /><SkeletonRow height={44} /></div>
+                  ) : recentQ.isError ? (
                     <ErrorState title="No pudimos cargar las membresías" onRetry={() => recentQ.refetch()} />
                   ) : recent.length === 0 ? (
                     <p className="py-3 text-sm text-ink-muted">Aún no hay membresías recientes. Cuando una clienta compre un paquete aparecerá aquí.</p>
@@ -446,7 +448,9 @@ const Dashboard = () => {
               <Panel aria-label="Ingresos · últimos 6 meses">
                 <PanelHeader title="Ingresos · últimos 6 meses" trailing={<PanelLink to="/admin/reports">Reportes</PanelLink>} />
                 <div className="px-5 pb-5 lg:px-6">
-                  {revenueQ.isError ? (
+                  {revenueQ.isLoading ? (
+                    <SkeletonRow height={170} />
+                  ) : revenueQ.isError ? (
                     <ErrorState title="No pudimos cargar los ingresos" onRetry={() => revenueQ.refetch()} />
                   ) : revenueRows.length === 0 ? (
                     <p className="py-3 text-sm text-ink-muted">Aún no hay ingresos registrados. Aquí verás la curva de los últimos meses.</p>
@@ -471,7 +475,9 @@ const Dashboard = () => {
               <Panel aria-label="Clientas por última visita">
                 <PanelHeader title="Clientas por última visita" trailing={<PanelLink to="/admin/reports">Ver en Reportes</PanelLink>} />
                 <div className="px-5 pb-5 lg:px-6">
-                  {dormantQ.isError ? (
+                  {dormantQ.isLoading ? (
+                    <SkeletonRow height={140} />
+                  ) : dormantQ.isError ? (
                     <ErrorState title="No pudimos cargar esta gráfica" onRetry={() => dormantQ.refetch()} />
                   ) : !dorm ? (
                     <p className="py-3 text-sm text-ink-muted">Aún no hay visitas registradas para esta gráfica.</p>
