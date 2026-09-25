@@ -50,7 +50,7 @@ const AccountRow = ({
   value: ReactNode;
   valueClassName?: string;
 }) => (
-  <div className="grid grid-cols-[1fr_auto] items-baseline gap-4 py-2.5 border-t border-line">
+  <div className="grid grid-cols-[1fr_auto] items-baseline gap-4 py-2.5 border-t border-line-strong">
     <span className="text-[0.72rem] uppercase tracking-[0.18em] text-ink-muted">
       {label}
     </span>
