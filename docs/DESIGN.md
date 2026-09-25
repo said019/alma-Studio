@@ -77,8 +77,11 @@ clase `accent-foreground` (`text-accent-foreground`); sobre `inverse`,
 
 - Ningún color escrito a mano fuera de `src/design/`: nada de `COLOR`, `resolveTone(`, `TONE_STYLE`.
 - Sin color en `style={{}}` (`color`, `background`, `border`, `boxShadow`, `fill`, `stroke`…), salvo `cssColor(`.
-- Sin `bg-white`/`text-white`/`bg-black`/`text-black`/`#fff`/`#000`: ningún blanco o negro fijo que ignore el tema.
-- Nunca `text-ink` en la misma línea que un fondo terracota (`bg-accent`, `bg-accent-gradient`, `from-accent`): en oscuro `ink` es claro (regla 1).
+- Sin colores fijos que ignoren el tema (`FIJOS`):
+  - blanco y negro (`white`, `black`) y la paleta por defecto de Tailwind —`slate`, `gray`, `zinc`, `neutral`, `stone`, `red`, `orange`, `amber`, `yellow`, `lime`, `green`, `emerald`, `teal`, `cyan`, `sky`, `blue`, `indigo`, `violet`, `purple`, `fuchsia`, `pink`, `rose`, de `-50` a `-950`—;
+  - con cualquiera de los prefijos `bg`, `text`, `border`, `ring`, `from`, `to`, `via`, `fill`, `stroke`, `shadow`, `divide`, `outline`, `decoration`, `placeholder` y `caret` (p. ej. `bg-white`, `text-gray-500`, `fill-black`, `shadow-black/10`);
+  - y `#fff`/`#000` escritos a mano.
+- Sobre terracota sólo va `text-accent-foreground` (regla 1, invertida): toda línea con un relleno terracota (`bg-accent` sin sufijo, `bg-accent-gradient`, `from-accent`; no `bg-accent-soft`) lleva `text-accent-foreground`, o es **decorativa**. Decorativa es la línea que tiene `aria-hidden` o el comentario `/* decorativo */`, que se añade a mano en los puntos y adornos sin texto (p. ej. la rama de una ternaria que pinta un punto, en su propia línea). Caso particular que nunca pasa, ni marcado como decorativo: `text-ink` en la misma línea que el relleno (en oscuro `ink` es claro), así que una ternaria que mezcle la rama terracota con una rama `text-ink` va en líneas separadas.
 - **Sólo opacidades que Tailwind genera**: pasos de 5 (`/5`, `/10`, `/15`…) más `/8` — otra cifra no produce CSS y la clase queda sin efecto silenciosamente.
 - **Texto de al menos 12 px** (`text-[0.75rem]` es el mínimo; nada por debajo en `text-[…]`).
 

@@ -411,7 +411,7 @@ const BookClasses = () => {
                       "h-1 w-1 rounded-full " +
                       (selected
                         ? "bg-accent-foreground"
-                        : "bg-accent") +
+                        : "bg-accent") + /* decorativo */
                       (hasClasses ? "" : " opacity-0")
                     }
                   />

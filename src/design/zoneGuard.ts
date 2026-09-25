@@ -10,11 +10,30 @@ import path from "path";
 const root = path.resolve(__dirname, "..", "..");
 export const read = (f: string) => fs.readFileSync(path.join(root, f), "utf8");
 
-/** Fondo terracota en la misma línea que text-ink: en oscuro ink es claro (regla 1). */
+/** Relleno terracota: `bg-accent` sin sufijo, el degradado o `from-accent` (no `bg-accent-soft`). */
 export const FONDO_TERRACOTA = /\b(?:bg-accent(?![\w-])|bg-accent-gradient|from-accent(?![\w-]))/;
 export const TINTA = /\btext-ink(?![\w-])/;
-/** Blancos y negros fijos que ignoran el tema. */
-export const FIJOS = /\b(?:bg|text|border|ring|from|to|via)-(?:white|black)\b|#(?:fff|000)\b/i;
+/** El único texto que va sobre terracota (regla 1). */
+export const TEXTO_SOBRE_TERRACOTA = /\btext-accent-foreground\b/;
+/** Adorno sin texto (punto, barra): la línea lo dice con `aria-hidden` o con el comentario `/* decorativo *\/`. */
+export const DECORATIVA = /aria-hidden|\/\* decorativo \*\//;
+/**
+ * Regla 1, invertida: una línea con relleno terracota lleva `text-accent-foreground`
+ * o es decorativa. Caso particular que nunca pasa: `text-ink` en la misma línea
+ * (en oscuro ink es claro), aunque la otra rama de una ternaria lleve el texto oscuro.
+ */
+export const terracotaSinTexto = (l: string) =>
+  FONDO_TERRACOTA.test(l) && (TINTA.test(l) || !(TEXTO_SOBRE_TERRACOTA.test(l) || DECORATIVA.test(l)));
+
+/** Prefijos de color de Tailwind y su paleta por defecto: ninguno sigue al tema. */
+const PREFIJOS_DE_COLOR = "bg|text|border|ring|from|to|via|fill|stroke|shadow|divide|outline|decoration|placeholder|caret";
+const PALETA_TAILWIND =
+  "slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose";
+/** Blancos, negros y la paleta por defecto de Tailwind (50…950): colores fijos que ignoran el tema. */
+export const FIJOS = new RegExp(
+  `\\b(?:${PREFIJOS_DE_COLOR})-(?:(?:white|black)\\b|(?:${PALETA_TAILWIND})-(?:50|[1-9]00|950)\\b)|#(?:fff|000)\\b`,
+  "i",
+);
 /** Color en estilo en línea: jsdom no lo ve y no sigue al tema. */
 export const COLOR_EN_LINEA = /style=\{\{[^}]*\b(?:color|backgroundColor|background|borderColor|border|boxShadow|fill|stroke)\s*:/;
 
@@ -56,8 +75,8 @@ export function describeZone(files: string[], opciones: { permitir?: RegExp } = 
     it("no escribe texto de menos de 12 px", () => {
       expect(lineasCon(src, (l) => textosChicos(l).length > 0)).toEqual([]);
     });
-    it("nunca pone text-ink sobre un fondo terracota", () => {
-      expect(lineasCon(src, (l) => FONDO_TERRACOTA.test(l) && TINTA.test(l))).toEqual([]);
+    it("sobre terracota sólo va text-accent-foreground (o la línea es decorativa)", () => {
+      expect(lineasCon(src, terracotaSinTexto)).toEqual([]);
     });
   });
 }

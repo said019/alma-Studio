@@ -388,7 +388,7 @@ export const Tag = ({ children, tint = "accent", variant = "soft" }: TagProps) =
   const t = resolveToneClass(tint);
   const tone = variant === "soft"
     ? `${t.softBg} ${t.softFg} ring-1 ring-inset ${t.ring}`
-    : `${t.solidBg} ${t.solidFg}` + (tint === "accent" ? " dark:bg-accent-gradient" : "");
+    : `${t.solidBg} ${t.solidFg}` + (tint === "accent" ? " dark:bg-accent-gradient dark:text-accent-foreground" : "");
   return (
     <span className={"inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[0.75rem] font-bold leading-none " + tone}>
       {children}

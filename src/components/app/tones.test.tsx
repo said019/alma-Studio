@@ -16,7 +16,7 @@ describe("piezas con tono (clases por tema)", () => {
   it("Tag sólido terracota: nunca texto claro", () => {
     wrap(<Tag tint="accent" variant="solid">4 lugares</Tag>);
     const el = screen.getByText("4 lugares");
-    has(el, "bg-accent"); has(el, "text-accent-foreground"); has(el, "dark:bg-accent-gradient");
+    has(el, "bg-accent"); has(el, "text-accent-foreground"); has(el, "dark:bg-accent-gradient"); has(el, "dark:text-accent-foreground");
   });
   it("un tono desconocido no rompe la pantalla: cae al neutro", () => {
     wrap(<Tag tint={"violeta" as never}>Raro</Tag>);
