@@ -158,13 +158,7 @@ const WalletRewards = () => {
                             Te faltan {ms.next_remaining ?? 0}
                           </span>
                         </div>
-                        <div
-                          className="mt-2 h-1.5 overflow-hidden rounded-full bg-sunken"
-                          role="progressbar"
-                          aria-valuemin={0}
-                          aria-valuemax={ms.next_milestone.classes_required}
-                          aria-valuenow={ms.lifetime_classes}
-                        >
+                        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-sunken">
                           <div
                             className="h-full rounded-full bg-ink transition-[width] duration-700 ease-[cubic-bezier(0.23,1,0.32,1)]"
                             style={{
