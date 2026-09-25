@@ -22,6 +22,10 @@ describe("placeBlocks", () => {
     expect(p.height).toBeCloseTo((50 / 60) * HOUR_PX - 4);
     expect(p.lanes).toBe(1);
   });
+  it("una clase de 50 minutos mide al menos 44 px de alto (área de toque)", () => {
+    const [p] = placeBlocks([g("a", "11:00", "11:50")], 7);
+    expect(p.height).toBeGreaterThanOrEqual(44);
+  });
   it("dos clases a la misma hora van lado a lado", () => {
     const ps = placeBlocks([g("a", "11:00", "11:50"), g("b", "11:00", "11:50"), g("c", "13:00", "13:50")], 7);
     const byId = Object.fromEntries(ps.map((p) => [p.cls.id, p]));

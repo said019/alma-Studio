@@ -18,7 +18,7 @@ export type GridClass = {
   isClosed: boolean;
 };
 
-export const HOUR_PX = 52;
+export const HOUR_PX = 60;
 
 const minutesOf = (iso: string): number => {
   const d = new Date(iso);

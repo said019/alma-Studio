@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { format, startOfWeek, addDays, parseISO } from "date-fns";
+import { format, startOfWeek, addDays, parseISO, getISOWeek } from "date-fns";
 import { es } from "date-fns/locale";
 import api from "@/lib/api";
 import { AuthGuard } from "@/components/admin/AuthGuard";
@@ -28,6 +28,7 @@ import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight, Plus, CalendarDays, Loader2, ArrowRight } from "lucide-react";
 import { resolveClassColor, classTint, CLASSES_SECTION_TABS } from "./palette";
 import { WellhubClassControl } from "./WellhubClassControl";
+import { Avatar } from "@/components/admin/PersonCell";
 import WeekHourGrid from "./WeekHourGrid";
 import { FEATURES } from "@/config/features";
 
@@ -64,6 +65,18 @@ interface ClassType {
 }
 
 const DAYS_ES = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+
+/* Forma real (mixta snake/camel) de una fila del roster, según venga del
+   servidor: confirmada/en espera/no-show, clienta registrada o walk-in. */
+type RosterEntry = {
+  status?: string;
+  bookingId?: string;
+  booking_id?: string;
+  displayName?: string;
+  display_name?: string;
+  guestName?: string;
+  guest_name?: string;
+};
 
 /* ── Schema ── */
 const classSchema = z.object({
@@ -415,7 +428,7 @@ function CalendarView({
           <div className="mb-5 flex flex-wrap items-center gap-3">
             <Button variant="outline" size="icon" aria-label="Semana anterior" onClick={() => shiftWeek(-7)}><ChevronLeft size={18} /></Button>
             <Button variant="outline" size="icon" aria-label="Semana siguiente" onClick={() => shiftWeek(7)}><ChevronRight size={18} /></Button>
-            <span className="nums ml-1 text-base font-extrabold text-ink">{weekLabel}</span>
+            <span className="nums ml-1 text-base font-extrabold text-ink">{`Semana ${getISOWeek(weekStart)} · ${weekLabel}`}</span>
             <Button
               variant="ghost"
               className="underline"
@@ -427,7 +440,7 @@ function CalendarView({
               Hoy
             </Button>
             <span className="text-[13px] text-ink-muted">
-              <span className="nums">{active.length}</span> clases · <span className="nums">{bookedTotal}</span> reservas · <span className="nums">{occ}%</span> ocupación
+              <span className="nums">{active.length}</span> {active.length === 1 ? "clase" : "clases"} · <span className="nums">{bookedTotal}</span> reservas · <span className="nums">{occ}%</span> ocupación
             </span>
             <div className="ml-auto flex flex-wrap gap-2">
               <Button
@@ -451,7 +464,7 @@ function CalendarView({
 
       {/* Empty week */}
       {!isLoadingClasses && classes.length === 0 && (
-        <div className="mb-4 flex flex-col items-start gap-3 rounded-2xl border border-dashed border-line-strong bg-surface p-5 sm:flex-row sm:items-center sm:justify-between">
+        <div data-testid="empty-week-banner" className="mb-4 flex flex-col items-start gap-3 rounded-2xl border border-dashed border-line-strong bg-surface p-5 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-sunken text-ink">
               <CalendarDays size={18} />
@@ -463,6 +476,7 @@ function CalendarView({
               </p>
             </div>
           </div>
+          <Button asChild variant="outline"><Link to="/admin/class-generator">Generar semana</Link></Button>
         </div>
       )}
 
@@ -661,13 +675,32 @@ function CalendarView({
             const booked = selectedClass.currentBookings ?? selectedClass.bookedCount ?? 0;
             const cap = selectedClass.maxCapacity ?? selectedClass.capacity ?? 0;
             const full = cap > 0 && booked >= cap;
-            const waiting = ((rosterData?.data?.roster ?? []) as { status: string }[]).filter((r) => r.status === "waitlist").length;
+            const roster: RosterEntry[] = rosterData?.data?.roster ?? [];
+            const waiting = roster.filter((r) => r.status === "waitlist").length;
+            const bookedRoster = roster.filter((r) => r.status === "confirmed" || r.status === "checked_in");
+            const shownBooked = bookedRoster.slice(0, 5);
+            const moreBooked = bookedRoster.length - shownBooked.length;
             return (
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <span className="text-sm text-ink-muted">con {selectedClass.instructorName ?? "—"}</span>
-                {full ? <Badge variant="attention">Llena · {booked}/{cap}</Badge> : <span className="nums text-sm font-bold">{booked}/{cap}</span>}
-                {waiting > 0 && <span className="rounded-full bg-sunken px-2.5 py-1 text-[0.75rem] font-extrabold text-ink">{waiting} en espera</span>}
-              </div>
+              <>
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <span className="text-sm text-ink-muted">con {selectedClass.instructorName ?? "—"}</span>
+                  {full ? <Badge variant="attention">Llena · {booked}/{cap}</Badge> : <span className="nums text-sm font-bold">{booked}/{cap}</span>}
+                  {waiting > 0 && <span className="rounded-full bg-sunken px-2.5 py-1 text-[0.75rem] font-extrabold text-ink">{waiting} en espera</span>}
+                </div>
+                {shownBooked.length > 0 && (
+                  <div className="mt-3 flex items-center">
+                    {shownBooked.map((r, i) => (
+                      <Avatar
+                        key={r.bookingId ?? r.booking_id ?? i}
+                        name={r.displayName ?? r.display_name ?? r.guestName ?? r.guest_name}
+                        size={32}
+                        className={cn("border-2 border-surface", i > 0 && "-ml-2")}
+                      />
+                    ))}
+                    {moreBooked > 0 && <span className="ml-2 text-sm text-ink-muted">y {moreBooked} más</span>}
+                  </div>
+                )}
+              </>
             );
           })()}
           {selectedClass && (
