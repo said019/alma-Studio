@@ -440,7 +440,7 @@ function CalendarView({
               Hoy
             </Button>
             <span className="text-[13px] text-ink-muted">
-              <span className="nums">{active.length}</span> {active.length === 1 ? "clase" : "clases"} · <span className="nums">{bookedTotal}</span> reservas · <span className="nums">{occ}%</span> ocupación
+              <span className="nums">{active.length}</span> {active.length === 1 ? "clase" : "clases"} · <span className="nums">{bookedTotal}</span> {bookedTotal === 1 ? "reserva" : "reservas"} · <span className="nums">{occ}%</span> ocupación
             </span>
             <div className="ml-auto flex flex-wrap gap-2">
               <Button

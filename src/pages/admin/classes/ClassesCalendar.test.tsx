@@ -42,6 +42,20 @@ describe("Clases · Calendario", () => {
     expect(screen.getByText("Gestionar en Reservas").closest("a")).toHaveAttribute("href", "/admin/bookings?clase=c11");
   });
 
+  it("una sola reserva va en singular", async () => {
+    routeApi(mockApi, {
+      "/admin/stats": { pendingAlerts: 0 },
+      "/class-types": { data: [] },
+      "/instructors": { data: [] },
+      "/classes?start=": { data: [{
+        id: "c07", class_type_id: "t1", class_type_name: "Mat", instructor_id: "i1", instructor_name: "Fer",
+        start_time: "2026-09-25T07:00:00", end_time: "2026-09-25T07:50:00", max_capacity: 10, current_bookings: 1, status: "scheduled",
+      }] },
+    });
+    renderAdmin(<ClassesCalendar />, { route: "/admin/classes" });
+    expect(await screen.findByText((_, el) => el?.textContent === "1 clase · 1 reserva · 10% ocupación")).toBeInTheDocument();
+  });
+
   it("muestra el resumen de la semana, el número de semana y las acciones", async () => {
     renderAdmin(<ClassesCalendar />, { route: "/admin/classes" });
     // El resumen va en varios <span>: se compara el texto completo del contenedor.

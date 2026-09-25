@@ -272,7 +272,7 @@ const Dashboard = () => {
     {
       label: "Membresías activas",
       value: stats?.activeMembers != null ? String(stats.activeMembers) : "—",
-      hint: expiringCount ? `${expiringCount} vencen en 7 días` : "clientas con paquete vigente",
+      hint: expiringCount ? `${expiringCount} ${expiringCount === 1 ? "vence" : "vencen"} en 7 días` : "clientas con paquete vigente",
     },
   ];
 

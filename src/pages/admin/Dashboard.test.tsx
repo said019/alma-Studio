@@ -74,6 +74,13 @@ describe("Inicio", () => {
     expect(screen.queryByText(/Reactivar por WhatsApp/)).toBeNull();
   });
 
+  it("una sola membresía por vencer va en singular", async () => {
+    loginAs("admin");
+    routeApi(mockApi, tabla({ "/memberships?status=expiring": { data: [{ id: "m1" }] } }));
+    renderAdmin(<Dashboard />, { route: "/admin/dashboard" });
+    expect(await screen.findByText("1 vence en 7 días")).toBeInTheDocument();
+  });
+
   it("recepción no ve dinero ni pide los reportes", async () => {
     loginAs("reception");
     routeApi(mockApi, tabla());

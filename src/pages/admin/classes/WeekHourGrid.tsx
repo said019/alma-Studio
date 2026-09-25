@@ -186,8 +186,8 @@ export default function WeekHourGrid({ days, classes, now, selectedId, onSelect,
 
         <div className="relative grid grid-cols-[56px_repeat(7,minmax(0,1fr))]" style={{ height }}>
           <div className="relative">
-            {hours.slice(1).map((h) => (
-              <span key={h} className="nums absolute right-2.5 text-[0.75rem] text-ink-muted" style={{ top: (h - from) * HOUR_PX - 8 }}>
+            {hours.map((h) => (
+              <span key={h} className="nums absolute right-2.5 text-[0.75rem] text-ink-muted" style={{ top: Math.max(2, (h - from) * HOUR_PX - 8) }}>
                 {String(h).padStart(2, "0")}:00
               </span>
             ))}

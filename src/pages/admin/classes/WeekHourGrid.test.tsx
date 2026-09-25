@@ -58,6 +58,11 @@ describe("WeekHourGrid", () => {
     expect(onSelect).toHaveBeenCalled();
     expect(screen.getByRole("button", { name: /Mat.*cancelada/ })).toHaveTextContent("Cancelada");
   });
+  it("la primera hora también lleva su etiqueta", () => {
+    render(<WeekHourGrid days={days} now={new Date(2026, 8, 25, 10, 40)} classes={[g("Mat", "07:00", "07:50")]} onSelect={() => {}} onCreate={() => {}} />);
+    expect(screen.getByText("07:00")).toBeInTheDocument();
+    expect(screen.getByText("08:00")).toBeInTheDocument();
+  });
   it("el + del día crea una clase en esa fecha", () => {
     const onCreate = vi.fn();
     render(<WeekHourGrid days={days} now={new Date(2026, 8, 25, 10, 40)} classes={[]} onSelect={() => {}} onCreate={onCreate} />);

@@ -458,7 +458,7 @@ const ClientDetail = () => {
                 </div>
               ) : (
                 <div className="mb-7 flex flex-col gap-5 lg:flex-row lg:items-center">
-                  <div className="relative shrink-0">
+                  <div className="relative shrink-0 self-start">
                     {u?.photoUrl ? (
                       <ZoomableImage src={u.photoUrl} alt={u.displayName ?? "Cliente"} overlayLabel="Ver" className="h-[88px] w-[88px] overflow-hidden rounded-full" />
                     ) : (
@@ -467,9 +467,11 @@ const ClientDetail = () => {
                       </span>
                     )}
                     <button type="button" onClick={() => photoInputRef.current?.click()}
-                      className="absolute -bottom-1 -right-1 grid h-11 w-11 place-items-center rounded-full bg-ink text-canvas shadow-sm hover:bg-inverse"
+                      className="group absolute -bottom-3 -right-3 grid h-11 w-11 place-items-center rounded-full"
                       aria-label="Cambiar foto" title="Cambiar foto">
-                      <Camera size={18} />
+                      <span className="grid h-8 w-8 place-items-center rounded-full bg-ink text-canvas shadow-sm group-hover:bg-inverse">
+                        <Camera size={16} />
+                      </span>
                     </button>
                     <input ref={photoInputRef} type="file" accept="image/*" className="hidden"
                       onChange={(e) => { const f = e.target.files?.[0]; if (f) photoMutation.mutate(f); e.target.value = ""; }} />
