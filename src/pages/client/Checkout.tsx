@@ -444,6 +444,16 @@ const Checkout = () => {
             {selectedPlan && (
               <Section title="Resumen">
                 <div className="rounded-3xl p-5 sm:p-6 space-y-4 bg-sunken">
+                  <div>
+                    <DataRow label="Paquete" value={selectedPlan.name} />
+                    <DataRow label="Precio" value={`$${formatMoneyMX(selectedEffective)} MXN`} />
+                    {discountResult && (
+                      <DataRow
+                        label="Descuento"
+                        value={`−$${formatMoneyMX(discountResult.discount_amount)} MXN`}
+                      />
+                    )}
+                  </div>
                   <div className="flex items-center gap-2">
                     <span className="grid h-9 w-9 place-items-center rounded-full bg-canvas text-accent-strong">
                       <TagIcon size={14} />

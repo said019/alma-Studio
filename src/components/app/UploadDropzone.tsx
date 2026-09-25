@@ -37,7 +37,7 @@ export const UploadDropzone = ({
   };
 
   const zoneTone = file
-    ? "border-success bg-success/10"
+    ? "border-success bg-success/5"
     : dragOver
       ? "border-accent bg-accent-soft"
       : "border-line-strong bg-surface dark:bg-surface/40";

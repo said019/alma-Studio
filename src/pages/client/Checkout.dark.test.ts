@@ -15,4 +15,10 @@ describe("Checkout en oscuro (spec 2026-09-25 §6.6)", () => {
   it("los precios van en Unbounded con cifras tabulares", () => {
     expect(src).toMatch(/font-display[^"]*nums|nums[^"]*font-display/);
   });
+  it("el Resumen muestra el paquete elegido con DataRow", () => {
+    // Aserción sobre el código fuente: montar la pantalla completa (guard de
+    // auth, react-query, router) no es práctico en este archivo, que sólo
+    // lee Checkout.tsx como texto (como el resto de las pruebas de arriba).
+    expect(src).toMatch(/<DataRow[^>]*label="Paquete"/);
+  });
 });
