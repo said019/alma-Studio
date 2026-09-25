@@ -16,7 +16,9 @@ export default function CobrosTabs() {
     <SectionTabs
       aria-label="Secciones de Cobros"
       tabs={[
-        { label: "Cobrar", to: "/admin/payments", exact: true },
+        // "Cobrar" es sólo para quien ve dinero (spec §8, I3): recepción y
+        // coach no deben poder llegar a la pantalla de cobro.
+        ...(showFinance ? [{ label: "Cobrar", to: "/admin/payments", exact: true }] : []),
         { label: "Verificar", to: "/admin/orders", count: data?.pendingAlerts ?? 0 },
         ...(showFinance ? [{ label: "Historial", to: "/admin/payments/historial" }] : []),
       ]}

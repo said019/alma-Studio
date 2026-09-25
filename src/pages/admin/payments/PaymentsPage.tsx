@@ -250,8 +250,11 @@ function CashAssignment() {
 }
 
 // ── Página principal de pagos ─────────────────────────────
+// Cobrar es sólo de quien ve dinero (spec §8, I3): el servidor no lo protege
+// (POST /memberships acepta recepción y coach), así que aquí es el único
+// control.
 const PaymentsPage = () => (
-  <AuthGuard>
+  <AuthGuard requiredRoles={["admin", "super_admin"]}>
     <AdminLayout>
       <AdminPage>
         <AdminPageHeader kicker="Cobros · mostrador" title="Cobrar" subtitle="Asigna una membresía y cóbrala en el momento." actions={<CobrosTabs />} />

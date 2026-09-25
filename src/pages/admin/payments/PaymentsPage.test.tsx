@@ -72,11 +72,12 @@ describe("Cobros · Cobrar", () => {
     expect(screen.getByRole("combobox", { name: "Buscar clienta para cobrar" })).toBeInTheDocument();
   });
 
-  it("recepción no ve la pestaña Historial", async () => {
+  it("recepción no llega a la pantalla de Cobrar (I3)", async () => {
     loginAs("reception");
     renderAdmin(<PaymentsPage />, { route: "/admin/payments" });
-    expect(await screen.findByRole("link", { name: /Verificar/ })).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Historial" })).toBeNull();
+    await waitFor(() => expect(screen.getByTestId("location").textContent).toBe("/app"));
+    expect(screen.queryByRole("complementary", { name: "Resumen de la membresía" })).toBeNull();
+    expect(screen.queryByRole("combobox", { name: "Buscar clienta para cobrar" })).toBeNull();
   });
 });
 
