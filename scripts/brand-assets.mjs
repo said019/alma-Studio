@@ -17,7 +17,10 @@ export const TARGETS = [
   { file: "icon-192.png", size: 192, fg: COLOR.ink, bg: COLOR.accent, pad: 0.18 },
   { file: "icon-512.png", size: 512, fg: COLOR.ink, bg: COLOR.accent, pad: 0.18 },
   { file: "icon-maskable-512.png", size: 512, fg: COLOR.ink, bg: COLOR.accent, pad: 0.28 },
-  { file: "email-logo.png", size: 240, fg: COLOR.ink, bg: null, pad: 0.06 },
+  // F2 — fondo accent y pad 0.18 (como el ícono de la app): con bg: null
+  // (transparente) el trazo ink desaparecía al componerse sobre clientes de
+  // correo en modo oscuro. El correo ya recorta este PNG en círculo.
+  { file: "email-logo.png", size: 240, fg: COLOR.ink, bg: COLOR.accent, pad: 0.18 },
   { file: "alma-mark-light.png", size: 512, fg: COLOR.accent, bg: null, pad: 0.06 }, // "light" = para fondos oscuros
   ...[1, 2, 3].flatMap((k) => [
     { file: `wallet-logo${k > 1 ? `@${k}x` : ""}.png`, size: 220 * k, fg: COLOR.ink, bg: COLOR.canvas, pad: 0.14 },
