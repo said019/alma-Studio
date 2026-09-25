@@ -116,7 +116,7 @@ export const AuthShell = ({
         <div className="relative z-10 flex h-full min-h-[30vh] lg:min-h-screen flex-col justify-between p-6 sm:p-9 lg:p-12">
           <Link
             to="/"
-            className="inline-flex w-fit items-center rounded-md no-underline transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-canvas"
+            className="inline-flex w-fit items-center rounded-md no-underline transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong"
             aria-label="Inicio HIVE Pilates Studio"
           >
             <BrandLogo variant="lockup" size={56} className="text-accent" />
@@ -429,7 +429,7 @@ type AuthSecondaryLinkProps = {
 export const AuthSecondaryLink = ({ to, children }: AuthSecondaryLinkProps) => (
   <Link
     to={to}
-    className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-line px-6 py-3.5 text-[0.78rem] font-medium uppercase tracking-[0.2em] text-ink no-underline transition-colors duration-200 hover:border-line-strong hover:bg-sunken focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-offset-2"
+    className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-line px-6 py-3.5 text-[0.78rem] font-medium uppercase tracking-[0.2em] text-ink no-underline transition-colors duration-200 hover:border-line-strong hover:bg-sunken focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
   >
     {children}
   </Link>
@@ -485,7 +485,7 @@ export const AuthCheckbox = ({ checked, onChange, children, error }: AuthCheckbo
         aria-checked={checked}
         onClick={() => onChange(!checked)}
         className={
-          "mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-md border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-offset-1 " +
+          "mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-md border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-offset-1 focus-visible:ring-offset-canvas " +
           (checked ? "bg-ink border-accent-strong" : "bg-transparent border-line-strong")
         }
       >

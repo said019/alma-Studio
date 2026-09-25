@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { AuthShell, AuthField, AuthCheckbox } from "./AuthShell";
-import { describeZone } from "@/design/zoneGuard";
+import { AuthShell, AuthField, AuthCheckbox, AuthSecondaryLink } from "./AuthShell";
+import { describeZone, read, lineasCon } from "@/design/zoneGuard";
 
 describeZone([
   "src/components/auth/AuthShell.tsx",
@@ -94,5 +94,39 @@ describe("AuthCheckbox — objetivo táctil", () => {
     fireEvent.click(screen.getByText("Acepto la responsiva"));
     expect(onChange).toHaveBeenCalledWith(true);
     expect(screen.getByText("Acepto la responsiva").closest("label")!.className).toContain("min-h-[44px]");
+  });
+});
+
+describe("anillos de foco del acceso (M8)", () => {
+  const ARCHIVOS = [
+    "src/components/auth/AuthShell.tsx",
+    "src/pages/auth/Login.tsx",
+    "src/pages/auth/Register.tsx",
+    "src/pages/auth/ForgotPassword.tsx",
+    "src/pages/auth/ResetPassword.tsx",
+    "src/pages/auth/Onboarding.tsx",
+  ];
+  const clases = (el: Element) => el.className.split(/\s+/);
+
+  it.each(ARCHIVOS)("%s: ningún anillo en canvas (invisible en oscuro)", (f) => {
+    expect(lineasCon(read(f), (l) => /(?<![\w-])ring-canvas\b/.test(l))).toEqual([]);
+  });
+  it.each(ARCHIVOS)("%s: todo anillo con separación la pinta en canvas (sin color, la separación sale blanca)", (f) => {
+    expect(lineasCon(read(f), (l) => /\bring-offset-[1-9]/.test(l) && !/\bring-offset-canvas\b/.test(l))).toEqual([]);
+  });
+  it("el logo del panel de marca enfoca en accent-strong", () => {
+    renderShell();
+    const logo = screen.getByRole("link", { name: "Inicio HIVE Pilates Studio" });
+    expect(clases(logo)).toContain("focus-visible:ring-accent-strong");
+  });
+  it("AuthSecondaryLink y AuthCheckbox: anillo accent-strong con separación en canvas", () => {
+    wrap(<AuthSecondaryLink to="/auth/register">Crear cuenta</AuthSecondaryLink>);
+    expect(clases(screen.getByRole("link", { name: "Crear cuenta" }))).toEqual(
+      expect.arrayContaining(["focus-visible:ring-accent-strong", "focus-visible:ring-offset-2", "focus-visible:ring-offset-canvas"]),
+    );
+    render(<AuthCheckbox checked onChange={() => {}}>Acepto</AuthCheckbox>);
+    expect(clases(screen.getByRole("checkbox"))).toEqual(
+      expect.arrayContaining(["focus-visible:ring-accent-strong", "focus-visible:ring-offset-1", "focus-visible:ring-offset-canvas"]),
+    );
   });
 });

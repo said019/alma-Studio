@@ -50,7 +50,7 @@ const YesNoField = ({
             aria-checked={active}
             onClick={() => onChange(opt)}
             className={
-              "min-h-[44px] rounded-full border px-4 py-3 text-[0.9rem] font-medium transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-offset-2 " +
+              "min-h-[44px] rounded-full border px-4 py-3 text-[0.9rem] font-medium transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-offset-2 focus-visible:ring-offset-canvas " +
               (active
                 ? "border-ink bg-ink text-canvas"
                 : "border-line bg-canvas text-ink hover:border-line-strong hover:bg-sunken")

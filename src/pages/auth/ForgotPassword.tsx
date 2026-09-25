@@ -97,13 +97,13 @@ const ForgotPassword = () => {
             <button
               type="button"
               onClick={() => setSent(false)}
-              className="inline-flex items-center justify-center gap-2 rounded-full border border-line px-6 py-3.5 text-[0.78rem] font-medium uppercase tracking-[0.18em] text-ink transition-colors duration-200 hover:border-line-strong hover:bg-sunken focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-offset-2"
+              className="inline-flex items-center justify-center gap-2 rounded-full border border-line px-6 py-3.5 text-[0.78rem] font-medium uppercase tracking-[0.18em] text-ink transition-colors duration-200 hover:border-line-strong hover:bg-sunken focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
             >
               Cambiar correo
             </button>
             <Link
               to="/auth/login"
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-ink px-6 py-3.5 text-[0.78rem] font-medium uppercase tracking-[0.18em] text-canvas no-underline transition-transform duration-200 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-offset-2"
+              className="inline-flex items-center justify-center gap-2 rounded-full bg-ink px-6 py-3.5 text-[0.78rem] font-medium uppercase tracking-[0.18em] text-canvas no-underline transition-transform duration-200 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
             >
               <CheckCircle2 size={14} />
               Volver a iniciar sesión
