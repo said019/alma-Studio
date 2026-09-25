@@ -21,7 +21,6 @@ import {
   FileText,
   FileSignature,
 } from "lucide-react";
-import { COLOR } from "@/design/tokens";
 
 const Profile = () => {
   const { user, logout } = useAuthStore();
@@ -62,14 +61,8 @@ const Profile = () => {
         />
 
         {/* ── Header card ── */}
-        <div
-          className="rounded-3xl p-5 sm:p-7 flex items-center gap-5"
-          style={{ backgroundColor: COLOR.sunken }}
-        >
-          <div
-            className="relative grid h-20 w-20 sm:h-24 sm:w-24 place-items-center rounded-full overflow-hidden text-[1.2rem] font-bold shrink-0"
-            style={{ backgroundColor: COLOR.ink, color: COLOR.canvas }}
-          >
+        <div className="rounded-3xl p-5 sm:p-7 flex items-center gap-5 border border-line bg-sunken">
+          <div className="relative grid h-20 w-20 sm:h-24 sm:w-24 place-items-center rounded-full overflow-hidden text-[1.2rem] font-bold shrink-0 bg-inverse text-inverse-foreground">
             {(user?.photoUrl ?? user?.photo_url) ? (
               <img
                 src={(user?.photoUrl ?? user?.photo_url)!}
@@ -82,18 +75,18 @@ const Profile = () => {
           </div>
           <div className="min-w-0 flex-1">
             <h2
-              className="font-display leading-tight truncate"
-              style={{ color: COLOR.ink, fontSize: "clamp(1.55rem, 2.6vw, 2.1rem)" }}
+              className="font-display leading-tight truncate text-ink"
+              style={{ fontSize: "clamp(1.55rem, 2.6vw, 2.1rem)" }}
             >
               {fullName}
             </h2>
             {email && (
-              <p className="text-[0.86rem] mt-1 truncate" style={{ color: COLOR.ink, opacity: 0.65 }}>
+              <p className="text-[0.86rem] mt-1 truncate text-ink-muted">
                 {email}
               </p>
             )}
             {phone && (
-              <p className="nums text-[0.82rem] mt-0.5 truncate" style={{ color: COLOR.ink, opacity: 0.55 }}>
+              <p className="nums text-[0.82rem] mt-0.5 truncate text-ink-muted">
                 {phone}
               </p>
             )}
@@ -186,8 +179,8 @@ const Profile = () => {
           </ListGroup>
         </Section>
 
-        <p className="nums mt-12 text-[0.72rem] uppercase tracking-[0.18em]" style={{ color: COLOR.ink, opacity: 0.4 }}>
-          Versión Alma · {new Date().getFullYear()}
+        <p className="nums mt-12 text-[0.75rem] uppercase tracking-[0.18em] text-ink-muted">
+          HIVE Pilates Studio · {new Date().getFullYear()}
         </p>
       </AppShell>
     </ClientAuthGuard>

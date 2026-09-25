@@ -3,10 +3,11 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { X } from "lucide-react";
 import api from "@/lib/api";
 
+import { PrimaryButton } from "@/components/app/AppShell";
+import { Field } from "@/components/app/fields";
 import { SignaturePad } from "@/components/app/SignaturePad";
 import { RESPONSIVA_TITLE, RESPONSIVA_SECTIONS } from "@/components/app/responsivaContent";
 import { useToast } from "@/hooks/use-toast";
-import { COLOR } from "@/design/tokens";
 
 interface ResponsivaDialogProps {
   open: boolean;
@@ -17,28 +18,8 @@ interface ResponsivaDialogProps {
   defaultPhone?: string;
 }
 
-const fieldStyle: React.CSSProperties = {
-  width: "100%",
-  borderRadius: 12,
-  padding: "0.75rem 0.9rem",
-  fontSize: "0.95rem",
-  color: COLOR.ink,
-  backgroundColor: COLOR.surface,
-  border: `1px solid ${COLOR.line}`,
-  outline: "none",
-  boxSizing: "border-box",
-};
-
-const labelStyle: React.CSSProperties = {
-  fontSize: "0.66rem",
-  fontWeight: 500,
-  textTransform: "uppercase" as const,
-  letterSpacing: "0.22em",
-  color: COLOR.ink,
-  opacity: 0.62,
-  marginBottom: 6,
-  display: "block",
-};
+/* Etiqueta pequeña de las dos secciones sin campo dedicado (uso de imagen, firma). */
+const LABEL_CLASS = "block mb-2.5 text-[0.75rem] font-bold uppercase tracking-[0.12em] text-ink-muted";
 
 export const ResponsivaDialog = ({
   open,
@@ -86,7 +67,7 @@ export const ResponsivaDialog = ({
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["my-waiver"] });
-      toast({ title: "Responsiva firmada. ¡Bienvenida a Alma Movement!" });
+      toast({ title: "Responsiva firmada. ¡Bienvenida a HIVE!" });
       onSigned();
     },
     onError: () => {
@@ -102,73 +83,23 @@ export const ResponsivaDialog = ({
 
   return (
     <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 60,
-        backgroundColor: `${COLOR.inverse}8c`,
-        backdropFilter: "blur(4px)",
-        WebkitBackdropFilter: "blur(4px)",
-        display: "flex",
-        alignItems: "flex-end",
-        justifyContent: "center",
-        padding: "0",
-      }}
+      className="fixed inset-0 z-[60] flex items-end justify-center bg-canvas/80"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div
-        style={{
-          position: "relative",
-          width: "100%",
-          maxWidth: 600,
-          maxHeight: "92vh",
-          backgroundColor: COLOR.canvas,
-          borderRadius: "24px 24px 0 0",
-          overflowY: "auto",
-          boxShadow: `0 -12px 48px ${COLOR.inverse}24`,
-          // Center on desktop
-        }}
+        className="relative w-full max-w-[600px] max-h-[92vh] overflow-y-auto rounded-t-[24px] border-t border-line bg-canvas shadow-float"
         // Prevent click propagation so clicking inside doesn't close
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div
-          style={{
-            position: "sticky",
-            top: 0,
-            zIndex: 10,
-            backgroundColor: `${COLOR.canvas}f5`,
-            backdropFilter: "blur(12px)",
-            WebkitBackdropFilter: "blur(12px)",
-            borderBottom: `1px solid ${COLOR.line}`,
-            padding: "1.1rem 1.4rem",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 12,
-          }}
-        >
+        <div className="sticky top-0 z-10 flex items-center justify-between gap-3 px-6 py-4 border-b border-line bg-canvas/95 backdrop-blur-md">
           <div>
-            <p
-              style={{
-                fontSize: "0.62rem",
-                fontWeight: 500,
-                textTransform: "uppercase",
-                letterSpacing: "0.28em",
-                color: COLOR.accentStrong,
-                margin: 0,
-              }}
-            >
+            <p className="m-0 text-[0.75rem] font-medium uppercase tracking-[0.28em] text-accent-strong">
               Antes de reservar
             </p>
             <h2
-              className="font-display"
-              style={{
-                color: COLOR.inverse,
-                fontSize: "clamp(1.25rem, 2.5vw, 1.65rem)",
-                lineHeight: 1,
-                margin: "4px 0 0",
-              }}
+              className="font-display text-ink mt-1"
+              style={{ fontSize: "clamp(1.25rem, 2.5vw, 1.65rem)", lineHeight: 1 }}
             >
               {RESPONSIVA_TITLE}
             </h2>
@@ -176,56 +107,24 @@ export const ResponsivaDialog = ({
           <button
             type="button"
             onClick={onClose}
-            style={{
-              background: "transparent",
-              border: 0,
-              cursor: "pointer",
-              color: COLOR.ink,
-              opacity: 0.5,
-              padding: 6,
-              borderRadius: 8,
-              flexShrink: 0,
-            }}
             aria-label="Cerrar"
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-transparent border-0 cursor-pointer text-ink-muted transition-colors hover:text-ink"
           >
             <X size={20} />
           </button>
         </div>
 
         {/* Scrollable content */}
-        <div style={{ padding: "1.4rem 1.4rem 2rem" }}>
+        <div className="px-6 pt-6 pb-8">
           {/* Document sections */}
-          <div style={{ marginBottom: "2rem" }}>
+          <div className="mb-8">
             {RESPONSIVA_SECTIONS.map((section) => (
-              <div
-                key={section.n}
-                style={{
-                  borderTop: `1px solid ${COLOR.line}`,
-                  paddingTop: "1.1rem",
-                  paddingBottom: "1rem",
-                }}
-              >
-                <h3
-                  className="font-display"
-                  style={{
-                    color: COLOR.ink,
-                    fontSize: "1.05rem",
-                    margin: "0 0 0.35rem",
-                    letterSpacing: "0.03em",
-                  }}
-                >
-                  <span style={{ color: COLOR.accentStrong, marginRight: 6 }}>{section.n}.</span>
+              <div key={section.n} className="border-t border-line pt-[1.1rem] pb-4">
+                <h3 className="font-display text-ink text-[1.05rem] m-0 mb-1.5 tracking-[0.03em]">
+                  <span className="text-accent-strong mr-1.5">{section.n}.</span>
                   {section.title}
                 </h3>
-                <p
-                  style={{
-                    color: COLOR.ink,
-                    opacity: 0.75,
-                    fontSize: "0.875rem",
-                    lineHeight: 1.65,
-                    margin: 0,
-                  }}
-                >
+                <p className="m-0 text-ink-muted text-[0.875rem] leading-[1.65]">
                   {section.body}
                 </p>
               </div>
@@ -233,66 +132,44 @@ export const ResponsivaDialog = ({
           </div>
 
           {/* Form */}
-          <div
-            style={{
-              borderTop: `2px solid ${COLOR.line}`,
-              paddingTop: "1.4rem",
-              display: "flex",
-              flexDirection: "column",
-              gap: "1rem",
-            }}
-          >
-            <p
-              className="font-display"
-              style={{ color: COLOR.inverse, fontSize: "1.2rem", margin: 0 }}
-            >
-              Tus datos
-            </p>
+          <div className="flex flex-col gap-4 border-t-2 border-line pt-6">
+            <p className="font-display text-ink text-[1.2rem] m-0">Tus datos</p>
 
             {/* Nombre */}
-            <div>
-              <label style={labelStyle}>Nombre completo *</label>
-              <input
-                style={fieldStyle}
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                placeholder="Tu nombre completo"
-                autoComplete="name"
-              />
-            </div>
+            {/* id explícito: el " *" no debe cambiar el id que Field deriva de la etiqueta. */}
+            <Field
+              id="field-nombre-completo"
+              label="Nombre completo *"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              placeholder="Tu nombre completo"
+              autoComplete="name"
+            />
 
             {/* Phone + Email row */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <div>
-                <label style={labelStyle}>Teléfono</label>
-                <input
-                  style={fieldStyle}
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="+52 000 000 0000"
-                  type="tel"
-                  autoComplete="tel"
-                />
-              </div>
-              <div>
-                <label style={labelStyle}>Correo</label>
-                <input
-                  style={fieldStyle}
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="correo@ejemplo.com"
-                  type="email"
-                  autoComplete="email"
-                />
-              </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Field
+                label="Teléfono"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="+52 000 000 0000"
+                type="tel"
+                autoComplete="tel"
+              />
+              <Field
+                label="Correo"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="correo@ejemplo.com"
+                type="email"
+                autoComplete="email"
+              />
             </div>
 
             {/* Uso de imagen */}
             <div>
-              <label style={{ ...labelStyle, marginBottom: 10 }}>
-                Uso de imagen (sección 4) *
-              </label>
-              <div style={{ display: "flex", gap: 10 }}>
+              <label className={LABEL_CLASS}>Uso de imagen (sección 4) *</label>
+              <div className="flex gap-2.5">
                 {(
                   [
                     { value: true, label: "Sí autorizo" },
@@ -305,19 +182,12 @@ export const ResponsivaDialog = ({
                       key={String(opt.value)}
                       type="button"
                       onClick={() => setImageConsent(opt.value)}
-                      style={{
-                        flex: 1,
-                        padding: "0.6rem 0.8rem",
-                        borderRadius: 12,
-                        border: `1px solid ${isSelected ? COLOR.accentStrong : COLOR.line}`,
-                        backgroundColor: isSelected ? `${COLOR.ink}18` : COLOR.surface,
-                        color: isSelected ? COLOR.accentStrong : COLOR.ink,
-                        fontSize: "0.82rem",
-                        fontWeight: isSelected ? 600 : 400,
-                        cursor: "pointer",
-                        transition: "all 0.15s",
-                        letterSpacing: "0.04em",
-                      }}
+                      className={
+                        "flex-1 min-h-[44px] rounded-xl px-3 text-[0.82rem] tracking-[0.04em] transition-colors border " +
+                        (isSelected
+                          ? "border-accent-strong bg-ink/10 text-accent-strong font-semibold"
+                          : "border-line bg-surface text-ink font-normal")
+                      }
                     >
                       {opt.label}
                     </button>
@@ -326,79 +196,42 @@ export const ResponsivaDialog = ({
               </div>
             </div>
 
-            {/* Signature pad */}
+            {/* Signature pad — baldosa clara (bg-inverse), trazo oscuro fijo: ver SignaturePad.tsx. */}
             <div>
-              <label style={{ ...labelStyle, marginBottom: 10 }}>
-                Tu firma *
-              </label>
+              <label className={LABEL_CLASS}>Tu firma *</label>
               <SignaturePad onChange={setSignatureData} />
             </div>
 
             {/* Acceptance checkbox */}
             <label
-              style={{
-                display: "flex",
-                alignItems: "flex-start",
-                gap: 12,
-                cursor: "pointer",
-                padding: "0.8rem",
-                borderRadius: 12,
-                border: `1px solid ${accepted ? COLOR.accentStrong : COLOR.line}`,
-                backgroundColor: accepted ? `${COLOR.ink}0d` : "transparent",
-                transition: "all 0.15s",
-              }}
+              className={
+                "flex items-start gap-3 cursor-pointer rounded-xl border p-3 transition-colors " +
+                (accepted ? "border-accent-strong bg-ink/5" : "border-line bg-transparent")
+              }
             >
               <input
                 type="checkbox"
                 checked={accepted}
                 onChange={(e) => setAccepted(e.target.checked)}
-                style={{
-                  marginTop: 2,
-                  accentColor: COLOR.accentStrong,
-                  width: 16,
-                  height: 16,
-                  flexShrink: 0,
-                  cursor: "pointer",
-                }}
+                className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-accent-strong"
               />
-              <span style={{ fontSize: "0.84rem", color: COLOR.ink, lineHeight: 1.5 }}>
+              <span className="text-[0.84rem] leading-[1.5] text-ink">
                 He leído y acepto la responsiva y consentimiento informado en su totalidad.
               </span>
             </label>
 
             {/* Submit */}
-            <button
-              type="button"
-              disabled={!canSubmit || mutation.isPending}
+            <PrimaryButton
+              className="w-full"
+              disabled={!canSubmit}
+              loading={mutation.isPending}
+              loadingLabel="Firmando…"
               onClick={() => mutation.mutate()}
-              style={{
-                width: "100%",
-                padding: "1rem",
-                borderRadius: 99,
-                border: 0,
-                backgroundColor: canSubmit && !mutation.isPending ? COLOR.inverse : COLOR.line,
-                color: COLOR.canvas,
-                fontSize: "0.82rem",
-                fontWeight: 600,
-                textTransform: "uppercase",
-                letterSpacing: "0.18em",
-                cursor: canSubmit && !mutation.isPending ? "pointer" : "not-allowed",
-                transition: "background-color 0.2s, transform 0.15s",
-                marginTop: 4,
-              }}
             >
-              {mutation.isPending ? "Firmando…" : "Firmar y continuar"}
-            </button>
+              Firmar y continuar
+            </PrimaryButton>
 
-            <p
-              style={{
-                fontSize: "0.72rem",
-                color: COLOR.ink,
-                opacity: 0.45,
-                textAlign: "center",
-                margin: 0,
-              }}
-            >
+            <p className="m-0 text-center text-[0.75rem] text-ink-muted">
               Tu firma y datos quedan guardados de forma segura.
             </p>
           </div>

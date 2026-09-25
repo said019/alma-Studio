@@ -18,7 +18,7 @@ import {
 import { BackLink, DataRow, InfoBanner } from "@/components/app/widgets";
 import { CreditCard } from "lucide-react";
 import type { ClientMembership } from "@/types/membership";
-import { COLOR, type Tone } from "@/design/tokens";
+import type { Tone } from "@/design/tokens";
 
 const STATUS: Record<string, { label: string; tone: Tone }> = {
   active: { label: "Activa", tone: "success" },
@@ -107,14 +107,14 @@ const ProfileMembership = () => {
             />
 
             <Section>
-              <div className="rounded-3xl p-5 sm:p-7" style={{ backgroundColor: COLOR.sunken }}>
-                <div className="flex items-baseline justify-between gap-4 pb-3" style={{ borderBottom: `1px solid ${COLOR.line}` }}>
-                  <span className="text-[0.72rem] font-medium uppercase tracking-[0.24em]" style={{ color: COLOR.accentStrong }}>
+              <div className="rounded-3xl p-5 sm:p-7 border border-line bg-sunken">
+                <div className="flex items-baseline justify-between gap-4 pb-3 border-b border-line">
+                  <span className="text-[0.75rem] font-medium uppercase tracking-[0.24em] text-accent-strong">
                     {CATEGORY_LABEL[String(membership.classCategory ?? "all")] ?? "Todas las disciplinas"}
                   </span>
-                  <span className="nums font-display" style={{ color: COLOR.accentStrong, fontSize: "clamp(1.6rem, 2.6vw, 2.1rem)" }}>
+                  <span className="nums font-display text-accent-strong dark:text-accent" style={{ fontSize: "clamp(1.6rem, 2.6vw, 2.1rem)" }}>
                     {isUnlimited ? "∞" : Number(membership.classes_remaining ?? 0)}{" "}
-                    <span className="text-[0.72rem] font-sans uppercase tracking-[0.18em]" style={{ color: COLOR.ink, opacity: 0.55 }}>
+                    <span className="text-[0.75rem] font-sans uppercase tracking-[0.18em] text-ink-muted">
                       por usar
                     </span>
                   </span>
@@ -151,24 +151,24 @@ const ProfileMembership = () => {
             {isMixto && (
               <Section title="Créditos por área">
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-2xl p-5 text-center" style={{ backgroundColor: COLOR.canvas, border: `1px solid ${COLOR.line}` }}>
-                    <div className="nums font-display" style={{ color: COLOR.accentStrong, fontSize: "clamp(1.8rem, 4vw, 2.4rem)" }}>
+                  <div className="rounded-2xl p-5 text-center bg-canvas border border-line">
+                    <div className="nums font-display text-accent-strong dark:text-accent" style={{ fontSize: "clamp(1.8rem, 4vw, 2.4rem)" }}>
                       {Number(membership.studioRemaining ?? 0)}
                     </div>
-                    <div className="text-[0.64rem] uppercase tracking-[0.16em] mt-1" style={{ color: COLOR.ink, opacity: 0.6 }}>
+                    <div className="text-[0.75rem] uppercase tracking-[0.16em] mt-1 text-ink-muted">
                       Studio · Mat · Barre · Sculpt
                     </div>
                   </div>
-                  <div className="rounded-2xl p-5 text-center" style={{ backgroundColor: COLOR.canvas, border: `1px solid ${COLOR.line}` }}>
-                    <div className="nums font-display" style={{ color: COLOR.accentStrong, fontSize: "clamp(1.8rem, 4vw, 2.4rem)" }}>
+                  <div className="rounded-2xl p-5 text-center bg-canvas border border-line">
+                    <div className="nums font-display text-accent-strong dark:text-accent" style={{ fontSize: "clamp(1.8rem, 4vw, 2.4rem)" }}>
                       {Number(membership.rtRemaining ?? 0)}
                     </div>
-                    <div className="text-[0.64rem] uppercase tracking-[0.16em] mt-1" style={{ color: COLOR.ink, opacity: 0.6 }}>
+                    <div className="text-[0.75rem] uppercase tracking-[0.16em] mt-1 text-ink-muted">
                       Reformer · Tower
                     </div>
                   </div>
                 </div>
-                <p className="mt-3 text-[0.78rem]" style={{ color: COLOR.ink, opacity: 0.62 }}>
+                <p className="mt-3 text-[0.78rem] text-ink-muted">
                   Tu paquete mixto reparte sus créditos entre las dos áreas; cada uno se usa solo en su disciplina.
                 </p>
               </Section>
@@ -176,29 +176,28 @@ const ProfileMembership = () => {
 
             {classesPercent !== null && (
               <Section title="Avance del paquete">
-                <div className="rounded-2xl p-5" style={{ backgroundColor: COLOR.canvas, border: `1px solid ${COLOR.line}` }}>
+                <div className="rounded-2xl p-5 bg-canvas border border-line">
                   <div className="flex items-baseline justify-between gap-3 mb-3">
-                    <span className="nums text-[0.78rem]" style={{ color: COLOR.ink, opacity: 0.6 }}>
+                    <span className="nums text-[0.78rem] text-ink-muted">
                       {classesUsed} de {Number(membership.class_limit)} usadas
                     </span>
                     <span
-                      className="nums font-display text-[1.2rem]"
-                      style={{ color: isLow ? COLOR.danger : COLOR.accentStrong }}
+                      className={
+                        "nums font-display text-[1.2rem] " +
+                        (isLow ? "text-danger" : "text-accent-strong dark:text-accent")
+                      }
                     >
                       {classesPercent}%
                     </span>
                   </div>
-                  <div className="h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: COLOR.sunken }}>
+                  <div className="h-1.5 rounded-full overflow-hidden bg-sunken">
                     <div
-                      className="h-full rounded-full transition-[width] duration-700"
-                      style={{
-                        width: `${classesPercent}%`,
-                        backgroundColor: isLow ? COLOR.danger : COLOR.ink,
-                      }}
+                      className={"h-full rounded-full transition-[width] duration-700 " + (isLow ? "bg-danger" : "bg-ink")}
+                      style={{ width: `${classesPercent}%` }}
                     />
                   </div>
                   {isLow && (
-                    <p className="mt-2.5 text-[0.78rem]" style={{ color: COLOR.danger }}>
+                    <p className="mt-2.5 text-[0.78rem] text-danger">
                       {lowClasses
                         ? "Te quedan pocas clases en este paquete."
                         : "Tu paquete vence pronto."}
@@ -213,16 +212,15 @@ const ProfileMembership = () => {
                 {CANCELLATION_RULES.map((line, i, arr) => (
                   <li
                     key={line}
-                    className="grid grid-cols-[auto_1fr] items-baseline gap-4 py-3.5"
-                    style={{
-                      borderTop: `1px solid ${COLOR.line}`,
-                      borderBottom: i === arr.length - 1 ? `1px solid ${COLOR.line}` : undefined,
-                    }}
+                    className={
+                      "grid grid-cols-[auto_1fr] items-baseline gap-4 py-3.5 border-t border-line" +
+                      (i === arr.length - 1 ? " border-b" : "")
+                    }
                   >
-                    <span className="nums font-display text-[0.95rem] leading-none" style={{ color: COLOR.accentStrong }}>
+                    <span className="nums font-display text-[0.95rem] leading-none text-accent-strong">
                       {String(i + 1).padStart(2, "0")}
                     </span>
-                    <span className="text-[0.9rem] leading-[1.55]" style={{ color: COLOR.ink, opacity: 0.78 }}>
+                    <span className="text-[0.9rem] leading-[1.55] text-ink-muted">
                       {line}
                     </span>
                   </li>

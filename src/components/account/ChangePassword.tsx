@@ -10,7 +10,6 @@ import { useNavigate } from "react-router-dom";
 
 import { PrimaryButton } from "@/components/app/AppShell";
 import { PasswordField, PasswordRules } from "@/components/app/fields";
-import { COLOR } from "@/design/tokens";
 
 const schema = z
   .object({
@@ -90,19 +89,13 @@ export const ChangePassword = ({
     return (
       <div
         role="status"
-        className="rounded-2xl px-5 py-4 text-[0.9rem] leading-[1.55]"
-        style={{
-          backgroundColor: `${COLOR.success}14`,
-          border: `1px solid ${COLOR.success}40`,
-          color: COLOR.ink,
-        }}
+        className="rounded-2xl px-5 py-4 text-[0.9rem] leading-[1.55] bg-success/8 border border-success/25 text-ink"
       >
         Tu contraseña se actualizó correctamente.{" "}
         <button
           type="button"
           onClick={() => setDone(false)}
-          className="font-medium underline bg-transparent border-0 p-0 cursor-pointer"
-          style={{ color: COLOR.accentStrong }}
+          className="font-medium underline bg-transparent border-0 p-0 cursor-pointer text-accent-strong"
         >
           Cambiar de nuevo
         </button>
@@ -115,12 +108,7 @@ export const ChangePassword = ({
       {serverError && (
         <div
           role="alert"
-          className="flex items-start gap-3 rounded-2xl px-4 py-3 text-[0.86rem]"
-          style={{
-            backgroundColor: `${COLOR.danger}10`,
-            border: `1px solid ${COLOR.danger}30`,
-            color: COLOR.danger,
-          }}
+          className="flex items-start gap-3 rounded-2xl px-4 py-3 text-[0.86rem] bg-danger/5 border border-danger/20 text-danger"
         >
           <AlertCircle size={16} className="mt-0.5 shrink-0" />
           <span className="leading-[1.5]">{serverError}</span>

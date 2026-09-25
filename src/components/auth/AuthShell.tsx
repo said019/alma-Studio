@@ -7,32 +7,21 @@ import {
   type TextareaHTMLAttributes,
 } from "react";
 import { Link } from "react-router-dom";
-import { Eye, EyeOff, Loader2, ArrowRight, Check, AlertCircle, ChevronDown } from "lucide-react";
+import { Eye, EyeOff, Check, AlertCircle, ChevronDown } from "lucide-react";
 
 import { BrandLogo } from "@/components/brand/BrandLogo";
-import { COLOR } from "@/design/tokens";
+import { HexPedestal } from "@/components/brand/HexPedestal";
+import { PrimaryButton } from "@/components/app/AppShell";
+import { controlClass } from "@/components/app/fields";
 
 
 type Tint = "berry" | "coral" | "olive";
 
 /* ── Campos alineados con src/components/app/fields.tsx (Tarea 9, ruling
-   F6): fondo surface, borde 1.5px lineStrong (3:1), radio 12px, alto
-   ≥48px, foco ink + halo accent-soft, etiqueta 12px/inkMuted, placeholder
-   inkMuted, error en danger. Spec §4.4. ── */
-const LABEL_CLASS = "text-[0.75rem] font-bold uppercase tracking-[0.12em]";
-
-const INPUT_CLASS =
-  "w-full rounded-xl px-4 py-3.5 text-[0.95rem] outline-none transition-shadow " +
-  "focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-0 " +
-  "focus-visible:shadow-[0_0_0_5px_theme(colors.accent.soft)] " +
-  "placeholder:text-ink-muted";
-
-const inputStyle = (error?: string) => ({
-  backgroundColor: COLOR.surface,
-  color: COLOR.ink,
-  border: `1.5px solid ${error ? COLOR.danger : COLOR.lineStrong}`,
-  minHeight: 48,
-});
+   F6): fondo surface (hundido en oscuro), borde 1.5px lineStrong (3:1),
+   radio 12px, alto ≥48px, foco ink + halo accent-soft, etiqueta 12px/
+   inkMuted, placeholder inkMuted, error en danger. Spec §4.4 y §6.10. ── */
+const LABEL_CLASS = "text-[0.75rem] font-bold uppercase tracking-[0.12em] text-ink-muted";
 
 type FieldFeedbackProps = {
   errorId: string;
@@ -44,7 +33,7 @@ type FieldFeedbackProps = {
 const FieldFeedback = ({ errorId, error, success, hint }: FieldFeedbackProps) => {
   if (error) {
     return (
-      <p id={errorId} className="mt-0.5 flex items-center gap-1.5 text-[0.78rem]" style={{ color: COLOR.danger }}>
+      <p id={errorId} className="mt-0.5 flex items-center gap-1.5 text-[0.78rem] text-danger">
         <AlertCircle size={13} className="shrink-0" />
         {error}
       </p>
@@ -52,11 +41,8 @@ const FieldFeedback = ({ errorId, error, success, hint }: FieldFeedbackProps) =>
   }
   if (success) {
     return (
-      <p className="mt-0.5 flex items-center gap-1.5 text-[0.78rem]" style={{ color: COLOR.success }}>
-        <span
-          className="grid h-4 w-4 shrink-0 place-items-center rounded-full"
-          style={{ backgroundColor: COLOR.success, color: COLOR.canvas }}
-        >
+      <p className="mt-0.5 flex items-center gap-1.5 text-[0.78rem] text-success">
+        <span className="grid h-4 w-4 shrink-0 place-items-center rounded-full bg-success text-canvas">
           <Check size={9} strokeWidth={3.5} />
         </span>
         {success}
@@ -64,11 +50,7 @@ const FieldFeedback = ({ errorId, error, success, hint }: FieldFeedbackProps) =>
     );
   }
   if (hint) {
-    return (
-      <p className="text-[0.78rem]" style={{ color: COLOR.ink, opacity: 0.55 }}>
-        {hint}
-      </p>
-    );
+    return <p className="text-[0.78rem] text-ink-muted">{hint}</p>;
   }
   return null;
 };
@@ -96,6 +78,9 @@ export type AuthShellProps = {
    AuthShell — split layout shared by Login, Register, Forgot, Reset
    Mobile: photo collapses to 30vh header banner with title overlay.
    Desktop: 50/50 split, brand left, form right.
+   Oscuro (spec 2026-09-25 §6.10): fondo canvas con el resplandor fijo de
+   AppShell; el panel de marca deja de ser inverse (en oscuro es claro) y
+   pasa a surface/40 transparente sobre el resplandor.
    ═══════════════════════════════════════════════════════════ */
 export const AuthShell = ({
   brandPhoto,
@@ -115,46 +100,52 @@ export const AuthShell = ({
   footer,
 }: AuthShellProps) => {
   return (
-    <div className="min-h-screen w-full grid grid-cols-1 lg:grid-cols-2" style={{ backgroundColor: COLOR.canvas, color: COLOR.ink }}>
-      {/* ── BRAND PANEL — drench oscuro + logo, sin foto ── */}
+    <div className="relative isolate min-h-screen w-full grid grid-cols-1 lg:grid-cols-2 bg-canvas text-ink">
+      {/* Resplandor cálido del fondo: capa fija, como en AppShell (regla 5). */}
+      <div aria-hidden="true" data-app-glow className="pointer-events-none fixed inset-0 -z-10 hidden dark:block bg-app-glow" />
+
+      {/* ── BRAND PANEL — transparente sobre el resplandor, sin foto ── */}
       <aside
-        className="relative overflow-hidden lg:min-h-screen"
-        style={{ minHeight: "30vh", backgroundColor: COLOR.inverse }}
+        className="relative overflow-hidden lg:min-h-screen bg-surface/40 border-b border-line lg:border-b-0 lg:border-r"
+        style={{ minHeight: "30vh" }}
       >
-        <span aria-hidden="true" className="pointer-events-none absolute -right-24 -bottom-24 opacity-[0.08] text-accent">
+        <span aria-hidden="true" className="pointer-events-none absolute -right-24 -bottom-24 opacity-[0.06] text-accent">
           <BrandLogo size={480} />
         </span>
-        <div aria-hidden className="absolute inset-0" style={{ background: `radial-gradient(110% 80% at 0% 0%, ${COLOR.accentStrong}59 0%, transparent 55%)` }} />
 
         <div className="relative z-10 flex h-full min-h-[30vh] lg:min-h-screen flex-col justify-between p-6 sm:p-9 lg:p-12">
           <Link
             to="/"
-            className="inline-flex w-fit items-center rounded-md no-underline transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-canvas"
-            aria-label="Inicio Alma Movement"
+            className="inline-flex w-fit items-center rounded-md no-underline transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong"
+            aria-label="Inicio HIVE Pilates Studio"
           >
             <BrandLogo variant="lockup" size={56} className="text-accent" />
           </Link>
 
+          <div className="hidden lg:flex lg:justify-center" aria-hidden="true">
+            <HexPedestal size="lg" />
+          </div>
+
           <div className="max-w-[440px]">
-            <span className="text-[0.72rem] font-medium uppercase tracking-[0.32em]" style={{ color: COLOR.canvas, opacity: 0.78 }}>
+            <span className="text-[0.75rem] font-medium uppercase tracking-[0.32em] text-ink-muted">
               {brandEyebrow}
             </span>
             <h2
-              className="font-display mt-4 leading-[0.96]"
-              style={{ color: COLOR.canvas, fontSize: "clamp(2.1rem, 4.4vw, 3.8rem)" }}
+              className="font-display mt-4 leading-[0.96] text-ink"
+              style={{ fontSize: "clamp(2.1rem, 4.4vw, 3.8rem)" }}
             >
               {brandHeadline}
               {brandHeadlineItalic && (
                 <span
-                  className="block font-display font-normal"
-                  style={{ color: COLOR.canvas, opacity: 0.92, fontSize: "0.78em" }}
+                  className="block font-display font-normal text-ink"
+                  style={{ fontSize: "0.78em" }}
                 >
                   {brandHeadlineItalic}
                 </span>
               )}
             </h2>
             {brandSubline && (
-              <p className="mt-5 text-[0.95rem] leading-[1.7] max-w-[34ch]" style={{ color: COLOR.canvas, opacity: 0.85 }}>
+              <p className="mt-5 text-[0.95rem] leading-[1.7] max-w-[34ch] text-ink-muted">
                 {brandSubline}
               </p>
             )}
@@ -164,19 +155,15 @@ export const AuthShell = ({
                 {brandList.map((item, i) => (
                   <li
                     key={item.label}
-                    className="grid grid-cols-[auto_1fr] items-center gap-4 py-3"
-                    style={{
-                      borderTop: `1px solid ${COLOR.canvas}33`,
-                      borderBottom: i === brandList.length - 1 ? `1px solid ${COLOR.canvas}33` : undefined,
-                    }}
+                    className={
+                      "grid grid-cols-[auto_1fr] items-center gap-4 py-3 border-t border-line " +
+                      (i === brandList.length - 1 ? "border-b" : "")
+                    }
                   >
-                    <span
-                      className="grid h-7 w-7 place-items-center rounded-full"
-                      style={{ backgroundColor: COLOR.canvas, color: COLOR.accentStrong }}
-                    >
+                    <span className="grid h-7 w-7 place-items-center rounded-full bg-inverse text-inverse-foreground">
                       <Check size={12} strokeWidth={3} />
                     </span>
-                    <span className="text-[0.88rem] leading-[1.55]" style={{ color: COLOR.canvas, opacity: 0.92 }}>
+                    <span className="text-[0.88rem] leading-[1.55] text-ink">
                       {item.label}
                     </span>
                   </li>
@@ -185,13 +172,13 @@ export const AuthShell = ({
             )}
 
             {brandQuote && (
-              <p className="mt-7 hidden lg:block font-display text-[1.05rem] leading-[1.55] max-w-[32ch]" style={{ color: COLOR.canvas, opacity: 0.85 }}>
+              <p className="mt-7 hidden lg:block font-display text-[1.05rem] leading-[1.55] max-w-[32ch] text-ink-muted">
                 «{brandQuote}»
               </p>
             )}
           </div>
 
-          <div className="hidden lg:flex items-center justify-between text-[0.72rem] uppercase tracking-[0.22em]" style={{ color: COLOR.canvas, opacity: 0.55 }}>
+          <div className="hidden lg:flex items-center justify-between text-[0.75rem] uppercase tracking-[0.22em] text-ink-muted">
             <span>Move with intention</span>
             <span>Juriquilla, Querétaro, MX</span>
           </div>
@@ -202,26 +189,26 @@ export const AuthShell = ({
       <main className="relative flex flex-col justify-center px-6 sm:px-10 lg:px-14 py-10 lg:py-12">
         <div className="mx-auto w-full max-w-[460px]">
           <div className="mb-9">
-            <span className="inline-flex items-center gap-2 text-[0.72rem] font-medium uppercase tracking-[0.32em]" style={{ color: COLOR.accentStrong }}>
-              <span className="inline-block h-px w-5" style={{ backgroundColor: COLOR.ink }} />
+            <span className="inline-flex items-center gap-2 text-[0.75rem] font-medium uppercase tracking-[0.32em] text-accent-strong">
+              <span className="inline-block h-px w-5 bg-ink" />
               {formEyebrow}
             </span>
             <h1
-              className="font-display mt-4 leading-[0.96] tracking-[-0.005em]"
-              style={{ color: COLOR.ink, fontSize: "clamp(2.3rem, 4vw, 3.2rem)" }}
+              className="font-display mt-4 leading-[0.96] tracking-[-0.005em] text-ink"
+              style={{ fontSize: "clamp(2.3rem, 4vw, 3.2rem)" }}
             >
               {formHeadline}
               {formHeadlineItalic && (
                 <span
-                  className="block font-display font-normal"
-                  style={{ color: COLOR.inkMuted, fontSize: "0.78em" }}
+                  className="block font-display font-normal text-ink-muted"
+                  style={{ fontSize: "0.78em" }}
                 >
                   {formHeadlineItalic}
                 </span>
               )}
             </h1>
             {formIntro && (
-              <p className="mt-4 text-[0.95rem] leading-[1.65] max-w-[44ch]" style={{ color: COLOR.ink, opacity: 0.7 }}>
+              <p className="mt-4 text-[0.95rem] leading-[1.65] max-w-[44ch] text-ink-muted">
                 {formIntro}
               </p>
             )}
@@ -231,8 +218,8 @@ export const AuthShell = ({
 
           {footer && <div className="mt-8">{footer}</div>}
 
-          <p className="mt-10 text-[0.72rem] uppercase tracking-[0.2em]" style={{ color: COLOR.ink, opacity: 0.42 }}>
-            © <span className="nums">{new Date().getFullYear()}</span> Alma Movement
+          <p className="mt-10 text-[0.75rem] uppercase tracking-[0.2em] text-ink-muted">
+            © <span className="nums">{new Date().getFullYear()}</span> HIVE Pilates Studio
           </p>
         </div>
       </main>
@@ -259,7 +246,7 @@ export const AuthField = forwardRef<HTMLInputElement, AuthFieldProps>(
     return (
       <div className="flex flex-col gap-1.5">
         <div className="flex items-center justify-between gap-2">
-          <label htmlFor={inputId} className={LABEL_CLASS} style={{ color: COLOR.inkMuted }}>
+          <label htmlFor={inputId} className={LABEL_CLASS}>
             {label}
           </label>
           {rightSlot}
@@ -269,8 +256,7 @@ export const AuthField = forwardRef<HTMLInputElement, AuthFieldProps>(
           id={inputId}
           aria-invalid={error ? true : undefined}
           aria-describedby={error ? errorId : undefined}
-          className={INPUT_CLASS + " " + (className ?? "")}
-          style={inputStyle(error)}
+          className={controlClass(!!error) + " " + (className ?? "")}
           {...rest}
         />
         <FieldFeedback errorId={errorId} error={error} success={success} hint={hint} />
@@ -296,14 +282,13 @@ export const AuthPasswordField = forwardRef<HTMLInputElement, AuthPasswordFieldP
     return (
       <div className="flex flex-col gap-1.5">
         <div className="flex items-center justify-between gap-2">
-          <label htmlFor={inputId} className={LABEL_CLASS} style={{ color: COLOR.inkMuted }}>
+          <label htmlFor={inputId} className={LABEL_CLASS}>
             {label}
           </label>
           {forgotLink && (
             <Link
               to={forgotLink}
-              className="rounded-md text-[0.74rem] no-underline transition-opacity hover:opacity-75 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong"
-              style={{ color: COLOR.accentStrong }}
+              className="rounded-md text-[0.75rem] no-underline transition-opacity hover:opacity-75 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong text-accent-strong"
             >
               ¿Olvidaste?
             </Link>
@@ -316,8 +301,7 @@ export const AuthPasswordField = forwardRef<HTMLInputElement, AuthPasswordFieldP
             type={show ? "text" : "password"}
             aria-invalid={error ? true : undefined}
             aria-describedby={error ? errorId : undefined}
-            className={INPUT_CLASS + " pl-4 pr-14 " + (className ?? "")}
-            style={inputStyle(error)}
+            className={controlClass(!!error) + " pr-14 " + (className ?? "")}
             {...rest}
           />
           <button
@@ -325,8 +309,7 @@ export const AuthPasswordField = forwardRef<HTMLInputElement, AuthPasswordFieldP
             aria-pressed={show}
             aria-label={show ? "Ocultar contraseña" : "Mostrar contraseña"}
             onClick={() => setShow((v) => !v)}
-            className="absolute right-1.5 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full transition-colors hover:bg-sunken focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong"
-            style={{ color: COLOR.accentStrong }}
+            className="absolute right-1.5 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full transition-colors hover:bg-sunken focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong text-accent-strong"
           >
             {show ? <EyeOff size={16} /> : <Eye size={16} />}
           </button>
@@ -355,7 +338,7 @@ export const AuthSelect = forwardRef<HTMLSelectElement, AuthSelectProps>(
     const errorId = `${inputId}-error`;
     return (
       <div className="flex flex-col gap-1.5">
-        <label htmlFor={inputId} className={LABEL_CLASS} style={{ color: COLOR.inkMuted }}>
+        <label htmlFor={inputId} className={LABEL_CLASS}>
           {label}
         </label>
         <div className="relative">
@@ -364,8 +347,7 @@ export const AuthSelect = forwardRef<HTMLSelectElement, AuthSelectProps>(
             id={inputId}
             aria-invalid={error ? true : undefined}
             aria-describedby={error ? errorId : undefined}
-            className={INPUT_CLASS + " appearance-none pr-11 " + (className ?? "")}
-            style={inputStyle(error)}
+            className={controlClass(!!error) + " appearance-none pr-11 " + (className ?? "")}
             {...rest}
           >
             {children}
@@ -373,8 +355,7 @@ export const AuthSelect = forwardRef<HTMLSelectElement, AuthSelectProps>(
           <ChevronDown
             size={15}
             aria-hidden
-            className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2"
-            style={{ color: COLOR.ink }}
+            className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-ink"
           />
         </div>
         <FieldFeedback errorId={errorId} error={error} hint={hint} />
@@ -400,7 +381,7 @@ export const AuthTextarea = forwardRef<HTMLTextAreaElement, AuthTextareaProps>(
     const errorId = `${inputId}-error`;
     return (
       <div className="flex flex-col gap-1.5">
-        <label htmlFor={inputId} className={LABEL_CLASS} style={{ color: COLOR.inkMuted }}>
+        <label htmlFor={inputId} className={LABEL_CLASS}>
           {label}
         </label>
         <textarea
@@ -408,8 +389,7 @@ export const AuthTextarea = forwardRef<HTMLTextAreaElement, AuthTextareaProps>(
           id={inputId}
           aria-invalid={error ? true : undefined}
           aria-describedby={error ? errorId : undefined}
-          className={INPUT_CLASS + " resize-none " + (className ?? "")}
-          style={inputStyle(error)}
+          className={controlClass(!!error) + " resize-none " + (className ?? "")}
           {...rest}
         />
         <FieldFeedback errorId={errorId} error={error} hint={hint} />
@@ -420,7 +400,8 @@ export const AuthTextarea = forwardRef<HTMLTextAreaElement, AuthTextareaProps>(
 AuthTextarea.displayName = "AuthTextarea";
 
 /* ═══════════════════════════════════════════════════════════
-   AuthSubmit — CTA primario ink sólido con loading
+   AuthSubmit — CTA primario; envuelve PrimaryButton (degradado en
+   oscuro) para no duplicar estilos de botón (spec §6.10).
    ═══════════════════════════════════════════════════════════ */
 
 type AuthSubmitProps = {
@@ -431,29 +412,9 @@ type AuthSubmitProps = {
 };
 
 export const AuthSubmit = ({ loading, loadingLabel, children, disabled }: AuthSubmitProps) => (
-  <button
-    type="submit"
-    disabled={disabled || loading}
-    className="group relative mt-2 inline-flex w-full items-center justify-center gap-3 rounded-full bg-ink px-7 py-4 text-[0.84rem] font-medium uppercase tracking-[0.18em] text-canvas transition-transform duration-200 hover:-translate-y-0.5 hover:bg-inverse focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-offset-2 disabled:opacity-60 disabled:translate-y-0 disabled:cursor-not-allowed"
-    style={{ boxShadow: `0 12px 28px ${COLOR.ink}30` }}
-  >
-    {loading ? (
-      <>
-        <Loader2 size={15} className="animate-spin" />
-        {loadingLabel ?? "Cargando…"}
-      </>
-    ) : (
-      <>
-        {children}
-        <span
-          className="grid h-7 w-7 place-items-center rounded-full transition-transform group-hover:translate-x-0.5"
-          style={{ backgroundColor: `${COLOR.canvas}26` }}
-        >
-          <ArrowRight size={13} />
-        </span>
-      </>
-    )}
-  </button>
+  <PrimaryButton type="submit" loading={loading} loadingLabel={loadingLabel} disabled={disabled} className="mt-2 w-full">
+    {children}
+  </PrimaryButton>
 );
 
 /* ═══════════════════════════════════════════════════════════
@@ -468,7 +429,7 @@ type AuthSecondaryLinkProps = {
 export const AuthSecondaryLink = ({ to, children }: AuthSecondaryLinkProps) => (
   <Link
     to={to}
-    className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-line px-6 py-3.5 text-[0.78rem] font-medium uppercase tracking-[0.2em] text-ink no-underline transition-colors duration-200 hover:border-line-strong hover:bg-sunken focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-offset-2"
+    className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-line px-6 py-3.5 text-[0.78rem] font-medium uppercase tracking-[0.2em] text-ink no-underline transition-colors duration-200 hover:border-line-strong hover:bg-sunken focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
   >
     {children}
   </Link>
@@ -481,12 +442,7 @@ export const AuthSecondaryLink = ({ to, children }: AuthSecondaryLinkProps) => (
 export const AuthErrorBanner = ({ message }: { message: string }) => (
   <div
     role="alert"
-    className="mb-6 flex items-start gap-3 rounded-2xl px-4 py-3 text-[0.86rem]"
-    style={{
-      backgroundColor: `${COLOR.danger}10`,
-      border: `1px solid ${COLOR.danger}40`,
-      color: COLOR.danger,
-    }}
+    className="mb-6 flex items-start gap-3 rounded-2xl border px-4 py-3 text-[0.86rem] bg-danger/10 border-danger/25 text-danger"
   >
     <AlertCircle size={16} className="mt-0.5 shrink-0" />
     <span className="leading-[1.5]">{message}</span>
@@ -499,13 +455,13 @@ export const AuthErrorBanner = ({ message }: { message: string }) => (
 
 export const AuthDivider = ({ label }: { label?: string }) => (
   <div className="my-7 flex items-center gap-4">
-    <span className="flex-1 h-px" style={{ backgroundColor: COLOR.line }} />
+    <span className="flex-1 h-px bg-line" />
     {label && (
-      <span className="text-[0.72rem] uppercase tracking-[0.22em]" style={{ color: COLOR.ink, opacity: 0.45 }}>
+      <span className="text-[0.75rem] uppercase tracking-[0.22em] text-ink-muted">
         {label}
       </span>
     )}
-    <span className="flex-1 h-px" style={{ backgroundColor: COLOR.line }} />
+    <span className="flex-1 h-px bg-line" />
   </div>
 );
 
@@ -522,26 +478,25 @@ type AuthCheckboxProps = {
 
 export const AuthCheckbox = ({ checked, onChange, children, error }: AuthCheckboxProps) => (
   <div className="flex flex-col gap-1">
-    <label className="flex items-start gap-3 cursor-pointer group">
+    <label className="flex min-h-[44px] items-start gap-3 cursor-pointer group">
       <button
         type="button"
         role="checkbox"
         aria-checked={checked}
         onClick={() => onChange(!checked)}
-        className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-offset-1"
-        style={{
-          backgroundColor: checked ? COLOR.ink : "transparent",
-          border: `1px solid ${checked ? COLOR.accentStrong : COLOR.lineStrong}`,
-        }}
+        className={
+          "mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-md border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-offset-1 focus-visible:ring-offset-canvas " +
+          (checked ? "bg-ink border-accent-strong" : "bg-transparent border-line-strong")
+        }
       >
-        {checked && <Check size={12} strokeWidth={3} style={{ color: COLOR.canvas }} />}
+        {checked && <Check size={12} strokeWidth={3} className="text-canvas" />}
       </button>
-      <span className="text-[0.86rem] leading-[1.5] transition-opacity group-hover:opacity-100" style={{ color: COLOR.ink, opacity: 0.78 }}>
+      <span className="text-[0.86rem] leading-[1.5] transition-opacity group-hover:opacity-100 text-ink-muted">
         {children}
       </span>
     </label>
     {error && (
-      <p className="flex items-center gap-1.5 pl-8 text-[0.78rem]" style={{ color: COLOR.danger }}>
+      <p className="flex items-center gap-1.5 pl-8 text-[0.78rem] text-danger">
         <AlertCircle size={13} />
         {error}
       </p>
@@ -550,7 +505,7 @@ export const AuthCheckbox = ({ checked, onChange, children, error }: AuthCheckbo
 );
 
 /* ═══════════════════════════════════════════════════════════
-   AuthPasswordRules — live requirements list (olive = éxito)
+   AuthPasswordRules — live requirements list (success sólo en éxito)
    ═══════════════════════════════════════════════════════════ */
 
 type Rule = { label: string; ok: boolean };
@@ -563,14 +518,12 @@ export const AuthPasswordRules = ({ password = "" }: { password?: string }) => {
   return (
     <ul className="mt-1 grid grid-cols-1 sm:grid-cols-3 gap-y-1 gap-x-4 list-none p-0 m-0">
       {rules.map((r) => (
-        <li key={r.label} className="flex items-center gap-2 text-[0.74rem]" style={{ color: r.ok ? COLOR.success : COLOR.ink, opacity: r.ok ? 1 : 0.5 }}>
+        <li key={r.label} className={"flex items-center gap-2 text-[0.75rem] " + (r.ok ? "text-success" : "text-ink-muted")}>
           <span
-            className="grid h-4 w-4 place-items-center rounded-full transition-colors"
-            style={{
-              backgroundColor: r.ok ? COLOR.success : "transparent",
-              border: `1px solid ${r.ok ? COLOR.success : COLOR.line}`,
-              color: COLOR.canvas,
-            }}
+            className={
+              "grid h-4 w-4 place-items-center rounded-full border text-canvas transition-colors " +
+              (r.ok ? "bg-success border-success" : "bg-transparent border-line")
+            }
           >
             {r.ok && <Check size={9} strokeWidth={3.5} />}
           </span>

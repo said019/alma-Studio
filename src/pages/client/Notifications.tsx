@@ -20,7 +20,6 @@ import {
   Bell, BellOff,
   CalendarCheck2, CreditCard, Info, Trophy, Sparkles, Coins, Gift,
 } from "lucide-react";
-import { COLOR } from "@/design/tokens";
 
 type Category =
   | "booking" | "membership" | "marketing"
@@ -137,15 +136,14 @@ const Notifications = () => {
                     description={
                       <>
                         {n.body}
-                        <span className="nums" style={{ color: COLOR.ink, opacity: 0.4 }}> · {formatTime(n.time)}</span>
+                        <span className="nums text-ink-muted"> · {formatTime(n.time)}</span>
                       </>
                     }
                     trailing={n.unread ? (
-                      <span
-                        className="h-2 w-2 rounded-full"
-                        style={{ backgroundColor: COLOR.ink }}
-                        aria-label="Sin leer"
-                      />
+                      <>
+                        <span aria-hidden="true" className="h-2 w-2 rounded-full bg-accent" />
+                        <span className="sr-only">No leída</span>
+                      </>
                     ) : undefined}
                   />
                 ))}
@@ -165,7 +163,7 @@ const Notifications = () => {
           )}
         </Section>
 
-        <p className="mt-10 text-[0.74rem]" style={{ color: COLOR.ink, opacity: 0.45 }}>
+        <p className="mt-10 text-[0.75rem] text-ink-muted">
           Configura cuáles avisos recibes desde Perfil, en Preferencias.
         </p>
       </AppShell>

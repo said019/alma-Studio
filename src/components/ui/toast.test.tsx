@@ -6,11 +6,12 @@ import { Toast, ToastClose, ToastProvider, ToastViewport, toastVariants } from "
    sombra suave. Ninguna variante usa coral (accent). El botón cerrar es
    inkMuted y visible (no transparente). Spec §4.7; ruling F1. */
 describe("toastVariants — superficie clara, sin coral (spec F1)", () => {
-  it("el contenedor es surface con borde line, en toda variante", () => {
+  it("el contenedor es surface con borde line y sombra flotante, en toda variante", () => {
     for (const variant of ["default", "destructive"] as const) {
       const classes = toastVariants({ variant });
       expect(classes, variant).toMatch(/\bbg-surface\b/);
       expect(classes, variant).toMatch(/\bborder-line\b/);
+      expect(classes, variant).toMatch(/\bshadow-float\b/);
     }
   });
 

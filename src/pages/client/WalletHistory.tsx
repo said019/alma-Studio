@@ -15,7 +15,6 @@ import {
 } from "@/components/app/AppShell";
 import { BackLink } from "@/components/app/widgets";
 import { ArrowDownRight, ArrowUpRight, History as HistoryIcon } from "lucide-react";
-import { COLOR } from "@/design/tokens";
 
 const WalletHistory = () => {
   const { data, isLoading, isError, refetch } = useQuery({
@@ -57,34 +56,29 @@ const WalletHistory = () => {
                 return (
                   <div
                     key={key}
-                    className="grid grid-cols-[auto_1fr_auto] items-center gap-4 px-1 py-4"
-                    style={{ borderTop: `1px solid ${COLOR.line}` }}
+                    className="grid grid-cols-[auto_1fr_auto] items-center gap-4 border-t border-line px-1 py-4"
                   >
                     <span
-                      className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl"
-                      style={{
-                        backgroundColor: COLOR.sunken,
-                        color: earned ? COLOR.success : COLOR.ink,
-                      }}
+                      className={
+                        "grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-sunken " +
+                        (earned ? "text-success" : "text-ink")
+                      }
                     >
                       {earned
                         ? <ArrowUpRight size={17} strokeWidth={1.7} />
                         : <ArrowDownRight size={17} strokeWidth={1.7} />}
                     </span>
                     <div className="min-w-0">
-                      <p className="truncate text-[0.94rem] font-medium leading-tight" style={{ color: COLOR.ink }}>
+                      <p className="truncate text-[0.94rem] font-medium leading-tight text-ink">
                         {item.reason || (earned ? "Puntos ganados" : "Puntos usados")}
                       </p>
-                      <p className="mt-0.5 truncate text-[0.78rem]" style={{ color: COLOR.ink, opacity: 0.55 }}>
+                      <p className="mt-0.5 truncate text-[0.78rem] text-ink-muted">
                         {item.created_at
                           ? format(safeParse(item.created_at), "d MMM yyyy", { locale: es })
                           : "Sin fecha"}
                       </p>
                     </div>
-                    <p
-                      className="nums shrink-0 text-[0.94rem] font-medium"
-                      style={earned ? { color: COLOR.success } : { color: COLOR.ink, opacity: 0.55 }}
-                    >
+                    <p className={"nums shrink-0 text-[0.94rem] font-medium " + (earned ? "text-success" : "text-ink-muted")}>
                       {earned ? "+" : "−"}
                       {item.points}
                     </p>
@@ -95,7 +89,7 @@ const WalletHistory = () => {
           )}
         </Section>
 
-        <p className="mt-10 text-[0.74rem]" style={{ color: COLOR.ink, opacity: 0.45 }}>
+        <p className="mt-10 text-[0.75rem] text-ink-muted">
           Los puntos se acreditan al cierre de cada visita.
         </p>
       </AppShell>

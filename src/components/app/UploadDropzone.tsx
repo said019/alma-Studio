@@ -1,6 +1,5 @@
 import { useRef, useState, type ChangeEvent, type DragEvent } from "react";
 import { Check, Upload } from "lucide-react";
-import { COLOR } from "@/design/tokens";
 
 
 /* ═══════════════════════════════════════════════════════════
@@ -37,6 +36,12 @@ export const UploadDropzone = ({
     if (dropped) onFileChange(dropped);
   };
 
+  const zoneTone = file
+    ? "border-success bg-success/5"
+    : dragOver
+      ? "border-accent bg-accent-soft"
+      : "border-line-strong bg-surface dark:bg-surface/40";
+
   return (
     <>
       <input
@@ -57,26 +62,23 @@ export const UploadDropzone = ({
         }}
         onDragLeave={() => setDragOver(false)}
         onDrop={handleDrop}
-        className="w-full rounded-3xl p-7 text-center cursor-pointer transition-colors"
-        style={{
-          backgroundColor: file ? `${COLOR.success}10` : dragOver ? COLOR.sunken : "transparent",
-          border: `1px dashed ${file ? COLOR.success : dragOver ? COLOR.accentStrong : COLOR.line}`,
-          color: COLOR.ink,
-        }}
+        className={
+          "w-full rounded-3xl border-[1.5px] border-dashed p-7 text-center cursor-pointer transition-colors text-ink " +
+          zoneTone
+        }
       >
         <span
-          className="grid h-12 w-12 mx-auto place-items-center rounded-full mb-3"
-          style={{
-            backgroundColor: file ? COLOR.success : COLOR.sunken,
-            color: file ? COLOR.canvas : COLOR.accentStrong,
-          }}
+          className={
+            "grid h-12 w-12 mx-auto place-items-center rounded-full mb-3 " +
+            (file ? "bg-success text-canvas" : "bg-sunken text-accent-strong")
+          }
         >
           {file ? <Check size={20} strokeWidth={3} /> : <Upload size={18} />}
         </span>
-        <span className="block text-[0.92rem] font-medium" style={{ color: COLOR.ink }}>
+        <span className="block text-[0.92rem] font-medium text-ink">
           {file ? file.name : "Toca aquí o arrastra el archivo"}
         </span>
-        <span className="mt-1 block text-[0.78rem]" style={{ color: COLOR.ink, opacity: 0.55 }}>
+        <span className="mt-1 block text-[0.78rem] text-ink-muted">
           {hint}
         </span>
       </button>

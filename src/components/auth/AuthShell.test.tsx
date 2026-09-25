@@ -1,8 +1,17 @@
-import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, it, expect, vi } from "vitest";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { AuthShell, AuthField } from "./AuthShell";
-import { COLOR } from "@/design/tokens";
+import { AuthShell, AuthField, AuthCheckbox, AuthSecondaryLink } from "./AuthShell";
+import { describeZone, read, lineasCon } from "@/design/zoneGuard";
+
+describeZone([
+  "src/components/auth/AuthShell.tsx",
+  "src/pages/auth/Login.tsx",
+  "src/pages/auth/Register.tsx",
+  "src/pages/auth/ForgotPassword.tsx",
+  "src/pages/auth/ResetPassword.tsx",
+  "src/pages/auth/Onboarding.tsx",
+]);
 
 const wrap = (ui: React.ReactNode) => render(<MemoryRouter>{ui}</MemoryRouter>);
 
@@ -12,6 +21,13 @@ const MINIMAL_PROPS = {
   formEyebrow: "Acceso",
   formHeadline: "Inicia sesión",
 };
+
+const renderShell = (children: React.ReactNode = <div />) =>
+  wrap(
+    <AuthShell {...MINIMAL_PROPS}>
+      {children}
+    </AuthShell>
+  );
 
 describe("AuthShell — color del logo sobre el bloque oscuro (spec §5)", () => {
   it("el logo del enlace es coral (accent), no casi blanco, sobre inverse", () => {
@@ -25,7 +41,7 @@ describe("AuthShell — color del logo sobre el bloque oscuro (spec §5)", () =>
     expect(lockup.className).not.toContain("text-inverse-foreground");
   });
 
-  it("la marca de agua también es coral (accent), no casi blanca, sobre inverse", () => {
+  it("la marca de agua también es coral (accent), no casi blanca, sobre inverse, y oculta a lectores de pantalla", () => {
     const { container } = wrap(
       <AuthShell {...MINIMAL_PROPS}>
         <div />
@@ -35,6 +51,12 @@ describe("AuthShell — color del logo sobre el bloque oscuro (spec §5)", () =>
     expect(watermark).not.toBeNull();
     expect(watermark?.className).toContain("text-accent");
     expect(watermark?.className).not.toContain("text-inverse-foreground");
+    expect(watermark?.getAttribute("aria-hidden")).toBe("true");
+  });
+
+  it("el panel de marca ya no es inverse (en oscuro inverse es claro)", () => {
+    const { container } = renderShell();
+    expect(container.innerHTML).not.toMatch(/\bbg-inverse\b/);
   });
 });
 
@@ -42,9 +64,10 @@ describe("AuthField — alineado con fields.tsx (spec §4.4, ruling F6)", () => 
   it("fondo surface, borde lineStrong de 1.5px", () => {
     render(<AuthField label="Correo" />);
     const input = screen.getByLabelText("Correo");
-    expect(input).toHaveStyle({ backgroundColor: COLOR.surface });
-    expect(input.style.border).toContain("1.5px");
-    expect(input).toHaveStyle({ borderColor: COLOR.lineStrong });
+    expect(input.className).toMatch(/\bbg-surface\b/);
+    expect(input.className).toMatch(/dark:bg-sunken\b/);
+    expect(input.className).toMatch(/\bborder-line-strong\b/);
+    expect(input.className).toMatch(/border-\[1\.5px\]/);
   });
   it("foco negro (ring-ink) con halo coral suave, no accent-strong", () => {
     render(<AuthField label="Teléfono" />);
@@ -54,12 +77,56 @@ describe("AuthField — alineado con fields.tsx (spec §4.4, ruling F6)", () => 
   });
   it("con error: borde danger", () => {
     render(<AuthField label="Correo" error="Falta el dominio." />);
-    expect(screen.getByLabelText("Correo")).toHaveStyle({ borderColor: COLOR.danger });
+    expect(screen.getByLabelText("Correo").className).toMatch(/\bborder-danger\b/);
   });
   it("la etiqueta mide al menos 12px (0.75rem), en inkMuted", () => {
     render(<AuthField label="Correo" />);
     const label = screen.getByText("Correo");
     expect(label.className).toMatch(/text-\[0\.75rem\]/);
-    expect(label).toHaveStyle({ color: COLOR.inkMuted });
+    expect(label.className).toMatch(/text-ink-muted\b/);
+  });
+});
+
+describe("AuthCheckbox — objetivo táctil", () => {
+  it("toda la fila activa la casilla y mide al menos 44 px", () => {
+    const onChange = vi.fn();
+    render(<AuthCheckbox checked={false} onChange={onChange}>Acepto la responsiva</AuthCheckbox>);
+    fireEvent.click(screen.getByText("Acepto la responsiva"));
+    expect(onChange).toHaveBeenCalledWith(true);
+    expect(screen.getByText("Acepto la responsiva").closest("label")!.className).toContain("min-h-[44px]");
+  });
+});
+
+describe("anillos de foco del acceso (M8)", () => {
+  const ARCHIVOS = [
+    "src/components/auth/AuthShell.tsx",
+    "src/pages/auth/Login.tsx",
+    "src/pages/auth/Register.tsx",
+    "src/pages/auth/ForgotPassword.tsx",
+    "src/pages/auth/ResetPassword.tsx",
+    "src/pages/auth/Onboarding.tsx",
+  ];
+  const clases = (el: Element) => el.className.split(/\s+/);
+
+  it.each(ARCHIVOS)("%s: ningún anillo en canvas (invisible en oscuro)", (f) => {
+    expect(lineasCon(read(f), (l) => /(?<![\w-])ring-canvas\b/.test(l))).toEqual([]);
+  });
+  it.each(ARCHIVOS)("%s: todo anillo con separación la pinta en canvas (sin color, la separación sale blanca)", (f) => {
+    expect(lineasCon(read(f), (l) => /\bring-offset-[1-9]/.test(l) && !/\bring-offset-canvas\b/.test(l))).toEqual([]);
+  });
+  it("el logo del panel de marca enfoca en accent-strong", () => {
+    renderShell();
+    const logo = screen.getByRole("link", { name: "Inicio HIVE Pilates Studio" });
+    expect(clases(logo)).toContain("focus-visible:ring-accent-strong");
+  });
+  it("AuthSecondaryLink y AuthCheckbox: anillo accent-strong con separación en canvas", () => {
+    wrap(<AuthSecondaryLink to="/auth/register">Crear cuenta</AuthSecondaryLink>);
+    expect(clases(screen.getByRole("link", { name: "Crear cuenta" }))).toEqual(
+      expect.arrayContaining(["focus-visible:ring-accent-strong", "focus-visible:ring-offset-2", "focus-visible:ring-offset-canvas"]),
+    );
+    render(<AuthCheckbox checked onChange={() => {}}>Acepto</AuthCheckbox>);
+    expect(clases(screen.getByRole("checkbox"))).toEqual(
+      expect.arrayContaining(["focus-visible:ring-accent-strong", "focus-visible:ring-offset-1", "focus-visible:ring-offset-canvas"]),
+    );
   });
 });

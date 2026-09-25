@@ -14,6 +14,7 @@ import {
   SkeletonRow,
   ErrorState,
 } from "@/components/app/AppShell";
+import { BrandLogo } from "@/components/brand/BrandLogo";
 import { InfoBanner } from "@/components/app/widgets";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -25,7 +26,7 @@ import {
   Copy,
   Check,
 } from "lucide-react";
-import { COLOR } from "@/design/tokens";
+import { DARK } from "@/design/tokens";
 
 /* Logos oficiales sin recolorear: la "G" de Google con sus colores
    oficiales y la manzana de Apple en blanco, ambos sobre el badge
@@ -46,7 +47,9 @@ const AppleLogo = () => (
 );
 
 /* Badge oficial de wallet: pill negro, texto blanco. Los hex son del
-   lockup oficial de Google/Apple, no de la paleta Alma. */
+   lockup oficial de Google/Apple, no de la paleta HIVE. La guardia de zona
+   prohíbe esas clases fijas de Tailwind; el hex fijo en estilo en línea es
+   la excepción permitida (lista de guards.test.ts). */
 const walletBadgeClass =
   "flex min-h-[52px] w-full items-center justify-center gap-2.5 rounded-full px-5 no-underline transition-transform hover:-translate-y-px cursor-pointer border-0";
 const walletBadgeStyle = { backgroundColor: "#000000", color: "#FFFFFF" } as const;
@@ -78,9 +81,6 @@ const formatShortDate = (value?: string | null) => {
   if (Number.isNaN(d.getTime())) return "Sin fecha";
   return d.toLocaleDateString("es-MX", { day: "numeric", month: "short" });
 };
-
-/* Hairline interna del pase drenched */
-const PASS_HAIRLINE = `1px solid ${COLOR.onInverse}24`;
 
 const Wallet = () => {
   const { toast } = useToast();
@@ -218,70 +218,44 @@ const Wallet = () => {
           </Section>
         ) : (
           <Section>
-            {/* ── El pase: una sola pieza drenched ── */}
-            <article
-              className="overflow-hidden rounded-[1.75rem]"
-              style={{
-                backgroundColor: COLOR.inverse,
-                color: COLOR.canvas,
-                boxShadow: `0 18px 48px -12px ${COLOR.ink}2e`,
-              }}
-            >
-              {/* Wordmark + estado */}
+            {/* ── El pase: superficie translúcida con resplandor terracota ── */}
+            <article className="overflow-hidden rounded-[22px] border border-line bg-surface/70 bg-pass-glow">
+              {/* Lockup + estado */}
               <header className="flex items-start justify-between gap-4 px-6 pb-5 pt-6 sm:px-7">
-                <div className="min-w-0">
-                  <p className="font-display text-[1.4rem] leading-none" style={{ color: COLOR.canvas }}>
-                    Alma <span className="font-display">Movement</span>
-                  </p>
-                  <p
-                    className="mt-2 text-[0.72rem] uppercase tracking-[0.22em]"
-                    style={{ color: COLOR.canvas, opacity: 0.6 }}
-                  >
-                    Pase del estudio
-                  </p>
-                </div>
+                <BrandLogo variant="lockup" size={28} className="text-accent" />
                 <span
-                  className="inline-flex shrink-0 items-center gap-1.5 pt-1 text-[0.72rem] font-medium uppercase tracking-[0.18em]"
-                  style={{ color: COLOR.canvas, opacity: metrics.hasMembership ? 0.92 : 0.6 }}
+                  className={
+                    "inline-flex shrink-0 items-center gap-1.5 pt-1 text-[0.75rem] font-medium uppercase tracking-[0.18em] " +
+                    (metrics.hasMembership ? "text-success" : "text-ink-muted")
+                  }
                 >
                   <span
-                    className="inline-block h-1.5 w-1.5 rounded-full"
-                    style={{ backgroundColor: metrics.hasMembership ? COLOR.success : `${COLOR.onInverse}66` }}
+                    aria-hidden="true"
+                    className={"inline-block h-1.5 w-1.5 rounded-full " + (metrics.hasMembership ? "bg-success" : "bg-ink-faint")}
                   />
                   {metrics.hasMembership ? "Activo" : "Sin paquete"}
                 </span>
               </header>
 
               {/* Titular y plan */}
-              <div className="px-6 py-5 sm:px-7" style={{ borderTop: PASS_HAIRLINE }}>
-                <p className="text-[0.72rem] uppercase tracking-[0.22em]" style={{ color: COLOR.canvas, opacity: 0.55 }}>
-                  Titular
-                </p>
-                <p
-                  className="font-display mt-1.5 leading-tight"
-                  style={{ color: COLOR.canvas, fontSize: "clamp(1.35rem, 4.5vw, 1.6rem)" }}
-                >
+              <div className="border-t border-line px-6 py-5 sm:px-7">
+                <p className="text-[0.75rem] uppercase tracking-[0.22em] text-ink-muted">Titular</p>
+                <p className="font-display mt-1.5 text-[length:clamp(1.35rem,4.5vw,1.6rem)] leading-tight text-ink">
                   {wallet?.user_name || "Tu pase"}
                 </p>
-                <p className="mt-1 text-[0.84rem]" style={{ color: COLOR.canvas, opacity: 0.7 }}>
-                  {metrics.planName}
-                </p>
+                <p className="mt-1 text-[0.84rem] text-ink-muted">{metrics.planName}</p>
               </div>
 
               {/* Datos del pase: número + label, hairlines internas */}
-              <div className="grid grid-cols-3 px-6 sm:px-7" style={{ borderTop: PASS_HAIRLINE }}>
+              <div className="grid grid-cols-3 border-t border-line px-6 sm:px-7">
                 {passStats.map((s, i) => (
-                  <div
-                    key={s.label}
-                    className="min-w-0 py-4"
-                    style={i > 0 ? { borderLeft: PASS_HAIRLINE, paddingLeft: "1rem" } : undefined}
-                  >
-                    <p className="text-[0.72rem] uppercase tracking-[0.18em]" style={{ color: COLOR.canvas, opacity: 0.55 }}>
-                      {s.label}
-                    </p>
+                  <div key={s.label} className={"min-w-0 py-4 " + (i > 0 ? "border-l border-line pl-4" : "")}>
+                    <p className="text-[0.75rem] uppercase tracking-[0.18em] text-ink-muted">{s.label}</p>
                     <p
-                      className="nums font-display mt-1.5 truncate leading-none"
-                      style={{ color: COLOR.canvas, fontSize: "1.3rem" }}
+                      className={
+                        "nums font-display mt-1.5 truncate text-[1.3rem] leading-none " +
+                        (s.label === "Por usar" ? "text-accent" : "text-ink")
+                      }
                     >
                       {s.value}
                     </p>
@@ -291,51 +265,42 @@ const Wallet = () => {
 
               {/* Próxima clase como dato del pase, sin caja anidada */}
               {wallet?.next_booking && (
-                <div className="px-6 py-4 sm:px-7" style={{ borderTop: PASS_HAIRLINE }}>
-                  <p className="text-[0.72rem] uppercase tracking-[0.22em]" style={{ color: COLOR.canvas, opacity: 0.55 }}>
-                    Próxima clase
-                  </p>
-                  <p className="mt-1 truncate text-[0.92rem]" style={{ color: COLOR.canvas }}>
+                <div className="border-t border-line px-6 py-4 sm:px-7">
+                  <p className="text-[0.75rem] uppercase tracking-[0.22em] text-ink-muted">Próxima clase</p>
+                  <p className="mt-1 truncate text-[0.92rem] text-ink">
                     {wallet.next_booking.class_name || "Clase"}
-                    <span className="nums" style={{ opacity: 0.7 }}>
+                    <span className="nums text-ink-muted">
                       {" "}· {formatShortDate(wallet.next_booking.date)}, {String(wallet.next_booking.start_time || "").slice(0, 5)}
                     </span>
                   </p>
                 </div>
               )}
 
-              {/* QR integrado sobre superficie cream (segundo y último nivel) */}
+              {/* QR sobre baldosa clara para que se lea, con margen dentro del pase oscuro */}
               {wallet?.qr_code && (
-                <div
-                  className="flex items-center gap-5 px-6 py-5 sm:px-7"
-                  style={{ backgroundColor: COLOR.canvas, color: COLOR.ink }}
-                >
-                  <QRCodeSVG
-                    value={wallet.qr_code}
-                    size={96}
-                    bgColor={COLOR.canvas}
-                    fgColor={COLOR.inverse}
-                    className="shrink-0"
-                  />
+                <div className="flex items-center gap-5 border-t border-line px-6 py-5 sm:px-7">
+                  <div className="shrink-0 rounded-xl bg-inverse p-2">
+                    <QRCodeSVG
+                      value={wallet.qr_code}
+                      size={96}
+                      bgColor={DARK.inverse}
+                      fgColor={DARK.onInverse}
+                    />
+                  </div>
                   <div className="min-w-0">
-                    <p
-                      className="flex items-center gap-1.5 text-[0.72rem] font-medium uppercase tracking-[0.2em]"
-                      style={{ color: COLOR.accentStrong }}
-                    >
+                    <p className="flex items-center gap-1.5 text-[0.75rem] font-medium uppercase tracking-[0.2em] text-accent-strong">
                       <ScanQrCode size={13} />
                       Check-in en recepción
                     </p>
-                    <p className="mt-1.5 text-[0.82rem] leading-[1.5]" style={{ color: COLOR.ink, opacity: 0.65 }}>
+                    <p className="mt-1.5 text-[0.82rem] leading-[1.5] text-ink-muted">
                       Muéstralo al llegar. Si te lo piden por chat, cópialo y mándalo.
                     </p>
                     <button
                       type="button"
                       onClick={handleCopyCode}
-                      className="mt-3 inline-flex min-h-[44px] cursor-pointer items-center gap-2 rounded-full border-0 px-4 text-[0.74rem] font-medium uppercase tracking-[0.16em] transition-colors"
-                      style={
-                        codeCopied
-                          ? { backgroundColor: COLOR.success, color: COLOR.canvas }
-                          : { backgroundColor: COLOR.ink, color: COLOR.canvas }
+                      className={
+                        "mt-3 inline-flex min-h-[44px] cursor-pointer items-center gap-2 rounded-full border-0 px-4 text-[0.75rem] font-medium uppercase tracking-[0.16em] transition-colors " +
+                        (codeCopied ? "bg-success text-canvas" : "bg-ink text-canvas")
                       }
                     >
                       {codeCopied
@@ -353,10 +318,7 @@ const Wallet = () => {
         <Section title="Agregar a tu teléfono">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {gwLoading || gwRetrying ? (
-              <div
-                className="flex min-h-[52px] items-center justify-center gap-3 rounded-full"
-                style={{ backgroundColor: COLOR.sunken, color: COLOR.ink, opacity: 0.65 }}
-              >
+              <div className="flex min-h-[52px] items-center justify-center gap-3 rounded-full bg-sunken text-ink-muted">
                 <RefreshCw size={15} className="animate-spin" />
                 <span className="text-[0.84rem]">Cargando Google Wallet…</span>
               </div>
@@ -374,8 +336,7 @@ const Wallet = () => {
             ) : (
               <button
                 onClick={handleGoogleRetry}
-                className="flex min-h-[52px] cursor-pointer items-center justify-center gap-3 rounded-full bg-transparent transition-colors"
-                style={{ border: `1px dashed ${COLOR.lineStrong}`, color: COLOR.ink, opacity: 0.75 }}
+                className="flex min-h-[52px] cursor-pointer items-center justify-center gap-3 rounded-full border border-dashed border-line-strong bg-transparent text-ink-muted transition-colors"
               >
                 <span className="text-[0.84rem]">Reintentar Google Wallet</span>
                 <RefreshCw size={13} />
