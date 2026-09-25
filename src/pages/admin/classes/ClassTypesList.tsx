@@ -6,6 +6,9 @@ import { z } from "zod";
 import api from "@/lib/api";
 import { AuthGuard } from "@/components/admin/AuthGuard";
 import AdminLayout from "@/components/admin/AdminLayout";
+import { AdminPage, AdminPageHeader } from "@/components/admin/AdminPage";
+import { Panel } from "@/components/admin/Panel";
+import StatusDot from "@/components/admin/StatusDot";
 import SectionTabs from "@/components/admin/SectionTabs";
 import { useConfirm } from "@/components/admin/ConfirmDialog";
 import { ErrorState, EmptyState } from "@/components/app/AppShell";
@@ -146,14 +149,6 @@ const ClassTypesList = () => {
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
 
-  const renderStatusBadge = (t: ClassType) => (
-    t.isActive !== false ? (
-      <Badge className="border border-line-strong/50 bg-sunken/60 text-ink hover:bg-sunken/60">Activo</Badge>
-    ) : (
-      <Badge variant="outline" className="border-line text-ink/50">Inactivo</Badge>
-    )
-  );
-
   const renderCategoryBadge = (t: ClassType) => {
     const label = categoryLabel(t.category);
     return label === "Sin categoría" ? (
@@ -163,20 +158,92 @@ const ClassTypesList = () => {
     );
   };
 
+  const typeForm = (
+    <form
+      onSubmit={form.handleSubmit((d) =>
+        editing ? updateMutation.mutate({ ...d, id: editing.id }) : createMutation.mutate(d)
+      )}
+      className="space-y-4"
+    >
+      <div className="space-y-1"><Label htmlFor="type-name">Nombre</Label><Input id="type-name" {...form.register("name")} /></div>
+      <div className="space-y-1">
+        <Label>Categoría</Label>
+        <Select
+          value={form.watch("category")}
+          onValueChange={(v) => form.setValue("category", v as ClassCategory)}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Seleccionar categoría" />
+          </SelectTrigger>
+          <SelectContent>
+            {CATEGORY_OPTIONS.map((opt) => (
+              <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="space-y-2">
+        <Label>Color</Label>
+        <div className="flex flex-wrap gap-3">
+          {CLASS_PALETTE.map((c) => {
+            const selected = form.watch("color") === c.value;
+            return (
+              <button
+                key={c.value}
+                type="button"
+                onClick={() => form.setValue("color", c.value)}
+                className="flex flex-col items-center gap-1"
+                title={c.label}
+                aria-pressed={selected}
+              >
+                <span
+                  className={cn(
+                    "h-8 w-8 rounded-full ring-1 ring-line transition-all",
+                    selected ? "scale-110 ring-2 ring-ink ring-offset-2 ring-offset-canvas" : "opacity-80 hover:opacity-100",
+                  )}
+                  style={{ backgroundColor: c.value }}
+                />
+                <span className={cn("text-[10px]", selected ? "font-semibold text-ink" : "text-ink/55")}>
+                  {c.label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="space-y-1"><Label>Duración (min)</Label><Input type="number" className="nums" {...form.register("defaultDuration")} /></div>
+        <div className="space-y-1"><Label>Capacidad máx.</Label><Input type="number" className="nums" {...form.register("maxCapacity")} /></div>
+      </div>
+      <div className="flex items-center gap-3">
+        <Switch checked={form.watch("isActive")} onCheckedChange={(v) => form.setValue("isActive", v)} />
+        <Label>Activo</Label>
+      </div>
+      <DialogFooter>
+        <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
+        <Button type="submit" disabled={isSaving}>
+          {isSaving && <Loader2 size={14} className="mr-2 animate-spin" />}
+          {editing ? "Actualizar" : "Crear"}
+        </Button>
+      </DialogFooter>
+    </form>
+  );
+
   return (
     <AuthGuard>
       <AdminLayout>
-        <div className="admin-page max-w-4xl">
-          <SectionTabs tabs={CLASSES_SECTION_TABS} />
-          <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <h1 className="admin-title text-ink">Tipos de clase</h1>
-              <p className="mt-1 text-sm text-ink/55">
-                {types.length === 1 ? "1 tipo registrado" : `${types.length} tipos registrados`} · color y categoría que ven las clientas.
-              </p>
-            </div>
-            <Button size="sm" onClick={openCreate}><Plus size={14} className="mr-1" />Nuevo tipo</Button>
-          </div>
+        <AdminPage>
+          <AdminPageHeader
+            kicker="Clases"
+            title="Tipos de clase"
+            subtitle={`${types.length === 1 ? "1 tipo registrado" : `${types.length} tipos registrados`} · color y categoría que ven las clientas.`}
+            actions={
+              <>
+                <SectionTabs aria-label="Secciones de Clases" tabs={CLASSES_SECTION_TABS} />
+                <Button onClick={openCreate}><Plus size={16} aria-hidden="true" />Nuevo tipo</Button>
+              </>
+            }
+          />
 
           {typesQuery.isError ? (
             <ErrorState
@@ -227,138 +294,86 @@ const ClassTypesList = () => {
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </div>
-                        <div className="mt-2">{renderStatusBadge(t)}</div>
+                        <div className="mt-2">
+                          {t.isActive !== false ? <StatusDot tone="success">Activo</StatusDot> : <StatusDot tone="muted">Inactivo</StatusDot>}
+                        </div>
                       </div>
                     );
                   })}
             </div>
           ) : (
-            <div className="overflow-hidden rounded-xl border border-line">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-16">Color</TableHead>
-                    <TableHead>Nombre</TableHead>
-                    <TableHead>Categoría</TableHead>
-                    <TableHead>Duración</TableHead>
-                    <TableHead>Capacidad</TableHead>
-                    <TableHead>Estado</TableHead>
-                    <TableHead className="w-12" />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {isLoading
-                    ? Array.from({ length: 4 }).map((_, i) => (
-                        <TableRow key={i}>
-                          {Array.from({ length: 7 }).map((_, j) => (
-                            <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>
-                          ))}
-                        </TableRow>
-                      ))
-                    : types.map((t) => (
-                        <TableRow key={t.id}>
-                          <TableCell>
-                            <div
-                              className="h-6 w-6 rounded-full ring-1 ring-line"
-                              style={{ backgroundColor: resolveClassColor(t.color) }}
-                            />
-                          </TableCell>
-                          <TableCell className="font-medium text-ink">{t.name}</TableCell>
-                          <TableCell>{renderCategoryBadge(t)}</TableCell>
-                          <TableCell className="nums text-ink/70">{(t.defaultDuration ?? t.durationMin ?? "?") + " min"}</TableCell>
-                          <TableCell className="nums text-ink/70">{t.maxCapacity ?? t.capacity ?? "?"}</TableCell>
-                          <TableCell>{renderStatusBadge(t)}</TableCell>
-                          <TableCell>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon"><MoreHorizontal size={14} /></Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent>
-                                <DropdownMenuItem onClick={() => openEdit(t)}>Editar</DropdownMenuItem>
-                                <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(t)}>Eliminar</DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                </TableBody>
-              </Table>
+            <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
+              <Panel className="overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Tipo</TableHead>
+                      <TableHead>Categoría</TableHead>
+                      <TableHead>Duración</TableHead>
+                      <TableHead>Capacidad</TableHead>
+                      <TableHead>Estado</TableHead>
+                      <TableHead className="w-12" />
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {isLoading
+                      ? Array.from({ length: 4 }).map((_, i) => (
+                          <TableRow key={i}>
+                            {Array.from({ length: 6 }).map((_, j) => (
+                              <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>
+                            ))}
+                          </TableRow>
+                        ))
+                      : types.map((t) => (
+                          <TableRow key={t.id}>
+                            <TableCell>
+                              <span className="inline-flex items-center gap-2 rounded-lg border border-line bg-canvas px-2.5 py-1.5 text-[0.75rem] font-extrabold">
+                                <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: resolveClassColor(t.color) }} />
+                                {t.name}
+                              </span>
+                            </TableCell>
+                            <TableCell>{renderCategoryBadge(t)}</TableCell>
+                            <TableCell className="nums text-ink/70">{(t.defaultDuration ?? t.durationMin ?? "?") + " min"}</TableCell>
+                            <TableCell className="nums text-ink/70">{t.maxCapacity ?? t.capacity ?? "?"} lugares</TableCell>
+                            <TableCell>
+                              {t.isActive !== false ? <StatusDot tone="success">Activo</StatusDot> : <StatusDot tone="muted">Inactivo</StatusDot>}
+                            </TableCell>
+                            <TableCell>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon"><MoreHorizontal size={14} /></Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent>
+                                  <DropdownMenuItem onClick={() => openEdit(t)}>Editar</DropdownMenuItem>
+                                  <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(t)}>Eliminar</DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                  </TableBody>
+                </Table>
+              </Panel>
+              {open && !isMobile && (
+                <aside
+                  aria-label={editing ? "Editar tipo" : "Nuevo tipo de clase"}
+                  className="rounded-2xl border border-line bg-surface p-6"
+                >
+                  <h2 className="mb-4 text-[0.75rem] font-bold uppercase tracking-[0.12em] text-ink-muted">
+                    {editing ? "Editar tipo" : "Nuevo tipo de clase"}
+                  </h2>
+                  {typeForm}
+                </aside>
+              )}
             </div>
           )}
-        </div>
+        </AdminPage>
 
-        {/* CRUD dialog */}
-        <Dialog open={open} onOpenChange={setOpen}>
+        {/* CRUD dialog: sólo celular */}
+        <Dialog open={open && isMobile} onOpenChange={setOpen}>
           <DialogContent className="max-w-md">
             <DialogHeader><DialogTitle>{editing ? "Editar tipo" : "Nuevo tipo de clase"}</DialogTitle></DialogHeader>
-            <form
-              onSubmit={form.handleSubmit((d) =>
-                editing ? updateMutation.mutate({ ...d, id: editing.id }) : createMutation.mutate(d)
-              )}
-              className="space-y-4"
-            >
-              <div className="space-y-1"><Label>Nombre</Label><Input {...form.register("name")} /></div>
-              <div className="space-y-1">
-                <Label>Categoría</Label>
-                <Select
-                  value={form.watch("category")}
-                  onValueChange={(v) => form.setValue("category", v as ClassCategory)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar categoría" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {CATEGORY_OPTIONS.map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Color</Label>
-                <div className="flex flex-wrap gap-3">
-                  {CLASS_PALETTE.map((c) => {
-                    const selected = form.watch("color") === c.value;
-                    return (
-                      <button
-                        key={c.value}
-                        type="button"
-                        onClick={() => form.setValue("color", c.value)}
-                        className="flex flex-col items-center gap-1"
-                        title={c.label}
-                        aria-pressed={selected}
-                      >
-                        <span
-                          className={cn(
-                            "h-8 w-8 rounded-full ring-1 ring-line transition-all",
-                            selected ? "scale-110 ring-2 ring-ink ring-offset-2 ring-offset-canvas" : "opacity-80 hover:opacity-100",
-                          )}
-                          style={{ backgroundColor: c.value }}
-                        />
-                        <span className={cn("text-[10px]", selected ? "font-semibold text-ink" : "text-ink/55")}>
-                          {c.label}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div className="space-y-1"><Label>Duración (min)</Label><Input type="number" className="nums" {...form.register("defaultDuration")} /></div>
-                <div className="space-y-1"><Label>Capacidad máx.</Label><Input type="number" className="nums" {...form.register("maxCapacity")} /></div>
-              </div>
-              <div className="flex items-center gap-3">
-                <Switch checked={form.watch("isActive")} onCheckedChange={(v) => form.setValue("isActive", v)} />
-                <Label>Activo</Label>
-              </div>
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-                <Button type="submit" disabled={isSaving}>
-                  {isSaving && <Loader2 size={14} className="mr-2 animate-spin" />}
-                  {editing ? "Actualizar" : "Crear"}
-                </Button>
-              </DialogFooter>
-            </form>
+            {typeForm}
           </DialogContent>
         </Dialog>
 
