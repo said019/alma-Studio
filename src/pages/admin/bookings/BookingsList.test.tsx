@@ -53,6 +53,19 @@ describe("Reservas · Semana", () => {
     expect(screen.getByRole("region", { name: "Clases de la semana" })).toBeInTheDocument();
   });
 
+  it("check-in también refresca la lista de la semana (M1)", async () => {
+    renderAdmin(<BookingsList />, { route: "/admin/bookings?clase=c11", path: "/admin/bookings" });
+    const lista = await screen.findByRole("region", { name: "Lista de la clase" });
+    await within(lista).findByText("Reformer Intermedio");
+    const before = mockApi.get.mock.calls.filter((c) => String(c[0]).startsWith("/classes?start=")).length;
+    fireEvent.click(within(lista).getByRole("button", { name: "Check-in de Camila Torres" }));
+    await waitFor(() => expect(mockApi.put).toHaveBeenCalledWith("/bookings/b1/check-in"));
+    await waitFor(() => {
+      const after = mockApi.get.mock.calls.filter((c) => String(c[0]).startsWith("/classes?start=")).length;
+      expect(after).toBeGreaterThan(before);
+    });
+  });
+
   it("elegir otra clase la pone en la URL", async () => {
     renderAdmin(<BookingsList />, { route: "/admin/bookings", path: "/admin/bookings" });
     fireEvent.click(await screen.findByRole("button", { name: /Tower/ }));

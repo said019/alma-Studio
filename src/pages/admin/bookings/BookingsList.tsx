@@ -247,10 +247,16 @@ const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: string; onBa
   });
   const userOptions = Array.isArray(usersData?.data) ? usersData.data : [];
 
+  // Las acciones de abajo cambian cupo/lista de espera, que la lista de la
+  // semana (panel izquierdo) también muestra — sin esto se queda con números
+  // viejos hasta que la ventana recupera el foco (M1).
+  const invalidateWeek = () => qc.invalidateQueries({ queryKey: ["admin-classes-week"] });
+
   const checkinMutation = useMutation({
     mutationFn: (id: string) => api.put(`/bookings/${id}/check-in`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["roster", classId] });
+      invalidateWeek();
       toast({ title: "Check-in registrado" });
     },
     onError: () => toast({ title: "Error al hacer check-in", variant: "destructive" }),
@@ -260,6 +266,7 @@ const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: string; onBa
     mutationFn: (id: string) => api.put(`/bookings/${id}/no-show`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["roster", classId] });
+      invalidateWeek();
       toast({ title: "Marcada como no asistió" });
     },
     onError: () => toast({ title: "Error", variant: "destructive" }),
@@ -272,6 +279,7 @@ const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: string; onBa
     onSuccess: (res: any) => {
       qc.invalidateQueries({ queryKey: ["roster", classId] });
       qc.invalidateQueries({ queryKey: ["my-bookings"] });
+      invalidateWeek();
       const restored = res?.data?.data?.credit_restored;
       toast({
         title: "Reserva cancelada",
@@ -293,6 +301,7 @@ const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: string; onBa
     onSuccess: (res: any) => {
       qc.invalidateQueries({ queryKey: ["roster", classId] });
       qc.invalidateQueries({ queryKey: ["classes"] });
+      invalidateWeek();
       const d = res?.data?.data || {};
       toast({
         title: "Clase cancelada",
@@ -316,6 +325,7 @@ const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: string; onBa
       }),
     onSuccess: (res: any) => {
       qc.invalidateQueries({ queryKey: ["roster", classId] });
+      invalidateWeek();
       const msg = res?.data?.message ?? "Reserva asignada";
       toast({ title: msg });
       setAssignOpen(false);
