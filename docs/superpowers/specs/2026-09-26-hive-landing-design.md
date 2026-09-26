@@ -183,7 +183,7 @@ export const STUDIO = {
 ```
 
 - Los campos se conservan con los mismos nombres. `facebook` se quita si nada lo usa, o queda en `null`.
-- Todo botón o liga de WhatsApp o teléfono sólo se pinta si su valor no es `null`.
+- Todo botón o liga de WhatsApp o teléfono sólo se pinta si su valor no es `null`. Hoy `src/pages/client/Profile.tsx` (~152) y `src/pages/legal/LegalLayout.tsx` (~104) usan `STUDIO.whatsapp` sin condición: se protegen igual.
 - En el perfil y en las legales cambia la dirección de Juriquilla por la de Coyoacán. El resto del texto legal no se toca (sub-proyecto A).
 
 ### 5.5 Regreso tras registrarse
