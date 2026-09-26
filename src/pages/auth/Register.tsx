@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuthStore } from "@/stores/authStore";
+import { safeReturnUrl, withReturnUrl } from "@/lib/returnUrl";
 import {
   AuthShell,
   AuthField,
@@ -66,6 +67,7 @@ const Register = () => {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const refCode = params.get("ref");
+  const returnUrl = safeReturnUrl(params.get("returnUrl"));
 
   const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -95,7 +97,7 @@ const Register = () => {
         ...(refCode ? { referralCode: refCode } : {}),
       } as any);
       // Con el cuestionario apagado (paridad con Velan) se entra directo a la app.
-      navigate(FEATURES.onboarding ? "/auth/onboarding" : "/app");
+      navigate(FEATURES.onboarding ? withReturnUrl("/auth/onboarding", returnUrl) : (returnUrl ?? "/app"));
     } catch {
       // El error del store se muestra en el AuthErrorBanner, único canal de error.
     }

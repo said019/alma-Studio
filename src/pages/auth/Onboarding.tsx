@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { AlertCircle } from "lucide-react";
 import api from "@/lib/api";
+import { safeReturnUrl } from "@/lib/returnUrl";
 import { useAuthStore } from "@/stores/authStore";
 import {
   AuthShell,
@@ -72,6 +73,8 @@ const YesNoField = ({
 
 const Onboarding = () => {
   const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const returnUrl = safeReturnUrl(params.get("returnUrl"));
   const { user, updateUser } = useAuthStore();
 
   const [hasInjury, setHasInjury] = useState<YesNo>(null);
@@ -106,7 +109,7 @@ const Onboarding = () => {
       if (res.data?.user && user) {
         updateUser({ ...user, ...res.data.user });
       }
-      navigate("/app");
+      navigate(returnUrl ?? "/app");
     } catch (err: any) {
       const msg = err?.response?.data?.message ?? "No pudimos guardar tus respuestas.";
       setError(msg);
