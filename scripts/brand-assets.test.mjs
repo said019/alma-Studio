@@ -15,8 +15,8 @@ test("genera cada imagen con su nombre y su tamaño", async () => {
   assert.equal(escritos.length, TARGETS.length);
   for (const t of TARGETS) {
     const meta = await sharp(path.join(dir, t.file)).metadata();
-    assert.equal(meta.width, t.size, t.file);
-    assert.equal(meta.height, t.size, t.file);
+    assert.equal(meta.width, t.width ?? t.size, t.file);
+    assert.equal(meta.height, t.height ?? t.size, t.file);
   }
 });
 
@@ -43,4 +43,16 @@ test("email-logo.png tiene la esquina en terracota opaca (se ve también en modo
   const [r, g, b, a] = [data[i], data[i + 1], data[i + 2], data[i + 3]];
   assert.deepEqual([r, g, b], rgbOf(DARK.accent), "esquina terracota (accent)");
   assert.equal(a, 255, "opaco, no transparente");
+});
+
+test("og-image.png es 1200×630, carbón con el hexágono terracota al centro", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "hive-assets-"));
+  await generate(dir);
+  const { data, info } = await sharp(path.join(dir, "og-image.png")).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  assert.equal(info.width, 1200);
+  assert.equal(info.height, 630);
+  const px = (x, y) => { const i = (y * info.width + x) * 3; return [data[i], data[i + 1], data[i + 2]]; };
+  assert.deepEqual(px(8, 8), rgbOf(DARK.canvas));
+  // Mismo punto relativo del hexágono que la prueba del ícono (a la derecha del rayo y sobre la corona).
+  assert.ok(near(px(632, 201), rgbOf(DARK.accent)), `el hexágono no es terracota: ${px(632, 201)}`);
 });

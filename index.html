@@ -14,7 +14,7 @@
     <script>
       /* Tema por ruta antes de que cargue React (src/design/theme.ts): sin parpadeo claro en la app. */
       (function () {
-        var dark = /^\/(app|auth)(\/|$)/.test(location.pathname);
+        var dark = /^\/(?:(?:app|auth)(?:\/|$)|$)/.test(location.pathname);
         document.documentElement.dataset.theme = dark ? "dark" : "light";
         if (dark) document.querySelector('meta[name="theme-color"]').setAttribute("content", "#141210");
       })();
@@ -28,24 +28,24 @@
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black" />
-    <meta name="apple-mobile-web-app-title" content="Alma" />
-    <meta name="application-name" content="Alma Movement" />
+    <meta name="apple-mobile-web-app-title" content="HIVE Pilates Studio" />
+    <meta name="application-name" content="HIVE Pilates Studio" />
     <meta name="msapplication-TileColor" content="#F2EFEA" />
-    <title>Alma Movement</title>
-    <meta name="description" content="Alma Movement · Studio de Pilates en Juriquilla, Querétaro. Reformer, Tower, Mat, Barre y Sculpt." />
-    <meta name="author" content="Alma Movement" />
+    <title>HIVE Pilates Studio · Pilates Reformer en Coyoacán</title>
+    <meta name="description" content="Pilates Reformer en grupos de 6 en Coyoacán, CDMX. Reserva tu clase muestra." />
+    <meta name="author" content="HIVE Pilates Studio" />
 
-    <meta property="og:title" content="Alma Movement" />
-    <meta property="og:description" content="Studio de Pilates en Juriquilla, Querétaro. Un espacio donde el movimiento se convierte en bienestar." />
+    <meta property="og:title" content="HIVE Pilates Studio" />
+    <meta property="og:description" content="Pilates Reformer en grupos de 6 en Coyoacán, CDMX. Reserva tu clase muestra." />
     <meta property="og:type" content="website" />
     <meta property="og:image" content="/og-image.png" />
     <meta property="og:image:width" content="1200" />
-    <meta property="og:image:height" content="1200" />
+    <meta property="og:image:height" content="630" />
 
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:site" content="@movementalma" />
-    <meta name="twitter:title" content="Alma Movement" />
-    <meta name="twitter:description" content="Estudio de Pilates en Juriquilla, Querétaro." />
+    <meta name="twitter:title" content="HIVE Pilates Studio" />
+    <meta name="twitter:description" content="Pilates Reformer en grupos de 6 en Coyoacán, CDMX." />
     <meta name="twitter:image" content="/og-image.png" />
   </head>
 

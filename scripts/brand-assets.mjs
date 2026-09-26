@@ -28,17 +28,18 @@ export const TARGETS = [
       file: `wallet-icon-${cat}${k > 1 ? `@${k}x` : ""}.png`, size: 29 * k, fg: DARK.onAccent, bg: DARK.accent, pad: 0.12,
     })),
   ]),
+  { file: "og-image.png", width: 1200, height: 630, fg: DARK.accent, bg: DARK.canvas, pad: 0.22 },
 ];
 
-async function render({ size, fg, bg, pad }) {
+async function render({ size, width = size, height = size, fg, bg, pad }) {
   const svg = fs.readFileSync(svgPath, "utf8").replace(/currentColor/g, fg);
-  const inner = Math.round(size * (1 - pad * 2));
+  const inner = Math.round(Math.min(width, height) * (1 - pad * 2));
   const mark = await sharp(Buffer.from(svg), { density: 384 })
     .resize({ height: inner, width: inner, fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
     .png().toBuffer();
   const base = sharp({
     create: {
-      width: size, height: size, channels: 4,
+      width, height, channels: 4,
       background: bg ? { r: parseInt(bg.slice(1, 3), 16), g: parseInt(bg.slice(3, 5), 16), b: parseInt(bg.slice(5, 7), 16), alpha: 1 } : { r: 0, g: 0, b: 0, alpha: 0 },
     },
   });
