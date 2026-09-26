@@ -19,7 +19,7 @@ export function WeekSchedule({ days, classes, todayIso, loading, error, onRetry 
       <div className="mx-auto grid max-w-[1120px] gap-6 px-5 py-14 sm:px-8 lg:grid-cols-[0.9fr_1.1fr] lg:py-20">
         <div>
           <SectionTitle id="horario-titulo" eyebrow="Horario" title="Esta semana" accent="en HIVE." />
-          <div role="tablist" aria-label="Días de la semana" className="flex justify-between gap-1">
+          <div role="group" aria-label="Días de la semana" className="flex justify-between gap-1">
             {days.map((d) => {
               const on = d.iso === selected;
               const has = (byDay[d.iso]?.length ?? 0) > 0;
@@ -27,8 +27,8 @@ export function WeekSchedule({ days, classes, todayIso, loading, error, onRetry 
                 <button
                   key={d.iso}
                   type="button"
-                  role="tab"
-                  aria-selected={on}
+                  aria-pressed={on}
+                  aria-label={`${d.weekday} ${d.dayNum}${has ? "" : ", sin clases"}`}
                   onClick={() => setChosen(d.iso)}
                   className={
                     "flex min-h-[44px] w-11 flex-col items-center justify-center rounded-xl text-[0.75rem] font-bold " +
@@ -55,7 +55,7 @@ export function WeekSchedule({ days, classes, todayIso, loading, error, onRetry 
           </div>
         </div>
 
-        <div role="tabpanel" aria-label="Clases del día">
+        <div aria-live="polite" aria-label="Clases del día">
           {error ? (
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-[18px] border border-line bg-surface/70 p-4">
               <p className="text-[0.9rem] text-ink-muted">No pudimos cargar el horario.</p>
@@ -80,12 +80,13 @@ export function WeekSchedule({ days, classes, todayIso, loading, error, onRetry 
             <ul className="grid gap-2">
               {list.map((c) => {
                 const a = availability(c);
+                const dim = a.full ? "opacity-60" : "";
                 return (
                   <li key={c.id} className="grid grid-cols-[3.2rem_1fr_auto] items-center gap-3 rounded-[18px] border border-line bg-surface/70 p-3.5">
-                    <div className={a.full ? "opacity-60" : ""}>
+                    <div className={dim}>
                       <p className="font-display text-[1rem] font-bold text-ink">{c.start}</p>
                     </div>
-                    <div className={"min-w-0 " + (a.full ? "opacity-60" : "")}>
+                    <div className={"min-w-0 " + dim}>
                       <p className="truncate text-[0.9rem] font-bold text-ink">{c.name}</p>
                       <p className="truncate text-[0.8rem] text-ink-muted">{c.coach}{c.durationMin ? ` · ${c.durationMin} min` : ""}</p>
                       <p className={"text-[0.75rem] font-bold " + (a.full ? "text-ink-muted" : "text-accent")}>{a.label}</p>

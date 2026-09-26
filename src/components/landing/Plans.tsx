@@ -15,7 +15,7 @@ function Price({ p, big }: { p: LandingPlan; big?: boolean }) {
 }
 
 export function Plans({ trial, plans }: { trial: LandingPlan | null; plans: LandingPlan[] }) {
-  const anyOpening = [trial, ...plans].some((p) => p?.opening);
+  const anyOpening = plans.some((p) => p.opening);
   return (
     <section id="paquetes" aria-labelledby="paquetes-titulo" className="scroll-mt-20 border-t border-line">
       <div className="mx-auto max-w-[720px] px-5 py-14 sm:px-8 lg:py-20">

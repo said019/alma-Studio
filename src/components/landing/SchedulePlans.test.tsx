@@ -17,9 +17,10 @@ const base = { days, todayIso: "2026-09-23", loading: false, error: false, onRet
 describe("horario", () => {
   it("tira de 7 días con el de hoy elegido y sus clases", () => {
     renderPage(<WeekSchedule {...base} classes={CLASES} />, "/");
-    const tira = screen.getByRole("tablist", { name: "Días de la semana" });
-    expect(within(tira).getAllByRole("tab")).toHaveLength(7);
-    expect(within(tira).getByRole("tab", { selected: true })).toHaveTextContent("MIÉ23");
+    const tira = screen.getByRole("group", { name: "Días de la semana" });
+    expect(within(tira).getAllByRole("button")).toHaveLength(7);
+    const elegido = within(tira).getByRole("button", { pressed: true });
+    expect(elegido).toHaveAccessibleName("MIÉ 23");
     expect(screen.getByText("4 de 6 lugares")).toBeInTheDocument();
     expect(screen.getByText("Último lugar")).toBeInTheDocument();
   });
@@ -37,7 +38,7 @@ describe("horario", () => {
   });
   it("cambiar de día muestra sus clases", () => {
     renderPage(<WeekSchedule {...base} classes={CLASES} />, "/");
-    fireEvent.click(screen.getByRole("tab", { name: /JUE/ }));
+    fireEvent.click(screen.getByRole("button", { name: /JUE/ }));
     expect(screen.getByText("17:00")).toBeInTheDocument();
     expect(screen.queryByText("06:00")).toBeNull();
   });
@@ -71,5 +72,10 @@ describe("paquetes", () => {
     renderPage(<Plans trial={null} plans={[plan({})]} />, "/");
     expect(screen.queryByText("Precio de apertura")).toBeNull();
     expect(screen.queryByText((_, el) => el?.tagName === "S")).toBeNull();
+  });
+  it("clase muestra en apertura pero paquetes regulares sin apertura: sin etiqueta", () => {
+    renderPage(<Plans trial={plan({ id: "t", name: "Clase muestra", price: 250, finalPrice: 200, opening: true, classLimit: 1, perClass: null })}
+      plans={[plan({})]} />, "/");
+    expect(screen.queryByText("Precio de apertura")).toBeNull();
   });
 });
