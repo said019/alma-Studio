@@ -5,7 +5,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 
-import { STUDIO } from "@/lib/studio";
+import { STUDIO, whatsappUrl } from "@/lib/studio";
 import api from "@/lib/api";
 import { COLOR } from "@/design/tokens";
 
@@ -98,18 +98,20 @@ export const LegalContact = () => (
         info@almamovement.mx
       </a>
     </li>
-    <li>
-      <strong className="font-semibold" style={{ color: COLOR.ink }}>WhatsApp:</strong>{" "}
-      <a
-        href={`https://wa.me/${STUDIO.whatsapp}`}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="underline underline-offset-2"
-        style={{ color: COLOR.accentStrong }}
-      >
-        escríbenos por WhatsApp
-      </a>
-    </li>
+    {whatsappUrl() && (
+      <li>
+        <strong className="font-semibold" style={{ color: COLOR.ink }}>WhatsApp:</strong>{" "}
+        <a
+          href={whatsappUrl()!}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline underline-offset-2"
+          style={{ color: COLOR.accentStrong }}
+        >
+          escríbenos por WhatsApp
+        </a>
+      </li>
+    )}
     {STUDIO.phone && (
       <li>
         <strong className="font-semibold" style={{ color: COLOR.ink }}>Teléfono:</strong> {STUDIO.phone}

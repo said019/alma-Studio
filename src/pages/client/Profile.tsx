@@ -2,7 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { FEATURES } from "@/config/features";
 import { useAuthStore } from "@/stores/authStore";
 import { ClientAuthGuard } from "@/components/layout/ClientAuthGuard";
-import { STUDIO } from "@/lib/studio";
+import { whatsappUrl } from "@/lib/studio";
 import {
   AppShell,
   PageHeader,
@@ -148,14 +148,16 @@ const Profile = () => {
         {/* ── Soporte ── */}
         <Section title="Soporte">
           <ListGroup>
-            <ListRow
-              onClick={() => window.open(`https://wa.me/${STUDIO.whatsapp}`, "_blank", "noopener")}
-              asButton
-              icon={<MessageCircle size={17} strokeWidth={1.7} />}
-              iconTint="success"
-              title="Escríbenos por WhatsApp"
-              description="Respondemos rápido"
-            />
+            {whatsappUrl() && (
+              <ListRow
+                onClick={() => window.open(whatsappUrl()!, "_blank", "noopener")}
+                asButton
+                icon={<MessageCircle size={17} strokeWidth={1.7} />}
+                iconTint="success"
+                title="Escríbenos por WhatsApp"
+                description="Respondemos rápido"
+              />
+            )}
             <ListRow
               to="/legal/terminos"
               icon={<HelpCircle size={17} strokeWidth={1.7} />}
