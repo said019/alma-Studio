@@ -12,6 +12,25 @@ describe("returnUrl seguro", () => {
       expect(safeReturnUrl(bad as string | null)).toBeNull();
     }
   });
+  it("normaliza la ruta: rechaza las que escapan de la app con .. o %2e%2e", () => {
+    for (const bad of ["/app/../admin", "/app/%2e%2e/admin", "/app/%2E%2E/admin", "/app/.%2e/admin", "/app/..%2fadmin/../../admin", "/app/x/../../admin/bookings"]) {
+      expect(safeReturnUrl(bad)).toBeNull();
+    }
+    expect(safeReturnUrl("/app/classes/../checkout")).toBe("/app/checkout");
+  });
+  it("el prefijo es exacto o seguido de /, y conserva búsqueda y ancla", () => {
+    expect(safeReturnUrl("/apple")).toBeNull();
+    expect(safeReturnUrl("/app?x=1#y")).toBe("/app?x=1#y");
+    expect(safeReturnUrl("/app/classes/1?from=landing#top")).toBe("/app/classes/1?from=landing#top");
+  });
+  it("/admin sólo se acepta con los prefijos del login", () => {
+    expect(safeReturnUrl("/admin/bookings")).toBeNull();
+    expect(safeReturnUrl("/admin/bookings", ["/app", "/admin"])).toBe("/admin/bookings");
+    expect(safeReturnUrl("/app/classes/1", ["/app", "/admin"])).toBe("/app/classes/1");
+    for (const bad of ["/administrador", "/admin//evil.com", "https://evil.com/admin", "//evil.com/admin", "/auth/login"]) {
+      expect(safeReturnUrl(bad, ["/app", "/admin"])).toBeNull();
+    }
+  });
   it("agrega el regreso a una ruta", () => {
     expect(withReturnUrl("/auth/onboarding", "/app/classes/1")).toBe("/auth/onboarding?returnUrl=%2Fapp%2Fclasses%2F1");
     expect(withReturnUrl("/auth/onboarding", null)).toBe("/auth/onboarding");
@@ -33,5 +52,11 @@ describe("registro, bienvenida y login respetan returnUrl", () => {
   });
   it("Login conserva returnUrl en la liga de crear cuenta", () => {
     expect(read("src/pages/auth/Login.tsx")).toMatch(/withReturnUrl\("\/auth\/register", safeReturnUrl\(params\.get\("returnUrl"\)\)\)/);
+  });
+  it("Login, tras entrar, sólo regresa a /app o /admin (staff con sesión vencida vuelve al panel)", () => {
+    const src = read("src/pages/auth/Login.tsx");
+    const seguro = 'safeReturnUrl(params.get("returnUrl"), ["/app", "/admin"])';
+    expect(src.split(seguro).length - 1).toBe(2);
+    expect(src).not.toMatch(/=\s*params\.get\("returnUrl"\)/);
   });
 });

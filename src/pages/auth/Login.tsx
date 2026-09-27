@@ -48,7 +48,8 @@ const Login = () => {
   const onboardingDone = user?.onboardingCompleted;
   useEffect(() => {
     if (!isAuthenticated || !role) return;
-    const returnUrl = params.get("returnUrl");
+    // Staff con sesión vencida en /admin/... vuelve ahí; nada fuera de /app o /admin.
+    const returnUrl = safeReturnUrl(params.get("returnUrl"), ["/app", "/admin"]);
     let target: string;
     if (returnUrl) target = returnUrl;
     else if (["admin", "super_admin", "instructor", "reception"].includes(role)) target = "/admin/dashboard";
@@ -65,7 +66,7 @@ const Login = () => {
     try {
       await login(data);
       const { user: authedUser } = useAuthStore.getState();
-      const returnUrl = params.get("returnUrl");
+      const returnUrl = safeReturnUrl(params.get("returnUrl"), ["/app", "/admin"]);
       if (returnUrl) { navigate(returnUrl, { replace: true }); return; }
       if (["admin", "super_admin", "instructor", "reception"].includes(authedUser?.role ?? "")) {
         navigate("/admin/dashboard", { replace: true });
