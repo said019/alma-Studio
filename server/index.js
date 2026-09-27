@@ -55,7 +55,8 @@ import {
   sendRenewalReminder,
   sendPasswordResetEmail,
 } from "./emailService.js";
-import { ALMA_CLASS_TYPES, ALMA_SCHEDULE_SLOTS, ALMA_SCHEDULE_DAYS, ALMA_PLANS, ALMA_PLAN_NAMES } from "./lib/almaCatalog.js";
+import { ALMA_CLASS_TYPES, ALMA_SCHEDULE_SLOTS, ALMA_SCHEDULE_DAYS, ALMA_PLANS } from "./lib/almaCatalog.js";
+import { seedClassTypesIfEmpty, seedPlansIfEmpty } from "./lib/catalogSeed.js";
 import { resolveEffectivePrice } from "./lib/pricing.js";
 import { isMembershipCategoryCompatible as ruleCategoryCompatible, normalizeClassCategory as ruleNormalizeCategory, isWithinMorningWindow, categoryLabel } from "./lib/bookingRules.js";
 import { isWithinCancelWindow, penaltyDueAt } from "./lib/faltas.js";
@@ -907,28 +908,13 @@ async function ensureSchema() {
     // La tabla `packages` es legacy (solo display). La landing ahora lee de
     // `plans`. Desactivamos cualquier fila para no mostrar precios viejos.
     await pool.query(`UPDATE packages SET is_active = false`).catch(() => { });
-    // ── Seed class_types – ensure Alma Barre exists ───────────────────────
+    // ── Seed class_types: catálogo inicial sólo si la tabla está vacía ────
     await pool.query(`ALTER TABLE class_types DROP CONSTRAINT IF EXISTS class_types_category_check`).catch(() => { });
     await pool.query(`UPDATE class_types SET category = 'studio' WHERE category NOT IN ('studio','reformer_tower')`).catch(() => { });
     await pool.query(`ALTER TABLE class_types ADD CONSTRAINT class_types_category_check CHECK (category IN ('studio','reformer_tower'))`).catch(() => { });
-    // Desactivar tipos heredados que no son disciplinas Alma.
-    await pool.query(
-      `UPDATE class_types SET is_active = false WHERE name <> ALL($1::text[])`,
-      [ALMA_CLASS_TYPES.map((c) => c.name)]
-    );
-    for (const c of ALMA_CLASS_TYPES) {
-      const upd = await pool.query(
-        `UPDATE class_types SET category=$2, capacity=$3, duration_min=$4, color=$5, sort_order=$6, is_active=true, updated_at=NOW() WHERE name=$1`,
-        [c.name, c.category, c.capacity, c.duration_min, c.color, c.sort_order]
-      );
-      if (upd.rowCount === 0) {
-        await pool.query(
-          `INSERT INTO class_types (name, category, intensity, level, duration_min, capacity, color, emoji, sort_order, is_active)
-           VALUES ($1,$2,'media','all',$3,$4,$5,'sparkles',$6,true)`,
-          [c.name, c.category, c.duration_min, c.capacity, c.color, c.sort_order]
-        );
-      }
-    }
+    // Con filas existentes (lo que el estudio captura en el panel) no se
+    // desactiva ni se reescribe nada. Ver server/lib/catalogSeed.js.
+    await seedClassTypesIfEmpty(pool, ALMA_CLASS_TYPES);
     // ── Seed schedule_slots si la tabla está vacía ─────────────────────────
     const existingSlots = await pool.query(`SELECT COUNT(*)::int AS n FROM schedule_slots`);
     if (existingSlots.rows[0].n === 0) {
@@ -1030,44 +1016,17 @@ async function ensureSchema() {
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS guest_profile_id UUID REFERENCES guest_profiles(id)`).catch(() => { });
     await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_guest_profile_unique ON users(guest_profile_id) WHERE guest_profile_id IS NOT NULL`).catch(() => { });
     // ── Migrate class_types: 'Barre' es disciplina Studio en Alma Movement ──
-    // (La categoría real la fija el upsert de ALMA_CLASS_TYPES; 'barre' ya no es
+    // (En una base nueva la categoría la fija la siembra inicial de ALMA_CLASS_TYPES; 'barre' ya no es
     //  una categoría válida según el CHECK class_types_category_check.)
     await pool.query(`
       UPDATE class_types SET category = 'studio' WHERE name = 'Barre';
     `).catch(() => { });
     // ── Migrate plans: 'mixto' class_category means both, keep as 'mixto' for logic ──
     // (mixto plans are still valid — the booking endpoint allows them on both categories)
-    // ── Seed plans: ensure el lineup oficial de Alma existe si la tabla está vacía ──
-      // Upsert idempotente de los 17 paquetes Alma + desactivar lo heredado.
-      await pool.query(
-        `UPDATE plans SET is_active = false, updated_at = NOW() WHERE name <> ALL($1::text[])`,
-        [ALMA_PLAN_NAMES]
-      );
-      for (const p of ALMA_PLANS) {
-        const upd = await pool.query(
-          `UPDATE plans SET
-             description=$2, price=$3, opening_price=$4, currency='MXN',
-             duration_days=$5, class_limit=$6, class_category=$7, morning_only=$8,
-             is_non_repeatable=$9, repeat_key=$10, is_non_transferable=false,
-             is_active=true, sort_order=$11, studio_credits=$12, rt_credits=$13, updated_at=NOW()
-           WHERE name=$1`,
-          [p.name, p.description, p.price, p.opening_price, p.duration_days,
-           p.class_limit, p.class_category, p.morning_only, p.is_non_repeatable,
-           p.repeat_key, p.sort_order, p.studio_credits ?? null, p.rt_credits ?? null]
-        );
-        if (upd.rowCount === 0) {
-          await pool.query(
-            `INSERT INTO plans
-               (name, description, price, opening_price, currency, duration_days, class_limit,
-                class_category, morning_only, is_non_repeatable, repeat_key, is_non_transferable,
-                is_active, sort_order, studio_credits, rt_credits)
-             VALUES ($1,$2,$3,$4,'MXN',$5,$6,$7,$8,$9,$10,false,true,$11,$12,$13)`,
-            [p.name, p.description, p.price, p.opening_price, p.duration_days,
-             p.class_limit, p.class_category, p.morning_only, p.is_non_repeatable,
-             p.repeat_key, p.sort_order, p.studio_credits ?? null, p.rt_credits ?? null]
-          );
-        }
-      }
+    // ── Seed plans: el lineup inicial sólo se siembra si la tabla está vacía ──
+    // Con filas existentes (los paquetes que el estudio captura en el panel) no
+    // se desactiva ni se reescribe nada. Ver server/lib/catalogSeed.js.
+    await seedPlansIfEmpty(pool, ALMA_PLANS);
     // Planes de muestra/visita heredados eliminados: el catálogo Alma define
     // "Alma Studio Intro" como única clase muestra y las clases únicas Studio /
     // Reformer-Tower como sesiones sueltas. Ver server/lib/almaCatalog.js.
