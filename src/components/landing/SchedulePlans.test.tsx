@@ -50,6 +50,14 @@ describe("horario", () => {
     fireEvent.click(screen.getByRole("button", { name: /VIE/ }));
     expect(resumen).toHaveTextContent("Sin clases el VIE 25");
   });
+  it("la hora no se pega al nombre: primera columna auto y bloque de hora de ancho fijo mínimo", () => {
+    renderPage(<WeekSchedule {...base} classes={CLASES} />, "/");
+    const hora = screen.getByText("08:00");
+    const fila = hora.closest("li")!;
+    expect(fila).toHaveClass("grid-cols-[auto_1fr_auto]", "gap-3");
+    expect(fila.className).not.toMatch(/grid-cols-\[3\.2rem/);
+    expect(hora.parentElement).toHaveClass("min-w-[3.75rem]", "tabular-nums");
+  });
   it("cambiar de día muestra sus clases", () => {
     renderPage(<WeekSchedule {...base} classes={CLASES} />, "/");
     fireEvent.click(screen.getByRole("button", { name: /JUE/ }));

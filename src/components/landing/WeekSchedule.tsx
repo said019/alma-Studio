@@ -91,8 +91,8 @@ export function WeekSchedule({ days, classes, todayIso, loading, error, onRetry 
                 const a = availability(c);
                 const dim = a.full ? "opacity-60" : "";
                 return (
-                  <li key={c.id} className="grid grid-cols-[3.2rem_1fr_auto] items-center gap-3 rounded-[18px] border border-line bg-surface/70 p-3.5">
-                    <div className={dim}>
+                  <li key={c.id} className="grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-[18px] border border-line bg-surface/70 p-3.5">
+                    <div className={"min-w-[3.75rem] tabular-nums " + dim}>
                       <p className="font-display text-[1rem] font-bold text-ink">{c.start}</p>
                     </div>
                     <div className={"min-w-0 " + dim}>
