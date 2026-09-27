@@ -38,6 +38,21 @@ describe("landing de HIVE", () => {
     expect(document.getElementById("paquetes")).toBeNull();
     expect(screen.queryByRole("link", { name: "Paquetes" })).toBeNull();
   });
+  it("Paquetes, que monta tarde (llega con /plans), también se revela", async () => {
+    vi.mocked(api.get).mockImplementation(respuestas({
+      "/plans": { data: PLANES },
+      "/class-types": { data: [{ id: "r", name: "Reformer", durationMin: 50 }] },
+      "/public/instructors": { data: [{ id: "c", displayName: "Ana" }] },
+      "/classes": { data: [] },
+    }) as never);
+    renderPage(<Landing />, "/");
+    await screen.findByText("4 clases");
+    const paquetes = document.getElementById("paquetes");
+    expect(paquetes?.closest("[data-reveal]")).toHaveClass("is-visible");
+    const reveals = document.querySelectorAll("[data-reveal]");
+    expect(reveals.length).toBeGreaterThan(0);
+    reveals.forEach((el) => expect(el).toHaveClass("is-visible"));
+  });
 });
 
 const root = path.resolve(__dirname, "..", "..", "..");

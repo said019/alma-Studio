@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import api from "@/lib/api";
@@ -16,24 +16,23 @@ import {
 
 const lista = <T,>(data: unknown): T[] => (Array.isArray(data) ? data : ((data as { data?: T[] })?.data ?? []));
 
-/** Aparición suave de las secciones; sin IntersectionObserver (o en pruebas) todo queda visible. */
-function useReveal() {
+/** Aparición suave por sección; se observa a sí misma al montarse (también si llega tarde). Sin IntersectionObserver queda visible. */
+function Reveal({ children }: { children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    const root = ref.current;
-    if (!root) return;
-    const els = root.querySelectorAll("[data-reveal]");
+    const el = ref.current;
+    if (!el) return;
     if (typeof IntersectionObserver === "undefined") {
-      els.forEach((el) => el.classList.add("is-visible"));
+      el.classList.add("is-visible");
       return;
     }
-    const io = new IntersectionObserver((entries) => {
-      entries.forEach((e) => { if (e.isIntersecting) { e.target.classList.add("is-visible"); io.unobserve(e.target); } });
+    const io = new IntersectionObserver(([entry]) => {
+      if (entry?.isIntersecting) { el.classList.add("is-visible"); io.disconnect(); }
     }, { threshold: 0.12 });
-    els.forEach((el) => io.observe(el));
+    io.observe(el);
     return () => io.disconnect();
   }, []);
-  return ref;
+  return <div ref={ref} data-reveal>{children}</div>;
 }
 
 export default function Landing() {
@@ -72,13 +71,12 @@ export default function Landing() {
     { href: "#contacto", label: "Contacto" },
   ];
 
-  const ref = useReveal();
   return (
-    <div ref={ref} className="min-h-screen bg-canvas bg-app-glow text-ink">
+    <div className="min-h-screen bg-canvas bg-app-glow text-ink">
       <LandingNav links={links} />
       <main>
         <LandingHero />
-        <div data-reveal>
+        <Reveal>
           <ClassesCoaches
             classTypes={typesQ.data ?? []}
             coaches={coachesQ.data ?? []}
@@ -86,8 +84,8 @@ export default function Landing() {
             error={typesQ.isError && coachesQ.isError}
             onRetry={() => { typesQ.refetch(); coachesQ.refetch(); }}
           />
-        </div>
-        <div data-reveal>
+        </Reveal>
+        <Reveal>
           <WeekSchedule
             days={days}
             classes={classes}
@@ -96,15 +94,15 @@ export default function Landing() {
             error={classesQ.isError}
             onRetry={() => classesQ.refetch()}
           />
-        </div>
+        </Reveal>
         {hasPlans && (
-          <div data-reveal>
+          <Reveal>
             <Plans trial={trial} plans={rest} />
-          </div>
+          </Reveal>
         )}
-        <div data-reveal>
+        <Reveal>
           <Contact />
-        </div>
+        </Reveal>
       </main>
       <LandingFooter />
     </div>
