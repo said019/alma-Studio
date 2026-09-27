@@ -85,7 +85,7 @@ describe("cableado", () => {
     const head = html.slice(0, html.indexOf("</head>"));
     expect(head).toContain("<title>HIVE Pilates Studio · Pilates Reformer en Coyoacán</title>");
     expect(head).toContain('content="Pilates Reformer en grupos de 6 en Coyoacán, CDMX. Reserva tu clase muestra."');
-    expect(head).not.toMatch(/Alma|Juriquilla|Querétaro/);
+    expect(head).not.toMatch(/Alma|movementalma|Juriquilla|Querétaro/);
   });
   it("fuentes, barra de estado y manifest", () => {
     expect(html).toMatch(/family=Unbounded/);

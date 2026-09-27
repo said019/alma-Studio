@@ -21,6 +21,7 @@ describe("tema", () => {
     expect(themeForPath("/admin/dashboard")).toBe("light");
     expect(themeForPath("/legal/privacidad")).toBe("light");
     expect(themeForPath("/application")).toBe("light");
+    expect(themeForPath("/authx")).toBe("light");
   });
   it("applyTheme fija <html data-theme> y la barra de estado", () => {
     applyTheme("dark");
