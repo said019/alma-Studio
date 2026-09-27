@@ -28,6 +28,11 @@ describe("menú de la landing", () => {
       expect(link.className).toMatch(/min-h-\[44px\]/);
     }
   });
+  it("el logo (liga a inicio) también mide 44 px, como el resto del menú", () => {
+    renderPage(<LandingNav links={LINKS} />, "/");
+    const logo = screen.getByRole("link", { name: "HIVE Pilates Studio" });
+    expect(logo.className).toMatch(/min-h-\[44px\]/);
+  });
   it("con clienta: Mi cuenta", () => {
     login("client");
     renderPage(<LandingNav links={LINKS} />, "/");

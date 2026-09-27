@@ -22,7 +22,7 @@ export function LandingNav({ links }: { links: NavLinkItem[] }) {
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-canvas/90 backdrop-blur">
       <div className="mx-auto flex h-16 max-w-[1120px] items-center justify-between gap-3 px-5 sm:px-8">
-        <Link to="/" aria-label="HIVE Pilates Studio" className="text-ink no-underline [&_svg]:text-accent">
+        <Link to="/" aria-label="HIVE Pilates Studio" className="inline-flex min-h-[44px] items-center text-ink no-underline [&_svg]:text-accent">
           <BrandLogo variant="lockup" size={30} />
         </Link>
         <nav aria-label="Secciones" className="hidden items-center gap-7 lg:flex">
