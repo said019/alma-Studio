@@ -14,36 +14,60 @@ function Price({ p, big }: { p: LandingPlan; big?: boolean }) {
   );
 }
 
-export function Plans({ trial, plans }: { trial: LandingPlan | null; plans: LandingPlan[] }) {
+type Props = { trial: LandingPlan | null; plans: LandingPlan[]; loading: boolean; error: boolean; onRetry: () => void };
+
+const ESQUELETO = "animate-pulse rounded-[18px] border border-line bg-surface/70";
+
+export function Plans({ trial, plans, loading, error, onRetry }: Props) {
   const anyOpening = plans.some((p) => p.opening);
   return (
     <section id="paquetes" aria-labelledby="paquetes-titulo" className="scroll-mt-20 border-t border-line">
       <div className="mx-auto max-w-[720px] px-5 py-14 sm:px-8 lg:py-20">
         <SectionTitle id="paquetes-titulo" eyebrow="Paquetes" title="Elige cómo" accent="entrar a la colmena." />
-        {trial && (
-          <div className="mb-4 flex items-center justify-between gap-3 rounded-[18px] border border-accent-deep bg-surface/70 p-4">
-            <div>
-              <p className="text-[0.95rem] font-bold text-ink">{trial.name}</p>
-              <p className="text-[0.8rem] text-ink-muted">Tu primera vez en HIVE</p>
+        {loading ? (
+          // Altura aproximada de la sección cargada (clase muestra, filas y botón): la página no salta al llegar.
+          <div aria-hidden="true">
+            <div className={`mb-4 h-[84px] ${ESQUELETO}`} />
+            <div className="grid gap-2">
+              {[0, 1, 2, 3, 4].map((i) => <div key={i} className={`h-[60px] ${ESQUELETO}`} />)}
             </div>
-            <Price p={trial} big />
+            <div className="mt-6 h-11 animate-pulse rounded-full border border-line bg-surface/70" />
           </div>
-        )}
-        {anyOpening && <p className="mb-2 text-[0.75rem] font-extrabold uppercase tracking-[0.12em] text-accent">Precio de apertura</p>}
-        <ul>
-          {plans.map((p) => (
-            <li key={p.id} className="flex items-center justify-between gap-3 border-t border-line py-3">
-              <div className="min-w-0">
-                <p className="truncate text-[0.95rem] font-bold text-ink">{p.name}</p>
-                {p.perClass != null && <p className="text-[0.8rem] text-ink-muted">{money(p.perClass)} por clase</p>}
+        ) : error ? (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-[18px] border border-line bg-surface/70 p-4">
+            <p className="text-[0.9rem] text-ink-muted">No pudimos cargar los paquetes.</p>
+            <button type="button" onClick={onRetry} className="min-h-[44px] rounded-full border border-line-strong px-4 text-[0.85rem] font-bold text-ink">
+              Reintentar
+            </button>
+          </div>
+        ) : (
+          <>
+            {trial && (
+              <div className="mb-4 flex items-center justify-between gap-3 rounded-[18px] border border-accent-deep bg-surface/70 p-4">
+                <div>
+                  <p className="text-[0.95rem] font-bold text-ink">{trial.name}</p>
+                  <p className="text-[0.8rem] text-ink-muted">Tu primera vez en HIVE</p>
+                </div>
+                <Price p={trial} big />
               </div>
-              <Price p={p} />
-            </li>
-          ))}
-        </ul>
-        <div className="mt-6">
-          <PrimaryButton to="/app/checkout" className="w-full">Comprar paquete</PrimaryButton>
-        </div>
+            )}
+            {anyOpening && <p className="mb-2 text-[0.75rem] font-extrabold uppercase tracking-[0.12em] text-accent">Precio de apertura</p>}
+            <ul>
+              {plans.map((p) => (
+                <li key={p.id} className="flex items-center justify-between gap-3 border-t border-line py-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-[0.95rem] font-bold text-ink">{p.name}</p>
+                    {p.perClass != null && <p className="text-[0.8rem] text-ink-muted">{money(p.perClass)} por clase</p>}
+                  </div>
+                  <Price p={p} />
+                </li>
+              ))}
+            </ul>
+            <div className="mt-6">
+              <PrimaryButton to="/app/checkout" className="w-full">Comprar paquete</PrimaryButton>
+            </div>
+          </>
+        )}
       </div>
     </section>
   );

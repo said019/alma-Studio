@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { screen } from "@testing-library/react";
+import { screen, fireEvent, waitFor, within } from "@testing-library/react";
 import fs from "fs";
 import path from "path";
 import api from "@/lib/api";
@@ -37,6 +37,26 @@ describe("landing de HIVE", () => {
     await screen.findByText("Pronto publicamos el horario de la semana.");
     expect(document.getElementById("paquetes")).toBeNull();
     expect(screen.queryByRole("link", { name: "Paquetes" })).toBeNull();
+  });
+  it("mientras cargan los paquetes, la sección y su liga ya están, con esqueleto", async () => {
+    const resto = respuestas({ "/classes": { data: [] } });
+    vi.mocked(api.get).mockImplementation(((url: string) => (url.startsWith("/plans") ? new Promise(() => {}) : resto(url))) as never);
+    renderPage(<Landing />, "/");
+    await screen.findByText("Pronto publicamos el horario de la semana.");
+    const paquetes = document.getElementById("paquetes");
+    expect(paquetes).not.toBeNull();
+    expect(paquetes!.querySelectorAll(".animate-pulse").length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("link", { name: "Paquetes" }).length).toBeGreaterThan(0);
+  });
+  it("si /plans falla: aviso en Paquetes y Reintentar vuelve a pedirlos", async () => {
+    vi.mocked(api.get).mockImplementation(respuestas({ "/plans": new Error("500"), "/classes": { data: [] } }) as never);
+    renderPage(<Landing />, "/");
+    await screen.findByText("No pudimos cargar los paquetes.");
+    expect(screen.getAllByRole("link", { name: "Paquetes" }).length).toBeGreaterThan(0);
+    const pedidos = () => vi.mocked(api.get).mock.calls.filter(([u]) => String(u).startsWith("/plans")).length;
+    expect(pedidos()).toBe(1);
+    fireEvent.click(within(document.getElementById("paquetes")!).getByRole("button", { name: "Reintentar" }));
+    await waitFor(() => expect(pedidos()).toBe(2));
   });
   it("Paquetes, que monta tarde (llega con /plans), también se revela", async () => {
     vi.mocked(api.get).mockImplementation(respuestas({

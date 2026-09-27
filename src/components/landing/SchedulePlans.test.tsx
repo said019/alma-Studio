@@ -53,13 +53,14 @@ describe("horario", () => {
   });
 });
 
+const listo = { loading: false, error: false, onRetry: () => {} };
 const plan = (o: Partial<LandingPlan>): LandingPlan =>
   ({ id: "p", name: "4 clases", description: null, price: 1140, finalPrice: 1140, opening: false, classLimit: 4, perClass: 285, durationDays: 30, nonRepeatable: false, ...o });
 
 describe("paquetes", () => {
   it("clase muestra destacada; apertura con precio normal tachado y etiqueta", () => {
     renderPage(<Plans trial={plan({ id: "t", name: "Clase muestra", price: 200, finalPrice: 200, classLimit: 1, perClass: null })}
-      plans={[plan({ id: "4", finalPrice: 1080, opening: true, perClass: 270 })]} />, "/");
+      plans={[plan({ id: "4", finalPrice: 1080, opening: true, perClass: 270 })]} {...listo} />, "/");
     expect(screen.getByText("Clase muestra")).toBeInTheDocument();
     expect(screen.getByText("Precio de apertura")).toBeInTheDocument();
     const tachado = screen.getByText("$1,140");
@@ -72,21 +73,38 @@ describe("paquetes", () => {
     expect(screen.getByRole("link", { name: /Comprar paquete/ })).toHaveAttribute("href", "/app/checkout");
   });
   it("sin apertura: un solo precio y sin etiqueta", () => {
-    renderPage(<Plans trial={null} plans={[plan({})]} />, "/");
+    renderPage(<Plans trial={null} plans={[plan({})]} {...listo} />, "/");
     expect(screen.queryByText("Precio de apertura")).toBeNull();
     expect(screen.queryByText((_, el) => el?.tagName === "S")).toBeNull();
   });
   it("sin precio por clase no pinta nada, y nunca un 0 suelto", () => {
-    const r = renderPage(<Plans trial={null} plans={[plan({ id: "i", name: "Ilimitado", classLimit: 999, perClass: null })]} />, "/");
+    const r = renderPage(<Plans trial={null} plans={[plan({ id: "i", name: "Ilimitado", classLimit: 999, perClass: null })]} {...listo} />, "/");
     expect(screen.queryByText(/por clase/)).toBeNull();
     r.unmount();
-    renderPage(<Plans trial={null} plans={[plan({ id: "g", name: "Cortesía", price: 0, finalPrice: 0, perClass: 0 })]} />, "/");
+    renderPage(<Plans trial={null} plans={[plan({ id: "g", name: "Cortesía", price: 0, finalPrice: 0, perClass: 0 })]} {...listo} />, "/");
     expect(screen.queryByText("0")).toBeNull();
     expect(screen.getByText("$0 por clase")).toBeInTheDocument();
   });
+  it("cargando: la sección está con esqueletos de su altura, sin botón de compra", () => {
+    renderPage(<Plans trial={null} plans={[]} {...listo} loading />, "/");
+    const seccion = document.getElementById("paquetes")!;
+    expect(within(seccion).getByRole("heading", { level: 2 })).toBeInTheDocument();
+    expect(seccion.querySelectorAll(".animate-pulse").length).toBeGreaterThanOrEqual(5);
+    expect(screen.queryByRole("link", { name: /Comprar paquete/ })).toBeNull();
+  });
+  it("error: aviso y Reintentar de 44 px", () => {
+    const onRetry = vi.fn();
+    renderPage(<Plans trial={null} plans={[]} {...listo} error onRetry={onRetry} />, "/");
+    expect(screen.getByText("No pudimos cargar los paquetes.")).toBeInTheDocument();
+    const boton = screen.getByRole("button", { name: "Reintentar" });
+    expect(boton.className).toMatch(/min-h-\[44px\]/);
+    fireEvent.click(boton);
+    expect(onRetry).toHaveBeenCalled();
+    expect(screen.queryByRole("link", { name: /Comprar paquete/ })).toBeNull();
+  });
   it("clase muestra en apertura pero paquetes regulares sin apertura: sin etiqueta", () => {
     renderPage(<Plans trial={plan({ id: "t", name: "Clase muestra", price: 250, finalPrice: 200, opening: true, classLimit: 1, perClass: null })}
-      plans={[plan({})]} />, "/");
+      plans={[plan({})]} {...listo} />, "/");
     expect(screen.queryByText("Precio de apertura")).toBeNull();
   });
 });

@@ -63,11 +63,14 @@ export default function Landing() {
   const classes = useMemo(() => normalizeClasses(classesQ.data ?? [], now), [classesQ.data, now]);
   const { trial, rest } = useMemo(() => splitPlans(plansQ.data ?? []), [plansQ.data]);
   const hasPlans = !!trial || rest.length > 0;
+  // Paquetes (y su liga) se quitan sólo si la consulta terminó bien y no hay planes:
+  // mientras carga o si falla, la sección está con su esqueleto o su aviso.
+  const showPlans = plansQ.isLoading || plansQ.isError || hasPlans;
 
   const links = [
     { href: "#clases", label: "Clases" },
     { href: "#horario", label: "Horario" },
-    ...(hasPlans ? [{ href: "#paquetes", label: "Paquetes" }] : []),
+    ...(showPlans ? [{ href: "#paquetes", label: "Paquetes" }] : []),
     { href: "#contacto", label: "Contacto" },
   ];
 
@@ -95,9 +98,15 @@ export default function Landing() {
             onRetry={() => classesQ.refetch()}
           />
         </Reveal>
-        {hasPlans && (
+        {showPlans && (
           <Reveal>
-            <Plans trial={trial} plans={rest} />
+            <Plans
+              trial={trial}
+              plans={rest}
+              loading={plansQ.isLoading}
+              error={plansQ.isError}
+              onRetry={() => plansQ.refetch()}
+            />
           </Reveal>
         )}
         <Reveal>
