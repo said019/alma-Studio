@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { screen, within, fireEvent } from "@testing-library/react";
 import { renderPage } from "@/test/renderPage";
 import { describeZone } from "@/design/zoneGuard";
@@ -18,6 +18,7 @@ const login = (role: string) => useAuthStore.setState({ isAuthenticated: true, u
 // montajes dentro de la misma prueba, y eso dispara advertencias de act()
 // fuera de test. Reiniciar a "sin sesión" en beforeEach evita fugas entre pruebas.
 beforeEach(() => useAuthStore.setState({ isAuthenticated: false, user: null }));
+afterEach(() => vi.restoreAllMocks());
 
 describe("menú de la landing", () => {
   it("sin sesión: Entrar, y las ligas de escritorio miden 44 px", () => {
@@ -52,6 +53,25 @@ describe("menú de la landing", () => {
     expect(document.getElementById("landing-menu")).not.toBeNull();
     fireEvent.keyDown(window, { key: "Escape" });
     expect(document.getElementById("landing-menu")).toBeNull();
+  });
+  it("al cerrar con Escape, el foco vuelve al botón del menú", () => {
+    renderPage(<LandingNav links={LINKS} />, "/");
+    fireEvent.click(screen.getByRole("button", { name: "Abrir menú" }));
+    const link = within(document.getElementById("landing-menu")!).getByRole("link", { name: "Horario" });
+    link.focus();
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Abrir menú" }));
+  });
+  it("el logo en / además sube al inicio; fuera de / sólo navega", () => {
+    const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+    const r = renderPage(<LandingNav links={LINKS} />, "/");
+    fireEvent.click(screen.getByRole("link", { name: "HIVE Pilates Studio" }));
+    expect(scrollTo).toHaveBeenCalledWith({ top: 0 });
+    r.unmount();
+    scrollTo.mockClear();
+    renderPage(<LandingNav links={LINKS} />, "/legal/privacidad");
+    fireEvent.click(screen.getByRole("link", { name: "HIVE Pilates Studio" }));
+    expect(scrollTo).not.toHaveBeenCalled();
   });
 });
 

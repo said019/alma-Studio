@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { Link, useLocation } from "react-router-dom";
 import { Menu, X } from "lucide-react";
 import { BrandLogo } from "@/components/brand/BrandLogo";
 import { useAuthStore } from "@/stores/authStore";
@@ -11,10 +11,17 @@ export function LandingNav({ links }: { links: NavLinkItem[] }) {
   const { isAuthenticated, user } = useAuthStore();
   const account = accountLink(user, isAuthenticated);
   const [open, setOpen] = useState(false);
+  const menuButton = useRef<HTMLButtonElement>(null);
+  const { pathname } = useLocation();
 
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    // Al cerrar con Escape el foco vuelve al botón: la liga enfocada desaparece con el menú.
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      setOpen(false);
+      menuButton.current?.focus();
+    };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [open]);
@@ -22,7 +29,12 @@ export function LandingNav({ links }: { links: NavLinkItem[] }) {
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-canvas/90 backdrop-blur">
       <div className="mx-auto flex h-16 max-w-[1120px] items-center justify-between gap-3 px-5 sm:px-8">
-        <Link to="/" aria-label="HIVE Pilates Studio" className="inline-flex min-h-[44px] items-center text-ink no-underline [&_svg]:text-accent">
+        <Link
+          to="/"
+          aria-label="HIVE Pilates Studio"
+          onClick={() => { if (pathname === "/") window.scrollTo({ top: 0 }); }}
+          className="inline-flex min-h-[44px] items-center text-ink no-underline [&_svg]:text-accent"
+        >
           <BrandLogo variant="lockup" size={30} />
         </Link>
         <nav aria-label="Secciones" className="hidden items-center gap-7 lg:flex">
@@ -44,6 +56,7 @@ export function LandingNav({ links }: { links: NavLinkItem[] }) {
             {account.label}
           </Link>
           <button
+            ref={menuButton}
             type="button"
             className="grid h-11 w-11 place-items-center rounded-full border border-line-strong text-ink-muted lg:hidden"
             aria-label={open ? "Cerrar menú" : "Abrir menú"}
