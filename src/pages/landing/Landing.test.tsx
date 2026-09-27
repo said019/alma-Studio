@@ -85,6 +85,40 @@ describe("landing de HIVE", () => {
       expect(document.getElementById(id)!.querySelectorAll(".animate-pulse").length).toBeGreaterThan(0);
     }
   });
+  it("con IntersectionObserver real: cada sección se observa y se revela al entrar, también Paquetes", async () => {
+    const observados: Element[] = [];
+    class IOQueEntra {
+      constructor(private cb: IntersectionObserverCallback) {}
+      observe(el: Element) {
+        observados.push(el);
+        this.cb([{ isIntersecting: true, target: el } as IntersectionObserverEntry], this as unknown as IntersectionObserver);
+      }
+      unobserve() {}
+      disconnect() {}
+      takeRecords() { return []; }
+    }
+    vi.stubGlobal("IntersectionObserver", IOQueEntra);
+    try {
+      vi.mocked(api.get).mockImplementation(respuestas({
+        "/plans": { data: PLANES },
+        "/class-types": { data: [{ id: "r", name: "Reformer", durationMin: 50 }] },
+        "/public/instructors": { data: [{ id: "c", displayName: "Ana" }] },
+        "/classes": { data: [] },
+      }) as never);
+      renderPage(<Landing />, "/");
+      await screen.findByText("4 clases");
+      const reveals = Array.from(document.querySelectorAll("[data-reveal]"));
+      expect(reveals.length).toBe(4);
+      const paquetes = document.getElementById("paquetes")!.closest("[data-reveal]");
+      expect(reveals).toContain(paquetes);
+      for (const el of reveals) {
+        expect(observados).toContain(el);
+        expect(el).toHaveClass("is-visible");
+      }
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
   it("Paquetes, que monta tarde (llega con /plans), también se revela", async () => {
     vi.mocked(api.get).mockImplementation(respuestas({
       "/plans": { data: PLANES },
