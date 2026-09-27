@@ -27,7 +27,11 @@ export function LandingNav({ links }: { links: NavLinkItem[] }) {
         </Link>
         <nav aria-label="Secciones" className="hidden items-center gap-7 lg:flex">
           {links.map((l) => (
-            <a key={l.href} href={l.href} className="text-[0.85rem] font-bold text-ink-muted no-underline transition-colors hover:text-ink">
+            <a
+              key={l.href}
+              href={l.href}
+              className="inline-flex min-h-[44px] items-center text-[0.85rem] font-bold text-ink-muted no-underline transition-colors hover:text-ink"
+            >
               {l.label}
             </a>
           ))}

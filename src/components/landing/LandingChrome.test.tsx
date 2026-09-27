@@ -1,5 +1,5 @@
-import { describe, it, expect, afterEach } from "vitest";
-import { screen, fireEvent } from "@testing-library/react";
+import { describe, it, expect, beforeEach } from "vitest";
+import { screen, within, fireEvent } from "@testing-library/react";
 import { renderPage } from "@/test/renderPage";
 import { describeZone } from "@/design/zoneGuard";
 import { useAuthStore } from "@/stores/authStore";
@@ -12,17 +12,28 @@ describeZone(["src/components/landing/LandingNav.tsx", "src/components/landing/L
 const LINKS = [{ href: "#clases", label: "Clases" }, { href: "#horario", label: "Horario" }];
 const login = (role: string) => useAuthStore.setState({ isAuthenticated: true, user: { id: "u", role, displayName: "Ana" } as never });
 
-afterEach(() => useAuthStore.setState({ isAuthenticated: false, user: null }));
+// Cada prueba fija la sesión (si la necesita) antes de montar, y monta una
+// sola vez: la rehidratación de useAuthStore (persist) puede actualizar un
+// árbol que ya se desmontó o que se monta después si se entrelazan sesión y
+// montajes dentro de la misma prueba, y eso dispara advertencias de act()
+// fuera de test. Reiniciar a "sin sesión" en beforeEach evita fugas entre pruebas.
+beforeEach(() => useAuthStore.setState({ isAuthenticated: false, user: null }));
 
 describe("menú de la landing", () => {
-  it("sin sesión: Entrar; con clienta: Mi cuenta; con staff: Panel", () => {
-    const { unmount } = renderPage(<LandingNav links={LINKS} />, "/");
+  it("sin sesión: Entrar, y las ligas de escritorio miden 44 px", () => {
+    renderPage(<LandingNav links={LINKS} />, "/");
     expect(screen.getByRole("link", { name: "Entrar" })).toHaveAttribute("href", "/auth/login");
-    unmount();
+    const nav = screen.getByRole("navigation", { name: "Secciones" });
+    for (const link of within(nav).getAllByRole("link")) {
+      expect(link.className).toMatch(/min-h-\[44px\]/);
+    }
+  });
+  it("con clienta: Mi cuenta", () => {
     login("client");
-    const r2 = renderPage(<LandingNav links={LINKS} />, "/");
+    renderPage(<LandingNav links={LINKS} />, "/");
     expect(screen.getByRole("link", { name: "Mi cuenta" })).toHaveAttribute("href", "/app");
-    r2.unmount();
+  });
+  it("con staff: Panel", () => {
     login("admin");
     renderPage(<LandingNav links={LINKS} />, "/");
     expect(screen.getByRole("link", { name: "Panel" })).toHaveAttribute("href", "/admin/dashboard");
