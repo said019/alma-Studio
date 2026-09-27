@@ -112,9 +112,10 @@ export function toLandingPlan(p: PlanRow): LandingPlan {
   const opening = Boolean(p.openingActive ?? p.opening_active) && eff > 0 && eff < price;
   const finalPrice = opening ? eff : price;
   const classLimit = p.classLimit ?? p.class_limit ?? null;
+  // Como en Checkout: 900 clases o más es ilimitado, y ahí no hay precio por clase.
+  const perClass = classLimit != null && classLimit > 1 && classLimit < 900 ? Math.round(finalPrice / classLimit) : null;
   return {
-    id: p.id, name: p.name, description: p.description ?? null, price, finalPrice, opening, classLimit,
-    perClass: classLimit && classLimit > 1 ? Math.round(finalPrice / classLimit) : null,
+    id: p.id, name: p.name, description: p.description ?? null, price, finalPrice, opening, classLimit, perClass,
     durationDays: p.durationDays ?? p.duration_days ?? null,
     nonRepeatable: Boolean(p.isNonRepeatable ?? p.is_non_repeatable),
   };

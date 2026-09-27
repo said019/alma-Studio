@@ -72,6 +72,12 @@ describe("paquetes", () => {
     expect(toLandingPlan({ id: "3", name: "Mes", price: 4200, effective_price: 4200, opening_active: true, class_limit: null }))
       .toMatchObject({ finalPrice: 4200, opening: false, perClass: null });
   });
+  it("precio por clase sólo con 2 a 899 clases: 900 o más es ilimitado, como en Checkout", () => {
+    expect(toLandingPlan({ id: "i", name: "Ilimitado", price: "3900.00", class_limit: 999 }).perClass).toBeNull();
+    expect(toLandingPlan({ id: "j", name: "Ilimitado", price: 3900, classLimit: 900 }).perClass).toBeNull();
+    expect(toLandingPlan({ id: "k", name: "Muchas", price: 8990, classLimit: 899 }).perClass).toBe(10);
+    expect(toLandingPlan({ id: "l", name: "Cero", price: 500, classLimit: 0 }).perClass).toBeNull();
+  });
   it("clase muestra: bandera + 1 clase; si no, por nombre; si no, ninguna", () => {
     const base = { price: 200, classLimit: 1 };
     expect(splitPlans([{ id: "t", name: "Prueba", isNonRepeatable: true, ...base }, { id: "x", name: "1 clase", price: 300, classLimit: 1 }]).trial?.id).toBe("t");

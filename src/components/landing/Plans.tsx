@@ -35,7 +35,7 @@ export function Plans({ trial, plans }: { trial: LandingPlan | null; plans: Land
             <li key={p.id} className="flex items-center justify-between gap-3 border-t border-line py-3">
               <div className="min-w-0">
                 <p className="truncate text-[0.95rem] font-bold text-ink">{p.name}</p>
-                {p.perClass && <p className="text-[0.8rem] text-ink-muted">{money(p.perClass)} por clase</p>}
+                {p.perClass != null && <p className="text-[0.8rem] text-ink-muted">{money(p.perClass)} por clase</p>}
               </div>
               <Price p={p} />
             </li>

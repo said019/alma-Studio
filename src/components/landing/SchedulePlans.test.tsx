@@ -73,6 +73,14 @@ describe("paquetes", () => {
     expect(screen.queryByText("Precio de apertura")).toBeNull();
     expect(screen.queryByText((_, el) => el?.tagName === "S")).toBeNull();
   });
+  it("sin precio por clase no pinta nada, y nunca un 0 suelto", () => {
+    const r = renderPage(<Plans trial={null} plans={[plan({ id: "i", name: "Ilimitado", classLimit: 999, perClass: null })]} />, "/");
+    expect(screen.queryByText(/por clase/)).toBeNull();
+    r.unmount();
+    renderPage(<Plans trial={null} plans={[plan({ id: "g", name: "Cortesía", price: 0, finalPrice: 0, perClass: 0 })]} />, "/");
+    expect(screen.queryByText("0")).toBeNull();
+    expect(screen.getByText("$0 por clase")).toBeInTheDocument();
+  });
   it("clase muestra en apertura pero paquetes regulares sin apertura: sin etiqueta", () => {
     renderPage(<Plans trial={plan({ id: "t", name: "Clase muestra", price: 250, finalPrice: 200, opening: true, classLimit: 1, perClass: null })}
       plans={[plan({})]} />, "/");
