@@ -14,6 +14,7 @@ const listar = (dir: string): string[] =>
 /** Zona de la app (spec 2026-09-25 §9): todo lo que se ve en oscuro. */
 export const ZONA = [
   ...listar("src/pages/client"), ...listar("src/pages/auth"), ...listar("src/components/app"), ...listar("src/components/auth"),
+  ...listar("src/pages/landing"), ...listar("src/components/landing"),
   "src/pages/NotFound.tsx", "src/components/brand/HexPedestal.tsx", "src/components/account/ChangePassword.tsx", "src/components/ui/toaster.tsx",
 ].sort();
 
