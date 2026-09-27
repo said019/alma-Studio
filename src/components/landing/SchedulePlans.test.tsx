@@ -36,6 +36,20 @@ describe("horario", () => {
     expect(espera).toHaveAttribute("href", "/app/classes/c");
     expect(atenuadoPor(espera)).toEqual([]);
   });
+  it("anuncia el día elegido con un resumen para lector, no con el panel entero", () => {
+    const { container } = renderPage(<WeekSchedule {...base} classes={CLASES} />, "/");
+    expect(screen.queryByLabelText("Clases del día")).toBeNull();
+    const vivos = container.querySelectorAll("[aria-live]");
+    expect(vivos).toHaveLength(1);
+    const resumen = vivos[0];
+    expect(resumen).toHaveAttribute("aria-live", "polite");
+    expect(resumen).toHaveClass("sr-only");
+    expect(resumen).toHaveTextContent("3 clases el MIÉ 23");
+    fireEvent.click(screen.getByRole("button", { name: /JUE/ }));
+    expect(resumen).toHaveTextContent("1 clase el JUE 24");
+    fireEvent.click(screen.getByRole("button", { name: /VIE/ }));
+    expect(resumen).toHaveTextContent("Sin clases el VIE 25");
+  });
   it("cambiar de día muestra sus clases", () => {
     renderPage(<WeekSchedule {...base} classes={CLASES} />, "/");
     fireEvent.click(screen.getByRole("button", { name: /JUE/ }));

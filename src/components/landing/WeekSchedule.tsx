@@ -13,6 +13,14 @@ export function WeekSchedule({ days, classes, todayIso, loading, error, onRetry 
   const [chosen, setChosen] = useState<string | null>(null);
   const selected = chosen ?? defaultDay(days, byDay, todayIso);
   const list = byDay[selected] ?? [];
+  const selectedDay = days.find((d) => d.iso === selected);
+  const dayName = selectedDay ? `${selectedDay.weekday} ${selectedDay.dayNum}` : "";
+  // Lo que oye el lector al cambiar de día: un resumen corto, no el panel entero.
+  const summary = loading || error || !selectedDay
+    ? ""
+    : list.length > 0
+      ? `${list.length} ${list.length === 1 ? "clase" : "clases"} el ${dayName}`
+      : `Sin clases el ${dayName}`;
 
   return (
     <section id="horario" aria-labelledby="horario-titulo" className="scroll-mt-20 border-t border-line">
@@ -55,7 +63,8 @@ export function WeekSchedule({ days, classes, todayIso, loading, error, onRetry 
           </div>
         </div>
 
-        <div aria-live="polite" aria-label="Clases del día">
+        <div>
+          <p className="sr-only" aria-live="polite">{summary}</p>
           {loading ? (
             <div className="grid gap-2" aria-hidden="true">
               {[0, 1, 2].map((i) => <div key={i} className="h-[72px] animate-pulse rounded-[18px] border border-line bg-surface/70" />)}
