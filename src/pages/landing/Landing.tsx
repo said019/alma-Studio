@@ -16,6 +16,9 @@ import {
 
 const lista = <T,>(data: unknown): T[] => (Array.isArray(data) ? data : ((data as { data?: T[] })?.data ?? []));
 
+/** Cargando por primera vez, o reintentando tras un error: la sección muestra su esqueleto. */
+const cargando = (q: { isLoading: boolean; isError: boolean; isFetching: boolean }) => q.isLoading || (q.isError && q.isFetching);
+
 /** Aparición suave por sección; se observa a sí misma al montarse (también si llega tarde). Sin IntersectionObserver queda visible. */
 function Reveal({ children }: { children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -83,8 +86,8 @@ export default function Landing() {
           <ClassesCoaches
             classTypes={typesQ.data ?? []}
             coaches={coachesQ.data ?? []}
-            loading={typesQ.isLoading || coachesQ.isLoading}
-            error={typesQ.isError && coachesQ.isError}
+            loading={cargando(typesQ) || cargando(coachesQ)}
+            error={typesQ.isError || coachesQ.isError}
             onRetry={() => { typesQ.refetch(); coachesQ.refetch(); }}
           />
         </Reveal>
@@ -93,7 +96,7 @@ export default function Landing() {
             days={days}
             classes={classes}
             todayIso={format(now, "yyyy-MM-dd")}
-            loading={classesQ.isLoading}
+            loading={cargando(classesQ)}
             error={classesQ.isError}
             onRetry={() => classesQ.refetch()}
           />
@@ -103,7 +106,7 @@ export default function Landing() {
             <Plans
               trial={trial}
               plans={rest}
-              loading={plansQ.isLoading}
+              loading={cargando(plansQ)}
               error={plansQ.isError}
               onRetry={() => plansQ.refetch()}
             />

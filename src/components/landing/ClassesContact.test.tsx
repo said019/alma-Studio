@@ -38,6 +38,16 @@ describe("clases y coaches", () => {
     fireEvent.click(screen.getByRole("button", { name: "Reintentar" }));
     expect(onRetry).toHaveBeenCalled();
   });
+  it("error parcial: aviso y la mitad que sí cargó", () => {
+    renderPage(<ClassesCoaches {...props} coaches={[]} error />, "/");
+    expect(screen.getByText("No pudimos cargar las clases.")).toBeInTheDocument();
+    expect(screen.getByText("Reformer", { selector: "h3" })).toBeInTheDocument();
+  });
+  it("reintentando tras un error: esqueleto, no el aviso", () => {
+    const { container } = renderPage(<ClassesCoaches {...props} loading error />, "/");
+    expect(container.querySelectorAll(".animate-pulse").length).toBeGreaterThan(0);
+    expect(screen.queryByText("No pudimos cargar las clases.")).toBeNull();
+  });
 });
 
 describe("contacto", () => {

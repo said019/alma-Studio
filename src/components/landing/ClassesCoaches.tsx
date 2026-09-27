@@ -11,19 +11,21 @@ export function ClassesCoaches({ classTypes, coaches, loading, error, onRetry }:
       <div className="mx-auto max-w-[1120px] px-5 py-14 sm:px-8 lg:py-20">
         <SectionTitle id="clases-titulo" eyebrow="Clases y coaches" title="Reformer," accent="a tu ritmo y al nuestro." />
 
-        {error ? (
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-[18px] border border-line bg-surface/70 p-4">
-            <p className="text-[0.9rem] text-ink-muted">No pudimos cargar las clases.</p>
-            <button type="button" onClick={onRetry} className="min-h-[44px] rounded-full border border-line-strong px-4 text-[0.85rem] font-bold text-ink">
-              Reintentar
-            </button>
-          </div>
-        ) : loading ? (
+        {loading ? (
           <div className="grid gap-3 sm:grid-cols-2" aria-hidden="true">
             {[0, 1].map((i) => <div key={i} className="h-28 animate-pulse rounded-[18px] border border-line bg-surface/70" />)}
           </div>
         ) : (
           <>
+            {/* Si falla una de las dos consultas, el aviso va arriba y la otra mitad se conserva. */}
+            {error && (
+              <div className={"flex flex-wrap items-center justify-between gap-3 rounded-[18px] border border-line bg-surface/70 p-4" + (classTypes.length > 0 || coaches.length > 0 ? " mb-6" : "")}>
+                <p className="text-[0.9rem] text-ink-muted">No pudimos cargar las clases.</p>
+                <button type="button" onClick={onRetry} className="min-h-[44px] rounded-full border border-line-strong px-4 text-[0.85rem] font-bold text-ink">
+                  Reintentar
+                </button>
+              </div>
+            )}
             {classTypes.length > 0 && (
               <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {classTypes.map((t) => {

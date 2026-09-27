@@ -58,6 +58,33 @@ describe("landing de HIVE", () => {
     fireEvent.click(within(document.getElementById("paquetes")!).getByRole("button", { name: "Reintentar" }));
     await waitFor(() => expect(pedidos()).toBe(2));
   });
+  it("si falla sólo /public/instructors: aviso en Clases y coaches, y los tipos de clase siguen", async () => {
+    vi.mocked(api.get).mockImplementation(respuestas({
+      "/class-types": { data: [{ id: "r", name: "Reformer", durationMin: 50 }] },
+      "/public/instructors": new Error("500"),
+    }) as never);
+    renderPage(<Landing />, "/");
+    await screen.findByText("No pudimos cargar las clases.");
+    expect(screen.getByText("Reformer", { selector: "h3" })).toBeInTheDocument();
+  });
+  it("tras Reintentar, horario, clases y paquetes muestran esqueleto mientras piden de nuevo", async () => {
+    vi.mocked(api.get).mockImplementation(respuestas({
+      "/classes": new Error("500"), "/plans": new Error("500"), "/public/instructors": new Error("500"),
+    }) as never);
+    renderPage(<Landing />, "/");
+    const avisos = {
+      horario: "No pudimos cargar el horario.", paquetes: "No pudimos cargar los paquetes.", clases: "No pudimos cargar las clases.",
+    };
+    for (const texto of Object.values(avisos)) await screen.findByText(texto);
+    vi.mocked(api.get).mockImplementation((() => new Promise(() => {})) as never);
+    for (const id of Object.keys(avisos)) {
+      fireEvent.click(within(document.getElementById(id)!).getByRole("button", { name: "Reintentar" }));
+    }
+    for (const [id, texto] of Object.entries(avisos)) {
+      await waitFor(() => expect(screen.queryByText(texto)).toBeNull());
+      expect(document.getElementById(id)!.querySelectorAll(".animate-pulse").length).toBeGreaterThan(0);
+    }
+  });
   it("Paquetes, que monta tarde (llega con /plans), también se revela", async () => {
     vi.mocked(api.get).mockImplementation(respuestas({
       "/plans": { data: PLANES },

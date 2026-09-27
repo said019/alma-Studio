@@ -51,6 +51,11 @@ describe("horario", () => {
     fireEvent.click(screen.getByRole("button", { name: "Reintentar" }));
     expect(onRetry).toHaveBeenCalled();
   });
+  it("reintentando tras un error: esqueleto, no el aviso", () => {
+    const { container } = renderPage(<WeekSchedule {...base} classes={[]} loading error />, "/");
+    expect(container.querySelectorAll(".animate-pulse").length).toBeGreaterThan(0);
+    expect(screen.queryByText("No pudimos cargar el horario.")).toBeNull();
+  });
 });
 
 const listo = { loading: false, error: false, onRetry: () => {} };

@@ -56,16 +56,16 @@ export function WeekSchedule({ days, classes, todayIso, loading, error, onRetry 
         </div>
 
         <div aria-live="polite" aria-label="Clases del día">
-          {error ? (
+          {loading ? (
+            <div className="grid gap-2" aria-hidden="true">
+              {[0, 1, 2].map((i) => <div key={i} className="h-[72px] animate-pulse rounded-[18px] border border-line bg-surface/70" />)}
+            </div>
+          ) : error ? (
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-[18px] border border-line bg-surface/70 p-4">
               <p className="text-[0.9rem] text-ink-muted">No pudimos cargar el horario.</p>
               <button type="button" onClick={onRetry} className="min-h-[44px] rounded-full border border-line-strong px-4 text-[0.85rem] font-bold text-ink">
                 Reintentar
               </button>
-            </div>
-          ) : loading ? (
-            <div className="grid gap-2" aria-hidden="true">
-              {[0, 1, 2].map((i) => <div key={i} className="h-[72px] animate-pulse rounded-[18px] border border-line bg-surface/70" />)}
             </div>
           ) : classes.length === 0 ? (
             <div className="rounded-[18px] border border-line bg-surface/70 p-5">
