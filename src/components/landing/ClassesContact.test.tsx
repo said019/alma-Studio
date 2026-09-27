@@ -14,7 +14,8 @@ describeZone([
 const TIPOS = [{ id: "t1", name: "Reformer", description: "Fuerza y control en grupo pequeño.", durationMin: 50 }];
 const COACHES = [
   { id: "c1", displayName: "Ana López", specialties: ["Reformer", "Fuerza"], photoUrl: null },
-  { id: "c2", displayName: "Diego", specialties: "Particular", photoUrl: "https://example.com/d.jpg" },
+  { id: "c2", displayName: "Diego", specialties: "Particular", photoUrl: "https://example.com/d.jpg", photoFocusX: 20, photoFocusY: 80 },
+  { id: "c3", displayName: "Eva", specialties: [], photoUrl: "https://example.com/e.jpg", photoFocusX: null },
 ];
 const props = { classTypes: TIPOS, coaches: COACHES, loading: false, error: false, onRetry: () => {} };
 
@@ -27,10 +28,20 @@ describe("clases y coaches", () => {
     expect(screen.getByText("Pilates · Café · Wellness.")).toBeInTheDocument();
   });
   it("coach sin foto: monograma; con foto: la foto", () => {
-    renderPage(<ClassesCoaches {...props} />, "/");
+    const { container } = renderPage(<ClassesCoaches {...props} />, "/");
     expect(screen.getByText("A", { selector: "[data-monograma]" })).toBeInTheDocument();
-    expect(screen.getByRole("img", { name: "Diego" })).toHaveAttribute("src", "https://example.com/d.jpg");
+    expect(container.querySelector('img[src="https://example.com/d.jpg"]')).not.toBeNull();
     expect(screen.getByText("Reformer · Fuerza")).toBeInTheDocument();
+  });
+  it("la foto respeta el encuadre del panel (50/50 por defecto) y es decorativa: el nombre ya está debajo", () => {
+    const { container } = renderPage(<ClassesCoaches {...props} />, "/");
+    const diego = container.querySelector<HTMLImageElement>('img[src="https://example.com/d.jpg"]')!;
+    const eva = container.querySelector<HTMLImageElement>('img[src="https://example.com/e.jpg"]')!;
+    expect(diego.style.objectPosition).toBe("20% 80%");
+    expect(eva.style.objectPosition).toBe("50% 50%");
+    for (const img of [diego, eva]) expect(img).toHaveAttribute("alt", "");
+    expect(screen.queryByRole("img", { name: "Diego" })).toBeNull();
+    expect(screen.getByText("Diego")).toBeInTheDocument();
   });
   it("error: aviso con reintento", () => {
     const onRetry = vi.fn();

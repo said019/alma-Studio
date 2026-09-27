@@ -133,7 +133,11 @@ export type ClassTypeRow = {
   id: string; name: string; subtitle?: string | null; description?: string | null;
   durationMin?: number | null; durationMinutes?: number | null;
 };
-export type CoachRow = { id: string; displayName: string; specialties?: unknown; photoUrl?: string | null };
+export type CoachRow = {
+  id: string; displayName: string; specialties?: unknown; photoUrl?: string | null;
+  /** Encuadre de la foto que fija el panel, 0–100 (50/50 si no hay). */
+  photoFocusX?: number | null; photoFocusY?: number | null;
+};
 
 export function specialtiesText(s: unknown): string {
   if (Array.isArray(s)) return s.filter(Boolean).join(" · ");

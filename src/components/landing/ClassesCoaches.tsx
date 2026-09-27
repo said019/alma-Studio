@@ -47,7 +47,13 @@ export function ClassesCoaches({ classTypes, coaches, loading, error, onRetry }:
                 {coaches.map((c) => (
                   <li key={c.id} className="w-24 shrink-0 text-center">
                     {c.photoUrl ? (
-                      <img src={c.photoUrl} alt={c.displayName} loading="lazy" className="clip-hex mx-auto h-[74px] w-16 object-cover" />
+                      <img
+                        src={c.photoUrl}
+                        alt=""
+                        loading="lazy"
+                        className="clip-hex mx-auto h-[74px] w-16 object-cover"
+                        style={{ objectPosition: `${c.photoFocusX ?? 50}% ${c.photoFocusY ?? 50}%` }}
+                      />
                     ) : (
                       <span data-monograma aria-hidden="true" className="clip-hex mx-auto grid h-[74px] w-16 place-items-center bg-accent-soft font-display text-[1.25rem] font-extrabold text-accent">
                         {c.displayName.trim().charAt(0).toUpperCase()}
