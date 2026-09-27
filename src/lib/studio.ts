@@ -1,10 +1,18 @@
-// Datos públicos de Alma Movement: única fuente de verdad para contacto
-// y dirección en landing y app. Importar desde aquí, nunca hardcodear.
-// Fuente: README.md "Datos públicos".
+// Datos públicos de HIVE Pilates Studio: única fuente de verdad para contacto
+// y dirección en landing, app y legales. Importar desde aquí, nunca hardcodear.
+// Fuente: cuestionario del estudio (2026-09-25). WhatsApp y teléfono: pendientes.
 export const STUDIO = {
-  whatsapp: "527721119216",
+  name: "HIVE Pilates Studio",
+  address: "Cuauhtémoc #68, Del Carmen, Coyoacán, C.P. 04100, CDMX",
+  mapsUrl: "https://maps.app.goo.gl/6KvMNWPZk35siB4fA",
+  instagram: "hive.pilates",
+  whatsapp: null as string | null,
   phone: null as string | null,
-  address: "Plaza Arce, Calle Acueducto de Querétaro 513, Jurica Acueducto, 76230 Juriquilla, Qro.",
-  instagram: "movementalma",
-  facebook: "Alma Movement",
+  hours: "6 AM a 9 PM",
 } as const;
+
+export const instagramUrl = `https://www.instagram.com/${STUDIO.instagram}`;
+
+/** Liga de WhatsApp, o null mientras el estudio no comparta número. */
+export const whatsappUrl = (text?: string): string | null =>
+  STUDIO.whatsapp ? `https://wa.me/${STUDIO.whatsapp}${text ? `?text=${encodeURIComponent(text)}` : ""}` : null;

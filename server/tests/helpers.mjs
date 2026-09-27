@@ -98,12 +98,23 @@ export async function studioFixtures(prefix, adminToken) {
   // Se excluyen planes restringidos (solo matutinos, packs de visita): la
   // suite prueba el flujo general y un plan con reglas propias la hace fallar
   // por el motivo equivocado.
-  const [plan] = await sql(
+  let [plan] = await sql(
     `SELECT id, name, price FROM plans
       WHERE is_active AND class_category=$1 AND class_limit>=8
         AND COALESCE(morning_only,false) = false
         AND COALESCE(is_visit_pack,false) = false
       ORDER BY class_limit LIMIT 1`, [ct.category]);
+  // El arranque ya no reimpone el catálogo de Alma (sólo siembra una tabla
+  // vacía): en una base creada con schema_complete.sql quedan los paquetes
+  // heredados, todos de categoría 'all'. Si no hay un paquete general de la
+  // categoría, la suite siembra el suyo (una sola vez; las siguientes suites
+  // lo encuentran con la consulta de arriba).
+  if (!plan) {
+    [plan] = await sql(
+      `INSERT INTO plans (name, description, price, currency, duration_days, class_limit, class_category, is_active, sort_order)
+       VALUES ($1, 'Paquete de la regresión del servidor', 1700, 'MXN', 30, 8, $2, true, 999)
+       RETURNING id, name, price`, [`QA regresión ${ct.category} 8`, ct.category]);
+  }
   return { instructorId, classTypeId: ct.id, category: ct.category, plan };
 }
 

@@ -13,13 +13,15 @@ beforeEach(() => {
 });
 
 describe("tema", () => {
-  it("la ruta decide el tema: app y acceso oscuros, lo demás claro", () => {
+  it("la ruta decide el tema: landing, app y acceso oscuros; lo demás claro", () => {
+    expect(themeForPath("/")).toBe("dark");
     expect(themeForPath("/app")).toBe("dark");
     expect(themeForPath("/app/wallet")).toBe("dark");
     expect(themeForPath("/auth/login")).toBe("dark");
     expect(themeForPath("/admin/dashboard")).toBe("light");
-    expect(themeForPath("/")).toBe("light");
+    expect(themeForPath("/legal/privacidad")).toBe("light");
     expect(themeForPath("/application")).toBe("light");
+    expect(themeForPath("/authx")).toBe("light");
   });
   it("applyTheme fija <html data-theme> y la barra de estado", () => {
     applyTheme("dark");

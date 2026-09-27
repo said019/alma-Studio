@@ -7,7 +7,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { lazy, Suspense, useEffect } from "react";
 import { useAuthStore } from "@/stores/authStore";
 import { RouteTheme } from "@/design/theme";
-import Index from "./pages/Index";
+import Landing from "./pages/landing/Landing";
 import NotFound from "./pages/NotFound";
 
 // Auth pages
@@ -93,7 +93,7 @@ const App = () => (
         <RouteTheme />
         <Routes>
           {/* Public landing */}
-          <Route path="/" element={<Index />} />
+          <Route path="/" element={<Landing />} />
 
           {/* Legal pages */}
           <Route path="/legal/privacidad" element={<Privacidad />} />

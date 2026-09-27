@@ -5,6 +5,7 @@ import { z } from "zod";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { Smartphone } from "lucide-react";
 import { FEATURES } from "@/config/features";
+import { safeReturnUrl, withReturnUrl } from "@/lib/returnUrl";
 import { useAuthStore } from "@/stores/authStore";
 import { InstallAppPrompt, getDevice, isStandalone } from "@/components/InstallAppPrompt";
 import {
@@ -47,7 +48,8 @@ const Login = () => {
   const onboardingDone = user?.onboardingCompleted;
   useEffect(() => {
     if (!isAuthenticated || !role) return;
-    const returnUrl = params.get("returnUrl");
+    // Staff con sesión vencida en /admin/... vuelve ahí; nada fuera de /app o /admin.
+    const returnUrl = safeReturnUrl(params.get("returnUrl"), ["/app", "/admin"]);
     let target: string;
     if (returnUrl) target = returnUrl;
     else if (["admin", "super_admin", "instructor", "reception"].includes(role)) target = "/admin/dashboard";
@@ -64,7 +66,7 @@ const Login = () => {
     try {
       await login(data);
       const { user: authedUser } = useAuthStore.getState();
-      const returnUrl = params.get("returnUrl");
+      const returnUrl = safeReturnUrl(params.get("returnUrl"), ["/app", "/admin"]);
       if (returnUrl) { navigate(returnUrl, { replace: true }); return; }
       if (["admin", "super_admin", "instructor", "reception"].includes(authedUser?.role ?? "")) {
         navigate("/admin/dashboard", { replace: true });
@@ -121,7 +123,7 @@ const Login = () => {
 
         <AuthDivider label="¿Primera vez?" />
 
-        <AuthSecondaryLink to="/auth/register">Crear cuenta nueva</AuthSecondaryLink>
+        <AuthSecondaryLink to={withReturnUrl("/auth/register", safeReturnUrl(params.get("returnUrl")))}>Crear cuenta nueva</AuthSecondaryLink>
 
         {canInstall && (
           <button

@@ -1,0 +1,171 @@
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Unbounded:wght@500;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{--canvas:#141210;--surface:#1E1B18;--line:#2E2A26;--lineS:#6F665D;--ink:#F2EFEA;--muted:#A69C91;--faint:#8A7F73;--acc:#CF8A6B;--accD:#A9603F;--soft:#3A2A22;--ok:#8FCBA8}
+  .lc{display:flex;gap:28px;align-items:flex-start;flex-wrap:wrap;justify-content:center;margin-top:14px}
+  .lbl{font:700 11px Manrope,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#6b6259;margin:0 0 8px}
+  .page{font-family:Manrope,system-ui,sans-serif;color:var(--ink);background:var(--canvas);background-image:radial-gradient(70% 22% at 100% 0%,rgba(169,96,63,.32),transparent 70%),radial-gradient(60% 18% at 0% 58%,rgba(169,96,63,.14),transparent 70%);border-radius:28px;overflow:hidden;border:1px solid #000;box-shadow:0 20px 50px rgba(0,0,0,.25)}
+  .m{width:340px}
+  .d{width:760px}
+  .mk{display:inline-block;width:20px;height:23px;background:var(--acc);-webkit-mask:url(../hive-mark-provisional.svg) center/contain no-repeat;mask:url(../hive-mark-provisional.svg) center/contain no-repeat;flex:none}
+  .nav{position:sticky;top:0;display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:rgba(20,18,16,.88);border-bottom:1px solid var(--line)}
+  .brand{display:flex;align-items:center;gap:8px;font:800 13px Unbounded;letter-spacing:.03em}
+  .brand small{display:block;font:700 6.5px Manrope;letter-spacing:.3em;color:var(--muted);margin-top:1px}
+  .links{display:flex;gap:18px;font-size:11.5px;font-weight:700;color:var(--muted)}
+  .pill{font-size:11px;font-weight:800;padding:8px 13px;border-radius:999px;border:1px solid var(--lineS)}
+  .burger{width:30px;height:30px;border-radius:999px;border:1px solid var(--lineS);display:grid;place-items:center;font-size:13px;color:var(--muted)}
+  .sec{padding:26px 18px}
+  .eb{font-size:9.5px;font-weight:800;letter-spacing:.22em;text-transform:uppercase;color:var(--acc)}
+  .h1{font:800 30px/1 Unbounded;text-transform:uppercase;margin:12px 0 6px;letter-spacing:-.01em}
+  .h1acc{font:700 18px Unbounded;color:var(--acc);margin:0 0 12px}
+  .p{font-size:12.5px;line-height:1.55;color:var(--muted);margin:0 0 16px}
+  .ctas{display:flex;gap:8px;flex-wrap:wrap}
+  .grad{background:linear-gradient(135deg,var(--acc),var(--accD));color:var(--canvas);box-shadow:0 8px 24px rgba(207,138,107,.28)}
+  .btn{font-size:12px;font-weight:800;padding:12px 16px;border-radius:999px;display:inline-flex;align-items:center;gap:6px}
+  .ghost{border:1px solid var(--lineS);color:var(--ink)}
+  .facts{display:grid;grid-template-columns:repeat(3,1fr);margin-top:20px;border-top:1px solid var(--line)}
+  .facts div{padding:12px 6px 0;font-size:10px;color:var(--muted);line-height:1.35}
+  .facts b{display:block;font:700 14px Unbounded;color:var(--ink);margin-bottom:2px}
+  .st{font:800 20px/1.05 Unbounded;text-transform:uppercase;margin:6px 0 4px}
+  .stacc{font:700 13px Unbounded;color:var(--acc);margin:0 0 14px}
+  .card{background:rgba(30,27,24,.7);border:1px solid var(--line);border-radius:18px;padding:14px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .ct h4{font:700 13px Unbounded;margin:0 0 4px}
+  .ct p{font-size:11px;color:var(--muted);margin:0;line-height:1.45}
+  .tag{display:inline-block;font-size:9.5px;font-weight:800;padding:3px 8px;border-radius:999px;background:var(--soft);color:var(--acc);margin-top:8px}
+  .coaches{display:flex;gap:12px;overflow:hidden;margin-top:12px}
+  .co{text-align:center;width:72px;flex:none}
+  .hex{width:56px;height:64px;margin:0 auto 6px;clip-path:polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%);background:linear-gradient(160deg,#3A2A22,#1E1B18);display:grid;place-items:center;font:800 18px Unbounded;color:var(--acc);border:1px solid var(--line)}
+  .co b{font-size:11px;display:block}.co span{font-size:9.5px;color:var(--muted)}
+  .diff{margin-top:14px;display:flex;flex-direction:column;gap:6px;font-size:11.5px;color:var(--ink)}
+  .diff i{font-style:normal;color:var(--acc);margin-right:6px}
+  .days{display:flex;justify-content:space-between;margin:4px 0 12px}
+  .dy{text-align:center;font-size:9px;font-weight:700;letter-spacing:.06em;padding:6px 4px;border-radius:12px;width:36px;color:var(--muted)}
+  .dy b{display:block;font:700 14px Unbounded;color:var(--ink);margin-top:2px}
+  .dy.on{background:linear-gradient(135deg,var(--acc),var(--accD));color:var(--canvas)}.dy.on b{color:var(--canvas)}
+  .row{display:grid;grid-template-columns:50px 1fr auto;gap:10px;align-items:center;padding:11px 12px;margin-bottom:7px}
+  .t{font:700 13px Unbounded}.n{font-size:12.5px;font-weight:700}.mm{font-size:10.5px;color:var(--muted)}.av{font-size:10px;font-weight:700;color:var(--acc)}
+  .mini{font-size:10.5px;font-weight:800;padding:8px 11px;border-radius:999px}
+  .full{opacity:.55}
+  .trial{display:flex;justify-content:space-between;align-items:center;border:1px solid var(--accD);background:linear-gradient(135deg,rgba(207,138,107,.14),rgba(30,27,24,.7));margin-bottom:10px}
+  .price{font:800 20px Unbounded}.was{font-size:10.5px;color:var(--faint);text-decoration:line-through;display:block;text-align:right}
+  .open{display:inline-block;font-size:9px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--acc);margin-bottom:10px}
+  .plan{display:flex;justify-content:space-between;align-items:center;padding:12px 2px;border-top:1px solid var(--line)}
+  .plan .n{font-size:13px}.plan .mm{margin-top:2px}
+  .plan .price{font-size:16px}
+  .ci{display:grid;gap:10px}
+  .ci .card{display:flex;gap:12px;align-items:flex-start}
+  .ico{width:34px;height:34px;border-radius:12px;background:var(--soft);display:grid;place-items:center;color:var(--acc);font-size:15px;flex:none}
+  .ci b{font-size:12px;display:block;margin-bottom:2px}.ci span{font-size:11px;color:var(--muted);line-height:1.45}
+  .foot{padding:22px 18px 26px;border-top:1px solid var(--line);text-align:center}
+  .motto{font-size:9.5px;font-weight:800;letter-spacing:.3em;color:var(--acc);margin:12px 0 10px}
+  .legal{font-size:10px;color:var(--faint)}
+  /* escritorio */
+  .d .sec{padding:44px 44px}
+  .d .hero{display:grid;grid-template-columns:1.15fr .85fr;gap:30px;align-items:center}
+  .d .h1{font-size:44px}.d .h1acc{font-size:24px}.d .p{font-size:14px}
+  .bigmark{width:220px;height:254px;margin:0 auto;background:linear-gradient(160deg,var(--acc),var(--accD));-webkit-mask:url(../hive-mark-provisional.svg) center/contain no-repeat;mask:url(../hive-mark-provisional.svg) center/contain no-repeat;filter:drop-shadow(0 0 40px rgba(207,138,107,.35))}
+  .glowbase{width:240px;height:22px;margin:-6px auto 0;border-radius:50%;background:radial-gradient(closest-side,rgba(207,138,107,.35),transparent)}
+  .d .cols{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+</style>
+
+<h2>La landing completa, en oscuro</h2>
+<p class="subtitle">Celular a la izquierda con todas las secciones en orden; a la derecha, la portada y el horario en escritorio. Datos de ejemplo: en la real salen del panel.</p>
+
+<div class="lc">
+  <div>
+    <p class="lbl">Celular · 390 px</p>
+    <div class="page m">
+      <div class="nav"><div class="brand"><span class="mk"></span><div>HIVE<small>PILATES STUDIO</small></div></div><div style="display:flex;gap:6px;align-items:center"><span class="pill">Entrar</span><span class="burger">☰</span></div></div>
+
+      <div class="sec">
+        <div class="eb">Pilates Reformer · Coyoacán</div>
+        <div class="h1">Entra.<br>Muévete.</div>
+        <p class="h1acc">Sal más fuerte.</p>
+        <p class="p">Grupos de 6 en un espacio urbano con carácter. Una colmena que se mueve junta, desde las 6 de la mañana.</p>
+        <div class="ctas"><span class="btn grad">Reserva tu clase muestra →</span><span class="btn ghost">Ver horario</span></div>
+        <div class="facts"><div><b>6</b>reformers por clase</div><div><b>L–D</b>desde las 6 AM</div><div><b>CDMX</b>Coyoacán</div></div>
+      </div>
+
+      <div class="sec" style="border-top:1px solid var(--line)">
+        <div class="eb">Clases y coaches</div>
+        <div class="st">Reformer,</div><p class="stacc">a tu ritmo y al nuestro.</p>
+        <div class="grid2">
+          <div class="card ct"><h4>Reformer</h4><p>Fuerza y control en grupo pequeño.</p><span class="tag">50 min</span></div>
+          <div class="card ct"><h4>Particular</h4><p>Sesión 1 a 1 con tu coach.</p><span class="tag">50 min</span></div>
+        </div>
+        <div class="coaches">
+          <div class="co"><div class="hex">A</div><b>Ana</b><span>Reformer</span></div>
+          <div class="co"><div class="hex">D</div><b>Diego</b><span>Fuerza</span></div>
+          <div class="co"><div class="hex">M</div><b>Mariana</b><span>Particular</span></div>
+          <div class="co"><div class="hex">L</div><b>Luis</b><span>Reformer</span></div>
+        </div>
+        <div class="diff"><div><i>⬡</i>Grupos pequeños: atención de verdad.</div><div><i>⬡</i>Comunidad que te empuja a volver.</div><div><i>⬡</i>Pilates · Café · Wellness.</div></div>
+      </div>
+
+      <div class="sec" style="border-top:1px solid var(--line)">
+        <div class="eb">Horario</div>
+        <div class="st">Esta semana</div><p class="stacc">en HIVE.</p>
+        <div class="days"><span class="dy">LUN<b>21</b></span><span class="dy">MAR<b>22</b></span><span class="dy on">MIÉ<b>23</b></span><span class="dy">JUE<b>24</b></span><span class="dy">VIE<b>25</b></span><span class="dy">SÁB<b>26</b></span><span class="dy">DOM<b>27</b></span></div>
+        <div class="card row"><span class="t">06:00</span><div><div class="n">Reformer</div><div class="mm">Ana · 50 min</div><div class="av">4 de 6 lugares</div></div><span class="mini grad">Reservar</span></div>
+        <div class="card row"><span class="t">07:00</span><div><div class="n">Reformer</div><div class="mm">Diego · 50 min</div><div class="av">Último lugar</div></div><span class="mini grad">Reservar</span></div>
+        <div class="card row full"><span class="t">08:00</span><div><div class="n">Reformer</div><div class="mm">Ana · 50 min</div><div class="av" style="color:var(--muted)">Llena</div></div><span class="mini ghost" style="opacity:1">Lista de espera</span></div>
+      </div>
+
+      <div class="sec" style="border-top:1px solid var(--line)">
+        <div class="eb">Paquetes</div>
+        <div class="st">Elige cómo</div><p class="stacc">entrar a la colmena.</p>
+        <div class="card trial"><div><div class="n">Clase muestra</div><div class="mm">Tu primera vez en HIVE</div></div><div><span class="was">$300</span><span class="price">$200</span></div></div>
+        <span class="open">● Precio de apertura</span>
+        <div class="plan"><div><div class="n">1 clase</div></div><div><span class="was">$300</span><span class="price">$280</span></div></div>
+        <div class="plan"><div><div class="n">4 clases</div><div class="mm">$270 por clase</div></div><div><span class="was">$1,140</span><span class="price">$1,080</span></div></div>
+        <div class="plan"><div><div class="n">10 clases</div><div class="mm">$245 por clase</div></div><div><span class="was">$2,600</span><span class="price">$2,450</span></div></div>
+        <div class="plan"><div><div class="n">Mes ilimitado</div></div><div><span class="was">$4,200</span><span class="price">$3,750</span></div></div>
+        <div style="margin-top:12px"><span class="btn grad" style="width:100%;justify-content:center;box-sizing:border-box">Comprar paquete</span></div>
+      </div>
+
+      <div class="sec" style="border-top:1px solid var(--line)">
+        <div class="eb">Contacto</div>
+        <div class="st">Te esperamos</div><p class="stacc">en Coyoacán.</p>
+        <div class="ci">
+          <div class="card"><span class="ico">⌖</span><div><b>Cuauhtémoc #68, Del Carmen</b><span>Coyoacán, 04100, CDMX · Cómo llegar →</span></div></div>
+          <div class="card"><span class="ico">◷</span><div><b>6 AM a 9 PM</b><span>Clases L–V mañana y tarde, S y D por la mañana</span></div></div>
+          <div class="card"><span class="ico">@</span><div><b>@hive.pilates</b><span>Instagram · WhatsApp cuando esté el número</span></div></div>
+          <div class="card"><span class="ico">↺</span><div><b>Cancela con 12 h</b><span>Después cuenta como tomada. Ver política →</span></div></div>
+        </div>
+      </div>
+
+      <div class="foot"><span class="mk" style="width:30px;height:34px"></span><div class="motto">MOVIMIENTO · BIENESTAR · COMUNIDAD</div><div class="legal">Privacidad · Términos · Cancelación<br>© 2026 HIVE Pilates Studio</div></div>
+    </div>
+  </div>
+
+  <div>
+    <p class="lbl">Escritorio · 1280 px (vista reducida)</p>
+    <div class="page d">
+      <div class="nav" style="padding:16px 44px"><div class="brand"><span class="mk"></span><div>HIVE<small>PILATES STUDIO</small></div></div><div class="links"><span>Clases</span><span>Horario</span><span>Paquetes</span><span>Contacto</span></div><span class="pill">Entrar</span></div>
+      <div class="sec hero">
+        <div>
+          <div class="eb">Pilates Reformer · Coyoacán</div>
+          <div class="h1">Entra.<br>Muévete.</div>
+          <p class="h1acc">Sal más fuerte.</p>
+          <p class="p">Grupos de 6 en un espacio urbano con carácter. Una colmena que se mueve junta, desde las 6 de la mañana.</p>
+          <div class="ctas"><span class="btn grad">Reserva tu clase muestra →</span><span class="btn ghost">Ver horario</span></div>
+          <div class="facts"><div><b>6</b>reformers por clase</div><div><b>L–D</b>desde las 6 AM</div><div><b>CDMX</b>Coyoacán</div></div>
+        </div>
+        <div><div class="bigmark"></div><div class="glowbase"></div></div>
+      </div>
+      <div class="sec" style="border-top:1px solid var(--line)">
+        <div class="cols">
+          <div><div class="eb">Horario</div><div class="st">Esta semana</div><p class="stacc">en HIVE.</p>
+            <div class="days"><span class="dy">LUN<b>21</b></span><span class="dy">MAR<b>22</b></span><span class="dy on">MIÉ<b>23</b></span><span class="dy">JUE<b>24</b></span><span class="dy">VIE<b>25</b></span><span class="dy">SÁB<b>26</b></span><span class="dy">DOM<b>27</b></span></div>
+          </div>
+          <div>
+            <div class="card row"><span class="t">06:00</span><div><div class="n">Reformer</div><div class="mm">Ana · 50 min</div><div class="av">4 de 6 lugares</div></div><span class="mini grad">Reservar</span></div>
+            <div class="card row"><span class="t">07:00</span><div><div class="n">Reformer</div><div class="mm">Diego · 50 min</div><div class="av">Último lugar</div></div><span class="mini grad">Reservar</span></div>
+            <div class="card row"><span class="t">17:00</span><div><div class="n">Reformer</div><div class="mm">Mariana · 50 min</div><div class="av">6 de 6 lugares</div></div><span class="mini grad">Reservar</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
