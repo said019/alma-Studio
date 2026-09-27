@@ -64,6 +64,9 @@ describe("paquetes", () => {
     expect(screen.getByText("Precio de apertura")).toBeInTheDocument();
     const tachado = screen.getByText("$1,140");
     expect(tachado.tagName).toBe("S");
+    // ink-faint quedaba en 4.37:1 sobre el resplandor; ink-muted pasa AA.
+    expect(tachado).toHaveClass("text-ink-muted");
+    expect(tachado).not.toHaveClass("text-ink-faint");
     expect(screen.getByText("$1,080")).toBeInTheDocument();
     expect(screen.getByText("$270 por clase")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Comprar paquete/ })).toHaveAttribute("href", "/app/checkout");
