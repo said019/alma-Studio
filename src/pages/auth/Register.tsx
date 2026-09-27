@@ -247,7 +247,7 @@ const Register = () => {
 
       <AuthDivider label="¿Ya tienes cuenta?" />
 
-      <AuthSecondaryLink to="/auth/login">Iniciar sesión</AuthSecondaryLink>
+      <AuthSecondaryLink to={withReturnUrl("/auth/login", returnUrl)}>Iniciar sesión</AuthSecondaryLink>
     </AuthShell>
   );
 };

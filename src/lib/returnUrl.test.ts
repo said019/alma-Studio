@@ -59,4 +59,7 @@ describe("registro, bienvenida y login respetan returnUrl", () => {
     expect(src.split(seguro).length - 1).toBe(2);
     expect(src).not.toMatch(/=\s*params\.get\("returnUrl"\)/);
   });
+  it("Register conserva returnUrl en la liga de iniciar sesión", () => {
+    expect(read("src/pages/auth/Register.tsx")).toMatch(/<AuthSecondaryLink to=\{withReturnUrl\("\/auth\/login", returnUrl\)\}>Iniciar sesión<\/AuthSecondaryLink>/);
+  });
 });
