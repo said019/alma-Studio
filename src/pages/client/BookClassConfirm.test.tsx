@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { screen, within } from "@testing-library/react";
+import { screen, within, fireEvent, waitFor } from "@testing-library/react";
 import { Routes, Route } from "react-router-dom";
 import api from "@/lib/api";
 import BookClassConfirm from "./BookClassConfirm";
 import { renderPage, respuestas } from "@/test/renderPage";
-import { cancellationRules, waitlistRule, DEFAULT_BOOKING_POLICY } from "@/lib/booking-policy";
+import { cancellationRules, horasTexto, waitlistRule, DEFAULT_BOOKING_POLICY } from "@/lib/booking-policy";
 
 // jsdom no implementa IntersectionObserver (usado por StickyCta, ya en esta
 // pantalla antes de esta tarea); mismo stub local que src/components/app/widgets.test.tsx,
@@ -30,6 +30,8 @@ vi.mock("@/lib/api", () => ({ default: { get: vi.fn(), post: vi.fn(), delete: vi
 vi.mock("@/components/layout/ClientAuthGuard", () => ({
   ClientAuthGuard: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
+const toastSpy = vi.fn();
+vi.mock("@/hooks/use-toast", () => ({ useToast: () => ({ toast: toastSpy }), toast: (...a: unknown[]) => toastSpy(...a) }));
 
 const POLITICA = { ...DEFAULT_BOOKING_POLICY, cancellationLimit: 3, cancelWindowHours: 24 };
 const CLASE = {
@@ -48,7 +50,11 @@ function montar(clase: Record<string, unknown> = CLASE, membresia: Record<string
   return renderPage(<Routes><Route path="/app/classes/:classId" element={<BookClassConfirm />} /></Routes>, "/app/classes/c1");
 }
 
-beforeEach(() => { vi.mocked(api.get).mockReset(); });
+beforeEach(() => {
+  vi.mocked(api.get).mockReset();
+  vi.mocked(api.post).mockReset();
+  toastSpy.mockReset();
+});
 
 describe("Detalle de clase · política y fila (P0-4 · P1-1)", () => {
   it("las reglas son las de la política configurada, iguales a /legal/cancelacion, y dice cuántas le quedan", async () => {
@@ -77,5 +83,15 @@ describe("Detalle de clase · política y fila (P0-4 · P1-1)", () => {
     montar(CLASE, { ...MEM, cancellationLimit: 0, cancellationsLeft: null });
     await screen.findByRole("list", { name: "Reglas de cancelación" });
     expect(screen.queryByText(/cancelaciones de este paquete/)).toBeNull();
+  });
+
+  it("al quedar en lista de espera, el aviso dice cuándo sube sola en vez del genérico anterior (A2)", async () => {
+    montar({ ...CLASE, current_bookings: 2, waitlist_count: 1 });
+    vi.mocked(api.post).mockResolvedValue({ data: { booking: { status: "waitlist" } } } as never);
+    fireEvent.click(await screen.findByRole("button", { name: "Unirme a la lista de espera" }));
+    await waitFor(() => expect(toastSpy).toHaveBeenCalledWith(expect.objectContaining({
+      title: "Quedaste en lista de espera",
+      description: `Si se libera un lugar hasta ${horasTexto(POLITICA.waitlistCutoffHours)} antes, quedas inscrita sola y se usa una clase de tu paquete.`,
+    })));
   });
 });

@@ -19,7 +19,7 @@ import { BackLink, StatusPill, StickyCta } from "@/components/app/widgets";
 import { HexPedestal } from "@/components/brand/HexPedestal";
 import { useToast } from "@/hooks/use-toast";
 import { ResponsivaDialog } from "@/components/app/ResponsivaDialog";
-import { cancellationRules, cancellationsLeftText, useBookingPolicy, waitlistRule } from "@/lib/booking-policy";
+import { cancellationRules, cancellationsLeftText, horasTexto, useBookingPolicy, waitlistRule } from "@/lib/booking-policy";
 
 // La regla de la fila sale de la política vigente (auditoría 2026-09-27, P1-1).
 const knowBefore = (fila: string) => [
@@ -63,7 +63,10 @@ const BookClassConfirm = () => {
       qc.invalidateQueries({ queryKey: ["my-membership"] });
       qc.invalidateQueries({ queryKey: ["public-classes"] });
       if (data?.booking?.status === "waitlist") {
-        toast({ title: "Quedaste en lista de espera", description: "Te avisamos si se libera un lugar." });
+        toast({
+          title: "Quedaste en lista de espera",
+          description: `Si se libera un lugar hasta ${horasTexto(policy.waitlistCutoffHours)} antes, quedas inscrita sola y se usa una clase de tu paquete.`,
+        });
       } else {
         toast({ title: "Reserva confirmada." });
       }
