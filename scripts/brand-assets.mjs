@@ -21,6 +21,9 @@ export const TARGETS = [
   // Círculo terracota opaco: se ve en correo claro y oscuro (el correo lo recorta en círculo).
   { file: "email-logo.png", size: 240, fg: DARK.onAccent, bg: DARK.accent, pad: 0.18 },
   { file: "alma-mark-light.png", size: 512, fg: DARK.accent, bg: null, pad: 0.06 }, // "light" = para fondos oscuros
+  // Isotipo de los correos: terracota sobre transparente, sin margen, a 3× de
+  // los 40×46 con que lo pinta server/emailService.js en la banda carbón.
+  { file: "email/hive-mark.png", width: 120, height: 138, fg: DARK.accent, bg: null, pad: 0 },
   ...[1, 2, 3].flatMap((k) => [
     { file: `wallet-logo${k > 1 ? `@${k}x` : ""}.png`, size: 220 * k, fg: LIGHT.ink, bg: LIGHT.canvas, pad: 0.14 },
     { file: `wallet-logo-black${k > 1 ? `@${k}x` : ""}.png`, size: 220 * k, fg: DARK.accent, bg: DARK.canvas, pad: 0.14 },
@@ -33,9 +36,13 @@ export const TARGETS = [
 
 async function render({ size, width = size, height = size, fg, bg, pad }) {
   const svg = fs.readFileSync(svgPath, "utf8").replace(/currentColor/g, fg);
-  const inner = Math.round(Math.min(width, height) * (1 - pad * 2));
+  // Caja interior con el margen aplicado; el símbolo cabe con "contain". En los
+  // cuadrados y en og-image (limitado por la altura) da lo mismo que una caja
+  // cuadrada; en un lienzo con la proporción del símbolo lo llena sin márgenes.
+  const innerW = Math.round(width - Math.min(width, height) * pad * 2);
+  const innerH = Math.round(height - Math.min(width, height) * pad * 2);
   const mark = await sharp(Buffer.from(svg), { density: 384 })
-    .resize({ height: inner, width: inner, fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
+    .resize({ height: innerH, width: innerW, fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
     .png().toBuffer();
   const base = sharp({
     create: {
@@ -50,6 +57,7 @@ export async function generate(outDir) {
   fs.mkdirSync(outDir, { recursive: true });
   const written = [];
   for (const t of TARGETS) {
+    fs.mkdirSync(path.dirname(path.join(outDir, t.file)), { recursive: true });
     fs.writeFileSync(path.join(outDir, t.file), await render(t));
     written.push(t.file);
   }
