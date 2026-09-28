@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { FEATURES } from "@/config/features";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -22,6 +22,10 @@ import { BackLink, StickyCta } from "@/components/app/widgets";
 import { Field, SelectField, TextAreaField } from "@/components/app/fields";
 import { useToast } from "@/hooks/use-toast";
 import type { UpdateProfileData } from "@/types/auth";
+import { format, parseISO } from "date-fns";
+import { es } from "date-fns/locale";
+import { AuthCheckbox } from "@/components/auth/AuthShell";
+import { HEALTH_CONSENT_TEXT, hasCurrentHealthConsent } from "@/lib/legal/privacy-notice";
 
 const schema = z.object({
   displayName: z.string().min(2, "Mínimo 2 caracteres"),
@@ -42,6 +46,15 @@ const ProfileEdit = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const avatarInputRef = useRef<HTMLInputElement>(null);
+
+  // Consentimiento expreso para datos de salud (auditoría 2026-09-27, P1-10):
+  // a las clientas existentes se les pide la próxima vez que escriban salud, sin
+  // bloquear lo demás.
+  const [consent, setConsent] = useState(false);
+  const [consentError, setConsentError] = useState<string | null>(null);
+  const [confirmarRetiro, setConfirmarRetiro] = useState(false);
+  const yaConsintio = hasCurrentHealthConsent(user as { healthConsentVersion?: string | null; healthConsentAt?: string | null } | null);
+  const consentidoEl = user?.healthConsentAt ? format(parseISO(user.healthConsentAt), "d 'de' MMMM, yyyy", { locale: es }) : null;
 
   const { register, handleSubmit, reset, formState: { errors, isDirty } } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -69,7 +82,10 @@ const ProfileEdit = () => {
       toast({ title: "Perfil actualizado." });
       navigate("/app/profile");
     },
-    onError: () => toast({ title: "No se guardaron los cambios", variant: "destructive" }),
+    onError: (e: any) => {
+      if (e?.response?.data?.code === "HEALTH_CONSENT_REQUIRED") setConsentError(e.response.data.message);
+      toast({ title: "No se guardaron los cambios", description: e?.response?.data?.message, variant: "destructive" });
+    },
   });
 
   const avatarMutation = useMutation({
@@ -86,7 +102,28 @@ const ProfileEdit = () => {
     onError: (e: any) => toast({ title: e?.response?.data?.message ?? "No se pudo subir la foto", variant: "destructive" }),
   });
 
+  const retirar = useMutation({
+    mutationFn: () => api.delete("/me/health-consent"),
+    onSuccess: (res) => {
+      const updated = res.data?.user;
+      if (updated) updateUser(updated);
+      setConfirmarRetiro(false);
+      setConsent(false);
+      reset({ ...(user as unknown as Record<string, unknown>), healthNotes: "" } as never);
+      toast({ title: "Retiraste tu consentimiento", description: "Borramos tus datos de salud de tu perfil." });
+    },
+    onError: () => toast({ title: "No pudimos retirarlo", description: "Inténtalo de nuevo o pídelo en recepción.", variant: "destructive" }),
+  });
+
   const onSubmit = (data: FormValues) => {
+    const notasNuevas = (data.healthNotes ?? "").trim();
+    const notasGuardadas = String(user?.healthNotes ?? user?.health_notes ?? "").trim();
+    const escribeSalud = notasNuevas !== "" && notasNuevas !== notasGuardadas;
+    if (escribeSalud && !yaConsintio && !consent) {
+      setConsentError("Marca la casilla para guardar tus datos de salud.");
+      return;
+    }
+    setConsentError(null);
     mutation.mutate({
       displayName: data.displayName,
       phone: data.phone || undefined,
@@ -95,6 +132,7 @@ const ProfileEdit = () => {
       emergencyContactName: data.emergencyContactName || undefined,
       emergencyContactPhone: data.emergencyContactPhone || undefined,
       healthNotes: data.healthNotes || undefined,
+      ...(escribeSalud && !yaConsintio ? { healthConsent: true } : {}),
     } as any);
   };
 
@@ -202,6 +240,39 @@ const ProfileEdit = () => {
               hint="Solo el equipo del estudio ve esta información."
               {...register("healthNotes")}
             />
+            {yaConsintio ? (
+              <div className="mt-3 flex flex-col gap-2">
+                <p className="m-0 text-[0.8125rem] text-ink-muted">
+                  Autorizaste el tratamiento de tus datos de salud{consentidoEl ? ` el ${consentidoEl}` : ""}.
+                </p>
+                {confirmarRetiro ? (
+                  <div className="flex flex-col gap-2 rounded-2xl border border-line p-3">
+                    <p className="m-0 text-[0.8125rem] text-ink">Se borran tus notas de salud y tus lesiones registradas. El equipo ya no las verá.</p>
+                    <div className="flex flex-wrap gap-2">
+                      <GhostButton tone="danger" onClick={() => retirar.mutate()} disabled={retirar.isPending}>Sí, retirar y borrar</GhostButton>
+                      <GhostButton onClick={() => setConfirmarRetiro(false)}>Volver</GhostButton>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <GhostButton onClick={() => setConfirmarRetiro(true)}>Retirar mi consentimiento</GhostButton>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="mt-3">
+                <AuthCheckbox
+                  checked={consent}
+                  onChange={(v) => { setConsent(v); if (v) setConsentError(null); }}
+                  error={consentError ?? undefined}
+                >
+                  {HEALTH_CONSENT_TEXT}{" "}
+                  <a href="/legal/privacidad" target="_blank" rel="noopener noreferrer" className="no-underline font-medium text-accent-strong">
+                    Leer el aviso
+                  </a>
+                </AuthCheckbox>
+              </div>
+            )}
           </Section>
 
           <Section title="Seguridad">

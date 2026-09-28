@@ -83,6 +83,7 @@ import { responsivaDocument, waiverVersionProblem } from "./lib/responsiva.js";
 import { pgReminderLog, sendClassReminders } from "./lib/classReminder.js";
 import { createChannelState } from "./lib/whatsappState.js";
 import { recordAudit, recordAuditBestEffort, reasonProblem, cleanReason, buildAuditQuery, auditRowOut } from "./lib/audit.js";
+import { PRIVACY_NOTICE_VERSION, healthDataChanges, hasCurrentHealthConsent, healthConsentProblem } from "./lib/privacy.js";
 import {
   validateStripeConfig,
   createOrGetStripeCustomer,
@@ -3055,6 +3056,10 @@ function mapUser(u) {
     practicedBarreBefore: u.practiced_barre_before ?? null,
     injuryDetails: u.injury_details ?? null,
     onboardingCompleted: u.onboarding_completed ?? false,
+    // Aviso de privacidad y consentimiento de salud (auditoría 2026-09-27, P1-10).
+    privacyNoticeVersion: u.privacy_notice_version ?? null,
+    healthConsentVersion: u.health_consent_version ?? null,
+    healthConsentAt: u.health_consent_at ?? null,
     createdAt: u.created_at,
   };
 }
@@ -3063,7 +3068,7 @@ function mapUser(u) {
 
 // POST /api/auth/register
 app.post("/api/auth/register", async (req, res) => {
-  const { email, password, displayName, phone, gender, dateOfBirth, acceptsTerms, acceptsCommunications } = req.body;
+  const { email, password, displayName, phone, gender, dateOfBirth, acceptsTerms, acceptsCommunications, healthConsent } = req.body;
   if (!email || !password || !displayName) {
     return res.status(400).json({ message: "Nombre, email y contraseña son requeridos" });
   }
@@ -3086,11 +3091,20 @@ app.post("/api/auth/register", async (req, res) => {
       return res.status(409).json({ message: "Este email ya está registrado" });
     }
     const passwordHash = await bcrypt.hash(password, 12);
+    // Aceptar términos deja la versión y la fecha del aviso de privacidad; la
+    // casilla de salud (opcional al registrarse) deja su consentimiento expreso
+    // (auditoría 2026-09-27, P1-10).
+    const versionAviso = acceptsTerms === true ? PRIVACY_NOTICE_VERSION : null;
+    const versionSalud = healthConsent === true ? PRIVACY_NOTICE_VERSION : null;
     const result = await pool.query(
-      `INSERT INTO users (display_name, email, phone, gender, date_of_birth, password_hash, accepts_terms, accepts_communications, role)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'client')
+      `INSERT INTO users (display_name, email, phone, gender, date_of_birth, password_hash, accepts_terms, accepts_communications, role,
+                          privacy_notice_version, privacy_accepted_at, health_consent_version, health_consent_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'client',
+               $9::varchar, CASE WHEN $9::varchar IS NULL THEN NULL ELSE NOW() END,
+               $10::varchar, CASE WHEN $10::varchar IS NULL THEN NULL ELSE NOW() END)
        RETURNING *`,
-      [displayName.trim(), email.toLowerCase().trim(), phone || null, gender || null, normalizedDob, passwordHash, acceptsTerms ?? false, acceptsCommunications ?? false]
+      [displayName.trim(), email.toLowerCase().trim(), phone || null, gender || null, normalizedDob, passwordHash,
+       acceptsTerms ?? false, acceptsCommunications ?? false, versionAviso, versionSalud]
     );
     const user = result.rows[0];
     // Auto-create referral code (best-effort: nunca debe tirar el registro).
@@ -3262,16 +3276,32 @@ app.post("/api/auth/onboarding", authMiddleware, async (req, res) => {
     return res.status(400).json({ message: "Describe la lesión o condición que debemos saber" });
   }
   try {
+    // Reportar una lesión es dato de salud: exige consentimiento expreso
+    // vigente o la casilla (auditoría 2026-09-27, P1-10).
+    const cur = await pool.query(
+      "SELECT has_injury, injury_details, health_consent_version, health_consent_at FROM users WHERE id = $1",
+      [req.userId],
+    );
+    if (!cur.rows.length) return res.status(404).json({ message: "Usuario no encontrado" });
+    const hasConsent = hasCurrentHealthConsent(cur.rows[0]);
+    const consentGiven = req.body?.healthConsent === true;
+    const problem = healthConsentProblem({
+      changes: healthDataChanges(cur.rows[0], { hasInjury, injuryDetails: details }), consentGiven, hasConsent,
+    });
+    if (problem) return res.status(400).json(problem);
+    const recordConsent = consentGiven && !hasConsent;
     const r = await pool.query(
       `UPDATE users SET
          has_injury             = $1,
          practiced_barre_before = $2,
          injury_details         = $3,
          onboarding_completed   = true,
+         health_consent_version = CASE WHEN $5 THEN $6 ELSE health_consent_version END,
+         health_consent_at      = CASE WHEN $5 THEN NOW() ELSE health_consent_at END,
          updated_at             = NOW()
        WHERE id = $4
        RETURNING *`,
-      [hasInjury, practicedBarreBefore, hasInjury ? details : null, req.userId]
+      [hasInjury, practicedBarreBefore, hasInjury ? details : null, req.userId, recordConsent, PRIVACY_NOTICE_VERSION]
     );
     if (!r.rows.length) return res.status(404).json({ message: "Usuario no encontrado" });
     return res.json({ user: mapUser(r.rows[0]) });
@@ -8670,9 +8700,12 @@ app.get("/api/admin/users/:userId/waiver/pdf", adminMiddleware, async (req, res)
 
 // ─── Routes: /api/users ─────────────────────────────────────────────────────
 
-// PUT /api/users/:id
+// PUT /api/users/:id — la clienta edita su perfil o la dueña edita a cualquiera.
+// Si una clienta escribe datos de salud nuevos sin consentimiento expreso
+// vigente, pide la casilla (400 HEALTH_CONSENT_REQUIRED) y no guarda nada. Editar
+// otros datos nunca lo pide, y el personal no queda bloqueado ni al editar su
+// propio perfil (auditoría 2026-09-27, P1-10; ruling R12).
 app.put("/api/users/:id", authMiddleware, async (req, res) => {
-  // Allow own profile edit OR admin editing any user
   try {
     const selfRes = await pool.query("SELECT role FROM users WHERE id = $1", [req.userId]);
     const callerRole = selfRes.rows[0]?.role || "client";
@@ -8685,11 +8718,27 @@ app.put("/api/users/:id", authMiddleware, async (req, res) => {
       emergencyContactName, emergencyContactPhone, healthNotes,
       receiveReminders, receivePromotions, receiveWeeklySummary,
       acceptsCommunications,
-      role,
+      role, healthConsent,
     } = req.body;
     // Non-admins cannot change role
     const newRole = isAdminCaller && role ? role : null;
     const targetId = req.params.id;
+    const cur = await pool.query(
+      "SELECT health_notes, has_injury, injury_details, health_consent_version, health_consent_at FROM users WHERE id = $1",
+      [targetId],
+    );
+    if (!cur.rows.length) return res.status(404).json({ message: "Usuario no encontrado" });
+    const selfEdit = targetId === req.userId;
+    // R12: la casilla sólo se exige si la clienta edita su propio perfil; el
+    // personal no queda bloqueado, ni siquiera al editar el suyo.
+    const consentApplies = selfEdit && callerRole === "client";
+    const hasConsent = hasCurrentHealthConsent(cur.rows[0]);
+    const consentGiven = healthConsent === true;
+    if (consentApplies) {
+      const problem = healthConsentProblem({ changes: healthDataChanges(cur.rows[0], { healthNotes }), consentGiven, hasConsent });
+      if (problem) return res.status(400).json(problem);
+    }
+    const recordConsent = consentApplies && consentGiven && !hasConsent;
     const r = await pool.query(
       `UPDATE users SET
          display_name              = COALESCE($1, display_name),
@@ -8704,6 +8753,8 @@ app.put("/api/users/:id", authMiddleware, async (req, res) => {
          accepts_communications    = COALESCE($10, accepts_communications),
          role                      = COALESCE($11, role),
          gender                    = COALESCE($12, gender),
+         health_consent_version    = CASE WHEN $14 THEN $15 ELSE health_consent_version END,
+         health_consent_at         = CASE WHEN $14 THEN NOW() ELSE health_consent_at END,
          updated_at                = NOW()
        WHERE id = $13
        RETURNING *`,
@@ -8715,11 +8766,31 @@ app.put("/api/users/:id", authMiddleware, async (req, res) => {
         newRole,
         gender || null,
         targetId,
+        recordConsent, PRIVACY_NOTICE_VERSION,
       ]
     );
     return res.json({ user: mapUser(r.rows[0]) });
   } catch (err) {
     console.error("PUT users/:id error:", err);
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// DELETE /api/me/health-consent — la clienta retira su consentimiento para datos
+// de salud: se borran sus notas de salud y sus lesiones registradas
+// (auditoría 2026-09-27, P1-10).
+app.delete("/api/me/health-consent", authMiddleware, async (req, res) => {
+  try {
+    const r = await pool.query(
+      `UPDATE users SET health_notes = NULL, has_injury = NULL, injury_details = NULL,
+              health_consent_version = NULL, health_consent_at = NULL, updated_at = NOW()
+        WHERE id = $1 RETURNING *`,
+      [req.userId],
+    );
+    if (!r.rows.length) return res.status(404).json({ message: "Usuario no encontrado" });
+    return res.json({ user: mapUser(r.rows[0]), message: "Retiraste tu consentimiento: borramos tus datos de salud de tu perfil." });
+  } catch (err) {
+    console.error("[DELETE /me/health-consent]", err.message);
     return res.status(500).json({ message: "Error interno" });
   }
 });

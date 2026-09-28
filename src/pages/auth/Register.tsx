@@ -18,6 +18,7 @@ import {
   AuthPasswordRules,
 } from "@/components/auth/AuthShell";
 import { Check } from "lucide-react";
+import { HEALTH_CONSENT_TEXT } from "@/lib/legal/privacy-notice";
 
 const todayISO = new Date().toISOString().slice(0, 10);
 
@@ -45,6 +46,7 @@ const schema = z.object({
   confirmPassword: z.string(),
   acceptsTerms: z.boolean().refine((v) => v, "Debes aceptar los términos"),
   acceptsCommunications: z.boolean().default(false),
+  healthConsent: z.boolean().default(false),
 }).refine((d) => d.password === d.confirmPassword, {
   message: "Las contraseñas no coinciden",
   path: ["confirmPassword"],
@@ -60,6 +62,7 @@ type FormValues = {
   confirmPassword: string;
   acceptsTerms: boolean;
   acceptsCommunications: boolean;
+  healthConsent: boolean;
 };
 
 const Register = () => {
@@ -71,11 +74,12 @@ const Register = () => {
 
   const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { acceptsTerms: false, acceptsCommunications: false },
+    defaultValues: { acceptsTerms: false, acceptsCommunications: false, healthConsent: false },
   });
 
   const acceptsTerms = watch("acceptsTerms");
   const acceptsCommunications = watch("acceptsCommunications");
+  const healthConsent = watch("healthConsent");
   const password = watch("password") ?? "";
   const confirmPassword = watch("confirmPassword") ?? "";
   const passwordsMatch = password.length > 0 && password === confirmPassword;
@@ -94,6 +98,7 @@ const Register = () => {
         dateOfBirth: data.dateOfBirth,
         acceptsTerms: data.acceptsTerms,
         acceptsCommunications: data.acceptsCommunications,
+        healthConsent: data.healthConsent,
         ...(refCode ? { referralCode: refCode } : {}),
       } as any);
       // Con el cuestionario apagado (paridad con Velan) se entra directo a la app.
@@ -237,6 +242,25 @@ const Register = () => {
             onChange={(v) => setValue("acceptsCommunications", v)}
           >
             Quiero recibir recordatorios y novedades por WhatsApp.
+          </AuthCheckbox>
+
+          {/* Consentimiento expreso para datos de salud (LFPDPPP, auditoría
+              2026-09-27, P1-10). Opcional aquí: el registro no guarda salud;
+              se vuelve obligatoria al escribirlos en el perfil. */}
+          <AuthCheckbox
+            checked={healthConsent}
+            onChange={(v) => setValue("healthConsent", v)}
+          >
+            {HEALTH_CONSENT_TEXT}{" "}
+            <a
+              href="/legal/privacidad"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="no-underline font-medium text-accent-strong"
+            >
+              Leer el aviso
+            </a>
+            . Opcional al registrarte.
           </AuthCheckbox>
         </div>
 

@@ -9,8 +9,10 @@ import {
   AuthSubmit,
   AuthTextarea,
   AuthErrorBanner,
+  AuthCheckbox,
 } from "@/components/auth/AuthShell";
 import type { User } from "@/types/auth";
+import { HEALTH_CONSENT_TEXT, hasCurrentHealthConsent } from "@/lib/legal/privacy-notice";
 
 type YesNo = "yes" | "no" | null;
 
@@ -83,9 +85,13 @@ const Onboarding = () => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [touched, setTouched] = useState(false);
+  // Reportar una lesión es dato de salud: pide consentimiento expreso (P1-10).
+  const [consent, setConsent] = useState(false);
+  const yaConsintio = hasCurrentHealthConsent(user as { healthConsentVersion?: string | null; healthConsentAt?: string | null } | null);
 
   const injuryReported = hasInjury === "yes";
   const detailsMissing = injuryReported && injuryDetails.trim().length === 0;
+  const faltaConsentimiento = injuryReported && !yaConsintio && !consent;
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -99,12 +105,17 @@ const Onboarding = () => {
       setError("Cuéntanos qué lesión o condición debemos tener en cuenta.");
       return;
     }
+    if (faltaConsentimiento) {
+      setError("Marca la casilla para guardar tus datos de salud.");
+      return;
+    }
     setSubmitting(true);
     try {
       const res = await api.post<{ user: User }>("/auth/onboarding", {
         hasInjury: injuryReported,
         practicedBarreBefore: practicedBarre === "yes",
         injuryDetails: injuryReported ? injuryDetails.trim() : null,
+        ...(injuryReported && !yaConsintio ? { healthConsent: true } : {}),
       });
       if (res.data?.user && user) {
         updateUser({ ...user, ...res.data.user });
@@ -176,6 +187,17 @@ const Onboarding = () => {
                   error={touched && detailsMissing ? "Este dato es importante para cuidarte." : undefined}
                   hint="Lesión, cirugía o molestia reciente. Solo tu coach lo ve."
                 />
+                {!yaConsintio && (
+                  <div className="pt-4">
+                    <AuthCheckbox
+                      checked={consent}
+                      onChange={setConsent}
+                      error={touched && faltaConsentimiento ? "Marca la casilla para guardar tus datos de salud." : undefined}
+                    >
+                      {HEALTH_CONSENT_TEXT}
+                    </AuthCheckbox>
+                  </div>
+                )}
               </div>
             </div>
           </div>
