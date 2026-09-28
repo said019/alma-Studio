@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuthStore } from "@/stores/authStore";
+import { SessionUnavailable } from "@/components/auth/SessionUnavailable";
 
 const ADMIN_ROLES = ["admin", "super_admin", "reception", "instructor"];
 
@@ -37,14 +38,7 @@ export const AuthGuard = ({ children, requiredRoles = ADMIN_ROLES }: AuthGuardPr
   // eso (auditoría 2026-09-27, riesgo 3). Con usuaria guardada, se sigue como
   // hoy: se confía en la sesión local mientras el servidor no diga lo contrario.
   if (sessionCheck === "unavailable" && !user) {
-    return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-3 text-foreground p-6 text-center">
-        <p>No pudimos verificar tu sesión. El servidor está ocupado.</p>
-        <button type="button" className="min-h-[44px] rounded-full border px-5 font-bold" onClick={() => { setChecked(false); checkAuth().then(() => setChecked(true)); }}>
-          Reintentar
-        </button>
-      </div>
-    );
+    return <SessionUnavailable onRetry={() => { setChecked(false); checkAuth().then(() => setChecked(true)); }} />;
   }
 
   // Redirección declarativa con <Navigate>: idempotente, no apila history y
