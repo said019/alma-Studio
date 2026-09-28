@@ -12,7 +12,7 @@ test("clasifica: vacías se borran, empezadas y canceladas se quedan, el resto s
     { id: "cancelada", total_bookings: 2, active_bookings: 0, started: false, status: "cancelled" },
   ]);
   // Empezada (o pasada) siempre se conserva, aunque esté vacía: "Limpiar
-  // semana" nunca toca lo que ya ocurrió (ruling R4).
+  // semana" nunca toca lo que ya ocurrió.
   assert.deepEqual(plan, {
     delete: ["vacia"],
     cancel: ["con-reservas", "solo-historial"],

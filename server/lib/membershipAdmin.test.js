@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { saleAmountPlan, cleanPaymentReference, planMembershipAdjust, creditsKey, addDaysYmd, saleStartProblem, saleAuditAfter } from "./membershipAdmin.js";
 
-// R10 (rulings-preflight.md, T3): "2026-02-30" no da NaN en `new Date()`.
+// "2026-02-30" no da NaN en `new Date()`: la corre silenciosamente a marzo.
 test("saleStartProblem: sin fecha o fecha válida no hay problema; una fecha que no existe en el calendario sí", () => {
   assert.equal(saleStartProblem(undefined), null);
   assert.equal(saleStartProblem(""), null);
@@ -11,7 +11,7 @@ test("saleStartProblem: sin fecha o fecha válida no hay problema; una fecha que
   assert.match(saleStartProblem("no-es-fecha"), /inválida/);
 });
 
-// R12 (rulings-preflight.md, T3): misma forma del `after` en venta y alta manual.
+// Misma forma del `after` en la venta de mostrador y en el alta manual.
 test("saleAuditAfter: arma el after de membership.sale", () => {
   const plan = { id: "p1", name: "Paquete 8" };
   assert.deepEqual(

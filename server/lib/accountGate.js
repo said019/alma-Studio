@@ -3,9 +3,9 @@
 // cada petición; si la base falla, no se bloquea a nadie (el handler fallará igual).
 export function createAccountGate({ lookup, ttlMs = 30_000, now = () => Date.now(), maxEntries = 5000 }) {
   const cache = new Map();
-  // Generación por llave (ronda de ajustes 1, ítem 3): si forget() corre mientras
-  // una consulta para esa misma llave sigue en vuelo, la generación cambia y esa
-  // consulta —al resolver con un valor ya viejo— no debe volver a cachearlo.
+  // Generación por llave: si forget() corre mientras una consulta para esa
+  // misma llave sigue en vuelo, la generación cambia y esa consulta —al
+  // resolver con un valor ya viejo— no debe volver a cachearlo.
   const gens = new Map();
   const genOf = (key) => gens.get(key) || 0;
 

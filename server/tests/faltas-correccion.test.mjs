@@ -1,4 +1,4 @@
-// Tarea 4 · auditoría 2026-09-27, bloque 2. Corregir una falta el mismo día con
+// Auditoría 2026-09-27, bloque 2. Corregir una falta el mismo día con
 // motivo: asistencia, sin esa falta (y su penalización si la completó), puntos
 // una sola vez, y todo en la bitácora. Check-in manual y QR también se registran.
 import { test, before, after } from "node:test";

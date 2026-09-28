@@ -43,9 +43,9 @@ export const GUEST_ANON_VALUES = Object.freeze({
 });
 
 /**
- * Columnas de `event_registrations` con el valor que las reemplaza (ronda de
- * ajustes 1, ítem 1). `name` y `email` son NOT NULL en ambas fuentes del schema
- * (`ensureSchema` y `schema_complete.sql`) — y `schema_complete.sql` además exige
+ * Columnas de `event_registrations` con el valor que las reemplaza. `name` y
+ * `email` son NOT NULL en ambas fuentes del schema (`ensureSchema` y
+ * `schema_complete.sql`) — y `schema_complete.sql` además exige
  * `UNIQUE (event_id, email)`, así que `email` usa `anonEmail(userId)` (único por
  * usuaria, nunca vacío ni repetido) en vez de null o "". `phone` sí es nullable
  * en ambas fuentes, así que va a null.

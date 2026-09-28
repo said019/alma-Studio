@@ -1,4 +1,4 @@
-// Tarea 5 · auditoría 2026-09-27, bloque 2 (P0-3, P1-5 · I6). El estudio cancela
+// Auditoría 2026-09-27, bloque 2 (P0-3, P1-5 · I6). El estudio cancela
 // con motivo y queda en la bitácora; "Limpiar semana" borra sólo lo vacío, cancela
 // (crédito y aviso) lo que tiene reservas y no toca lo que ya ocurrió.
 import { test, before, after } from "node:test";
@@ -132,7 +132,7 @@ test("limpiar semana no toca clases que ya ocurrieron", async () => {
   assert.equal(await credits(c.id), antes, "no se devuelve crédito de una clase que ocurrió");
 });
 
-test("limpiar semana conserva una clase vacía que ya pasó, no la borra (R4)", async () => {
+test("limpiar semana conserva una clase vacía que ya pasó, no la borra", async () => {
   const vaciaPasada = await makeClass(A, f, { date: day(-150) });
   const r = await api("DELETE", "/api/classes/week", { token: A, body: { startDate: day(-150), endDate: day(-150) } });
   assert.equal(r.status, 200, JSON.stringify(r.body).slice(0, 200));

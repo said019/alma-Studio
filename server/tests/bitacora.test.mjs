@@ -1,4 +1,4 @@
-// Tarea 1 · auditoría 2026-09-27, bloque 2. Bitácora: sólo la dueña la lee, con
+// Auditoría 2026-09-27, bloque 2. Bitácora: sólo la dueña la lee, con
 // filtros por entidad (o clienta), actor y fechas, paginada; entrada mala → 400.
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
