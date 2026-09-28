@@ -25,12 +25,13 @@ beforeEach(() => {
       { status: "confirmed", displayName: "Camila Torres" },
       { status: "waitlist", displayName: "Regina López" },
     ] } },
+    "/partners/wellhub/class-status/c11": { data: { published: false, maxSpots: 0, bookedSpots: 0, externalSlotId: null } },
   });
 });
 afterEach(() => vi.useRealTimers());
 
 describe("Clases · Calendario", () => {
-  it("al tocar una clase abre su panel con el resumen, iniciales de inscritas, sin Wellhub y con enlace directo a Reservas", async () => {
+  it("al tocar una clase abre su panel con el resumen, iniciales de inscritas, el control de Wellhub para la dueña y enlace directo a Reservas", async () => {
     renderAdmin(<ClassesCalendar />, { route: "/admin/classes" });
     expect(await screen.findByRole("heading", { level: 1, name: "Clases" })).toBeInTheDocument();
     fireEvent.click(await screen.findByRole("button", { name: /Reformer Intermedio.*8 de 8, llena/ }));
@@ -38,8 +39,16 @@ describe("Clases · Calendario", () => {
     expect(await screen.findByText("1 en espera")).toBeInTheDocument();
     // Iniciales de la clienta confirmada (Camila Torres → "CT"), no de la instructora.
     expect(await screen.findByText("CT")).toBeInTheDocument();
-    expect(screen.queryByText("Wellhub")).toBeNull();
+    expect(await screen.findByPlaceholderText("Cupo para Wellhub")).toBeInTheDocument();
     expect(screen.getByText("Gestionar en Reservas").closest("a")).toHaveAttribute("href", "/admin/bookings?clase=c11");
+  });
+
+  it("recepción no ve el control de Wellhub de la clase (sólo la dueña publica a Wellhub)", async () => {
+    loginAs("reception");
+    renderAdmin(<ClassesCalendar />, { route: "/admin/classes" });
+    fireEvent.click(await screen.findByRole("button", { name: /Reformer Intermedio.*8 de 8, llena/ }));
+    expect(await screen.findByText("Llena · 8/8")).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("Cupo para Wellhub")).toBeNull();
   });
 
   it("una sola reserva va en singular", async () => {

@@ -75,6 +75,7 @@ import { createAccountGate } from "./lib/accountGate.js";
 import { userAnonymizationValues, buildAnonymizeUpdate, WAIVER_ANON_VALUES, GUEST_ANON_VALUES, eventRegistrationAnonValues } from "./lib/anonymize.js";
 import { validateWellhubVisit as wellhubValidateVisit } from "./lib/wellhub/api.js";
 import { handleBookingRequested, handleCheckin, handleCancel, handlePlanChange } from "./lib/wellhub/flows.js";
+import { wellhubMonthRange, summarizeWellhubMonth } from "./lib/wellhub/reconcile.js";
 import { isUuid, signatureProblem } from "./lib/validate.js";
 import { checkinRule, noShowCorrectionRule } from "./lib/checkin.js";
 import { responsivaDocument, waiverVersionProblem } from "./lib/responsiva.js";
@@ -2104,7 +2105,11 @@ async function wellhubWebhookHandler(req, res, eventTypeOverride) {
       case "cancel": result = await handlePlanChange(pool, creds, payload); break;
       default: result = { status: "ignored", eventType };
     }
-    return res.status(200).json(result);
+    // Lo que liberó lugar sube la lista de espera (auditoría 2026-09-27, P1-1).
+    // Los ids de clase no van en la respuesta a Wellhub.
+    const { classIds, ...body } = result ?? {};
+    if (Array.isArray(classIds) && classIds.length) await onSeatReleased(classIds, { source: "wellhub" });
+    return res.status(200).json(body);
   } catch (err) {
     console.error("[wellhub] handler error:", err.message);
     await pool.query("DELETE FROM processed_events WHERE event_id=$1", [eventId]).catch(() => {});
@@ -2154,7 +2159,8 @@ app.put("/api/partners/settings", ownerMiddleware, async (req, res) => {
   } catch (err) { console.error("[partners settings PUT]", err.message); return res.status(500).json({ message: "Error interno" }); }
 });
 
-app.post("/api/partners/wellhub/publish/:classId", adminMiddleware, async (req, res) => {
+// Publicar clases a Wellhub, sus check-ins y su resumen: sólo la dueña (auditoría 2026-09-27, P1-9).
+app.post("/api/partners/wellhub/publish/:classId", ownerMiddleware, async (req, res) => {
   try {
     const { classId } = req.params;
     const quota = Number(req.body?.quota ?? 0);
@@ -2174,7 +2180,7 @@ app.post("/api/partners/wellhub/publish/:classId", adminMiddleware, async (req, 
   } catch (err) { console.error("[partners publish]", err.message); return res.status(500).json({ message: "Error interno" }); }
 });
 
-app.post("/api/partners/wellhub/unpublish/:classId", adminMiddleware, async (req, res) => {
+app.post("/api/partners/wellhub/unpublish/:classId", ownerMiddleware, async (req, res) => {
   try {
     await pool.query("DELETE FROM channel_inventory WHERE class_id=$1 AND channel='wellhub'", [req.params.classId]);
     await pool.query("DELETE FROM partner_class_mappings WHERE class_id=$1 AND channel='wellhub'", [req.params.classId]);
@@ -2195,24 +2201,67 @@ app.get("/api/partners/wellhub/class-status/:classId", adminMiddleware, async (r
   } catch (err) { return res.status(500).json({ message: "Error interno" }); }
 });
 
-app.get("/api/partners/checkins", adminMiddleware, async (_req, res) => {
+// GET /api/partners/checkins?month=AAAA-MM — conciliación del mes (P1-9): los
+// check-ins de Wellhub con la asistencia en el estudio, el resumen y las
+// asistencias de Wellhub sin check-in confirmado. Sólo la dueña.
+app.get("/api/partners/checkins", ownerMiddleware, async (req, res) => {
+  const range = wellhubMonthRange(typeof req.query.month === "string" ? req.query.month : undefined, todayInStudio());
+  if (!range.ok) return res.status(400).json({ message: range.message });
   try {
-    const r = await pool.query(
-      `SELECT pc.id, pc.status, pc.method, pc.validated_at, pc.created_at, pc.channel,
-              u.display_name AS user_name, u.wellhub_id,
-              c.date AS class_date, ct.name AS class_name
-         FROM partner_checkins pc
-         LEFT JOIN users u ON u.id = pc.user_id
-         LEFT JOIN bookings b ON b.id = pc.booking_id
-         LEFT JOIN classes c ON c.id = b.class_id
-         LEFT JOIN class_types ct ON ct.id = c.class_type_id
-        ORDER BY pc.created_at DESC LIMIT 200`,
-    );
-    return res.json({ data: r.rows });
-  } catch (err) { console.error("[partners checkins]", err.message); return res.status(500).json({ message: "Error interno" }); }
+    const [rows, bookings, unmatched] = await Promise.all([
+      pool.query(
+        `SELECT pc.id, pc.status, pc.method, pc.validated_at, pc.created_at, pc.channel, pc.booking_id,
+                u.display_name AS user_name, u.wellhub_id,
+                to_char(c.date, 'YYYY-MM-DD') AS class_date, ct.name AS class_name,
+                b.status::text AS booking_status, b.checked_in_at
+           FROM partner_checkins pc
+           LEFT JOIN users u ON u.id = pc.user_id
+           LEFT JOIN bookings b ON b.id = pc.booking_id
+           LEFT JOIN classes c ON c.id = b.class_id
+           LEFT JOIN class_types ct ON ct.id = c.class_type_id
+          WHERE pc.channel = 'wellhub'
+            AND pc.created_at >= ($1::date::timestamp AT TIME ZONE '${STUDIO_TIMEZONE}')
+            AND pc.created_at <  ($2::date::timestamp AT TIME ZONE '${STUDIO_TIMEZONE}')
+          ORDER BY pc.created_at DESC
+          LIMIT 500`,
+        [range.from, range.to],
+      ),
+      pool.query(
+        `SELECT COUNT(*) FILTER (WHERE b.status <> 'cancelled')::int AS booked,
+                COUNT(*) FILTER (WHERE b.status = 'checked_in')::int AS attended,
+                COUNT(*) FILTER (WHERE b.status = 'no_show')::int AS no_show
+           FROM bookings b JOIN classes c ON c.id = b.class_id
+          WHERE b.channel = 'wellhub' AND c.date >= $1::date AND c.date < $2::date`,
+        [range.from, range.to],
+      ),
+      pool.query(
+        `SELECT b.id AS booking_id, u.display_name AS user_name, u.wellhub_id,
+                to_char(c.date, 'YYYY-MM-DD') AS class_date, ct.name AS class_name, b.checked_in_at
+           FROM bookings b
+           JOIN classes c ON c.id = b.class_id
+           LEFT JOIN class_types ct ON ct.id = c.class_type_id
+           LEFT JOIN users u ON u.id = b.user_id
+          WHERE b.channel = 'wellhub' AND b.status = 'checked_in'
+            AND c.date >= $1::date AND c.date < $2::date
+            AND NOT EXISTS (SELECT 1 FROM partner_checkins pc WHERE pc.booking_id = b.id AND pc.status = 'confirmed')
+          ORDER BY c.date DESC
+          LIMIT 200`,
+        [range.from, range.to],
+      ),
+    ]);
+    return res.json({
+      data: rows.rows,
+      summary: summarizeWellhubMonth(rows.rows, bookings.rows[0], unmatched.rows.length),
+      unmatched: unmatched.rows,
+      month: range.month,
+    });
+  } catch (err) {
+    console.error("[partners checkins]", err.message);
+    return res.status(500).json({ message: "Error interno" });
+  }
 });
 
-app.post("/api/partners/checkins/:id/confirm", adminMiddleware, async (req, res) => {
+app.post("/api/partners/checkins/:id/confirm", ownerMiddleware, async (req, res) => {
   try {
     const r = await pool.query(
       "UPDATE partner_checkins SET status='confirmed', validated_at=COALESCE(validated_at,NOW()), method='manual' WHERE id=$1 RETURNING *",
@@ -2223,7 +2272,7 @@ app.post("/api/partners/checkins/:id/confirm", adminMiddleware, async (req, res)
   } catch (err) { return res.status(500).json({ message: "Error interno" }); }
 });
 
-app.get("/api/partners/summary", adminMiddleware, async (_req, res) => {
+app.get("/api/partners/summary", ownerMiddleware, async (_req, res) => {
   try {
     const r = await pool.query(
       `SELECT channel, COUNT(*)::int AS checkins,

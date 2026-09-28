@@ -66,7 +66,7 @@ const PartnerPlatforms = () => {
   const setExtra = (k: string, v: any) => setForm((f) => ({ ...f, extra_config: { ...(f.extra_config || {}), [k]: v } }));
 
   return (
-    <AuthGuard>
+    <AuthGuard requiredRoles={["admin", "super_admin"]}>
       <AdminLayout>
         <div className="admin-page max-w-2xl">
           <div className="mb-2 flex items-center gap-2">
@@ -91,19 +91,19 @@ const PartnerPlatforms = () => {
               </div>
 
               <div className="space-y-1.5">
-                <Label>Environment</Label>
+                <Label>Ambiente</Label>
                 <select
-                  className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm"
+                  className="w-full rounded-md border border-line bg-surface text-ink px-3 py-2 text-sm"
                   value={form.environment || "production"}
                   onChange={(e) => set("environment", e.target.value)}
                 >
-                  <option value="production">production</option>
-                  <option value="sandbox">sandbox</option>
+                  <option value="production">Producción</option>
+                  <option value="sandbox">Pruebas (sandbox)</option>
                 </select>
               </div>
 
               <div className="space-y-1.5">
-                <Label>Gym ID (ID del studio en Wellhub)</Label>
+                <Label>ID del estudio en Wellhub (gym ID)</Label>
                 <Input value={form.gym_id || ""} onChange={(e) => set("gym_id", e.target.value)} />
               </div>
 

@@ -31,6 +31,7 @@ import { WellhubClassControl } from "./WellhubClassControl";
 import { Avatar } from "@/components/admin/PersonCell";
 import WeekHourGrid from "./WeekHourGrid";
 import { FEATURES } from "@/config/features";
+import { useCanSeeFinance } from "@/lib/roles";
 import UnreachedDialog, { type UnreachedPerson } from "@/components/admin/UnreachedDialog";
 import { REASON_MIN_CHARS } from "@/lib/audit-log";
 
@@ -149,6 +150,7 @@ function CalendarView({
   const { toast } = useToast();
   const qc = useQueryClient();
   const isMobile = useIsMobile();
+  const isOwner = useCanSeeFinance();
   const { confirm, promptText, dialog } = useConfirm();
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
   const [createOpen, setCreateOpen] = useState(false);
@@ -842,7 +844,8 @@ function CalendarView({
                   </div>
                 );
               })()}
-              {!selectedClass.isCancelled && FEATURES.partnerPlatforms && (
+              {/* Publicar a Wellhub: sólo la dueña (auditoría 2026-09-27, P1-9). */}
+              {!selectedClass.isCancelled && FEATURES.partnerPlatforms && isOwner && (
                 <div className="pt-2">
                   <WellhubClassControl classId={selectedClass.id} />
                 </div>

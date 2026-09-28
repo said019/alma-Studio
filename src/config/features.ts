@@ -22,6 +22,7 @@
  *     `/admin/classes/generate` y `/admin/classes/types`, que Velan sí tiene.
  *   - `/app/wallet`: equivale a `/app/pass` de Velan.
  *   - `/admin/bitacora`: la pidió la auditoría de producción (2026-09-27, P0-3).
+ *   - `/admin/settings/platforms` y `/admin/bookings/partners-checkins`: Wellhub está activo en producción y la dueña concilia sus visitas (auditoría 2026-09-27, P1-9).
  */
 export const FEATURES = {
   // ── Panel ────────────────────────────────────────────────────────────────
@@ -39,8 +40,8 @@ export const FEATURES = {
   adminInbox: false,
   /** Plantillas de horario semanal. `/admin/schedules` */
   scheduleTemplates: false,
-  /** Wellhub: configuración y check-ins. `/admin/settings/platforms`, `/admin/bookings/partners-checkins` */
-  partnerPlatforms: false,
+  /** Wellhub: configuración y check-ins, sólo para la dueña. `/admin/settings/platforms`, `/admin/bookings/partners-checkins` */
+  partnerPlatforms: true,
   /** Bitácora de la dueña: quién cobró, ajustó, canceló o dio de baja. `/admin/bitacora` */
   auditLog: true,
 

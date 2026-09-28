@@ -52,8 +52,8 @@ const NAV_GROUPS = [
       { path: "/admin/settings?tab=whatsapp", label: "WhatsApp", icon: MessageCircle, feature: "whatsappTemplates" },
       { path: "/admin/settings", label: "Configuración", icon: Settings },
       { path: "/admin/bitacora", label: "Bitácora", icon: ScrollText, ownerOnly: true, feature: "auditLog" },
-      { path: "/admin/settings/platforms", label: "Wellhub", icon: Package, feature: "partnerPlatforms" },
-      { path: "/admin/bookings/partners-checkins", label: "Check-ins Wellhub", icon: BookOpen , feature: "partnerPlatforms" },
+      { path: "/admin/settings/platforms", label: "Wellhub", icon: Package, feature: "partnerPlatforms", ownerOnly: true },
+      { path: "/admin/bookings/partners-checkins", label: "Check-ins Wellhub", icon: BookOpen , feature: "partnerPlatforms", ownerOnly: true },
     ],
   },
 ];
