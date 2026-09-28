@@ -13694,48 +13694,72 @@ app.put("/api/plans/:id", adminMiddleware, async (req, res) => {
   }
 });
 
-// DELETE /api/plans/:id
+// DELETE /api/plans/:id — un plan con historial (membresías, órdenes o códigos
+// de descuento) se ARCHIVA: deja de venderse (is_active = false) y su historial
+// se conserva. Sólo un plan sin nada ligado se borra. `?cascade=true` ya no
+// borra nada: antes se llevaba membresías y órdenes (auditoría 2026-09-27,
+// familia de P1-5). Todo queda en la bitácora.
 app.delete("/api/plans/:id", adminMiddleware, async (req, res) => {
-  const cascade = parseBooleanFlag(
+  const cascadeRequested = parseBooleanFlag(
     req.query?.cascade ?? req.query?.purgeRelated ?? req.body?.cascade ?? req.body?.purgeRelated
   );
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-
-    if (cascade) {
-      await client.query(
-        `UPDATE memberships
-            SET order_id = NULL
-          WHERE order_id IN (SELECT id FROM orders WHERE plan_id = $1)`,
-        [req.params.id]
-      ).catch(() => {});
-      await client.query("DELETE FROM discount_codes WHERE plan_id = $1", [req.params.id]).catch(() => {});
-      await client.query("DELETE FROM memberships WHERE plan_id = $1", [req.params.id]).catch(() => {});
-      await client.query("DELETE FROM orders WHERE plan_id = $1", [req.params.id]).catch(() => {});
-    }
-
-    const del = await client.query("DELETE FROM plans WHERE id = $1 RETURNING id", [req.params.id]);
-    if (!del.rows.length) {
+    const cur = await client.query(
+      `SELECT p.id, p.name, p.price, p.is_active,
+              (SELECT COUNT(*)::int FROM memberships m WHERE m.plan_id = p.id) AS memberships,
+              (SELECT COUNT(*)::int FROM orders o WHERE o.plan_id = p.id) AS orders,
+              (SELECT COUNT(*)::int FROM discount_codes d WHERE d.plan_id = p.id) AS discount_codes
+         FROM plans p
+        WHERE p.id = $1
+        FOR UPDATE OF p`,
+      [req.params.id],
+    );
+    if (!cur.rows.length) {
       await client.query("ROLLBACK");
       return res.status(404).json({ message: "Plan no encontrado" });
     }
+    const plan = cur.rows[0];
+    const kept = { memberships: plan.memberships, orders: plan.orders, discount_codes: plan.discount_codes };
+    const archivar = async (porque) => {
+      await client.query(
+        `UPDATE plans SET is_active = false, archived_at = COALESCE(archived_at, NOW()),
+                archived_by = COALESCE(archived_by, $2), updated_at = NOW()
+          WHERE id = $1`,
+        [plan.id, req.userId],
+      );
+      await recordAudit(client, {
+        actorId: req.userId, action: "plan.archive", entityType: "plan", entityId: plan.id,
+        before: { for_sale: plan.is_active !== false }, after: { for_sale: false },
+        meta: { plan_name: plan.name, kept, cascade_requested: cascadeRequested, why: porque },
+      });
+      await client.query("COMMIT");
+      return res.json({
+        message: "Plan archivado: tiene membresías, órdenes o códigos de descuento, así que se ocultó de la venta y su historial se conserva.",
+        data: { id: plan.id, archived: true, kept },
+      });
+    };
+    if (plan.memberships + plan.orders + plan.discount_codes > 0) return await archivar("historial");
 
-    await client.query("COMMIT");
-    if (cascade) {
-      return res.json({ message: "Plan y datos relacionados eliminados" });
+    // Sin nada ligado: se borra. Si otra tabla lo referencia, se archiva.
+    await client.query("SAVEPOINT borrar_plan");
+    try {
+      await client.query("DELETE FROM plans WHERE id = $1", [plan.id]);
+    } catch (err) {
+      if (err?.code !== "23503") throw err;
+      await client.query("ROLLBACK TO SAVEPOINT borrar_plan");
+      return await archivar("referencias");
     }
-    return res.json({ message: "Plan eliminado" });
+    await recordAudit(client, {
+      actorId: req.userId, action: "plan.delete", entityType: "plan", entityId: plan.id,
+      before: { plan_name: plan.name, list_price: Number(plan.price), for_sale: plan.is_active !== false },
+      meta: { plan_name: plan.name },
+    });
+    await client.query("COMMIT");
+    return res.json({ message: "Plan eliminado", data: { id: plan.id, deleted: true } });
   } catch (err) {
     await client.query("ROLLBACK").catch(() => {});
-    if (!cascade && err?.code === "23503") {
-      try {
-        await pool.query("UPDATE plans SET is_active = false, updated_at = NOW() WHERE id = $1", [req.params.id]);
-        return res.json({ message: "Plan desactivado (tiene registros asociados)" });
-      } catch (softErr) {
-        console.error("[DELETE /plans soft-delete]", softErr?.message || softErr);
-      }
-    }
     console.error("[DELETE /plans]", err.message);
     return res.status(500).json({ message: "Error interno" });
   } finally {
