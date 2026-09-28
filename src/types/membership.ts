@@ -12,6 +12,9 @@ export interface ClientMembership {
   studioRemaining?: number | null;
   rtRemaining?: number | null;
   paymentMethod?: string;
+  // true cuando end_date ya pasó aunque status siga en 'active' (barrido de
+  // cron pendiente). GET /api/memberships/my la calcula en el servidor.
+  isExpired?: boolean;
   // snake_case aliases kept for backwards compat
   plan_id?: string;
   plan_name?: string;

@@ -3429,11 +3429,14 @@ app.get("/api/memberships/my", authMiddleware, async (req, res) => {
               COALESCE(p.class_limit, m.class_limit_override)      AS class_limit,
               COALESCE(p.duration_days, 30)                        AS duration_days,
               p.features,
-              COALESCE(p.class_category, 'all')                    AS class_category
+              COALESCE(p.class_category, 'all')                    AS class_category,
+              (m.end_date IS NOT NULL AND m.end_date < (NOW() AT TIME ZONE '${STUDIO_TIMEZONE}')::date) AS is_expired
        FROM memberships m
        LEFT JOIN plans p ON m.plan_id = p.id
        WHERE m.user_id = $1
-       ORDER BY CASE m.status
+       ORDER BY
+         CASE WHEN m.end_date IS NOT NULL AND m.end_date < (NOW() AT TIME ZONE '${STUDIO_TIMEZONE}')::date THEN 1 ELSE 0 END ASC,
+         CASE m.status
          WHEN 'active'              THEN 1
          WHEN 'pending_activation'  THEN 2
          WHEN 'pending_payment'     THEN 3
@@ -11285,7 +11288,7 @@ app.get("/api/reports/overview", ownerMiddleware, async (req, res) => {
     const monthStart = range.from;
     const [members, revenue, bookings, classes, newMembers, reviews, churn,
            prevRevenue, prevBookings, prevNewMembers, prevReviews] = await Promise.all([
-      pool.query("SELECT COUNT(*) FROM memberships WHERE status='active'"),
+      pool.query(`SELECT COUNT(*) FROM memberships WHERE status = 'active' AND (end_date IS NULL OR end_date >= (NOW() AT TIME ZONE '${STUDIO_TIMEZONE}')::date)`),
       pool.query("SELECT COALESCE(SUM(total_amount),0) AS total FROM orders WHERE status='approved' AND created_at BETWEEN $1 AND $2", [range.from, range.to]),
       pool.query(
         `SELECT
@@ -12861,7 +12864,7 @@ app.get("/api/admin/stats", adminMiddleware, async (req, res) => {
 
     const [classesToday, activeMembers, monthlyRevenue, pendingAlerts] = await Promise.all([
       pool.query("SELECT COUNT(*) FROM classes WHERE date = $1", [today]),
-      pool.query("SELECT COUNT(*) FROM memberships WHERE status = 'active'"),
+      pool.query(`SELECT COUNT(*) FROM memberships WHERE status = 'active' AND (end_date IS NULL OR end_date >= (NOW() AT TIME ZONE '${STUDIO_TIMEZONE}')::date)`),
       pool.query("SELECT COALESCE(SUM(total_amount),0) AS total FROM orders WHERE status = 'approved' AND created_at >= $1", [monthStart]),
       pool.query("SELECT COUNT(*) FROM orders WHERE status = 'pending_verification'"),
     ]);
@@ -12988,6 +12991,12 @@ app.get("/api/memberships", adminMiddleware, async (req, res) => {
              AND m.end_date IS NOT NULL
              AND m.end_date >= ((NOW() AT TIME ZONE '${STUDIO_TIMEZONE}')::date)
              AND m.end_date <= ((NOW() AT TIME ZONE '${STUDIO_TIMEZONE}')::date + INTERVAL '7 days')`;
+    } else if (status === "active") {
+      // Filtro "activas": una membresía vencida (end_date pasado) sigue con
+      // status='active' hasta el barrido de cron, pero no debe listarse aquí
+      // como si estuviera vigente.
+      q += ` AND m.status = 'active'
+             AND (m.end_date IS NULL OR m.end_date >= ((NOW() AT TIME ZONE '${STUDIO_TIMEZONE}')::date))`;
     } else if (status) {
       params.push(status); q += ` AND m.status = $${params.length}`;
     }
@@ -14605,7 +14614,7 @@ app.get("/api/payments", ownerMiddleware, async (req, res) => {
       FROM memberships m
       LEFT JOIN users u ON m.user_id = u.id
       LEFT JOIN plans p ON m.plan_id = p.id
-      WHERE m.status = 'active'`;
+      WHERE m.status = 'active' AND m.order_id IS NULL`;
     if (startIdx) mq += ` AND m.created_at >= $${startIdx}`;
     if (endIdx) mq += ` AND m.created_at <= $${endIdx}`;
     if (userIdx) mq += ` AND m.user_id = $${userIdx}`;
