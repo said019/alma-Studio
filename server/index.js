@@ -63,14 +63,14 @@ import { PASS_DEFAULT_TEXTS, LOYALTY_MILESTONES_SEED } from "./lib/passDefaults.
 import { resolveEffectivePrice } from "./lib/pricing.js";
 import { saleAmountPlan, planMembershipAdjust, cleanPaymentReference, saleStartProblem, saleStartDay, saleAuditAfter, PAYMENT_METHODS } from "./lib/membershipAdmin.js";
 import { cancellationLimitProblem, cancellationQuota, clientCancelDecision, normalizeCancellationSettings, publicBookingPolicy } from "./lib/cancellationPolicy.js";
-import { isMembershipCategoryCompatible as ruleCategoryCompatible, normalizeClassCategory as ruleNormalizeCategory, isWithinMorningWindow, categoryLabel } from "./lib/bookingRules.js";
+import { isMembershipCategoryCompatible as ruleCategoryCompatible, normalizeClassCategory as ruleNormalizeCategory, isWithinMorningWindow, categoryLabel, canMixtoBook } from "./lib/bookingRules.js";
 import { rateKey } from "./lib/rateKey.js";
 import { isWithinCancelWindow, penaltyDueAt, faltaReversal } from "./lib/faltas.js";
 import { scheduleAt } from "./lib/schedule.js";
 import { verifyWellhubSignature, extractSignatureHeader } from "./lib/wellhub/signature.js";
 import { extractGymId, computeEventId } from "./lib/wellhub/payload.js";
 import { planWeekClear, weekRangeProblem } from "./lib/weekClear.js";
-import { promotionWindowOpen, freeSeats, queueBlocksNewBooking, firstEligible, sweepMinutes, bookingNotice } from "./lib/waitlist.js";
+import { promotionWindowOpen, freeSeats, queueBlocksNewBooking, firstEligible, sweepMinutes, MAX_SWEEP_MINUTES, singleFlight, bookingNotice, classEditReleasesSeats } from "./lib/waitlist.js";
 import { getWellhubCredentials } from "./lib/wellhub/credentials.js";
 import { publicPartnerSettings, mergeSecret } from "./lib/partnerSettings.js";
 import { createAccountGate } from "./lib/accountGate.js";
@@ -3894,19 +3894,26 @@ async function promoteOneFromWaitlist(classId) {
       await client.query("ROLLBACK");
       return null;
     }
-    // Se revalida bajo candado: la membresía pudo cancelarse, vencer o gastar
-    // su última clase entre la elección y el candado. Si ya no sirve no se usa;
-    // la siguiente vuelta la vuelve a evaluar (y la salta si no tiene otra).
+    // Se revalida bajo candado: entre la elección y el candado la membresía pudo
+    // cancelarse, vencer, gastar su última clase (o la de su área, si es mixta)
+    // o llenar su tope semanal con una reserva de otra clase. Si ya no sirve no
+    // se usa; la siguiente vuelta la vuelve a evaluar (y la salta si no tiene otra).
     const locked = (await client.query(
-      `SELECT id, classes_remaining, status::text AS status, end_date,
+      `SELECT id, classes_remaining, studio_remaining, rt_remaining, status::text AS status, end_date,
+              (SELECT p.class_category FROM plans p WHERE p.id = memberships.plan_id) AS plan_category,
               (end_date IS NOT NULL AND end_date < (NOW() AT TIME ZONE '${STUDIO_TIMEZONE}')::date) AS expired
          FROM memberships WHERE id = $1 FOR UPDATE`,
       [promote.membershipId],
     )).rows[0];
-    if (
-      !locked || locked.status !== "active" || locked.expired
-      || (!isUnlimitedClasses(locked.classes_remaining) && Number(locked.classes_remaining) <= 0)
-    ) {
+    const stillUsable = locked
+      && locked.status === "active" && !locked.expired
+      && (isUnlimitedClasses(locked.classes_remaining) || Number(locked.classes_remaining) > 0)
+      && (normalizeClassCategory(locked.plan_category, "all") !== "mixto"
+        || canMixtoBook({ studioRemaining: locked.studio_remaining, rtRemaining: locked.rt_remaining }, category))
+      // El tope semanal se cuenta otra vez ya con la membresía bloqueada: una
+      // reserva nueva de la misma clienta la bloquea antes de contar e insertar.
+      && (await checkWeeklyClassLimit(client, promote.userId, promote.membershipId, cls.date)).ok;
+    if (!stillUsable) {
       await client.query("ROLLBACK");
       return { retry: true };
     }
@@ -4027,8 +4034,10 @@ async function notifyWaitlistPromoted(p) {
 // Red de seguridad: clases con lugar libre y fila, por si una subida no ocurrió
 // (un reinicio a media cancelación o una vía sin gancho). Lo corre
 // scheduleEmailCrons cada WAITLIST_SWEEP_MINUTES, que viene APAGADO por
-// defecto (ver sweepMinutes en server/lib/waitlist.js).
-async function runWaitlistSweep() {
+// defecto (ver sweepMinutes en server/lib/waitlist.js). singleFlight: si una
+// vuelta tarda más que el intervalo (avisos de hasta 5 s por subida), la
+// siguiente no arranca encima de ella.
+const runWaitlistSweep = singleFlight(async () => {
   const r = await pool.query(
     `SELECT c.id FROM classes c
       WHERE c.status = 'scheduled'
@@ -4040,7 +4049,7 @@ async function runWaitlistSweep() {
     [BOOKING_LEAD_HOURS],
   );
   if (r.rows.length) await onSeatReleased(r.rows.map((x) => x.id), { source: "sweep" });
-}
+});
 
 // Responsiva firmada — helper compartido por /bookings, /bookings/with-guest
 // y /admin/bookings/assign (auditoría 2026-09-27, bloque 1, tarea 5).
@@ -16431,6 +16440,12 @@ app.put("/api/admin/classes/:id", adminMiddleware, async (req, res) => {
       return res.status(400).json({ message: "La hora de fin debe ser posterior a la de inicio." });
     }
 
+    // Cupo y estado de antes: sólo se sube la fila si la edición libera lugar.
+    const prev = (await pool.query(
+      "SELECT max_capacity, status::text AS status FROM classes WHERE id = $1", [req.params.id],
+    )).rows[0];
+    if (!prev) return res.status(404).json({ message: "Clase no encontrada" });
+
     const r = await pool.query(
       `UPDATE classes SET
          class_type_id = COALESCE($1, class_type_id),
@@ -16452,8 +16467,10 @@ app.put("/api/admin/classes/:id", adminMiddleware, async (req, res) => {
       ]
     );
     if (!r.rows.length) return res.status(404).json({ message: "Clase no encontrada" });
-    // Más cupo = lugares nuevos, y pasarla a 'scheduled' la reabre: sube la fila (P1-1).
-    const promoted = newCap != null || status === "scheduled"
+    // Sube la fila sólo si hay lugares nuevos (el cupo aumentó) o la clase
+    // pasó de 'closed' a 'scheduled'. Cambiar la coach, la hora o las notas no
+    // libera nada: no debe inscribir a nadie ni descontarle una clase.
+    const promoted = classEditReleasesSeats({ before: prev, after: r.rows[0] })
       ? await onSeatReleased([req.params.id], { source: "capacity" })
       : [];
     return res.json({ data: r.rows[0], waitlist_promoted: promoted });
@@ -17746,6 +17763,8 @@ function scheduleEmailCrons() {
     setInterval(() => {
       runWaitlistSweep().catch((e) => console.error("[Cron] lista de espera:", e?.message));
     }, sweepMin * 60 * 1000);
+  } else if (Number(process.env.WAITLIST_SWEEP_MINUTES) > MAX_SWEEP_MINUTES) {
+    console.warn(`[Cron] WAITLIST_SWEEP_MINUTES pasa de ${MAX_SWEEP_MINUTES}: el barrido de la lista de espera queda apagado.`);
   }
 
   // ── Wellhub: reconcile inventario cada 5 min (safety net del trigger) ──

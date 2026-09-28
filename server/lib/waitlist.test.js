@@ -1,8 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  promotionWindowOpen, freeSeats, queueBlocksNewBooking, firstEligible, sweepMinutes,
-  waitlistJoinRule, bookingNotice, WAITLIST_JOINED_TEMPLATE_KEY,
+  promotionWindowOpen, freeSeats, queueBlocksNewBooking, firstEligible, sweepMinutes, MAX_SWEEP_MINUTES,
+  singleFlight, classEditReleasesSeats, waitlistJoinRule, bookingNotice, WAITLIST_JOINED_TEMPLATE_KEY,
 } from "./waitlist.js";
 import { DEFAULT_NOTIFICATION_TEMPLATES } from "./notificationTemplates.js";
 
@@ -50,6 +50,55 @@ test("el barrido de respaldo viene apagado: sin la variable, en 0 o con basura n
   assert.equal(sweepMinutes("cinco"), 0);
   assert.equal(sweepMinutes("5"), 5);
   assert.equal(sweepMinutes(" 10 "), 10);
+});
+
+test("el barrido no pasa del máximo de setInterval: más de 35791 minutos queda apagado", () => {
+  assert.equal(MAX_SWEEP_MINUTES, 35791);
+  assert.ok(MAX_SWEEP_MINUTES * 60 * 1000 <= 2 ** 31 - 1, "cabe en setInterval");
+  assert.ok((MAX_SWEEP_MINUTES + 1) * 60 * 1000 > 2 ** 31 - 1, "uno más ya no cabe");
+  assert.equal(sweepMinutes("35791"), 35791);
+  assert.equal(sweepMinutes("35792"), 0);
+  assert.equal(sweepMinutes(1e9), 0);
+  assert.equal(sweepMinutes("Infinity"), 0);
+});
+
+test("singleFlight: una vuelta del barrido no arranca encima de otra", async () => {
+  let corriendo = 0;
+  let maximo = 0;
+  let vueltas = 0;
+  let soltar;
+  const tarea = singleFlight(async () => {
+    corriendo++;
+    maximo = Math.max(maximo, corriendo);
+    vueltas++;
+    await new Promise((r) => { soltar = r; });
+    corriendo--;
+  });
+  const primera = tarea();
+  assert.equal(await tarea(), false, "la segunda no corre mientras la primera sigue");
+  assert.equal(await tarea(), false);
+  soltar();
+  assert.equal(await primera, true);
+  assert.equal(maximo, 1);
+  assert.equal(vueltas, 1);
+  const otra = tarea();
+  soltar();
+  assert.equal(await otra, true, "terminada la primera, vuelve a correr");
+  assert.equal(vueltas, 2);
+  const falla = singleFlight(async () => { throw new Error("x"); });
+  await assert.rejects(falla(), /x/);
+  await assert.rejects(falla(), /x/, "un error no la deja trabada");
+});
+
+test("editar una clase sube la fila sólo si aumenta el cupo o pasa de cerrada a programada", () => {
+  const c = (max_capacity, status = "scheduled") => ({ max_capacity, status });
+  assert.equal(classEditReleasesSeats({ before: c(4), after: c(4) }), false, "sólo la coach o la hora");
+  assert.equal(classEditReleasesSeats({ before: c(4), after: c(6) }), true);
+  assert.equal(classEditReleasesSeats({ before: c(6), after: c(4) }), false, "bajar el cupo no libera");
+  assert.equal(classEditReleasesSeats({ before: c(4, "closed"), after: c(4, "scheduled") }), true);
+  assert.equal(classEditReleasesSeats({ before: c(4, "scheduled"), after: c(4, "closed") }), false);
+  assert.equal(classEditReleasesSeats({ before: c(4, "cancelled"), after: c(4, "scheduled") }), false);
+  assert.equal(classEditReleasesSeats({ before: null, after: c(4) }), false);
 });
 
 test("entrar a la fila explica la subida automática, no promete sólo un aviso", () => {

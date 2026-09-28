@@ -15,7 +15,12 @@ before(async () => {
   A = (await login(ADMIN.email, ADMIN.password)).token;
   f = await studioFixtures(PFX, A);
 });
-after(async () => { await cleanup(PFX); await closeDb(); });
+after(async () => {
+  await cleanup(PFX);
+  // Plan propio (inactivo) de la prueba del tope semanal bajo candado.
+  await sql(`DELETE FROM plans WHERE name LIKE $1`, [`${PFX}%`]);
+  await closeDb();
+});
 
 async function clienta(key, clases = 8) {
   const c = await makeClient(PFX, key);
@@ -369,4 +374,97 @@ test("salir de la fila con la pantalla desfasada: si ya subió, 409 ALREADY_PROM
   assert.equal(sale.body.leftWaitlist, true);
   assert.equal(sale.body.cancellationsUsed, 0);
   assert.equal(await estado(rw2.id), "cancelled");
+});
+
+// ── La subida revalida bajo candado y sólo corre cuando se libera lugar ─────
+
+test("tope semanal lleno entre la elección y el candado: no sube con él y sube la siguiente", async () => {
+  const a = await clienta("t1a");
+  const w = await clienta("t1w");
+  const w2 = await clienta("t1w2");
+  const [semanal] = await sql(
+    `INSERT INTO plans (name, description, price, currency, duration_days, class_limit, class_category, is_active, sort_order)
+     VALUES ($1, 'Plan de la regresión: tope semanal', 1000, 'MXN', 30, 8, $2, false, 999)
+     RETURNING id, weekly_class_limit`,
+    [`${PFX} QA 1 Clase por semana`, f.category],
+  );
+  assert.equal(semanal.weekly_class_limit, 1);
+  await sql(`UPDATE memberships SET plan_id = $2 WHERE user_id = $1`, [w.id, semanal.id]);
+  const [m] = await sql(`SELECT id FROM memberships WHERE user_id = $1`, [w.id]);
+  const classId = await makeClass(A, f, { date: day(24), cap: 1 });
+  const otraClase = await makeClass(A, f, { date: day(24), start: "09:00", end: "10:00", cap: 5 });
+  const ra = await reservar(a, classId);
+  const rw = await reservar(w, classId);
+  const rw2 = await reservar(w2, classId);
+  // Otra transacción le reserva otra clase de la misma semana con esa membresía
+  // y todavía no confirma: la subida la elige (su tope aún se ve libre) y se
+  // forma en el candado de la membresía. Al confirmar, el tope ya está lleno.
+  const otra = new pg.Client({ connectionString: DB, options: `-c TimeZone=${STUDIO_TIMEZONE}` });
+  await otra.connect();
+  let cancel;
+  try {
+    await otra.query("BEGIN");
+    await otra.query(`SELECT id FROM memberships WHERE id = $1 FOR UPDATE`, [m.id]);
+    await otra.query(
+      `INSERT INTO bookings (class_id, user_id, membership_id, status) VALUES ($1, $2, $3, 'confirmed')`,
+      [otraClase, w.id, m.id],
+    );
+    cancel = cancelarEstudio(ra.id);
+    let esperando = false;
+    for (let i = 0; i < 100 && !esperando; i++) {
+      const [q] = await sql(
+        `SELECT COUNT(*)::int AS n FROM pg_stat_activity
+          WHERE datname = current_database() AND wait_event_type = 'Lock'
+            AND query ILIKE '%FROM memberships WHERE id = $1 FOR UPDATE%'`,
+      );
+      esperando = q.n > 0;
+      if (!esperando) await new Promise((r) => setTimeout(r, 50));
+    }
+    assert.ok(esperando, "la subida debió formarse en el candado de la membresía");
+    await otra.query("COMMIT");
+  } finally {
+    await otra.query("ROLLBACK").catch(() => {});
+    await otra.end();
+  }
+  const c = await cancel;
+  assert.equal(c.status, 200, JSON.stringify(c.body).slice(0, 200));
+  assert.equal(await estado(rw.id), "waitlist", "con el tope semanal lleno no sube");
+  assert.equal((await subidas(rw.id)).length, 0);
+  const [semana] = await sql(
+    `SELECT COUNT(*)::int AS n FROM bookings WHERE membership_id = $1 AND status IN ('confirmed', 'checked_in')`, [m.id]);
+  assert.equal(semana.n, 1, "nunca más reservas en la semana que su tope");
+  assert.equal(await estado(rw2.id), "confirmed", "sube la siguiente");
+  const [log] = await subidas(rw2.id);
+  assert.deepEqual(log.meta.skipped.map((x) => [x.booking_id, x.reason]), [[rw.id, "tope_semanal"]]);
+});
+
+test("editar sólo la coach de una clase con lugar y fila no sube a nadie; subir el cupo o reabrirla sí", async () => {
+  const a = await clienta("e5a");
+  const w = await clienta("e5w");
+  const classId = await makeClass(A, f, { date: day(25), cap: 1 });
+  const ra = await reservar(a, classId);
+  const rw = await reservar(w, classId);
+  // Un lugar que se liberó sin pasar por el gancho: hay lugar y fila a la vez.
+  await sql(`UPDATE bookings SET status = 'cancelled', cancelled_at = NOW() WHERE id = $1`, [ra.id]);
+  const coach = await api("POST", "/api/instructors", { token: A, body: { displayName: `${PFX} Coach 2`, isActive: true } });
+  assert.ok(coach.body?.data?.id, JSON.stringify(coach.body).slice(0, 150));
+  const put = (body) => api("PUT", `/api/admin/classes/${classId}`, { token: A, body });
+
+  const r = await put({ instructorId: coach.body.data.id });
+  assert.equal(r.status, 200, JSON.stringify(r.body).slice(0, 200));
+  assert.equal(r.body.data.instructor_id, coach.body.data.id);
+  assert.deepEqual(r.body.waitlist_promoted, []);
+  assert.equal(await estado(rw.id), "waitlist", "cambiar la coach no inscribe a nadie");
+  assert.equal(await credits(w.id), 8, "ni le descuenta una clase");
+
+  const mismo = await put({ maxCapacity: 1, notes: "sin cambio de cupo" });
+  assert.equal(mismo.status, 200);
+  assert.deepEqual(mismo.body.waitlist_promoted, [], "el mismo cupo no libera lugares");
+  assert.equal(await estado(rw.id), "waitlist");
+
+  assert.equal((await put({ status: "closed" })).status, 200);
+  const reabre = await put({ status: "scheduled" });
+  assert.equal(reabre.status, 200);
+  assert.equal(reabre.body.waitlist_promoted.length, 1, "de cerrada a programada sí sube la fila");
+  assert.equal(await estado(rw.id), "confirmed");
 });

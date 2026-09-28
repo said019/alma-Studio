@@ -33,16 +33,55 @@ export function firstEligible(candidates = []) {
 }
 
 /**
+ * Máximo de WAITLIST_SWEEP_MINUTES: setInterval admite hasta 2^31-1 ms
+ * (≈ 35791,39 min); con más se desborda y Node lo corre cada 1 ms.
+ */
+export const MAX_SWEEP_MINUTES = 35791;
+
+/**
  * Minutos del barrido de respaldo, leídos de WAITLIST_SWEEP_MINUTES. Viene
  * APAGADO por defecto: sin la variable, en 0 o con un valor que no es un número
  * positivo devuelve 0 y el barrido no se programa. Motivo: en producción hay
  * filas viejas en clases con lugar, y al desplegar el barrido las inscribiría
  * solas, les descontaría una clase y les mandaría aviso sin que el dueño lo
  * decida. La subida por evento (onSeatReleased) sí corre siempre.
+ * Un valor mayor que MAX_SWEEP_MINUTES también se trata como apagado (no se
+ * recorta): es un error de configuración, y ante la duda el barrido no corre.
  */
 export function sweepMinutes(raw) {
   const n = Number(typeof raw === "string" ? raw.trim() : raw ?? 0);
-  return Number.isFinite(n) && n > 0 ? n : 0;
+  return Number.isFinite(n) && n > 0 && n <= MAX_SWEEP_MINUTES ? n : 0;
+}
+
+/**
+ * Envuelve una tarea para que no se traslape consigo misma: mientras una vuelta
+ * corre, las llamadas nuevas no hacen nada y devuelven false. Al terminar (bien
+ * o con error) se puede volver a correr.
+ */
+export function singleFlight(fn) {
+  let running = false;
+  return async (...args) => {
+    if (running) return false;
+    running = true;
+    try {
+      await fn(...args);
+      return true;
+    } finally {
+      running = false;
+    }
+  };
+}
+
+/**
+ * ¿Una edición de la clase (PUT /api/admin/classes/:id) libera lugares? Sólo si
+ * el cupo aumentó o si pasó de 'closed' a 'scheduled'. before/after:
+ * { max_capacity, status }.
+ */
+export function classEditReleasesSeats({ before, after } = {}) {
+  if (!before || !after) return false;
+  const grew = Number(after.max_capacity) > Number(before.max_capacity);
+  const reopened = before.status === "closed" && after.status === "scheduled";
+  return grew || reopened;
 }
 
 /**
