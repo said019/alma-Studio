@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 
 vi.mock("@/lib/api", () => ({ default: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() } }));
 import api from "@/lib/api";
@@ -113,5 +113,25 @@ describe("Configuración", () => {
     await screen.findByRole("tab", { name: /Notificaciones/ });
     const links = screen.queryAllByRole("link").map((a) => a.getAttribute("href") ?? "");
     expect(links.filter((h) => h.includes("whatsapp-templates"))).toEqual([]);
+  });
+
+  it("historial del pase: un recordatorio omitido por canal caído se ve como Omitido, no como Error", async () => {
+    const logs = [
+      { id: "l1", display_name: "Ana Omitida", reason: "class_reminder_b1", status: "skipped_disconnected", created_at: "2026-09-27T10:00:00Z" },
+      { id: "l2", display_name: "Bea Parcial", reason: "wallet_update", status: "partial", created_at: "2026-09-27T10:01:00Z" },
+      { id: "l3", display_name: "Caro Falló", reason: "class_reminder_b3", status: "failed", created_at: "2026-09-27T10:02:00Z" },
+    ];
+    const base = mockApi.get.getMockImplementation()!;
+    mockApi.get.mockImplementation((url: string) =>
+      url.startsWith("/admin/wallet/notifications") ? Promise.resolve({ data: { data: logs } }) : base(url));
+    renderAdmin(<SettingsPage />, { route: "/admin/settings?tab=notifications", path: "/admin/settings" });
+    const fila = (nombre: string) => screen.getByText(nombre).closest("div.rounded-lg") as HTMLElement;
+
+    await screen.findByText("Ana Omitida");
+    const omitido = within(fila("Ana Omitida")).getByText("Omitido");
+    const parcial = within(fila("Bea Parcial")).getByText("Parcial");
+    expect(omitido.className).toBe(parcial.className);
+    expect(within(fila("Ana Omitida")).queryByText("Error")).toBeNull();
+    expect(within(fila("Caro Falló")).getByText("Error")).toBeInTheDocument();
   });
 });

@@ -70,6 +70,7 @@ import { validateWellhubVisit as wellhubValidateVisit } from "./lib/wellhub/api.
 import { handleBookingRequested, handleCheckin, handleCancel, handlePlanChange } from "./lib/wellhub/flows.js";
 import { isUuid, signatureProblem } from "./lib/validate.js";
 import { checkinRule } from "./lib/checkin.js";
+import { pgReminderLog, sendClassReminders } from "./lib/classReminder.js";
 import { createChannelState } from "./lib/whatsappState.js";
 import {
   validateStripeConfig,
@@ -16431,59 +16432,27 @@ async function runClassReminderCron() {
     if (res.rows.length === 0) return;
     console.log(`[Cron] Class reminder — ${res.rows.length} upcoming bookings`);
 
-    // Un solo chequeo del canal por corrida (cacheado 60 s): si Evolution está
-    // caído no tiene caso intentar cada envío ni contarlo como enviado
-    // (auditoría 2026-09-27, P0-1).
-    const channel = await whatsappChannelState();
-
-    for (const row of res.rows) {
-      const timeStr = row.start_time ? String(row.start_time).slice(0, 5) : "";
-      const className = row.class_name || "tu clase";
-      const reason = `class_reminder_${row.booking_id}`;
-
-      // Dedup guard: sólo cuenta un envío que sí quedó 'ok' — un intento
-      // 'skipped_disconnected' o 'failed' debe poder reintentarse en la
-      // siguiente corrida cuando el canal vuelva.
-      const already = await pool.query(
-        `SELECT 1 FROM wallet_notification_logs WHERE user_id=$1 AND reason=$2 AND status = 'ok' LIMIT 1`,
-        [row.user_id, reason],
-      );
-      if (already.rows.length > 0) continue; // already sent, skip
-
-      if (!channel.connected) {
-        await pool.query(
-          `INSERT INTO wallet_notification_logs (user_id, reason, status, detail)
-           VALUES ($1, $2, 'skipped_disconnected', $3::jsonb)`,
-          [row.user_id, reason, JSON.stringify({ source: "class_reminder_cron", reason: "channel_disconnected" })],
-        ).catch((e) => console.error("[Cron] class_reminder log:", e?.message));
-        continue;
-      }
-
-      // 1. WhatsApp via notifyByTemplate (handles opt-out, phone lookup)
-      const r = await notifyByTemplate(
-        row.user_id,
-        "class_reminder",
-        { class: className, time: timeStr },
-        ({ firstName }) =>
-          `${firstName}, te vemos en ${className} a las ${timeStr}. Llega 10 minutos antes.`,
-      ).catch((e) => ({ sent: false, reason: "exception", error: e?.message }));
-
-      // 2. APNS wallet push — updates the pass on the lockscreen
-      // Fire-and-forget: triggerWalletPassSync schedules async push internally and logs its own errors
-      triggerWalletPassSync(row.user_id, reason);
-
-      // 3. Log to wallet_notification_logs for dedup (apple_sent=0 since
-      //    triggerWalletPassSync is async; the actual push count is logged
-      //    inside notifyWalletPassesUpdatedForUser separately)
-      await pool.query(
-        `INSERT INTO wallet_notification_logs (user_id, reason, status, detail)
-         VALUES ($1, $2, $3, $4::jsonb)`,
-        [row.user_id, reason, r?.sent ? "ok" : "failed", JSON.stringify({ source: "class_reminder_cron", reason: r?.reason ?? null })],
-      ).catch((e) => console.error("[Cron] class_reminder log:", e?.message));
-
-      // Small delay to respect Evolution API rate limits
-      await new Promise((r) => setTimeout(r, 400));
-    }
+    // Mismo ajuste que respeta cancelar clase: con los avisos de WhatsApp
+    // apagados por la dueña no se envía ni se registra 'failed'; el pase se
+    // sincroniza igual (auditoría 2026-09-27, P0-1).
+    const notifSettings = await getSettingsValue("notification_settings", DEFAULT_NOTIFICATION_SETTINGS);
+    await sendClassReminders(res.rows, {
+      log: pgReminderLog(pool),
+      remindersOn: notifSettings?.whatsapp_reminders !== false,
+      channelState: whatsappChannelState,
+      syncPass: triggerWalletPassSync,
+      notify: (row) => {
+        const timeStr = row.start_time ? String(row.start_time).slice(0, 5) : "";
+        const className = row.class_name || "tu clase";
+        return notifyByTemplate(
+          row.user_id,
+          "class_reminder",
+          { class: className, time: timeStr },
+          ({ firstName }) =>
+            `${firstName}, te vemos en ${className} a las ${timeStr}. Llega 10 minutos antes.`,
+        );
+      },
+    });
   } catch (err) {
     console.error("[Cron] Class reminder error:", err.message);
   }

@@ -5,6 +5,7 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { api, login, sql, studioFixtures, makeClass, makeClient, giveMembership, cleanup, closeDb, day, ADMIN } from "./helpers.mjs";
+import { pgReminderLog, sendClassReminders } from "../lib/classReminder.js";
 
 const PFX = "rgwa";
 let A, f;
@@ -13,7 +14,11 @@ before(async () => {
   A = (await login(ADMIN.email, ADMIN.password)).token;
   f = await studioFixtures(PFX, A);
 });
-after(async () => { await cleanup(PFX); await closeDb(); });
+after(async () => {
+  await sql(`DELETE FROM wallet_notification_logs WHERE user_id IN (SELECT id FROM users WHERE email LIKE $1)`, [`${PFX}%`]);
+  await cleanup(PFX);
+  await closeDb();
+});
 
 test("P0-1 cancelar una clase con Evolution sin configurar no cuenta wa_sent: todas quedan en wa_unreached", async () => {
   const c1 = await makeClient(PFX, "c1");
@@ -39,4 +44,54 @@ test("P0-1 cancelar una clase con Evolution sin configurar no cuenta wa_sent: to
     assert.ok("display_name" in u && "phone" in u, "cada elemento trae display_name y phone");
   }
   assert.ok(!("wa_sent" in d), "wa_sent ya no debe existir en la respuesta");
+});
+
+// Cron de recordatorios (server/lib/classReminder.js) contra la tabla real.
+const reminderRows = (users) => users.map((u) => ({
+  booking_id: `${PFX}-${u.id}`, user_id: u.id, class_name: "Reformer", start_time: "11:00:00",
+}));
+const cronDeps = ({ connected, notify = async () => ({ sent: true }), syncPass = () => {} }) => ({
+  log: pgReminderLog({ query: async (q, p) => ({ rows: await sql(q, p) }) }),
+  remindersOn: true,
+  pauseMs: 0,
+  channelState: async () => ({ connected, state: connected ? "connected" : "disconnected" }),
+  notify,
+  syncPass,
+});
+
+test("cron de recordatorios con el canal caído dos corridas: una sola fila skipped_disconnected por reserva", async () => {
+  const c = await makeClient(PFX, "cron1");
+  const rows = reminderRows([c]);
+  await sendClassReminders(rows, cronDeps({ connected: false }));
+  await sendClassReminders(rows, cronDeps({ connected: false }));
+  const logs = await sql(
+    `SELECT status FROM wallet_notification_logs WHERE user_id = $1 AND reason = $2`,
+    [c.id, `class_reminder_${rows[0].booking_id}`],
+  );
+  assert.deepEqual(logs.map((l) => l.status), ["skipped_disconnected"]);
+});
+
+test("cron de recordatorios: la bitácora del pase (misma reason, status ok) no bloquea el reintento cuando vuelve el canal", async () => {
+  const c = await makeClient(PFX, "cron2");
+  const rows = reminderRows([c]);
+  const reason = `class_reminder_${rows[0].booking_id}`;
+  // La sincronización del pase deja su propia fila 'ok' con la misma reason
+  // (persistWalletNotificationLog en server/index.js).
+  const pendientes = [];
+  const syncPass = (userId, why) => pendientes.push(sql(
+    `INSERT INTO wallet_notification_logs (user_id, reason, status, detail) VALUES ($1, $2, 'ok', $3::jsonb)`,
+    [userId, why, JSON.stringify({ apple: { reason: "apns_not_configured" }, google: { reason: "google_wallet_not_configured" } })],
+  ));
+  await sendClassReminders(rows, cronDeps({ connected: false, syncPass }));
+  await Promise.all(pendientes);
+
+  const enviados = [];
+  await sendClassReminders(rows, cronDeps({ connected: true, notify: async (row) => { enviados.push(row.booking_id); return { sent: true }; } }));
+  assert.deepEqual(enviados, [rows[0].booking_id], "con el canal de vuelta se debe intentar el envío");
+  const [propias] = await sql(
+    `SELECT count(*)::int n FROM wallet_notification_logs
+      WHERE user_id = $1 AND reason = $2 AND status = 'ok' AND detail->>'source' = 'class_reminder_cron'`,
+    [c.id, reason],
+  );
+  assert.equal(propias.n, 1, "queda registrado el envío ok del recordatorio");
 });
