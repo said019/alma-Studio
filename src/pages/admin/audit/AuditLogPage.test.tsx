@@ -44,6 +44,19 @@ describe("Bitácora", () => {
     expect(pedidas()[0]).toBe("/admin/audit?page=1&limit=50");
   });
 
+  it("muestra crédito, puntos y conteos del meta, sin abrir datos personales", async () => {
+    loginAs("admin");
+    const cancelacion = {
+      ...venta, id: "e3", action: "booking.cancel", reason: "Se enfermó",
+      before: { status: "confirmed" }, after: { status: "cancelled" },
+      meta: { credit_restored: true, points_reverted: 20 },
+    };
+    montar({ data: [cancelacion], page: 1, limit: 50, total: 1 });
+    const lista = await screen.findByRole("list", { name: "Movimientos" });
+    expect(within(lista).getByText(/Crédito devuelto: Sí/)).toBeInTheDocument();
+    expect(within(lista).getByText(/Puntos revertidos: 20/)).toBeInTheDocument();
+  });
+
   it("los filtros van a la URL y a la consulta, y vuelven a la página 1", async () => {
     loginAs("admin");
     montar(undefined, "/admin/bitacora?pagina=2");

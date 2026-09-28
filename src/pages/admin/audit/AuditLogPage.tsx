@@ -13,7 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState, ErrorState } from "@/components/app/AppShell";
 import { formatDateTime } from "@/lib/format";
 import { roleLabel } from "@/lib/roles";
-import { AUDIT_ENTITY_OPTIONS, actionLabel, auditChanges, auditSubject, type AuditEntry, type AuditPage } from "@/lib/audit-log";
+import { AUDIT_ENTITY_OPTIONS, actionLabel, auditChanges, auditMetaLines, auditSubject, type AuditEntry, type AuditPage } from "@/lib/audit-log";
 
 const LIMIT = 50;
 const SELECT_CLS = "h-11 w-full rounded-xl border border-line-strong bg-surface px-3 text-sm text-ink focus:border-2 focus:border-ink focus:outline-none";
@@ -156,6 +156,7 @@ function AuditLogContent() {
 function AuditRow({ entry }: { entry: AuditEntry }) {
   const changes = auditChanges(entry);
   const subject = auditSubject(entry);
+  const metaLines = auditMetaLines(entry);
   return (
     <li className="flex flex-col gap-2 px-5 py-4 lg:px-6">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
@@ -179,6 +180,9 @@ function AuditRow({ entry }: { entry: AuditEntry }) {
             </div>
           ))}
         </dl>
+      )}
+      {metaLines.length > 0 && (
+        <p className="nums text-[13px] text-ink-muted">{metaLines.join(" · ")}</p>
       )}
     </li>
   );

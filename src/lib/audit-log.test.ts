@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { actionLabel, auditChanges, auditSubject, formatAuditValue, type AuditEntry } from "./audit-log";
+import { actionLabel, auditChanges, auditMetaLines, auditSubject, formatAuditValue, type AuditEntry } from "./audit-log";
 
 const base: AuditEntry = {
   id: "e1", createdAt: "2026-09-28T16:00:00Z", actorId: "a1", actorName: "Dueña HIVE", actorRole: "admin",
@@ -49,5 +49,21 @@ describe("bitácora · textos", () => {
     expect(formatAuditValue("status", "no_show")).toBe("Falta");
     expect(formatAuditValue("end_date", null)).toBe("—");
     expect(formatAuditValue("is_active", false)).toBe("Cerrado");
+  });
+
+  it("resume crédito, puntos y conteos de meta, sin datos personales", () => {
+    expect(auditMetaLines({ action: "booking.cancel", after: null, meta: { credit_restored: true, points_reverted: 20 } }))
+      .toEqual(["Crédito devuelto: Sí", "Puntos revertidos: 20"]);
+    expect(auditMetaLines({ action: "booking.cancel", after: null, meta: { credit_restored: false, points_reverted: 0 } }))
+      .toEqual(["Crédito devuelto: No", "Puntos revertidos: 0"]);
+    expect(auditMetaLines({ action: "booking.cancel", after: null, meta: {} })).toEqual([]);
+    expect(auditMetaLines({ action: "class.cancel", after: null, meta: { bookings_cancelled: 3, credits_restored: 2 } }))
+      .toEqual(["Reservas canceladas: 3", "Créditos devueltos: 2"]);
+    expect(auditMetaLines({ action: "class.cancel", after: { bookings_cancelled: 1, credits_restored: 0 }, meta: {} }))
+      .toEqual(["Reservas canceladas: 1", "Créditos devueltos: 0"]);
+    expect(auditMetaLines({ action: "booking.no_show_corrected", after: null, meta: { penalty_refunded: 50 } }))
+      .toEqual(["Puntos devueltos por la falta: 50"]);
+    expect(auditMetaLines({ action: "booking.no_show_corrected", after: null, meta: { penalty_refunded: 0 } })).toEqual([]);
+    expect(auditMetaLines({ action: "membership.adjust", after: null, meta: { classes_remaining: 3 } })).toEqual([]);
   });
 });

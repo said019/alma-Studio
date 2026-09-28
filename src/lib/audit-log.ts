@@ -2,7 +2,8 @@
 import { formatMXN } from "@/lib/format";
 
 /** Mínimo de caracteres (sin espacios en los extremos) para un motivo de la
- *  bitácora. Lo usan aquí y las tareas 3, 4 y 5 del bloque 2. */
+ *  bitácora. Lo comparten aquí, los ajustes de membresía, las cancelaciones
+ *  del estudio y la corrección de una falta. */
 export const REASON_MIN_CHARS = 5;
 
 export type AuditEntry = {
@@ -102,6 +103,29 @@ export function auditChanges(e: AuditEntry): { key: string; label: string; befor
     before: k in b ? formatAuditValue(k, b[k]) : null,
     after: formatAuditValue(k, a[k]),
   }));
+}
+
+/** Líneas de resumen de `meta` (crédito, puntos, conteos): sólo campos
+ *  agregados o sí/no, nunca datos personales. */
+export function auditMetaLines(e: Pick<AuditEntry, "action" | "meta" | "after">): string[] {
+  const m = e.meta ?? {};
+  const a = e.after ?? {};
+  const lines: string[] = [];
+  if (e.action === "booking.cancel") {
+    if (m.credit_restored !== undefined) lines.push(`Crédito devuelto: ${m.credit_restored ? "Sí" : "No"}`);
+    if (m.points_reverted !== undefined) lines.push(`Puntos revertidos: ${Number(m.points_reverted) || 0}`);
+  }
+  if (e.action === "class.cancel") {
+    const bookingsCancelled = m.bookings_cancelled ?? a.bookings_cancelled;
+    const creditsRestored = m.credits_restored ?? a.credits_restored;
+    if (bookingsCancelled !== undefined) lines.push(`Reservas canceladas: ${Number(bookingsCancelled) || 0}`);
+    if (creditsRestored !== undefined) lines.push(`Créditos devueltos: ${Number(creditsRestored) || 0}`);
+  }
+  if (e.action === "booking.no_show_corrected") {
+    const refunded = Number(m.penalty_refunded) || 0;
+    if (refunded > 0) lines.push(`Puntos devueltos por la falta: ${refunded}`);
+  }
+  return lines;
 }
 
 export function auditSubject(e: AuditEntry): string | null {
