@@ -18,7 +18,7 @@ export function categoryLabel(category) {
     case "studio": return "Studio";
     case "reformer_tower": return "Reformer/Tower";
     case "mixto": return "Mixto";
-    default: return "Alma";
+    default: return "HIVE";
   }
 }
 
