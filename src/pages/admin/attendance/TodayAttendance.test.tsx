@@ -69,6 +69,26 @@ describe("Pasar lista", () => {
     await waitFor(() => expect(mockApi.put).toHaveBeenCalledWith("/bookings/d/no-show"));
   });
 
+  it("el diálogo de falta dice que ya no podrá marcarse como asistencia", async () => {
+    montar();
+    const actual = await screen.findByRole("region", { name: "Reformer Intermedio 11:00" });
+    fireEvent.click(within(actual).getByRole("button", { name: "Marcar falta de Camila Torres" }));
+    expect(await screen.findByText("Su reserva quedará registrada como falta y ya no podrá marcarse como asistencia.")).toBeInTheDocument();
+    expect(screen.queryByText(/todavía pueden hacerle check-in/)).toBeNull();
+  });
+
+  it("una fila con falta no ofrece Check-in y muestra la etiqueta Falta", async () => {
+    montar([
+      clase("c11", "11:00", "11:50", "Reformer Intermedio", 8, [e("d", "confirmed", "Camila Torres"), e("n", "no_show", "Lucía Díaz")]),
+    ]);
+    const actual = await screen.findByRole("region", { name: "Reformer Intermedio 11:00" });
+    expect(within(actual).getByRole("button", { name: "Check-in de Camila Torres" })).toBeInTheDocument();
+    expect(within(actual).queryByRole("button", { name: "Check-in de Lucía Díaz" })).toBeNull();
+    expect(within(actual).queryByRole("button", { name: "Marcar falta de Lucía Díaz" })).toBeNull();
+    const fila = within(actual).getByText("Lucía Díaz").closest("li")!;
+    expect(within(fila as HTMLElement).getByText("Falta")).toHaveClass("text-[13px]", "text-ink-muted");
+  });
+
   it("la cámara se abre desde aquí", async () => {
     montar();
     fireEvent.click(await screen.findByRole("button", { name: /Escanear QR del pase/ }));

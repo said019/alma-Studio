@@ -102,13 +102,15 @@ function ClassCard({ cls, clock, open, onToggle, current = false, past = false, 
                   </span>
                 ) : r.status === "waitlist" ? (
                   <span className="text-[13px] text-ink-muted">Lista de espera</span>
+                ) : r.status === "no_show" ? (
+                  // La regla de check-in (server/lib/checkin.js) rechaza una
+                  // reserva marcada como falta: no se ofrece el botón.
+                  <span className="text-[13px] text-ink-muted">Falta</span>
                 ) : (
                   <span className="flex gap-1.5">
-                    {r.status !== "no_show" && (
-                      <Button variant="ghost" size="icon" aria-label={`Marcar falta de ${labelOf(r)}`} onClick={() => onNoShow(r)} disabled={mutating}>
-                        <UserX size={18} />
-                      </Button>
-                    )}
+                    <Button variant="ghost" size="icon" aria-label={`Marcar falta de ${labelOf(r)}`} onClick={() => onNoShow(r)} disabled={mutating}>
+                      <UserX size={18} />
+                    </Button>
                     <Button aria-label={`Check-in de ${labelOf(r)}`} onClick={() => onCheckin(r.booking_id)} disabled={mutating}>
                       <Check size={16} aria-hidden="true" />Check-in
                     </Button>
@@ -187,7 +189,7 @@ const TodayAttendance = () => {
     const name = labelOf(r);
     const ok = await confirm({
       title: `¿Marcar a ${name} como no asistió?`,
-      description: "Su reserva quedará registrada como falta. Si se equivocan, todavía pueden hacerle check-in después.",
+      description: "Su reserva quedará registrada como falta y ya no podrá marcarse como asistencia.",
       destructive: true,
       confirmLabel: "Marcar falta",
     });

@@ -512,7 +512,9 @@ const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: string; onBa
         ) : (
           <ul>
             {roster.map((entry: RosterEntry) => {
-              const canCheckin = entry.status === "confirmed" || entry.status === "waitlist";
+              // Sólo una reserva confirmada: la regla de check-in del servidor
+              // (server/lib/checkin.js) rechaza lista de espera y faltas.
+              const canCheckin = entry.status === "confirmed";
               const canNoShow = entry.status === "confirmed";
               const canCancel = entry.status === "confirmed" || entry.status === "waitlist";
               const unlimited = entry.classesRemaining == null || entry.classesRemaining >= 9999;
