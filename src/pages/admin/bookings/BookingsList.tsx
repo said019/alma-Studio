@@ -184,6 +184,16 @@ const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: string; onBa
   const [agSearching, setAgSearching] = useState(false);
   const [agFound, setAgFound] = useState(false);
 
+  // ── Responsiva sin firmar: recepción puede asignar igual si deja el motivo ──
+  const [waiverBlocked, setWaiverBlocked] = useState(false);
+  const [waiverSignsAtDesk, setWaiverSignsAtDesk] = useState(false);
+  const [waiverReason, setWaiverReason] = useState("");
+  const resetWaiverState = () => {
+    setWaiverBlocked(false);
+    setWaiverSignsAtDesk(false);
+    setWaiverReason("");
+  };
+
   const resetAssignForm = () => {
     setAssignWithGuest(false);
     setSelectedMember(null);
@@ -195,6 +205,7 @@ const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: string; onBa
     setGuestChargeMode("host_pack");
     setGuestSalePlanId("");
     setGuestSalePayment("cash");
+    resetWaiverState();
   };
 
   const searchAdminGuest = async () => {
@@ -316,12 +327,13 @@ const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: string; onBa
   });
 
   const assignMutation = useMutation({
-    mutationFn: (vars: { userId: string; guest?: any; guestSale?: any }) =>
+    mutationFn: (vars: { userId?: string; guest?: any; guestSale?: any; waiverOverride?: { reason: string } }) =>
       api.post("/admin/bookings/assign", {
         classId,
         userId: vars.userId,
         guest: vars.guest,
         guestSale: vars.guestSale,
+        waiverOverride: vars.waiverOverride,
       }),
     onSuccess: (res: any) => {
       qc.invalidateQueries({ queryKey: ["roster", classId] });
@@ -332,6 +344,10 @@ const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: string; onBa
       resetAssignForm();
     },
     onError: (e: any) => {
+      if (e?.response?.status === 403 && e?.response?.data?.code === "WAIVER_REQUIRED") {
+        setWaiverBlocked(true);
+        return;
+      }
       toast({ title: e?.response?.data?.message ?? "Error al asignar reserva", variant: "destructive" });
     },
   });
@@ -540,6 +556,28 @@ const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: string; onBa
               </label>
             )}
 
+            {waiverBlocked && (
+              <div className="space-y-2 rounded-xl border border-danger/25 bg-danger/10 p-3">
+                <p className="text-sm font-bold text-ink">Esta clienta no ha firmado su responsiva</p>
+                <label className="flex min-h-[44px] items-center gap-2 text-sm text-ink">
+                  <input type="checkbox" checked={waiverSignsAtDesk} onChange={(e) => setWaiverSignsAtDesk(e.target.checked)} />
+                  Firmará en recepción
+                </label>
+                {waiverSignsAtDesk && (
+                  <Input placeholder="Motivo (obligatorio)" value={waiverReason} onChange={(e) => setWaiverReason(e.target.value)} />
+                )}
+                <Button
+                  disabled={!waiverSignsAtDesk || waiverReason.trim().length < 5 || assignMutation.isPending}
+                  onClick={() => assignMutation.mutate({
+                    ...(assignMutation.variables ?? {}),
+                    waiverOverride: { reason: waiverReason.trim() },
+                  })}
+                >
+                  Asignar de todos modos
+                </Button>
+              </div>
+            )}
+
             {/* Paso 1: elegir socia */}
             {(!assignWithGuest || !selectedMember) && (
               <div className="space-y-3">
@@ -564,6 +602,7 @@ const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: string; onBa
                         type="button"
                         disabled={assignMutation.isPending}
                         onClick={() => {
+                          resetWaiverState();
                           if (assignWithGuest) {
                             setSelectedMember(u);
                           } else {
@@ -599,7 +638,7 @@ const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: string; onBa
                   <button
                     type="button"
                     className="text-[11px] text-ink/55 transition-colors hover:text-ink"
-                    onClick={() => setSelectedMember(null)}
+                    onClick={() => { setSelectedMember(null); resetWaiverState(); }}
                   >
                     Cambiar
                   </button>

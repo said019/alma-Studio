@@ -1810,6 +1810,11 @@ async function ensureSchema() {
     await pool.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS partner_metadata JSONB DEFAULT '{}'::jsonb`).catch(() => { });
     await pool.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS partner_status TEXT`).catch(() => { });
     await pool.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS partner_reported_at TIMESTAMPTZ`).catch(() => { });
+    // Responsiva con motivo — recepción puede asignar sin firma si deja constancia
+    // (auditoría 2026-09-27, bloque 1, tarea 5).
+    await pool.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS waiver_override_reason TEXT`).catch(() => { });
+    await pool.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS waiver_override_by UUID`).catch(() => { });
+    await pool.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS waiver_override_at TIMESTAMPTZ`).catch(() => { });
     await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS uq_bookings_channel_ref
       ON bookings(channel, external_ref) WHERE channel <> 'app' AND external_ref IS NOT NULL`).catch(() => { });
 
@@ -3734,15 +3739,20 @@ async function liveBookingCount(classId, db = pool) {
   return r.rows[0]?.cnt ?? 0;
 }
 
+// Responsiva firmada — helper compartido por /bookings, /bookings/with-guest
+// y /admin/bookings/assign (auditoría 2026-09-27, bloque 1, tarea 5).
+const hasSignedWaiver = async (db, userId) =>
+  (await db.query("SELECT 1 FROM waivers WHERE user_id = $1 LIMIT 1", [userId]).catch(() => ({ rows: [] }))).rows.length > 0;
+const WAIVER_REQUIRED_MSG = "Antes de tu primera reserva necesitas leer y firmar la responsiva y consentimiento informado.";
+
 // POST /api/bookings
 app.post("/api/bookings", authMiddleware, async (req, res) => {
   const { classId } = req.body;
   if (!classId) return res.status(400).json({ message: "classId requerido" });
   if (!isUuid(classId)) return res.status(400).json({ message: "Identificador inválido" });
   // Gate: la primera reserva requiere la responsiva y consentimiento firmados.
-  const waiverGate = await pool.query("SELECT 1 FROM waivers WHERE user_id = $1 LIMIT 1", [req.userId]).catch(() => ({ rows: [] }));
-  if (waiverGate.rows.length === 0) {
-    return res.status(403).json({ code: "WAIVER_REQUIRED", message: "Antes de tu primera reserva necesitas leer y firmar la responsiva y consentimiento informado." });
+  if (!(await hasSignedWaiver(pool, req.userId))) {
+    return res.status(403).json({ code: "WAIVER_REQUIRED", message: WAIVER_REQUIRED_MSG });
   }
   const client = await pool.connect();
   try {
@@ -10097,6 +10107,11 @@ app.get("/api/my-guests/search", authMiddleware, async (req, res) => {
 app.post("/api/bookings/with-guest", authMiddleware, async (req, res) => {
   const { classId, guest = {} } = req.body || {};
   if (!classId) return res.status(400).json({ message: "classId requerido" });
+  if (!isUuid(classId)) return res.status(400).json({ message: "Identificador inválido" });
+  // Gate: la anfitriona (quien reserva) debe tener su propia responsiva firmada.
+  if (!(await hasSignedWaiver(pool, req.userId))) {
+    return res.status(403).json({ code: "WAIVER_REQUIRED", message: WAIVER_REQUIRED_MSG });
+  }
   if (!guest.name) return res.status(400).json({ message: "Nombre de la acompañante requerido" });
   if (!guest.phone) return res.status(400).json({ message: "Teléfono de la acompañante requerido" });
   if (!guest.acceptedWaiver) return res.status(400).json({ message: "Confirma el waiver de la acompañante" });
@@ -13596,6 +13611,16 @@ app.get("/api/bookings", adminMiddleware, async (req, res) => {
 app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
   const { classId, userId, guest, guestSale } = req.body;
   if (!classId || !userId) return res.status(400).json({ message: "classId y userId requeridos" });
+  if (!isUuid(classId) || !isUuid(userId)) return res.status(400).json({ message: "Identificador inválido" });
+  // Responsiva: recepción puede asignar sin firma si deja el motivo por el que
+  // la clienta firmará en recepción (auditoría 2026-09-27, bloque 1, tarea 5).
+  const override = req.body?.waiverOverride;
+  const overrideReason = typeof override?.reason === "string" ? override.reason.trim() : "";
+  if (override && overrideReason.length < 5) return res.status(400).json({ message: "Escribe el motivo (mínimo 5 caracteres)." });
+  const signed = await hasSignedWaiver(pool, userId);
+  if (!signed && !override) {
+    return res.status(403).json({ code: "WAIVER_REQUIRED", message: "Esta clienta no ha firmado su responsiva." });
+  }
   const withGuest = guest && typeof guest === "object" && guest.name && guest.phone;
   if (withGuest && !guest.acceptedWaiver) {
     return res.status(400).json({ message: "Confirma el waiver de la acompañante" });
@@ -13686,9 +13711,10 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
     const isWaitlist = (await liveBookingCount(classId, client)) >= cls.max_capacity;
     const bookingStatus = isWaitlist ? "waitlist" : "confirmed";
     const result = await client.query(
-      `INSERT INTO bookings (class_id, user_id, membership_id, status)
-       VALUES ($1, $2, $3, $4) RETURNING *`,
-      [classId, userId, membership.id, bookingStatus]
+      `INSERT INTO bookings (class_id, user_id, membership_id, status, waiver_override_reason, waiver_override_by, waiver_override_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      [classId, userId, membership.id, bookingStatus,
+       !signed ? overrideReason : null, !signed ? req.userId : null, !signed ? new Date() : null]
     );
 
     if (!isWaitlist) {
