@@ -60,7 +60,7 @@ import { seedClassTypesIfEmpty, seedPlansIfEmpty } from "./lib/catalogSeed.js";
 import { resolveEffectivePrice } from "./lib/pricing.js";
 import { isMembershipCategoryCompatible as ruleCategoryCompatible, normalizeClassCategory as ruleNormalizeCategory, isWithinMorningWindow, categoryLabel } from "./lib/bookingRules.js";
 import { rateKey } from "./lib/rateKey.js";
-import { isWithinCancelWindow, penaltyDueAt } from "./lib/faltas.js";
+import { isWithinCancelWindow, penaltyDueAt, faltaReversal } from "./lib/faltas.js";
 import { scheduleAt } from "./lib/schedule.js";
 import { verifyWellhubSignature, extractSignatureHeader } from "./lib/wellhub/signature.js";
 import { extractGymId, computeEventId } from "./lib/wellhub/payload.js";
@@ -69,7 +69,7 @@ import { publicPartnerSettings, mergeSecret } from "./lib/partnerSettings.js";
 import { validateWellhubVisit as wellhubValidateVisit } from "./lib/wellhub/api.js";
 import { handleBookingRequested, handleCheckin, handleCancel, handlePlanChange } from "./lib/wellhub/flows.js";
 import { isUuid, signatureProblem } from "./lib/validate.js";
-import { checkinRule } from "./lib/checkin.js";
+import { checkinRule, noShowCorrectionRule } from "./lib/checkin.js";
 import { pgReminderLog, sendClassReminders } from "./lib/classReminder.js";
 import { createChannelState } from "./lib/whatsappState.js";
 import { recordAudit, recordAuditBestEffort, reasonProblem, cleanReason, buildAuditQuery, auditRowOut } from "./lib/audit.js";
@@ -14053,14 +14053,41 @@ async function studioNow(client = pool) {
 async function awardCheckinPoints(userId) {
   try {
     const cfg = await getLoyaltyConfig();
-    const pts = cfg.points_per_class;
-    if (cfg.enabled !== false && pts > 0) {
-      await pool.query(
-        "INSERT INTO loyalty_transactions (user_id, type, points, description) VALUES ($1, 'earn', $2, 'Clase asistida')",
-        [userId, pts],
-      );
-    }
+    await insertCheckinPoints(pool, userId, cfg);
   } catch (e) { console.warn("[check-in] loyalty insert failed:", e?.message); }
+}
+
+// Inserta los puntos de "Clase asistida": los comparte el check-in (lista/QR,
+// dentro del try/catch best-effort de awardCheckinPoints) y la corrección de
+// falta (dentro de su transacción). Devuelve los puntos otorgados (0 si el
+// programa está apagado); lanza si la base falla (bloque 2, R11).
+async function insertCheckinPoints(q, userId, cfg) {
+  const pts = Number(cfg.points_per_class);
+  if (cfg.enabled === false || !(pts > 0)) return 0;
+  await q.query(
+    "INSERT INTO loyalty_transactions (user_id, type, points, description) VALUES ($1, 'earn', $2, 'Clase asistida')",
+    [userId, pts],
+  );
+  return pts;
+}
+
+// Refleja en Wellhub una asistencia marcada en el estudio (lista o corrección
+// de falta) para que la visita se facture. Best-effort, sin esperar.
+function reflectWellhubVisit(booking) {
+  (async () => {
+    try {
+      const creds = await getWellhubCredentials(pool);
+      if (creds && creds.is_enabled) {
+        const u = await pool.query("SELECT wellhub_id FROM users WHERE id=$1", [booking.user_id]);
+        const vres = await wellhubValidateVisit(creds, { customCode: u.rows[0]?.wellhub_id });
+        await pool.query(
+          `INSERT INTO partner_checkins (booking_id, user_id, channel, status, method, validated_at, external_response)
+           VALUES ($1,$2,'wellhub',$3,'manual',NOW(),$4)`,
+          [booking.id, booking.user_id, vres.ok ? "confirmed" : "failed", JSON.stringify(vres.data || {})],
+        );
+      }
+    } catch (e) { console.warn("[wellhub] reflect visit:", e.message); }
+  })();
 }
 
 // PUT /api/bookings/:id/check-in
@@ -14097,24 +14124,14 @@ app.put("/api/bookings/:id/check-in", adminMiddleware, async (req, res) => {
     const booking = r.rows[0];
     // ── Reflejar visita Wellhub si el check-in fue local (recepción/QR/coach) ──
     // Fire-and-forget, best-effort: valida la visita contra Wellhub para facturar.
-    if (booking.channel === "wellhub" && !wasAlreadyCheckedIn) {
-      (async () => {
-        try {
-          const creds = await getWellhubCredentials(pool);
-          if (creds && creds.is_enabled) {
-            const u = await pool.query("SELECT wellhub_id FROM users WHERE id=$1", [booking.user_id]);
-            const vres = await wellhubValidateVisit(creds, { customCode: u.rows[0]?.wellhub_id });
-            await pool.query(
-              `INSERT INTO partner_checkins (booking_id, user_id, channel, status, method, validated_at, external_response)
-               VALUES ($1,$2,'wellhub',$3,'manual',NOW(),$4)`,
-              [booking.id, booking.user_id, vres.ok ? "confirmed" : "failed", JSON.stringify(vres.data || {})],
-            );
-          }
-        } catch (e) { console.warn("[wellhub] reflect visit:", e.message); }
-      })();
-    }
+    if (booking.channel === "wellhub" && !wasAlreadyCheckedIn) reflectWellhubVisit(booking);
     // 3) Otorgar +10 pts SOLO si es primer check-in.
     if (booking.user_id && !wasAlreadyCheckedIn) await awardCheckinPoints(booking.user_id);
+    await recordAuditBestEffort(pool, {
+      actorId: req.userId, action: "booking.checkin", entityType: "booking", entityId: booking.id,
+      subjectUserId: booking.user_id, before: { status: bk.status }, after: { status: "checked_in" },
+      meta: { method: "manual", class_id: booking.class_id },
+    });
     // 4) notifyClassAttended (motivación + milestones + wallet sync) SOLO si es primer check-in.
     if (booking.user_id && !wasAlreadyCheckedIn) {
       // Get className for the notify ctx
@@ -14136,10 +14153,7 @@ app.put("/api/bookings/:id/check-in", adminMiddleware, async (req, res) => {
     });
   } catch (err) {
     console.error("[check-in] error:", err?.message, err?.code, err?.detail);
-    return res.status(500).json({
-      message: "Error interno",
-      error: err?.message?.slice(0, 160) || null,
-    });
+    return res.status(500).json({ message: "Error interno" });
   }
 });
 
@@ -14206,6 +14220,11 @@ app.post("/api/admin/checkin/scan", adminMiddleware, async (req, res) => {
     );
     // Puntos por asistir (igual que el check-in manual del roster)
     await awardCheckinPoints(userId);
+    await recordAuditBestEffort(pool, {
+      actorId: req.userId, action: "booking.checkin", entityType: "booking", entityId: bk.id,
+      subjectUserId: userId, before: { status: bk.status }, after: { status: "checked_in" },
+      meta: { method: "qr", class_name: bk.class_name },
+    });
 
     // Igual que el check-in manual del roster: dispara motivación, milestones y
     // sincronización del pase de wallet (antes el check-in por QR no lo hacía).
@@ -14223,24 +14242,128 @@ app.post("/api/admin/checkin/scan", adminMiddleware, async (req, res) => {
   }
 });
 
-// PUT /api/bookings/:id/no-show
+// PUT /api/bookings/:id/no-show — marca falta. La falta queda ligada a ESTA
+// reserva (falta_recorded_at) para poder corregirla el mismo día, y el cambio
+// queda en la bitácora (auditoría 2026-09-27, bloque 2).
 app.put("/api/bookings/:id/no-show", adminMiddleware, async (req, res) => {
   try {
     const r = await pool.query(
-      "UPDATE bookings SET status = 'no_show' WHERE id = $1 AND status NOT IN ('cancelled','no_show') RETURNING *",
+      `WITH prev AS (SELECT id, status::text AS status FROM bookings WHERE id = $1 FOR UPDATE)
+       UPDATE bookings b SET status = 'no_show'
+         FROM prev
+        WHERE b.id = prev.id AND prev.status NOT IN ('cancelled', 'no_show')
+       RETURNING b.*, prev.status AS prev_status`,
       [req.params.id]
     );
     if (!r.rows.length) return res.status(404).json({ message: "Reserva no encontrada o ya procesada" });
-    triggerWalletPassSync(r.rows[0].user_id, "booking_no_show");
+    const { prev_status: prevStatus, ...bk } = r.rows[0];
+    triggerWalletPassSync(bk.user_id, "booking_no_show");
     // Registrar falta por no-show (excluye invitadas con guest_profile_id).
+    let falta = null;
     try {
-      if (r.rows[0]?.user_id && !r.rows[0]?.guest_profile_id) {
-        await recordFalta({ userId: r.rows[0].user_id, reason: "no-show" });
+      if (bk.user_id && !bk.guest_profile_id) {
+        falta = await recordFalta({ userId: bk.user_id, reason: "no-show" });
+        if (falta.faltasCount > 0) {
+          await pool.query("UPDATE bookings SET falta_recorded_at = NOW() WHERE id = $1", [bk.id]);
+        }
       }
     } catch (e) { console.warn("[faltas] no-show:", e.message); }
-    return res.json({ data: r.rows[0] });
+    await recordAuditBestEffort(pool, {
+      actorId: req.userId, action: "booking.no_show", entityType: "booking", entityId: bk.id,
+      subjectUserId: bk.user_id, before: { status: prevStatus }, after: { status: "no_show" },
+      meta: { falta_recorded: Boolean(falta?.faltasCount), penalty_applied: Boolean(falta?.penaltyApplied) },
+    });
+    return res.json({ data: bk });
   } catch (err) {
+    console.error("[PUT /bookings/:id/no-show]", err.message);
     return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// PUT /api/bookings/:id/correct-no-show — corrige a asistencia una falta
+// marcada por error, sólo el mismo día de la clase y con motivo. Revierte la
+// falta que registró ESTA reserva (el contador y, si esa falta completó el
+// umbral, la penalización), da los puntos de asistencia una sola vez y deja
+// constancia en la bitácora. Pedido del dueño, auditoría 2026-09-27, bloque 2.
+app.put("/api/bookings/:id/correct-no-show", adminMiddleware, async (req, res) => {
+  const reason = req.body?.reason;
+  const problem = reasonProblem(reason);
+  if (problem) return res.status(400).json({ code: "REASON_REQUIRED", message: problem });
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const cur = await client.query(
+      `SELECT b.id, b.user_id, b.status::text AS status, b.checked_in_at, b.guest_profile_id,
+              b.falta_recorded_at, b.channel, c.status::text AS class_status,
+              to_char(c.date, 'YYYY-MM-DD') AS class_date, ct.name AS class_name
+         FROM bookings b
+         JOIN classes c ON c.id = b.class_id
+         LEFT JOIN class_types ct ON ct.id = c.class_type_id
+        WHERE b.id = $1
+        FOR UPDATE OF b`,
+      [req.params.id],
+    );
+    if (!cur.rows.length) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ message: "Reserva no encontrada" });
+    }
+    const bk = cur.rows[0];
+    const { nowDate } = await studioNow(client);
+    const rule = noShowCorrectionRule({ bookingStatus: bk.status, classStatus: bk.class_status, classDate: bk.class_date, nowDate });
+    if (!rule.ok) {
+      await client.query("ROLLBACK");
+      return res.status(409).json({ code: rule.code, message: rule.message });
+    }
+    const firstAttendance = !bk.checked_in_at;
+    await client.query(
+      `UPDATE bookings
+          SET status = 'checked_in', checked_in_at = COALESCE(checked_in_at, NOW()),
+              checked_in_by = COALESCE(checked_in_by, $2), falta_recorded_at = NULL
+        WHERE id = $1`,
+      [bk.id, req.userId],
+    );
+    const cfg = await getLoyaltyConfig(client);
+    let faltas = null;
+    if (bk.falta_recorded_at && bk.user_id && !bk.guest_profile_id) {
+      const u = await client.query("SELECT COALESCE(faltas_count, 0)::int AS n FROM users WHERE id = $1 FOR UPDATE", [bk.user_id]);
+      const antes = Number(u.rows[0]?.n ?? 0);
+      const rev = faltaReversal({ faltasCount: antes, threshold: cfg.faltas_threshold, penaltyPoints: cfg.faltas_penalty_points });
+      await client.query("UPDATE users SET faltas_count = $2 WHERE id = $1", [bk.user_id, rev.newCount]);
+      if (rev.refundPoints > 0) {
+        await client.query(
+          "INSERT INTO loyalty_transactions (user_id, type, points, description) VALUES ($1, 'adjust', $2, $3)",
+          [bk.user_id, rev.refundPoints, "Reverso de penalización: falta corregida a asistencia"],
+        );
+      }
+      faltas = { antes, despues: rev.newCount, refund: rev.refundPoints };
+    }
+    let pointsAwarded = 0;
+    if (firstAttendance && bk.user_id) {
+      pointsAwarded = await insertCheckinPoints(client, bk.user_id, cfg);
+    }
+    await recordAudit(client, {
+      actorId: req.userId, action: "booking.no_show_corrected", entityType: "booking", entityId: bk.id,
+      subjectUserId: bk.user_id, reason,
+      before: { status: "no_show", ...(faltas ? { faltas_count: faltas.antes } : {}) },
+      after: { status: "checked_in", ...(faltas ? { faltas_count: faltas.despues } : {}) },
+      meta: { class_name: bk.class_name, falta_reverted: Boolean(faltas), penalty_refunded: faltas?.refund ?? 0, points_awarded: pointsAwarded },
+    });
+    await client.query("COMMIT");
+    if (bk.user_id) {
+      triggerWalletPassSync(bk.user_id, "no_show_corrected");
+      if (pointsAwarded > 0) {
+        checkLoyaltyMilestones(bk.user_id).catch((e) => console.warn("[Milestones] corrección de falta:", e?.message));
+      }
+    }
+    if (bk.channel === "wellhub" && firstAttendance) reflectWellhubVisit({ id: bk.id, user_id: bk.user_id });
+    const row = await pool.query("SELECT * FROM bookings WHERE id = $1", [bk.id]);
+    return res.json({ data: row.rows[0], falta_reverted: Boolean(faltas), penalty_refunded: faltas?.refund ?? 0, points_awarded: pointsAwarded });
+  } catch (err) {
+    await client.query("ROLLBACK").catch(() => {});
+    console.error("[PUT /bookings/:id/correct-no-show]", err.message);
+    return res.status(500).json({ message: "Error interno" });
+  } finally {
+    client.release();
   }
 });
 
