@@ -82,13 +82,25 @@ describe("Personas · Clientas", () => {
     await waitFor(() => expect(screen.getByTestId("location").textContent).toBe("/admin/clients"));
   });
 
-  it("recepción no ve 'Editar' en el menú de la fila (I3)", async () => {
+  it("recepción no ve el menú de la fila (I3)", async () => {
     loginAs("reception");
     renderAdmin(<ClientsList />, { route: "/admin/clients" });
     await screen.findByText("Camila Torres");
+    expect(screen.queryByRole("button", { name: "Acciones de Camila Torres" })).toBeNull();
+  });
+
+  it("eliminar da de baja: lo explica, pide motivo opcional y lo manda", async () => {
+    mockApi.delete.mockResolvedValue({ data: { data: { id: "u1", anonymized: true } } });
+    renderAdmin(<ClientsList />, { route: "/admin/clients" });
+    await screen.findByText("Camila Torres");
     abrirMenu("Acciones de Camila Torres");
-    expect(await screen.findByRole("menuitem", { name: "Eliminar" })).toBeInTheDocument();
-    expect(screen.queryByRole("menuitem", { name: "Editar" })).toBeNull();
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Eliminar" }));
+    const dlg = await screen.findByRole("alertdialog");
+    expect(within(dlg).getByText(/Sus reservas, órdenes y pagos se conservan/)).toBeInTheDocument();
+    fireEvent.change(within(dlg).getByRole("textbox"), { target: { value: "Lo pidió por WhatsApp" } });
+    fireEvent.click(within(dlg).getByRole("button", { name: "Eliminar clienta" }));
+    await waitFor(() => expect(mockApi.delete).toHaveBeenCalledWith("/users/u1", { data: { reason: "Lo pidió por WhatsApp" } }));
+    await waitFor(() => expect(toastSpy).toHaveBeenCalledWith(expect.objectContaining({ title: "Clienta dada de baja" })));
   });
 
   it("?birthday=month con la petición caída muestra un error, no el vacío de clientas (I4)", async () => {

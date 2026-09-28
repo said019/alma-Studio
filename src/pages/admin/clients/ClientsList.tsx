@@ -95,7 +95,7 @@ const ClientsList = () => {
   const { toast } = useToast();
   const qc = useQueryClient();
   const navigate = useNavigate();
-  const { confirm, dialog } = useConfirm();
+  const { promptText, dialog } = useConfirm();
   // "Editar" pisa datos que el servidor sólo deja tocar a la dueña
   // (PUT /users/:id rechaza a los demás roles) — spec §8, I3.
   const canSeeFinance = useCanSeeFinance();
@@ -146,23 +146,24 @@ const ClientsList = () => {
   const plans: Plan[] = Array.isArray(plansData?.data) ? plansData.data : [];
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => api.delete(`/users/${id}`),
+    mutationFn: ({ id, reason }: { id: string; reason?: string }) =>
+      api.delete(`/users/${id}`, { data: reason ? { reason } : {} }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["clients"] });
-      toast({ title: "Clienta eliminada" });
+      toast({ title: "Clienta dada de baja", description: "Se borraron sus datos personales; su historial y sus pagos se conservan." });
     },
     onError: (e: any) =>
       toast({ title: "No se pudo eliminar", description: e?.response?.data?.message ?? "Revisa si tiene membresías o reservas activas.", variant: "destructive" }),
   });
 
   const askDelete = async (c: Client) => {
-    const ok = await confirm({
-      title: `¿Eliminar a ${c.displayName}?`,
-      description: "Se borra su cuenta y su acceso al estudio. Esta acción no se puede deshacer.",
+    const reason = await promptText({
+      title: `¿Dar de baja a ${c.displayName}?`,
+      description: "Se borran sus datos personales y de salud y se cierra su acceso. Sus reservas, órdenes y pagos se conservan sin su nombre. No se puede deshacer.",
+      placeholder: "Motivo (opcional): p. ej. lo pidió por WhatsApp",
       confirmLabel: "Eliminar clienta",
-      destructive: true,
     });
-    if (ok) deleteMutation.mutate(c.id);
+    if (reason !== null) deleteMutation.mutate({ id: c.id, reason: reason || undefined });
   };
 
   // ── Manual registration form ───────────────────────────────────────────────
@@ -322,26 +323,26 @@ const ClientsList = () => {
                                 <MessageCircle size={18} />
                               </a>
                             )}
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" aria-label={`Acciones de ${c.displayName}`}>
-                                  <MoreHorizontal size={18} />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                {canSeeFinance && (
+                            {canSeeFinance && (
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon" aria-label={`Acciones de ${c.displayName}`}>
+                                    <MoreHorizontal size={18} />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
                                   <DropdownMenuItem onClick={() => setEditId(c.id)}>
                                     Editar
                                   </DropdownMenuItem>
-                                )}
-                                <DropdownMenuItem
-                                  className="text-danger focus:text-danger"
-                                  onClick={() => askDelete(c)}
-                                >
-                                  Eliminar
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
+                                  <DropdownMenuItem
+                                    className="text-danger focus:text-danger"
+                                    onClick={() => askDelete(c)}
+                                  >
+                                    Eliminar
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>

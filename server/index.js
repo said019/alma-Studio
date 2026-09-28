@@ -66,6 +66,8 @@ import { verifyWellhubSignature, extractSignatureHeader } from "./lib/wellhub/si
 import { extractGymId, computeEventId } from "./lib/wellhub/payload.js";
 import { getWellhubCredentials } from "./lib/wellhub/credentials.js";
 import { publicPartnerSettings, mergeSecret } from "./lib/partnerSettings.js";
+import { createAccountGate } from "./lib/accountGate.js";
+import { userAnonymizationValues, buildAnonymizeUpdate, WAIVER_ANON_VALUES, GUEST_ANON_VALUES } from "./lib/anonymize.js";
 import { validateWellhubVisit as wellhubValidateVisit } from "./lib/wellhub/api.js";
 import { handleBookingRequested, handleCheckin, handleCancel, handlePlanChange } from "./lib/wellhub/flows.js";
 import { isUuid, signatureProblem } from "./lib/validate.js";
@@ -3047,16 +3049,30 @@ function isStrongPassword(password) {
   return candidate.length >= 8 && /[A-Z]/.test(candidate) && /[0-9]/.test(candidate);
 }
 
+// Cuentas dadas de baja (anonimizadas) o borradas: su token deja de servir
+// aunque no haya vencido. Ver server/lib/accountGate.js (auditoría 2026-09-27, P1-5).
+const accountGate = createAccountGate({
+  lookup: async (userId) => {
+    if (!isUuid(userId)) return false;
+    const r = await pool.query("SELECT anonymized_at FROM users WHERE id = $1", [userId]);
+    return r.rows.length === 0 || r.rows[0].anonymized_at != null;
+  },
+});
+
 async function authMiddleware(req, res, next) {
   const header = req.headers.authorization;
   if (!header?.startsWith("Bearer ")) return res.status(401).json({ message: "No autorizado" });
+  let payload;
   try {
-    const payload = jwt.verify(header.slice(7), JWT_SECRET);
-    req.userId = payload.sub;
-    next();
+    payload = jwt.verify(header.slice(7), JWT_SECRET);
   } catch {
     return res.status(401).json({ message: "Token inválido" });
   }
+  req.userId = payload.sub;
+  if (await accountGate.isDisabled(req.userId)) {
+    return res.status(401).json({ code: "ACCOUNT_DISABLED", message: "Esta cuenta fue dada de baja." });
+  }
+  next();
 }
 
 function roleGuard(allowed) {
@@ -12990,7 +13006,7 @@ app.get("/api/admin/stats", adminMiddleware, async (req, res) => {
 app.get("/api/users", adminMiddleware, async (req, res) => {
   try {
     const { role, search = "" } = req.query;
-    let q = `SELECT id, display_name, email, phone, role, created_at FROM users WHERE 1=1`;
+    let q = `SELECT id, display_name, email, phone, role, created_at FROM users WHERE anonymized_at IS NULL`;
     const params = [];
     if (role) { params.push(role); q += ` AND role = $${params.length}`; }
     const searchValue = String(search ?? "").trim();
@@ -13036,38 +13052,110 @@ app.post("/api/users", adminMiddleware, async (req, res) => {
   }
 });
 
-// DELETE /api/users/:id
-app.delete("/api/users/:id", adminMiddleware, async (req, res) => {
+// Columnas que existen en la base, por tabla (la baja sólo toca ésas).
+async function existingColumns(db, tables) {
+  const r = await db.query(
+    `SELECT table_name, column_name FROM information_schema.columns
+      WHERE table_schema = current_schema() AND table_name = ANY($1::text[])`,
+    [tables],
+  );
+  const out = Object.fromEntries(tables.map((t) => [t, new Set()]));
+  for (const row of r.rows) out[row.table_name]?.add(row.column_name);
+  return out;
+}
+
+// DELETE /api/users/:id — dar de baja a una clienta SIN borrar su historial
+// (auditoría 2026-09-27, P1-5 · A9 · EC15). Antes el DELETE se llevaba en cascada
+// sus órdenes, pagos y reservas. Ahora se anonimiza: se quitan sus datos
+// personales y de salud, se cierra su acceso y se conserva todo lo demás con el
+// mismo id. Sólo la dueña: es irreversible.
+app.delete("/api/users/:id", ownerMiddleware, async (req, res) => {
+  const id = req.params.id;
+  if (!isUuid(id)) {
+    return res.status(400).json({ message: "Identificador inválido" });
+  }
+  if (id === req.userId) {
+    return res.status(400).json({ message: "No puedes eliminar tu propia cuenta." });
+  }
+  const client = await pool.connect();
   try {
-    const id = req.params.id;
-    if (id === req.userId) {
-      return res.status(400).json({ message: "No puedes eliminar tu propia cuenta." });
+    await client.query("BEGIN");
+    const cur = await client.query(
+      "SELECT id, role::text AS role, is_active, anonymized_at, guest_profile_id FROM users WHERE id = $1 FOR UPDATE",
+      [id],
+    );
+    if (!cur.rows.length) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ message: "Clienta no encontrada" });
     }
-    // No borrar clientas con historial vivo: membresías activas o reservas próximas.
-    const deps = await pool.query(
+    const target = cur.rows[0];
+    if (!["client", "guest"].includes(target.role)) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({ message: "Sólo se pueden dar de baja clientas desde aquí." });
+    }
+    if (target.anonymized_at) {
+      await client.query("ROLLBACK");
+      return res.json({ message: "La clienta ya estaba dada de baja.", data: { id, alreadyAnonymized: true } });
+    }
+    // No dar de baja con historial vivo: membresías activas o reservas próximas.
+    const deps = await client.query(
       `SELECT
          (SELECT COUNT(*) FROM memberships
             WHERE user_id = $1 AND status IN ('active','pending_activation','pending_payment')) AS memberships,
          (SELECT COUNT(*) FROM bookings b JOIN classes c ON b.class_id = c.id
             WHERE b.user_id = $1 AND b.status IN ('confirmed','checked_in')
               AND c.date >= (NOW() AT TIME ZONE '${STUDIO_TIMEZONE}')::date) AS upcoming`,
-      [id]
+      [id],
     );
     const d = deps.rows[0] || {};
     if (Number(d.memberships) > 0 || Number(d.upcoming) > 0) {
+      await client.query("ROLLBACK");
       return res.status(409).json({
         message: "No se puede eliminar: la clienta tiene membresías activas o reservas próximas. Cancélalas primero.",
       });
     }
-    const del = await pool.query("DELETE FROM users WHERE id = $1 RETURNING id", [id]);
-    if (!del.rows.length) return res.status(404).json({ message: "Usuario no encontrado" });
-    return res.json({ message: "Usuario eliminado" });
-  } catch (err) {
-    console.error("DELETE /api/users/:id error:", err);
-    if (err?.code === "23503") {
-      return res.status(409).json({ message: "No se puede eliminar: la clienta tiene historial asociado (reservas o pagos). Considera desactivarla en su lugar." });
+    const kept = (await client.query(
+      `SELECT (SELECT COUNT(*)::int FROM memberships WHERE user_id = $1) AS memberships,
+              (SELECT COUNT(*)::int FROM orders WHERE user_id = $1) AS orders,
+              (SELECT COUNT(*)::int FROM bookings WHERE user_id = $1) AS bookings`,
+      [id],
+    )).rows[0];
+
+    const cols = await existingColumns(client, ["users", "waivers", "guest_profiles"]);
+    const u = buildAnonymizeUpdate({
+      table: "users", values: userAnonymizationValues(id, req.userId),
+      nowColumns: ["anonymized_at", "updated_at"], existing: cols.users, id,
+    });
+    await client.query(u.sql, u.params);
+    const w = buildAnonymizeUpdate({ table: "waivers", values: WAIVER_ANON_VALUES, existing: cols.waivers, idColumn: "user_id", id });
+    if (w) await client.query(w.sql, w.params);
+    if (target.guest_profile_id) {
+      const g = buildAnonymizeUpdate({ table: "guest_profiles", values: GUEST_ANON_VALUES, nowColumns: ["updated_at"], existing: cols.guest_profiles, id: target.guest_profile_id });
+      if (g) await client.query(g.sql, g.params);
     }
+    await client.query("UPDATE referral_codes SET is_active = false WHERE user_id = $1", [id]);
+    await client.query("DELETE FROM password_reset_tokens WHERE user_id = $1", [id]);
+    const serial = buildAppleWalletSerialFromUserId(id);
+    await client.query("DELETE FROM apple_wallet_devices WHERE serial_number = $1 OR serial_number LIKE $2", [serial, `${serial}_ev_%`]);
+    await recordAudit(client, {
+      actorId: req.userId, action: "user.anonymize", entityType: "user", entityId: id, subjectUserId: id,
+      reason: req.body?.reason,
+      before: { role: target.role, is_active: target.is_active !== false },
+      after: { is_active: false, anonymized: true },
+      meta: { kept },
+    });
+    await client.query("COMMIT");
+    accountGate.forget(id);
+    return res.json({
+      message: "Clienta dada de baja: se borraron sus datos personales y se conserva su historial.",
+      data: { id, anonymized: true, kept },
+    });
+  } catch (err) {
+    await client.query("ROLLBACK").catch(() => {});
+    console.error("DELETE /api/users/:id error:", err);
     return res.status(500).json({ message: "Error interno" });
+  } finally {
+    client.release();
   }
 });
 
