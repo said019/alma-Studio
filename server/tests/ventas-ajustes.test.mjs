@@ -1,4 +1,4 @@
-// Tarea 3 · auditoría 2026-09-27, bloque 2 (P0-3 · E2 · D12 · I5). Venta en
+// Auditoría 2026-09-27, bloque 2 (P0-3 · E2 · D12 · I5). Venta en
 // mostrador con quién, referencia y motivo si es $0 o distinto al plan; ajustes
 // de saldo/vigencia/estado con motivo; todo en la bitácora.
 import { test, before, after } from "node:test";
@@ -92,6 +92,7 @@ test("entradas malas en la venta → 400, nunca 500", async () => {
     { userId: c.id, planId: f.plan.id, startDate: "no-es-fecha" },
     { userId: c.id, planId: f.plan.id, startDate: "2026-02-30" },
     { userId: c.id, planId: f.plan.id, startDate: "2026-09-25Tbasura" },
+    { userId: c.id, planId: f.plan.id, startDate: "2026-09-25 junk" },
   ]) {
     const r = await venta(body);
     assert.equal(r.status, 400, JSON.stringify(body).slice(0, 80));

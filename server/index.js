@@ -58,7 +58,7 @@ import {
 import { ALMA_CLASS_TYPES, ALMA_SCHEDULE_SLOTS, ALMA_SCHEDULE_DAYS, ALMA_PLANS } from "./lib/almaCatalog.js";
 import { seedClassTypesIfEmpty, seedPlansIfEmpty } from "./lib/catalogSeed.js";
 import { resolveEffectivePrice } from "./lib/pricing.js";
-import { saleAmountPlan, planMembershipAdjust, cleanPaymentReference, saleStartProblem, saleAuditAfter } from "./lib/membershipAdmin.js";
+import { saleAmountPlan, planMembershipAdjust, cleanPaymentReference, saleStartProblem, saleStartDay, saleAuditAfter, PAYMENT_METHODS } from "./lib/membershipAdmin.js";
 import { isMembershipCategoryCompatible as ruleCategoryCompatible, normalizeClassCategory as ruleNormalizeCategory, isWithinMorningWindow, categoryLabel } from "./lib/bookingRules.js";
 import { rateKey } from "./lib/rateKey.js";
 import { isWithinCancelWindow, penaltyDueAt, faltaReversal } from "./lib/faltas.js";
@@ -117,9 +117,6 @@ const DEFAULT_GENERAL_SETTINGS = {
   venue_media_updated_at: "",
   opening_pricing_active: true,
 };
-
-// Valores válidos del enum payment_method en la base.
-const PAYMENT_METHODS = ["cash", "transfer", "card", "online"];
 
 // Operación diaria: dueña, recepción e instructoras.
 const OPERATIONS_ROLES = ["admin", "super_admin", "instructor", "reception"];
@@ -3060,6 +3057,17 @@ const accountGate = createAccountGate({
     return r.rows.length === 0 || r.rows[0].anonymized_at != null;
   },
 });
+
+// Venta o asignación a una clienta dada de baja: 409 antes de abrir cualquier
+// transacción, para no reactivarla por accidente.
+async function anonymizedSaleConflict(userId) {
+  if (!isUuid(userId)) return null;
+  const r = await pool.query("SELECT anonymized_at FROM users WHERE id = $1", [userId]);
+  if (r.rows.length && r.rows[0].anonymized_at) {
+    return { code: "ACCOUNT_ANONYMIZED", message: "Esta clienta fue dada de baja." };
+  }
+  return null;
+}
 
 async function authMiddleware(req, res, next) {
   const header = req.headers.authorization;
@@ -13139,7 +13147,7 @@ async function existingColumns(db, tables) {
 app.delete("/api/users/:id", ownerMiddleware, async (req, res) => {
   // `id` no se valida aquí: app.param("id") (arriba, registro de rutas) ya
   // responde 400 "Identificador inválido" para cualquier valor que no sea un
-  // UUID, antes de que este handler corra. Ronda de ajustes 1, ítem 4.
+  // UUID, antes de que este handler corra.
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -13157,8 +13165,7 @@ app.delete("/api/users/:id", ownerMiddleware, async (req, res) => {
     // minúscula, de aquí en adelante se usa el normalizado para que el correo
     // anónimo, el candado de caché (accountGate) y el serial de Apple Wallet
     // coincidan exactamente con lo que ya usa el resto del sistema (que siempre
-    // trabaja con el id normalizado que devuelve la base). Ronda de ajustes 1,
-    // ítem 2.
+    // trabaja con el id normalizado que devuelve la base).
     const id = target.id;
     if (id === req.userId) {
       await client.query("ROLLBACK");
@@ -13189,6 +13196,22 @@ app.delete("/api/users/:id", ownerMiddleware, async (req, res) => {
         message: "No se puede eliminar: la clienta tiene membresías activas o reservas próximas. Cancélalas primero.",
       });
     }
+    // La lista de espera no cuenta para el candado de "reservas próximas"
+    // (no ocupa cupo ni consume crédito), pero si la clienta se va no debe
+    // quedar esperando un lugar en una clase futura: se cancelan esos
+    // lugares en la misma transacción. Sin devolver crédito: la lista de
+    // espera no lo consume.
+    const waitlistCancel = await client.query(
+      `UPDATE bookings b SET status = 'cancelled', cancelled_at = NOW(), cancelled_by = $2,
+              cancellation_reason = 'Baja de la clienta'
+         FROM classes c
+        WHERE b.class_id = c.id AND b.user_id = $1 AND b.status = 'waitlist'
+          AND c.date >= (NOW() AT TIME ZONE '${STUDIO_TIMEZONE}')::date
+       RETURNING b.id`,
+      [id, req.userId],
+    );
+    const waitlistCancelled = waitlistCancel.rows.length;
+
     const kept = (await client.query(
       `SELECT (SELECT COUNT(*)::int FROM memberships WHERE user_id = $1) AS memberships,
               (SELECT COUNT(*)::int FROM orders WHERE user_id = $1) AS orders,
@@ -13209,10 +13232,9 @@ app.delete("/api/users/:id", ownerMiddleware, async (req, res) => {
       const g = buildAnonymizeUpdate({ table: "guest_profiles", values: GUEST_ANON_VALUES, nowColumns: ["updated_at"], existing: cols.guest_profiles, id: target.guest_profile_id });
       if (g) await client.query(g.sql, g.params);
     }
-    // Inscripciones a eventos (auditoría, ronda de ajustes 1, ítem 1): se
-    // conserva la fila (el evento asistido queda en el historial), pero el
-    // nombre, correo y teléfono con los que se inscribió se anonimizan igual
-    // que en `users`.
+    // Inscripciones a eventos: se conserva la fila (el evento asistido queda
+    // en el historial), pero el nombre, correo y teléfono con los que se
+    // inscribió se anonimizan igual que en `users`.
     const er = buildAnonymizeUpdate({
       table: "event_registrations", values: eventRegistrationAnonValues(id),
       nowColumns: ["updated_at"], existing: cols.event_registrations, idColumn: "user_id", id,
@@ -13233,7 +13255,7 @@ app.delete("/api/users/:id", ownerMiddleware, async (req, res) => {
       reason: req.body?.reason,
       before: { role: target.role, is_active: target.is_active !== false },
       after: { is_active: false, anonymized: true },
-      meta: { kept },
+      meta: { kept, waitlist_cancelled: waitlistCancelled },
     });
     await client.query("COMMIT");
     accountGate.forget(id);
@@ -13320,6 +13342,8 @@ app.post("/api/memberships", adminMiddleware, async (req, res) => {
     const { userId, planId, startDate } = req.body || {};
     if (!userId || !planId) return res.status(400).json({ message: "userId y planId requeridos" });
     if (!isUuid(userId) || !isUuid(planId)) return res.status(400).json({ message: "Identificador inválido" });
+    const anonConflict = await anonymizedSaleConflict(userId);
+    if (anonConflict) return res.status(409).json(anonConflict);
     // El método de pago se exige explícito: el default anterior ("efectivo") ni
     // siquiera era un valor del enum payment_method y reventaba con 500, además
     // de registrar como efectivo lo que quizá fue transferencia.
@@ -13330,16 +13354,14 @@ app.post("/api/memberships", adminMiddleware, async (req, res) => {
         message: `Método de pago requerido. Opciones: ${PAYMENT_METHODS.join(", ")}.`,
       });
     }
-    // "2026-02-30" no da NaN en `new Date()`: se corre silenciosamente a marzo.
-    // Auditoría 2026-09-27, R10. `saleStartProblem` sólo mira los primeros 10
-    // caracteres (AAAA-MM-DD): basura después de ahí ("2026-09-25Tbasura") la
-    // deja pasar, y `start.toISOString()` más abajo revienta con 500. Por eso
-    // se conserva también el chequeo de `Number.isNaN`. Ronda de ajustes 1,
-    // 2026-09-28.
+    // "2026-02-30" no da NaN en `new Date()`: se corre silenciosamente a marzo,
+    // y "2026-09-25 junk" también parsea a una fecha válida pero equivocada
+    // (JS ignora la basura y cambia de mes). `saleStartDay` exige el día
+    // AAAA-MM-DD exacto (o un ISO completo del que sólo recorta la hora) y
+    // `start` se arma desde ese día ya validado, nunca desde el texto crudo.
     const startProblem = saleStartProblem(startDate);
     if (startProblem) return res.status(400).json({ message: startProblem });
-    const start = startDate ? new Date(startDate) : new Date();
-    if (Number.isNaN(start.getTime())) return res.status(400).json({ message: "Fecha de inicio inválida (usa AAAA-MM-DD)." });
+    const start = startDate ? new Date(`${saleStartDay(startDate)}T00:00:00Z`) : new Date();
     const ref = cleanPaymentReference(req.body.paymentReference);
     if (!ref.ok) return res.status(400).json({ message: ref.message });
 
@@ -13437,7 +13459,7 @@ app.post("/api/memberships", adminMiddleware, async (req, res) => {
     // La descripción se queda con `plan.price` (no `sale.amount`): así sigue
     // coincidiendo con la que arma /admin/loyalty/recalculate/:userId para no
     // duplicar puntos al recalcular; los PUNTOS sí se calculan sobre lo
-    // cobrado. Ronda de ajustes 1, 2026-09-28.
+    // cobrado.
     if (userId && sale.amount > 0) {
       try {
         const cfg = await getLoyaltyConfig();
@@ -13657,7 +13679,7 @@ app.put("/api/memberships/:id", adminMiddleware, async (req, res) => {
     // todo `plan.next`: si el panel manda 9999 sobre una membresía ilimitada
     // (NULL) para otro campo (p. ej. sólo el estado), 9999 y NULL son el mismo
     // valor y no debe grabarse — si se grabara, quedaría un cambio real de
-    // dato sin motivo ni bitácora. Ronda de ajustes 1, 2026-09-28.
+    // dato sin motivo ni bitácora.
     const n = plan.next;
     const changed = new Set(plan.changes.changed);
     const val = (key) => (changed.has(key) ? n[key] ?? null : null);
@@ -13928,6 +13950,8 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
   const { classId, userId, guest, guestSale } = req.body;
   if (!classId || !userId) return res.status(400).json({ message: "classId y userId requeridos" });
   if (!isUuid(classId) || !isUuid(userId)) return res.status(400).json({ message: "Identificador inválido" });
+  const anonConflict = await anonymizedSaleConflict(userId);
+  if (anonConflict) return res.status(409).json(anonConflict);
   // Responsiva: recepción puede asignar sin firma si deja el motivo por el que
   // la clienta firmará en recepción (auditoría 2026-09-27, bloque 1, tarea 5).
   const override = req.body?.waiverOverride;
@@ -14296,7 +14320,7 @@ async function awardCheckinPoints(userId) {
 // Inserta los puntos de "Clase asistida": los comparte el check-in (lista/QR,
 // dentro del try/catch best-effort de awardCheckinPoints) y la corrección de
 // falta (dentro de su transacción). Devuelve los puntos otorgados (0 si el
-// programa está apagado); lanza si la base falla (bloque 2, R11).
+// programa está apagado); lanza si la base falla.
 async function insertCheckinPoints(q, userId, cfg) {
   const pts = Number(cfg.points_per_class);
   if (cfg.enabled === false || !(pts > 0)) return 0;
@@ -14500,7 +14524,9 @@ app.put("/api/bookings/:id/no-show", adminMiddleware, async (req, res) => {
       if (bk.user_id && !bk.guest_profile_id) {
         falta = await recordFalta({ userId: bk.user_id, reason: "no-show" });
         if (falta.faltasCount > 0) {
-          await pool.query("UPDATE bookings SET falta_recorded_at = NOW() WHERE id = $1", [bk.id]);
+          // Sólo si sigue en falta: si ya la corrigieron a asistencia mientras
+          // esto corría, no le vuelve a poner una marca de falta.
+          await pool.query("UPDATE bookings SET falta_recorded_at = NOW() WHERE id = $1 AND status = 'no_show'", [bk.id]);
         }
       }
     } catch (e) { console.warn("[faltas] no-show:", e.message); }
@@ -14656,6 +14682,14 @@ app.post("/api/admin/clients/manual", adminMiddleware, async (req, res) => {
     } = req.body;
     if (!displayName || !email) return res.status(400).json({ message: "Nombre y email son requeridos" });
 
+    // El alta es un upsert por email: si ya hay una clienta dada de baja con
+    // este correo, el ON CONFLICT de abajo la reactivaría sin querer.
+    const emailNorm = email.toLowerCase().trim();
+    const existingByEmail = await client.query("SELECT id, anonymized_at FROM users WHERE email = $1", [emailNorm]);
+    if (existingByEmail.rows.length && existingByEmail.rows[0].anonymized_at) {
+      return res.status(409).json({ code: "ACCOUNT_ANONYMIZED", message: "Esta clienta fue dada de baja." });
+    }
+
     await client.query("BEGIN");
 
     // 1. Create user (random password — they can reset later)
@@ -14670,7 +14704,7 @@ app.post("/api/admin/clients/manual", adminMiddleware, async (req, res) => {
          phone = EXCLUDED.phone,
          updated_at = NOW()
        RETURNING id, display_name, email`,
-      [displayName, email.toLowerCase().trim(), phone || null, dateOfBirth || null,
+      [displayName, emailNorm, phone || null, dateOfBirth || null,
         emergencyContactName || null, emergencyContactPhone || null, healthNotes || null, hash]
     );
     const user = userRes.rows[0];
@@ -14688,7 +14722,11 @@ app.post("/api/admin/clients/manual", adminMiddleware, async (req, res) => {
         await client.query("ROLLBACK");
         return res.status(409).json({ message: nonRepeatableConflict.message });
       }
-      const start = startDate ? new Date(startDate) : new Date();
+      // Misma validación que la venta en mostrador: día AAAA-MM-DD exacto,
+      // nunca texto crudo con basura pegada.
+      const startProblem = saleStartProblem(startDate);
+      if (startProblem) { await client.query("ROLLBACK"); return res.status(400).json({ message: startProblem }); }
+      const start = startDate ? new Date(`${saleStartDay(startDate)}T00:00:00Z`) : new Date();
       const end = new Date(start);
       end.setDate(end.getDate() + plan.duration_days);
 
@@ -15419,7 +15457,7 @@ app.post("/api/admin/loyalty/recalculate/:userId", adminMiddleware, async (req, 
 
     // Get all active/expired memberships for this user, con el total de la
     // orden ligada (si la hay): una cortesía es una orden en $0 y no debe
-    // recibir puntos retroactivos. Ronda de ajustes 1, 2026-09-28.
+    // recibir puntos retroactivos.
     const mRes = await pool.query(
       `SELECT m.id, p.price, p.name, o.total_amount
        FROM memberships m
@@ -15756,7 +15794,7 @@ app.delete("/api/admin/classes/:id", adminMiddleware, async (req, res) => {
     const cls = cur.rows[0];
     // NOT EXISTS dentro del propio DELETE (no un SELECT COUNT aparte): si algo
     // reserva la clase entre el SELECT de arriba y aquí, esta consulta ya no
-    // borra nada — nunca una foto vieja del conteo (Review Focus 4).
+    // borra nada — nunca una foto vieja del conteo.
     const del = await client.query(
       `DELETE FROM classes c WHERE c.id = $1 AND NOT EXISTS (SELECT 1 FROM bookings b WHERE b.class_id = c.id)`,
       [cls.id],

@@ -1,4 +1,4 @@
-// Tarea 6 · auditoría 2026-09-27, bloque 2 (P1-5 · A9 · EC15). Dar de baja a una
+// Auditoría 2026-09-27, bloque 2 (P1-5 · A9 · EC15). Dar de baja a una
 // clienta la anonimiza: sin datos personales ni de salud, sin acceso, y con sus
 // órdenes, membresías y reservas conservadas. Sólo la dueña.
 import { test, before, after } from "node:test";
@@ -99,7 +99,7 @@ test("dar de baja: borra datos personales y de salud, conserva historial y cierr
   assert.deepEqual(await cuenta(), hist, "órdenes, membresías, reservas e inscripciones a eventos se conservan");
 
   // La inscripción al evento conserva el evento, pero ya no lleva su nombre,
-  // correo ni teléfono (ronda de ajustes 1, ítem 1).
+  // correo ni teléfono.
   const [evReg] = await sql(`SELECT event_id, name, email, phone FROM event_registrations WHERE user_id=$1`, [c.id]);
   assert.equal(evReg.event_id, eventId, "conserva el evento al que se inscribió");
   assert.equal(evReg.name, "Clienta dada de baja");
@@ -179,4 +179,41 @@ test("un id con otra mayúscula/minúscula anonimiza igual y el token viejo qued
   const me = await api("GET", "/api/auth/me", { token: c.token });
   assert.equal(me.status, 401);
   assert.equal(me.body.code, "ACCOUNT_DISABLED");
+});
+
+test("la baja cancela sus lugares en listas de espera de clases futuras, sin devolver crédito", async () => {
+  const c = await makeClient(PFX, "espera");
+  const classId = await makeClass(A, f, { date: day(5) });
+  const [booking] = await sql(
+    `INSERT INTO bookings (class_id, user_id, status) VALUES ($1, $2, 'waitlist') RETURNING id`,
+    [classId, c.id],
+  );
+  const r = await api("DELETE", `/api/users/${c.id}`, { token: A, body: {} });
+  assert.equal(r.status, 200, JSON.stringify(r.body).slice(0, 200));
+  bajas.push(c.id);
+  const [b] = await sql(`SELECT status, cancelled_by, cancellation_reason FROM bookings WHERE id = $1`, [booking.id]);
+  assert.equal(b.status, "cancelled");
+  assert.equal(b.cancelled_by, adminId);
+  assert.equal(b.cancellation_reason, "Baja de la clienta");
+  const [log] = await sql(
+    `SELECT meta FROM audit_log WHERE entity_id = $1 AND action = 'user.anonymize' ORDER BY created_at DESC LIMIT 1`, [c.id]);
+  assert.equal(log.meta.waitlist_cancelled, 1);
+});
+
+test("clienta dada de baja: ni se le vende ni se le asigna → 409", async () => {
+  const c = await makeClient(PFX, "vendida");
+  const del = await api("DELETE", `/api/users/${c.id}`, { token: A, body: {} });
+  assert.equal(del.status, 200, JSON.stringify(del.body).slice(0, 200));
+  bajas.push(c.id);
+
+  const venta = await api("POST", "/api/memberships", {
+    token: A, body: { userId: c.id, planId: f.plan.id, paymentMethod: "cash", startDate: day(0) },
+  });
+  assert.equal(venta.status, 409);
+  assert.equal(venta.body.code, "ACCOUNT_ANONYMIZED");
+
+  const classId = await makeClass(A, f, { date: day(5) });
+  const assign = await api("POST", "/api/admin/bookings/assign", { token: A, body: { classId, userId: c.id } });
+  assert.equal(assign.status, 409);
+  assert.equal(assign.body.code, "ACCOUNT_ANONYMIZED");
 });

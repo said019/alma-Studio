@@ -21,6 +21,24 @@ export function addDaysYmd(ymd, days) {
   return d.toISOString().slice(0, 10);
 }
 
+const ISO_DATETIME_RE = /^(\d{4}-\d{2}-\d{2})T\d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?(Z|[+-]\d{2}:?\d{2})?$/;
+
+/**
+ * Día AAAA-MM-DD de una fecha de inicio de venta, o null si no sirve. Exige
+ * `isDay` exacto sobre el valor completo; sólo si es un ISO completo válido
+ * (AAAA-MM-DDTHH:mm…) recorta esa parte de hora y valida el día resultante.
+ * Cualquier otra basura pegada al día ("2026-09-25 junk") se rechaza: antes,
+ * un `.slice(0, 10)` la dejaba pasar y `new Date()` la corría silenciosamente
+ * a otro mes sin marcar error.
+ */
+export function saleStartDay(v) {
+  const s = String(v);
+  if (isDay(s)) return s;
+  const m = ISO_DATETIME_RE.exec(s);
+  if (m && isDay(m[1])) return m[1];
+  return null;
+}
+
 /**
  * Problema con la fecha de inicio de una venta, o null si sirve (sin fecha
  * incluido). `new Date("2026-02-30")` no da NaN: la corre silenciosamente al
@@ -28,8 +46,7 @@ export function addDaysYmd(ymd, days) {
  */
 export function saleStartProblem(v) {
   if (!given(v)) return null;
-  if (!isDay(String(v).slice(0, 10))) return "Fecha de inicio inválida (usa AAAA-MM-DD).";
-  return null;
+  return saleStartDay(v) ? null : "Fecha de inicio inválida (usa AAAA-MM-DD).";
 }
 
 /**
