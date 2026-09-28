@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from "vitest";
-import { fireEvent, screen, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 
 vi.mock("@/lib/api", () => ({ default: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() } }));
 import api from "@/lib/api";
@@ -143,5 +143,24 @@ describe("Ficha de clienta", () => {
     renderAdmin(<ClientDetail />, { route: "/admin/clients/u1", path: "/admin/clients/:id" });
     const resp = await screen.findByRole("region", { name: "Responsiva" });
     expect(within(resp).queryByText("Pendiente")).toBeNull();
+  });
+
+  it("editar la membresía pide motivo, avisa si queda por encima del plan y lo manda", async () => {
+    const mockPut = (api as unknown as { put: Mock }).put;
+    mockPut.mockReset().mockResolvedValue({ data: {} });
+    loginAs("admin");
+    routeApi(mockApi, tabla());
+    renderAdmin(<ClientDetail />, { route: "/admin/clients/u1", path: "/admin/clients/:id" });
+    const mem = await screen.findByRole("region", { name: "Membresía" });
+    fireEvent.click(await within(mem).findByRole("button", { name: /Editar/ }));
+    const dlg = await screen.findByRole("dialog", { name: "Editar membresía" });
+    fireEvent.change(within(dlg).getByLabelText("Clases restantes"), { target: { value: "10" } });
+    expect(within(dlg).getByText("Queda por encima del plan (8 clases).")).toBeInTheDocument();
+    const guardar = within(dlg).getByRole("button", { name: "Guardar" });
+    expect(guardar).toBeDisabled();
+    fireEvent.change(within(dlg).getByLabelText("Motivo del ajuste"), { target: { value: "Compensación por clase cancelada" } });
+    expect(guardar).toBeEnabled();
+    fireEvent.click(guardar);
+    await waitFor(() => expect(mockPut).toHaveBeenCalledWith("/memberships/m1", expect.objectContaining({ classesRemaining: 10, reason: "Compensación por clase cancelada" })));
   });
 });

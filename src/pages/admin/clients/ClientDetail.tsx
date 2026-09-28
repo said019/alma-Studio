@@ -18,6 +18,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -27,6 +28,7 @@ import { cn } from "@/lib/utils";
 import { useCanSeeFinance } from "@/lib/roles";
 import { FEATURES } from "@/config/features";
 import { waLink } from "@/lib/phone";
+import { REASON_MIN_CHARS } from "@/lib/audit-log";
 import {
   ArrowLeft, ArrowRight, CalendarDays, Camera, ChevronLeft, ChevronRight, CreditCard,
   MessageCircle, Pencil, Phone, Receipt, RefreshCw, type LucideProps,
@@ -305,6 +307,7 @@ const ClientDetail = () => {
   const [editStatus, setEditStatus] = useState("");
   const [editStartDate, setEditStartDate] = useState("");
   const [editEndDate, setEditEndDate] = useState("");
+  const [editReason, setEditReason] = useState("");
 
   // Paginación por pestaña
   const [memPage, setMemPage] = useState(0);
@@ -392,6 +395,7 @@ const ClientDetail = () => {
     setEditStatus(m.status ?? "active");
     setEditStartDate(m.startDate ? String(m.startDate).slice(0, 10) : "");
     setEditEndDate(m.endDate ? String(m.endDate).slice(0, 10) : "");
+    setEditReason("");
   };
 
   const handleEditStartDateChange = (val: string) => {
@@ -410,6 +414,7 @@ const ClientDetail = () => {
       body.classesRemaining = editUnlimited ? 9999 : Math.max(0, Number(editCredits || 0));
       if (editStartDate) body.startDate = editStartDate;
       if (editEndDate) body.endDate = editEndDate;
+      body.reason = editReason.trim();
       return api.put(`/memberships/${editMem.id}`, body);
     },
     onSuccess: () => {
@@ -422,6 +427,10 @@ const ClientDetail = () => {
   });
 
   const u = user?.data ?? user;
+
+  const creditsNum = Number(editCredits);
+  const editAbovePlan = !editUnlimited && editMem?.classLimit != null && editCredits.trim() !== ""
+    && Number.isFinite(creditsNum) && creditsNum > Number(editMem.classLimit);
 
   const membershipRows: any[] = Array.isArray(memberships?.data) ? memberships.data : [];
   const bookingRows: any[] = Array.isArray(bookings?.data) ? bookings.data : [];
@@ -924,8 +933,9 @@ const ClientDetail = () => {
                 </div>
 
                 <div className="space-y-1">
-                  <Label className="text-xs text-ink/70">Clases restantes</Label>
+                  <Label htmlFor="mem-credits" className="text-xs text-ink/70">Clases restantes</Label>
                   <Input
+                    id="mem-credits"
                     type="number"
                     min="0"
                     inputMode="numeric"
@@ -938,6 +948,9 @@ const ClientDetail = () => {
                   <p className="text-xs text-ink/50">
                     Ajusta los créditos de la clienta (sirve para paquetes por semana o por mes).
                   </p>
+                  {editAbovePlan && (
+                    <p className="text-[0.75rem] font-bold text-danger">Queda por encima del plan ({editMem.classLimit} clases).</p>
+                  )}
                 </div>
 
                 <div className="space-y-1">
@@ -978,6 +991,12 @@ const ClientDetail = () => {
                     Puedes ajustarlo manualmente.
                   </p>
                 )}
+                <div className="space-y-1">
+                  <Label htmlFor="mem-reason" className="text-xs text-ink/70">Motivo del ajuste</Label>
+                  <Textarea id="mem-reason" rows={2} className={fieldCls} value={editReason} onChange={(e) => setEditReason(e.target.value)}
+                    placeholder="Obligatorio: p. ej. compensación por clase cancelada" />
+                  <p className="text-xs text-ink/50">Queda en la bitácora con tu nombre. Mínimo {REASON_MIN_CHARS} caracteres.</p>
+                </div>
               </div>
             )}
             <DialogFooter>
@@ -986,7 +1005,7 @@ const ClientDetail = () => {
               </Button>
               <Button
                 className={primaryBtnCls}
-                disabled={editMemMutation.isPending || (!editUnlimited && editCredits.trim() === "")}
+                disabled={editMemMutation.isPending || (!editUnlimited && editCredits.trim() === "") || editReason.trim().length < REASON_MIN_CHARS}
                 onClick={() => editMemMutation.mutate()}
               >
                 {editMemMutation.isPending ? "Guardando…" : "Guardar"}

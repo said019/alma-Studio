@@ -58,6 +58,7 @@ import {
 import { ALMA_CLASS_TYPES, ALMA_SCHEDULE_SLOTS, ALMA_SCHEDULE_DAYS, ALMA_PLANS } from "./lib/almaCatalog.js";
 import { seedClassTypesIfEmpty, seedPlansIfEmpty } from "./lib/catalogSeed.js";
 import { resolveEffectivePrice } from "./lib/pricing.js";
+import { saleAmountPlan, planMembershipAdjust, cleanPaymentReference, saleStartProblem, saleAuditAfter } from "./lib/membershipAdmin.js";
 import { isMembershipCategoryCompatible as ruleCategoryCompatible, normalizeClassCategory as ruleNormalizeCategory, isWithinMorningWindow, categoryLabel } from "./lib/bookingRules.js";
 import { rateKey } from "./lib/rateKey.js";
 import { isWithinCancelWindow, penaltyDueAt, faltaReversal } from "./lib/faltas.js";
@@ -13310,11 +13311,15 @@ app.get("/api/memberships", adminMiddleware, async (req, res) => {
   }
 });
 
-// POST /api/memberships — admin assigns membership to a user
+// POST /api/memberships — venta en mostrador: activa la membresía y su orden
+// aprobada en una transacción. Guarda quién vendió (activated_by), la
+// referencia del pago y, si lo cobrado es $0 o distinto al plan, el motivo
+// obligatorio; todo en la bitácora (auditoría 2026-09-27, P0-3 · E2).
 app.post("/api/memberships", adminMiddleware, async (req, res) => {
   try {
-    const { userId, planId, startDate } = req.body;
+    const { userId, planId, startDate } = req.body || {};
     if (!userId || !planId) return res.status(400).json({ message: "userId y planId requeridos" });
+    if (!isUuid(userId) || !isUuid(planId)) return res.status(400).json({ message: "Identificador inválido" });
     // El método de pago se exige explícito: el default anterior ("efectivo") ni
     // siquiera era un valor del enum payment_method y reventaba con 500, además
     // de registrar como efectivo lo que quizá fue transferencia.
@@ -13325,42 +13330,63 @@ app.post("/api/memberships", adminMiddleware, async (req, res) => {
         message: `Método de pago requerido. Opciones: ${PAYMENT_METHODS.join(", ")}.`,
       });
     }
+    // "2026-02-30" no da NaN en `new Date()`: se corre silenciosamente a marzo.
+    // Auditoría 2026-09-27, R10.
+    const startProblem = saleStartProblem(startDate);
+    if (startProblem) return res.status(400).json({ message: startProblem });
+    const start = startDate ? new Date(startDate) : new Date();
+    const ref = cleanPaymentReference(req.body.paymentReference);
+    if (!ref.ok) return res.status(400).json({ message: ref.message });
+
     const planRes = await pool.query("SELECT * FROM plans WHERE id = $1 AND is_active = true", [planId]);
     if (!planRes.rows.length) return res.status(404).json({ message: "Plan no encontrado" });
     const plan = planRes.rows[0];
     const _gen = await getSettingValueWithDefaults("general_settings");
     const _eff = resolveEffectivePrice(plan, _gen?.opening_pricing_active !== false);
+    const sale = saleAmountPlan({ listPrice: _eff ?? 0, amount: req.body.amount, reason: req.body.reason });
+    if (!sale.ok) return res.status(400).json({ ...(sale.code ? { code: sale.code } : {}), message: sale.message });
     const nonRepeatableConflict = await findNonRepeatablePlanConflict({ userId, plan });
     if (nonRepeatableConflict) {
       return res.status(409).json({ message: nonRepeatableConflict.message });
     }
-    const start = startDate ? new Date(startDate) : new Date();
     const end = new Date(start);
     end.setDate(end.getDate() + (plan.duration_days || 30));
 
-    // La venta de mostrador (efectivo/transferencia) también genera su orden
-    // aprobada: los ingresos se calculan sobre `orders`, así que sin esto todo
-    // lo cobrado en recepción quedaba fuera del reporte. Membresía y orden se
-    // escriben en la misma transacción. Auditoría 2026-09-08, P0-3.
+    // Membresía, orden, referencia y bitácora en la misma transacción: los
+    // ingresos se calculan sobre `orders` (auditoría 2026-09-08, P0-3).
     const saleClient = await pool.connect();
     let r;
     try {
       await saleClient.query("BEGIN");
       r = await saleClient.query(
-        `INSERT INTO memberships (user_id, plan_id, status, payment_method, start_date, end_date, classes_remaining)
-         VALUES ($1,$2,'active',$3,$4,$5,$6) RETURNING *`,
-        [userId, planId, paymentMethod, start.toISOString(), end.toISOString(), plan.class_limit ?? null]
+        `INSERT INTO memberships (user_id, plan_id, status, payment_method, start_date, end_date, classes_remaining, activated_by, activated_at)
+         VALUES ($1,$2,'active',$3,$4,$5,$6,$7,NOW())
+         RETURNING *, to_char(start_date, 'YYYY-MM-DD') AS start_ymd, to_char(end_date, 'YYYY-MM-DD') AS end_ymd`,
+        [userId, planId, paymentMethod, start.toISOString(), end.toISOString(), plan.class_limit ?? null, req.userId || null]
       );
       const orderRes = await saleClient.query(
-        `INSERT INTO orders (user_id, plan_id, status, payment_method, subtotal, tax_amount, total_amount,
+        `INSERT INTO orders (user_id, plan_id, status, payment_method, subtotal, tax_amount, total_amount, discount_amount,
                              channel, verified_at, verified_by, approved_at, approved_by, paid_at)
-         VALUES ($1,$2,'approved',$3,$4,0,$4,'counter',NOW(),$5,NOW(),$5,NOW())
-         RETURNING id`,
-        [userId, planId, paymentMethod, _eff ?? 0, req.userId || null]
+         VALUES ($1,$2,'approved',$3,$4,0,$5,$6,'counter',NOW(),$7,NOW(),$7,NOW())
+         RETURNING id, order_number`,
+        [userId, planId, paymentMethod, sale.subtotal, sale.amount, sale.discount, req.userId || null]
       );
-      await saleClient.query(`UPDATE memberships SET order_id = $2 WHERE id = $1`,
-        [r.rows[0].id, orderRes.rows[0].id]);
-      r.rows[0].order_id = orderRes.rows[0].id;
+      const order = orderRes.rows[0];
+      const paymentReference = ref.value || order.order_number || order.id;
+      await saleClient.query(`UPDATE memberships SET order_id = $2, payment_reference = $3 WHERE id = $1`,
+        [r.rows[0].id, order.id, paymentReference]);
+      r.rows[0].order_id = order.id;
+      r.rows[0].payment_reference = paymentReference;
+      await recordAudit(saleClient, {
+        actorId: req.userId, action: "membership.sale", entityType: "membership", entityId: r.rows[0].id,
+        subjectUserId: userId, reason: sale.courtesy || sale.priceDiffers ? req.body.reason : null,
+        after: saleAuditAfter({
+          plan, listPrice: sale.listPrice, amount: sale.amount, paymentMethod, paymentReference,
+          orderId: order.id, startDate: r.rows[0].start_ymd, endDate: r.rows[0].end_ymd,
+          classesRemaining: plan.class_limit ?? null,
+        }),
+        meta: { source: "mostrador", courtesy: sale.courtesy, price_differs: sale.priceDiffers },
+      });
       await saleClient.query("COMMIT");
     } catch (saleErr) {
       await saleClient.query("ROLLBACK").catch(() => { });
@@ -13402,15 +13428,15 @@ app.post("/api/memberships", adminMiddleware, async (req, res) => {
       console.error("[Email] membership create query:", emailErr.message);
     }
 
-    // ── Award loyalty points for membership purchase ────────────────────
-    if (userId && Number(_eff) > 0) {
+    // ── Puntos por compra: sobre lo cobrado (una cortesía no da puntos) ──
+    if (userId && sale.amount > 0) {
       try {
         const cfg = await getLoyaltyConfig();
-        const pts = Math.floor(Number(_eff) * cfg.points_per_peso);
+        const pts = Math.floor(sale.amount * cfg.points_per_peso);
         if (cfg.enabled !== false && pts > 0) {
           await pool.query(
             "INSERT INTO loyalty_transactions (user_id, type, points, description) VALUES ($1, 'earn', $2, $3)",
-            [userId, pts, `Membresía asignada — ${plan.name} ($${plan.price})`]
+            [userId, pts, `Membresía asignada — ${plan.name} ($${sale.amount})`]
           );
         }
       } catch (e) { /* loyalty error shouldn't fail membership creation */ }
@@ -13576,43 +13602,50 @@ app.put("/api/memberships/:id/cancel", adminMiddleware, async (req, res) => {
   }
 });
 
-// PUT /api/memberships/:id — update any field
+// PUT /api/memberships/:id — ajuste de saldo, vigencia, estado o método.
+// Cambiar saldo, vigencia o estado exige motivo; todo cambio queda en la
+// bitácora con el antes y el después (auditoría 2026-09-27, P0-3 · D12 · I5).
+// El panel manda todos los campos aunque no cambien: sólo cuenta lo que cambia
+// de verdad (9999 e ilimitado son lo mismo).
 app.put("/api/memberships/:id", adminMiddleware, async (req, res) => {
+  const { status, classesRemaining, endDate, startDate, paymentMethod, reason } = req.body || {};
+  const client = await pool.connect();
   try {
-    const { status, classesRemaining, endDate, startDate, paymentMethod } = req.body;
-
-    // Validar enum de status.
-    const VALID_STATUS = ["pending_payment", "pending_activation", "active", "expired", "paused", "cancelled"];
-    if (status !== undefined && status !== null && !VALID_STATUS.includes(status)) {
-      return res.status(400).json({
-        message: `status inválido. Debe ser uno de: ${VALID_STATUS.join(", ")}`,
-      });
+    await client.query("BEGIN");
+    const cur = await client.query(
+      `SELECT m.id, m.user_id, m.status::text AS status, m.classes_remaining, m.payment_method::text AS payment_method,
+              to_char(m.start_date, 'YYYY-MM-DD') AS start_date, to_char(m.end_date, 'YYYY-MM-DD') AS end_date,
+              p.duration_days, p.class_limit AS plan_class_limit, p.name AS plan_name
+         FROM memberships m
+         LEFT JOIN plans p ON p.id = m.plan_id
+        WHERE m.id = $1
+        FOR UPDATE OF m`,
+      [req.params.id],
+    );
+    if (!cur.rows.length) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ message: "Membresía no encontrada" });
     }
-
-    if (classesRemaining !== undefined && classesRemaining !== null) {
-      const n = Number(classesRemaining);
-      if (!Number.isFinite(n) || n < 0) {
-        return res.status(400).json({ message: "classesRemaining debe ser >= 0" });
+    const before = cur.rows[0];
+    const plan = planMembershipAdjust({ before, input: { status, classesRemaining, startDate, endDate, paymentMethod } });
+    if (!plan.ok) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({ message: plan.message });
+    }
+    if (!plan.changes.changed.length) {
+      const same = await client.query("SELECT * FROM memberships WHERE id = $1", [req.params.id]);
+      await client.query("ROLLBACK");
+      return res.json({ data: same.rows[0], unchanged: true });
+    }
+    if (plan.needsReason) {
+      const problem = reasonProblem(reason);
+      if (problem) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({ code: "REASON_REQUIRED", message: problem });
       }
     }
-
-    // Si se cambia start_date y no se provee end_date explícito,
-    // recalcular end_date = start_date + duration_days del plan.
-    let resolvedEndDate = endDate || null;
-    if (startDate && !endDate) {
-      const planRes = await pool.query(
-        `SELECT p.duration_days FROM memberships m JOIN plans p ON p.id = m.plan_id WHERE m.id = $1`,
-        [req.params.id]
-      );
-      const durationDays = planRes.rows[0]?.duration_days;
-      if (durationDays) {
-        const d = new Date(startDate);
-        d.setDate(d.getDate() + durationDays);
-        resolvedEndDate = d.toISOString().slice(0, 10);
-      }
-    }
-
-    const r = await pool.query(
+    const n = plan.next;
+    const r = await client.query(
       `UPDATE memberships SET
          status = COALESCE($1, status),
          classes_remaining = COALESCE($2, classes_remaining),
@@ -13621,16 +13654,25 @@ app.put("/api/memberships/:id", adminMiddleware, async (req, res) => {
          payment_method = COALESCE($5, payment_method),
          updated_at = NOW()
        WHERE id = $6 RETURNING *`,
-      [status || null, classesRemaining ?? null, resolvedEndDate, startDate || null, paymentMethod || null, req.params.id]
+      [n.status ?? null, n.classes_remaining ?? null, n.end_date ?? null, n.start_date ?? null, n.payment_method ?? null, req.params.id],
     );
-    if (!r.rows.length) return res.status(404).json({ message: "Membresía no encontrada" });
-    // Si el admin cambió el total de una membresía mixta, re-reparte los buckets.
-    if (classesRemaining != null) await resyncMixtoBuckets(pool, req.params.id);
+    // Si cambió el total de una membresía mixta, re-reparte los buckets.
+    if (plan.changes.changed.includes("classes_remaining")) await resyncMixtoBuckets(client, req.params.id);
+    await recordAudit(client, {
+      actorId: req.userId, action: "membership.adjust", entityType: "membership", entityId: req.params.id,
+      subjectUserId: before.user_id, reason: cleanReason(reason),
+      before: plan.changes.before, after: plan.changes.after,
+      meta: { plan_name: before.plan_name ?? null, plan_class_limit: before.plan_class_limit ?? null, above_plan: plan.abovePlan },
+    });
+    await client.query("COMMIT");
     triggerWalletPassSync(r.rows[0].user_id, "membership_updated");
     return res.json({ data: r.rows[0] });
   } catch (err) {
+    await client.query("ROLLBACK").catch(() => {});
     console.error("PUT /memberships/:id error:", err);
     return res.status(500).json({ message: "Error interno" });
+  } finally {
+    client.release();
   }
 });
 
@@ -14668,14 +14710,26 @@ app.post("/api/admin/clients/manual", adminMiddleware, async (req, res) => {
         await client.query("UPDATE discount_codes SET uses_count = uses_count + 1 WHERE id = $1", [dc.id]).catch(() => {});
       }
 
+      // Cortesía en el alta manual (sale en $0): exige motivo, en `reason` o en
+      // Notas del formulario (auditoría 2026-09-27, P0-3).
+      const chargedPrice = Math.max(0, (Number(_eff) || 0) - orderDiscount);
+      const saleReason = typeof req.body.reason === "string" && req.body.reason.trim() ? req.body.reason : notes;
+      if (chargedPrice === 0) {
+        const p = reasonProblem(saleReason);
+        if (p) {
+          await client.query("ROLLBACK");
+          return res.status(400).json({ code: "REASON_REQUIRED", message: `Es una cortesía ($0): escribe el motivo en Notas. ${p}` });
+        }
+      }
+
       const memRes = await client.query(
         `INSERT INTO memberships (user_id, plan_id, status, payment_method, start_date, end_date,
-          classes_remaining, notes)
-         VALUES ($1,$2,'active',$3,$4,$5,$6,$7) RETURNING *`,
+          classes_remaining, notes, activated_by, activated_at)
+         VALUES ($1,$2,'active',$3,$4,$5,$6,$7,$8,NOW()) RETURNING *`,
         [user.id, plan.id, paymentMethod, start.toISOString().split("T")[0],
         end.toISOString().split("T")[0],
         plan.class_limit === 0 ? null : plan.class_limit,
-        (notes || `Alta manual por admin`) + priceNote]
+        (notes || `Alta manual por admin`) + priceNote, req.userId || null]
       );
       membership = camelRow(memRes.rows[0]);
 
@@ -14688,13 +14742,25 @@ app.post("/api/admin/clients/manual", adminMiddleware, async (req, res) => {
                              total_amount, discount_amount, channel, verified_at, verified_by,
                              approved_at, approved_by, paid_at)
          VALUES ($1,$2,'approved',$3,$4,0,$5,$6,'counter',NOW(),$7,NOW(),$7,NOW())
-         RETURNING id`,
+         RETURNING id, order_number`,
         [user.id, plan.id, paymentMethod, Number(_eff) || 0,
-         Math.max(0, (Number(_eff) || 0) - orderDiscount), orderDiscount, req.userId || null]
+         chargedPrice, orderDiscount, req.userId || null]
       );
-      await client.query(`UPDATE memberships SET order_id = $2 WHERE id = $1`,
-        [memRes.rows[0].id, ordRes.rows[0].id]);
+      const paymentReference = ordRes.rows[0].order_number || ordRes.rows[0].id;
+      await client.query(`UPDATE memberships SET order_id = $2, payment_reference = $3 WHERE id = $1`,
+        [memRes.rows[0].id, ordRes.rows[0].id, paymentReference]);
       membership.orderId = ordRes.rows[0].id;
+      membership.paymentReference = paymentReference;
+      await recordAudit(client, {
+        actorId: req.userId, action: "membership.sale", entityType: "membership", entityId: memRes.rows[0].id,
+        subjectUserId: user.id, reason: chargedPrice === 0 ? saleReason : null,
+        after: saleAuditAfter({
+          plan, listPrice: Number(_eff) || 0, amount: chargedPrice, paymentMethod, paymentReference,
+          orderId: ordRes.rows[0].id, startDate: start.toISOString().split("T")[0], endDate: end.toISOString().split("T")[0],
+          classesRemaining: plan.class_limit === 0 ? null : plan.class_limit,
+        }),
+        meta: { source: "alta_manual", courtesy: chargedPrice === 0, price_differs: orderDiscount > 0, discount_code: discountCode || null },
+      });
     }
 
     await client.query("COMMIT");

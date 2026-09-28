@@ -54,8 +54,68 @@ describe("Cobros · Cobrar", () => {
     expect(within(resumen).getByText("25 sep – 25 oct")).toBeInTheDocument();
     fireEvent.click(confirmar);
     await waitFor(() => expect(mockApi.post).toHaveBeenCalledWith("/memberships", {
-      userId: "u1", planId: "p8", paymentMethod: "card", startDate: "2026-09-25",
+      userId: "u1", planId: "p8", paymentMethod: "card", startDate: "2026-09-25", amount: 1450,
     }));
+  });
+
+  it("cobrar distinto al plan pide motivo y lo manda", async () => {
+    loginAs("admin");
+    renderAdmin(<PaymentsPage />, { route: "/admin/payments" });
+    const resumen = await screen.findByRole("complementary", { name: "Resumen de la membresía" });
+    fireEvent.change(screen.getByRole("combobox", { name: "Buscar clienta para cobrar" }), { target: { value: "cam" } });
+    fireEvent.click(await screen.findByRole("option", { name: /Camila Torres/ }));
+    fireEvent.click(await screen.findByRole("radio", { name: /Paquete 8 clases/ }));
+    fireEvent.change(screen.getByLabelText("Precio cobrado"), { target: { value: "1200" } });
+    const confirmar = within(resumen).getByRole("button", { name: "Confirmar y activar membresía" });
+    expect(screen.getByText("Lo cobrado es distinto al precio del plan.", { exact: false })).toBeInTheDocument();
+    expect(confirmar).toBeDisabled();
+    fireEvent.change(screen.getByLabelText("Motivo (obligatorio)"), { target: { value: "Descuento de amiga" } });
+    expect(confirmar).toBeEnabled();
+    expect(within(resumen).getByText("$1,200")).toBeInTheDocument();
+    fireEvent.click(confirmar);
+    await waitFor(() => expect(mockApi.post).toHaveBeenCalledWith("/memberships", {
+      userId: "u1", planId: "p8", paymentMethod: "cash", startDate: "2026-09-25", amount: 1200, reason: "Descuento de amiga",
+    }));
+  });
+
+  it("una cortesía en $0 se marca y pide motivo", async () => {
+    loginAs("admin");
+    renderAdmin(<PaymentsPage />, { route: "/admin/payments" });
+    const resumen = await screen.findByRole("complementary", { name: "Resumen de la membresía" });
+    fireEvent.change(screen.getByRole("combobox", { name: "Buscar clienta para cobrar" }), { target: { value: "cam" } });
+    fireEvent.click(await screen.findByRole("option", { name: /Camila Torres/ }));
+    fireEvent.click(await screen.findByRole("radio", { name: /Paquete 8 clases/ }));
+    fireEvent.change(screen.getByLabelText("Precio cobrado"), { target: { value: "0" } });
+    expect(within(resumen).getByText("Cortesía")).toBeInTheDocument();
+    expect(screen.getByText("Es una cortesía ($0).", { exact: false })).toBeInTheDocument();
+    expect(within(resumen).getByRole("button", { name: "Confirmar y activar membresía" })).toBeDisabled();
+  });
+
+  it("la referencia de pago viaja con la venta y sin motivo si el precio es el del plan", async () => {
+    loginAs("admin");
+    renderAdmin(<PaymentsPage />, { route: "/admin/payments" });
+    const resumen = await screen.findByRole("complementary", { name: "Resumen de la membresía" });
+    fireEvent.change(screen.getByRole("combobox", { name: "Buscar clienta para cobrar" }), { target: { value: "cam" } });
+    fireEvent.click(await screen.findByRole("option", { name: /Camila Torres/ }));
+    fireEvent.click(await screen.findByRole("radio", { name: /Paquete 8 clases/ }));
+    fireEvent.change(screen.getByLabelText("Referencia de pago (opcional)"), { target: { value: "SPEI 998877" } });
+    fireEvent.click(within(resumen).getByRole("button", { name: "Confirmar y activar membresía" }));
+    await waitFor(() => expect(mockApi.post).toHaveBeenCalledWith("/memberships", expect.objectContaining({ amount: 1450, paymentReference: "SPEI 998877" })));
+    expect(mockApi.post.mock.calls[0][1]).not.toHaveProperty("reason");
+  });
+
+  it("un plan con precio de apertura cobra el precio efectivo sin pedir motivo", async () => {
+    routeApi(mockApi, { ...tabla(), "/plans": { data: [{ id: "pa", name: "Ilimitado apertura", price: 2700, effectivePrice: 2300, classLimit: null, durationDays: 30, classCategory: "studio", isActive: true }] } });
+    loginAs("admin");
+    renderAdmin(<PaymentsPage />, { route: "/admin/payments" });
+    const resumen = await screen.findByRole("complementary", { name: "Resumen de la membresía" });
+    fireEvent.change(screen.getByRole("combobox", { name: "Buscar clienta para cobrar" }), { target: { value: "cam" } });
+    fireEvent.click(await screen.findByRole("option", { name: /Camila Torres/ }));
+    fireEvent.click(await screen.findByRole("radio", { name: /Ilimitado apertura/ }));
+    expect(screen.getByLabelText("Precio cobrado")).toHaveValue(2300);
+    expect(screen.queryByLabelText("Motivo (obligatorio)")).toBeNull();
+    fireEvent.click(within(resumen).getByRole("button", { name: "Confirmar y activar membresía" }));
+    await waitFor(() => expect(mockApi.post).toHaveBeenCalledWith("/memberships", expect.objectContaining({ planId: "pa", amount: 2300 })));
   });
 
   it("con ?clienta= llega con la clienta elegida", async () => {

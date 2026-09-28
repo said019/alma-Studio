@@ -10,10 +10,14 @@ import { Panel } from "@/components/admin/Panel";
 import PersonCell from "@/components/admin/PersonCell";
 import ClientSearch from "@/components/admin/ClientSearch";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { ErrorState, EmptyState } from "@/components/app/AppShell";
 import { formatMXN } from "@/lib/format";
+import { REASON_MIN_CHARS } from "@/lib/audit-log";
 import { CreditCard, Banknote, ArrowRight, Check } from "lucide-react";
 import { useSearchParamState } from "@/hooks/use-search-param-state";
 import { cn } from "@/lib/utils";
@@ -54,6 +58,9 @@ function groupPlans(plans: any[]) {
 type SelectedUser = { id: string; displayName: string; email?: string | null; phone?: string | null };
 type SelectedPlan = { id: string; name: string; price: number; durationDays?: number | null };
 
+// Precio que el servidor cobra: el efectivo (con precio de apertura si aplica).
+const planPrice = (p: any) => Number(p.effectivePrice ?? p.effective_price ?? p.price ?? 0);
+
 function StepTitle({ n, done, children }: { n: number; done: boolean; children: ReactNode }) {
   return (
     <div className="flex items-center gap-2.5">
@@ -74,6 +81,10 @@ function CashAssignment() {
   const [selectedUser, setSelectedUser] = useState<SelectedUser | null>(null);
   const [selectedPlan, setSelectedPlan] = useState<SelectedPlan | null>(null);
   const [paymentMethod, setPaymentMethod] = useState("cash");
+  // Precio cobrado, referencia y motivo (auditoría 2026-09-27, P0-3).
+  const [amountStr, setAmountStr] = useState("");
+  const [paymentReference, setPaymentReference] = useState("");
+  const [reason, setReason] = useState("");
 
   // "Renovar" desde la ficha: /admin/payments?clienta=<id>. Misma llave que la ficha.
   const preselectQ = useQuery<Record<string, any>>({
@@ -98,6 +109,14 @@ function CashAssignment() {
   const plans = (Array.isArray(plansData?.data) ? plansData!.data : []).filter((p) => p.isActive !== false && p.is_active !== false);
   const planGroups = groupPlans(plans);
 
+  const listPrice = selectedPlan?.price ?? 0;
+  const amount = amountStr.trim() === "" ? NaN : Number(amountStr.trim().replace(",", "."));
+  const amountValid = Number.isFinite(amount) && amount >= 0;
+  const courtesy = amountValid && amount === 0;
+  const differs = amountValid && Math.abs(amount - listPrice) >= 0.01;
+  const needsReason = !!selectedPlan && (courtesy || differs);
+  const reasonOk = reason.trim().length >= REASON_MIN_CHARS;
+
   const assignMutation = useMutation({
     mutationFn: () =>
       api.post("/memberships", {
@@ -105,6 +124,9 @@ function CashAssignment() {
         planId: selectedPlan!.id,
         paymentMethod,
         startDate: format(new Date(), "yyyy-MM-dd"),
+        amount,
+        ...(paymentReference.trim() ? { paymentReference: paymentReference.trim() } : {}),
+        ...(needsReason ? { reason: reason.trim() } : {}),
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["memberships"] });
@@ -113,6 +135,9 @@ function CashAssignment() {
       setSelectedUser(null);
       setSelectedPlan(null);
       setPaymentMethod("cash");
+      setAmountStr("");
+      setPaymentReference("");
+      setReason("");
       setClientParam(null);
     },
     onError: (e: any) =>
@@ -183,7 +208,7 @@ function CashAssignment() {
                           type="button"
                           role="radio"
                           aria-checked={sel}
-                          onClick={() => setSelectedPlan({ id: p.id, name: p.name, price: Number(p.price), durationDays: days })}
+                          onClick={() => { const price = planPrice(p); setSelectedPlan({ id: p.id, name: p.name, price, durationDays: days }); setAmountStr(String(price)); setReason(""); }}
                           className={cn("flex min-h-[88px] items-start gap-3 rounded-xl bg-surface p-4 text-left", sel ? "border-2 border-ink" : "border border-line hover:border-line-strong")}
                         >
                           <span aria-hidden="true" className={cn("mt-0.5 h-5 w-5 shrink-0 rounded-full", sel ? "border-[6px] border-ink" : "border border-line-strong")} />
@@ -193,7 +218,7 @@ function CashAssignment() {
                               {limit == null ? "Ilimitado" : `${limit} ${Number(limit) === 1 ? "clase" : "clases"}`}
                               {days ? ` · ${days} días` : ""}
                             </span>
-                            <span className="nums mt-1.5 text-base font-extrabold">{formatMXN(Number(p.price))}</span>
+                            <span className="nums mt-1.5 text-base font-extrabold">{formatMXN(planPrice(p))}</span>
                           </span>
                         </button>
                       );
@@ -226,6 +251,36 @@ function CashAssignment() {
             })}
           </div>
         </Panel>
+
+        <Panel aria-label="Cobro" className="flex flex-col gap-3.5 p-5 lg:p-6">
+          <StepTitle n={4} done={false}>Cobro</StepTitle>
+          <div className="grid gap-3.5 sm:grid-cols-2">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="cobro-monto">Precio cobrado</Label>
+              <Input id="cobro-monto" type="number" inputMode="decimal" min={0} step="1" className="nums" disabled={!selectedPlan}
+                value={amountStr} onChange={(e) => setAmountStr(e.target.value)} />
+              <p className="text-[0.75rem] text-ink-muted">
+                {selectedPlan ? `Precio del plan: ${formatMXN(listPrice)}.` : "Elige un plan primero."}
+              </p>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="cobro-ref">Referencia de pago (opcional)</Label>
+              <Input id="cobro-ref" maxLength={100} value={paymentReference} onChange={(e) => setPaymentReference(e.target.value)}
+                placeholder="Folio de la transferencia o del voucher" />
+            </div>
+          </div>
+          {needsReason && (
+            <div className="flex flex-col gap-1.5 rounded-xl border border-accent/30 bg-accent-soft p-3.5">
+              <Label htmlFor="cobro-motivo">Motivo (obligatorio)</Label>
+              <p className="text-[0.75rem] text-ink">
+                {courtesy ? "Es una cortesía ($0)." : "Lo cobrado es distinto al precio del plan."} Queda en la bitácora con tu nombre.
+              </p>
+              <Textarea id="cobro-motivo" rows={2} value={reason} onChange={(e) => setReason(e.target.value)}
+                placeholder="Ej. cortesía por evento de apertura" />
+              {!reasonOk && <p className="text-[0.75rem] text-ink-muted">Mínimo {REASON_MIN_CHARS} caracteres.</p>}
+            </div>
+          )}
+        </Panel>
       </div>
 
       <aside aria-label="Resumen de la membresía" className="flex flex-col gap-1.5 rounded-2xl border border-line bg-surface p-6 lg:sticky lg:top-24">
@@ -235,12 +290,17 @@ function CashAssignment() {
           {row("Plan", selectedPlan?.name ?? "—")}
           {row("Vigencia", vigencia)}
           {row("Método", methodLabel)}
+          {paymentReference.trim() && row("Referencia", paymentReference.trim())}
+          {selectedPlan && differs && row("Precio del plan", formatMXN(listPrice))}
         </dl>
         <div className="flex items-baseline justify-between border-t-2 border-ink pb-2 pt-4">
-          <span className="text-[15px] font-bold">Total</span>
-          <span className="nums font-display text-[2rem] font-semibold">{selectedPlan ? formatMXN(selectedPlan.price) : "—"}</span>
+          <span className="flex items-center gap-2 text-[15px] font-bold">
+            Total
+            {courtesy && <span className="rounded-full bg-accent-soft px-2.5 py-1 text-[0.75rem] font-extrabold text-accent-strong">Cortesía</span>}
+          </span>
+          <span className="nums font-display text-[2rem] font-semibold">{selectedPlan && amountValid ? formatMXN(amount) : "—"}</span>
         </div>
-        <Button size="lg" className="w-full" disabled={!selectedUser || !selectedPlan || assignMutation.isPending} onClick={() => assignMutation.mutate()}>
+        <Button size="lg" className="w-full" disabled={!selectedUser || !selectedPlan || !amountValid || (needsReason && !reasonOk) || assignMutation.isPending} onClick={() => assignMutation.mutate()}>
           {assignMutation.isPending ? "Activando…" : "Confirmar y activar membresía"}
         </Button>
         <p className="mt-1.5 text-center text-[0.75rem] text-ink-muted">La membresía se activa hoy y la clienta recibe su confirmación.</p>
