@@ -67,6 +67,7 @@ import { getWellhubCredentials } from "./lib/wellhub/credentials.js";
 import { publicPartnerSettings, mergeSecret } from "./lib/partnerSettings.js";
 import { validateWellhubVisit as wellhubValidateVisit } from "./lib/wellhub/api.js";
 import { handleBookingRequested, handleCheckin, handleCancel, handlePlanChange } from "./lib/wellhub/flows.js";
+import { isUuid, signatureProblem } from "./lib/validate.js";
 import {
   validateStripeConfig,
   createOrGetStripeCustomer,
@@ -2126,10 +2127,9 @@ app.use((req, res, next) => {
 // Estos nombres SÍ mapean a columnas uuid; :key, :fileId, :sessionId,
 // :deviceId, :passTypeId y :serial no, y por eso quedan fuera.
 // Auditoría 2026-09-08, familia P2.
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 for (const paramName of ["id", "userId", "eventId", "classId", "regId"]) {
   app.param(paramName, (req, res, next, value) => {
-    if (!UUID_RE.test(String(value || ""))) {
+    if (!isUuid(String(value || ""))) {
       return res.status(400).json({ message: "Identificador inválido" });
     }
     next();
@@ -3191,6 +3191,8 @@ app.post("/api/me/waiver", authMiddleware, async (req, res) => {
   if (!full_name?.trim() || !signature_data) {
     return res.status(400).json({ message: "Nombre y firma son requeridos." });
   }
+  const firmaMala = signatureProblem(signature_data);
+  if (firmaMala) return res.status(400).json({ message: firmaMala });
   try {
     const r = await pool.query(
       `INSERT INTO waivers (user_id, full_name, phone, email, image_consent, signature_data, waiver_version, signed_at)
@@ -3728,6 +3730,7 @@ async function liveBookingCount(classId, db = pool) {
 app.post("/api/bookings", authMiddleware, async (req, res) => {
   const { classId } = req.body;
   if (!classId) return res.status(400).json({ message: "classId requerido" });
+  if (!isUuid(classId)) return res.status(400).json({ message: "Identificador inválido" });
   // Gate: la primera reserva requiere la responsiva y consentimiento firmados.
   const waiverGate = await pool.query("SELECT 1 FROM waivers WHERE user_id = $1 LIMIT 1", [req.userId]).catch(() => ({ rows: [] }));
   if (waiverGate.rows.length === 0) {
