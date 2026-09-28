@@ -10,7 +10,7 @@ interface AuthGuardProps {
 }
 
 export const AuthGuard = ({ children, requiredRoles = ADMIN_ROLES }: AuthGuardProps) => {
-  const { user, isAuthenticated, checkAuth } = useAuthStore();
+  const { user, isAuthenticated, sessionCheck, checkAuth } = useAuthStore();
   const location = useLocation();
   const [checked, setChecked] = useState(false);
 
@@ -27,6 +27,22 @@ export const AuthGuard = ({ children, requiredRoles = ADMIN_ROLES }: AuthGuardPr
     return (
       <div className="min-h-screen bg-background flex items-center justify-center text-foreground">
         Cargando...
+      </div>
+    );
+  }
+
+  // Un 429/5xx/red al verificar la sesión no es "no autorizada": no hay forma
+  // de saber si la usuaria sigue con sesión válida, así que no se manda al
+  // login (le borraría la sesión sin motivo) — se ofrece reintentar en vez de
+  // eso (auditoría 2026-09-27, riesgo 3). Con usuaria guardada, se sigue como
+  // hoy: se confía en la sesión local mientras el servidor no diga lo contrario.
+  if (sessionCheck === "unavailable" && !user) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-3 text-foreground p-6 text-center">
+        <p>No pudimos verificar tu sesión. El servidor está ocupado.</p>
+        <button type="button" className="min-h-[44px] rounded-full border px-5 font-bold" onClick={() => { setChecked(false); checkAuth().then(() => setChecked(true)); }}>
+          Reintentar
+        </button>
       </div>
     );
   }

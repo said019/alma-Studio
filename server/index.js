@@ -59,6 +59,7 @@ import { ALMA_CLASS_TYPES, ALMA_SCHEDULE_SLOTS, ALMA_SCHEDULE_DAYS, ALMA_PLANS }
 import { seedClassTypesIfEmpty, seedPlansIfEmpty } from "./lib/catalogSeed.js";
 import { resolveEffectivePrice } from "./lib/pricing.js";
 import { isMembershipCategoryCompatible as ruleCategoryCompatible, normalizeClassCategory as ruleNormalizeCategory, isWithinMorningWindow, categoryLabel } from "./lib/bookingRules.js";
+import { rateKey } from "./lib/rateKey.js";
 import { isWithinCancelWindow, penaltyDueAt } from "./lib/faltas.js";
 import { scheduleAt } from "./lib/schedule.js";
 import { verifyWellhubSignature, extractSignatureHeader } from "./lib/wellhub/signature.js";
@@ -2058,18 +2059,19 @@ function getRateLimitIp(req) {
   if (forwarded) return forwarded;
   return String(req.ip || req.socket?.remoteAddress || "unknown");
 }
-function createSimpleRateLimiter({ windowMs, max, keyPrefix, shouldApply }) {
+function createSimpleRateLimiter({ windowMs, max, keyPrefix, shouldApply, keyFn }) {
   return (req, res, next) => {
     if (!shouldApply(req)) return next();
-    const ip = getRateLimitIp(req);
-    const key = `${keyPrefix}:${ip}`;
+    const id = keyFn ? keyFn(req) : getRateLimitIp(req);
+    const key = `${keyPrefix}:${id}`;
+    const limit = typeof max === "function" ? max(id) : max;
     const now = Date.now();
     const current = rateLimitBuckets.get(key);
     if (!current || current.resetAt <= now) {
       rateLimitBuckets.set(key, { count: 1, resetAt: now + windowMs });
       return next();
     }
-    if (current.count >= max) {
+    if (current.count >= limit) {
       const retryAfterSec = Math.max(1, Math.ceil((current.resetAt - now) / 1000));
       res.setHeader("Retry-After", String(retryAfterSec));
       return res.status(429).json({ message: "Demasiadas solicitudes. Intenta de nuevo en unos segundos." });
@@ -2086,10 +2088,12 @@ setInterval(() => {
   }
 }, 60_000).unref();
 
+const SECURITY_RATE_LIMIT_USER_MAX = Math.max(60, Number(process.env.API_RATE_LIMIT_USER_MAX || 600));
 app.use(createSimpleRateLimiter({
   windowMs: SECURITY_RATE_LIMIT_WINDOW_MS,
-  max: SECURITY_RATE_LIMIT_MAX,
   keyPrefix: "api",
+  keyFn: (req) => rateKey(req, (t) => jwt.verify(t, JWT_SECRET)),
+  max: (key) => (key.startsWith("user:") ? SECURITY_RATE_LIMIT_USER_MAX : SECURITY_RATE_LIMIT_MAX),
   shouldApply: (req) =>
     req.path.startsWith("/api/") &&
     !req.path.startsWith("/api/wallet/v1/") &&
