@@ -70,6 +70,7 @@ import { scheduleAt } from "./lib/schedule.js";
 import { verifyWellhubSignature, extractSignatureHeader } from "./lib/wellhub/signature.js";
 import { extractGymId, computeEventId } from "./lib/wellhub/payload.js";
 import { planWeekClear, weekRangeProblem } from "./lib/weekClear.js";
+import { promotionWindowOpen, freeSeats, queueBlocksNewBooking, firstEligible, sweepMinutes } from "./lib/waitlist.js";
 import { getWellhubCredentials } from "./lib/wellhub/credentials.js";
 import { publicPartnerSettings, mergeSecret } from "./lib/partnerSettings.js";
 import { createAccountGate } from "./lib/accountGate.js";
@@ -3646,6 +3647,7 @@ app.get("/api/classes/:id", async (req, res) => {
     // Usar el conteo real de lugares ocupados (no el contador guardado, que
     // puede estar desfasado y mostrar la clase como "llena" sin estarlo).
     row.current_bookings = await liveBookingCount(req.params.id);
+    row.waitlist_count = await waitingCount(req.params.id);
     return res.json({ data: row });
   } catch (err) {
     console.error("Class/:id error:", err);
@@ -3674,6 +3676,11 @@ app.get("/api/bookings/my-bookings", authMiddleware, async (req, res) => {
                 WHERE rv.booking_id = b.id
               ) AS has_review,
               f.name         AS facility_name
+              , CASE WHEN b.status = 'waitlist' THEN (
+                  SELECT COUNT(*)::int + 1 FROM bookings w
+                   WHERE w.class_id = b.class_id AND w.status = 'waitlist'
+                     AND (w.created_at, w.id) < (b.created_at, b.id)
+                ) END AS waitlist_position_live
        FROM bookings b
        JOIN classes c       ON b.class_id       = c.id
        JOIN class_types ct  ON c.class_type_id  = ct.id
@@ -3683,7 +3690,10 @@ app.get("/api/bookings/my-bookings", authMiddleware, async (req, res) => {
        ORDER BY c.date DESC, c.start_time DESC`,
       [req.userId]
     );
-    return res.json({ data: r.rows });
+    // waitlist_position en vivo por orden de llegada (antes salía siempre null).
+    return res.json({
+      data: r.rows.map(({ waitlist_position_live, ...row }) => ({ ...row, waitlist_position: waitlist_position_live ?? null })),
+    });
   } catch (err) {
     console.error("Bookings/my error:", err);
     return res.status(500).json({ message: "Error interno" });
@@ -3780,18 +3790,256 @@ async function liveBookingCount(classId, db = pool) {
   return r.rows[0]?.cnt ?? 0;
 }
 
-// Se liberó uno o más lugares (bloque 3, auditoría 2026-09-27, P1-1). Lo llaman,
-// DESPUÉS de su COMMIT y con await, todas las vías que liberan cupo:
+// ── Lista de espera: subida automática (auditoría 2026-09-27, P1-1) ─────────
+// Se liberó uno o más lugares. Lo llaman, DESPUÉS de su COMMIT y con await,
+// todas las vías que liberan cupo:
 //   - la clienta que cancela y el estudio que cancela una reserva;
 //   - subir el cupo, cancelar una membresía o reembolsarla;
 //   - la cancelación por webhook de Wellhub, reabrir una clase;
 //   - la reserva nueva que entra a la fila.
-// La Tarea 4 del bloque 3 le pone el cuerpo (la subida de la lista de espera).
+// Quien llama debe haber soltado ya su cliente de la transacción: la subida
+// pide su propia conexión y el aviso puede tardar hasta 5 s (sonda de WhatsApp).
+// Sube, clase por clase, a la primera de la fila (orden de llegada) que pueda
+// usar el lugar:
+//   - membresía vigente con clases para esa categoría;
+//   - AM Club y tope semanal respetados;
+//   - cuenta no dada de baja.
+// La que no cumple se salta y sigue en la fila. Sólo en clases 'scheduled' y
+// hasta BOOKING_LEAD_HOURS antes del inicio; después el lugar queda libre.
+// Concurrencia: cada subida es su propia transacción y empieza con
+// SELECT … FOR UPDATE de la clase. Así dos liberaciones a la vez se forman, y
+// ninguna sube dos veces a la misma ni pasa el cupo. Una subida bloquea una
+// sola membresía y siempre en el orden clase → fila → membresía, así que no
+// forma un ciclo de candados con una reserva o una cancelación sola; si
+// Postgres aun así corta un interbloqueo (40P01), la vuelta se reintenta.
 // Contrato: nunca lanza y devuelve las subidas
 // [{ booking_id, user_id, display_name, phone, whatsapp, email }].
 // ctx: { source?: string, quietUserIds?: string[] }.
 async function onSeatReleased(classIds, ctx = {}) {
-  return [];
+  const out = [];
+  try {
+    const ids = [...new Set([].concat(classIds ?? []).map((x) => String(x ?? "")).filter((x) => isUuid(x)))];
+    const quietUserIds = Array.isArray(ctx?.quietUserIds) ? ctx.quietUserIds.map(String) : [];
+    for (const id of ids) {
+      try {
+        out.push(...(await promoteWaitlist(id, { quietUserIds })));
+      } catch (err) {
+        console.error(`[waitlist] no se pudo subir la fila de ${id} (${ctx?.source ?? "?"}):`, err?.message);
+      }
+    }
+  } catch (err) {
+    console.error(`[waitlist] onSeatReleased (${ctx?.source ?? "?"}):`, err?.message);
+  }
+  return out;
+}
+
+const waitingCount = async (classId, db = pool) =>
+  Number((await db.query(
+    "SELECT COUNT(*)::int AS n FROM bookings WHERE class_id = $1 AND status = 'waitlist'", [classId],
+  )).rows[0]?.n ?? 0);
+
+/** Una subida, en su propia transacción. null = nada que hacer; { retry } = revisar otra vez. */
+async function promoteOneFromWaitlist(classId) {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const c = await client.query(
+      `SELECT c.id, c.status::text AS status, c.max_capacity, c.date, c.start_time,
+              to_char(c.date, 'YYYY-MM-DD') AS day,
+              ((c.date + c.start_time) AT TIME ZONE '${STUDIO_TIMEZONE}') AS starts_at,
+              ct.category AS class_category, ct.name AS class_name, i.display_name AS instructor_name
+         FROM classes c
+         JOIN class_types ct ON ct.id = c.class_type_id
+         LEFT JOIN instructors i ON i.id = c.instructor_id
+        WHERE c.id = $1
+        FOR UPDATE OF c`,
+      [classId],
+    );
+    const cls = c.rows[0];
+    if (!cls || cls.status !== "scheduled" || !promotionWindowOpen(cls.starts_at, Date.now(), BOOKING_LEAD_HOURS)) {
+      await client.query("ROLLBACK");
+      return null;
+    }
+    if (freeSeats(cls.max_capacity, await liveBookingCount(classId, client)) <= 0) {
+      await client.query("ROLLBACK");
+      return null;
+    }
+    const queue = (await client.query(
+      `SELECT b.id, b.user_id, (u.anonymized_at IS NOT NULL) AS anonymized
+         FROM bookings b
+         LEFT JOIN users u ON u.id = b.user_id
+        WHERE b.class_id = $1 AND b.status = 'waitlist'
+        ORDER BY b.created_at ASC, b.id ASC
+        FOR UPDATE OF b`,
+      [classId],
+    )).rows;
+    const category = normalizeClassCategory(cls.class_category, "all");
+    const candidates = [];
+    for (const [i, w] of queue.entries()) {
+      let mem = null;
+      let reason = null;
+      // Dada de baja (bloque 2): no sube aunque le quede una fila previa.
+      if (w.anonymized) reason = "baja";
+      else {
+        mem = w.user_id ? await selectMembershipForClass({ userId: w.user_id, classCategory: category, client }) : null;
+        if (!mem) reason = "sin_clases";
+        else if (mem.morning_only && !isWithinMorningWindow(cls.starts_at)) reason = "solo_manana";
+        else if (!(await checkWeeklyClassLimit(client, w.user_id, mem.id, cls.date)).ok) reason = "tope_semanal";
+      }
+      candidates.push({ bookingId: w.id, userId: w.user_id, membershipId: mem?.id ?? null, position: i + 1, reason });
+      if (!reason) break; // la primera que cumple; las de atrás siguen esperando
+    }
+    const { promote, skipped } = firstEligible(candidates);
+    if (!promote) {
+      await client.query("ROLLBACK");
+      return null;
+    }
+    // Se revalida bajo candado: la membresía pudo cancelarse, vencer o gastar
+    // su última clase entre la elección y el candado. Si ya no sirve no se usa;
+    // la siguiente vuelta la vuelve a evaluar (y la salta si no tiene otra).
+    const locked = (await client.query(
+      `SELECT id, classes_remaining, status::text AS status, end_date,
+              (end_date IS NOT NULL AND end_date < (NOW() AT TIME ZONE '${STUDIO_TIMEZONE}')::date) AS expired
+         FROM memberships WHERE id = $1 FOR UPDATE`,
+      [promote.membershipId],
+    )).rows[0];
+    if (
+      !locked || locked.status !== "active" || locked.expired
+      || (!isUnlimitedClasses(locked.classes_remaining) && Number(locked.classes_remaining) <= 0)
+    ) {
+      await client.query("ROLLBACK");
+      return { retry: true };
+    }
+    await client.query(
+      "UPDATE bookings SET status = 'confirmed', membership_id = $2, promoted_at = NOW() WHERE id = $1",
+      [promote.bookingId, promote.membershipId],
+    );
+    // Cupo: lo mantiene el trigger update_class_booking_count (auditoría 2026-09-08, P1-6).
+    if (!isUnlimitedClasses(locked.classes_remaining)) {
+      await consumeMembershipCredit(client, promote.membershipId, classId);
+    }
+    await recordAudit(client, {
+      systemActor: "system", action: "booking.waitlist_promoted", entityType: "booking",
+      entityId: promote.bookingId, subjectUserId: promote.userId,
+      before: { status: "waitlist" }, after: { status: "confirmed" },
+      meta: {
+        class_id: cls.id, class_name: cls.class_name, day: cls.day, start_time: String(cls.start_time).slice(0, 5),
+        position: promote.position, membership_id: promote.membershipId,
+        skipped: skipped.map((s) => ({ booking_id: s.bookingId, position: s.position, reason: s.reason })),
+      },
+    });
+    await client.query("COMMIT");
+    return { bookingId: promote.bookingId, userId: promote.userId, membershipId: promote.membershipId, cls };
+  } catch (err) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+// Interbloqueo o candado no disponible: la otra transacción ya confirmó o se
+// revirtió; la subida se vuelve a intentar en la siguiente vuelta.
+const RETRYABLE_PG_CODES = new Set(["40P01", "55P03", "40001"]);
+
+/** Sube mientras haya lugar y alguien que cumpla; luego avisa (salvo a quietUserIds). */
+async function promoteWaitlist(classId, { quietUserIds = [] } = {}) {
+  const promoted = [];
+  let retries = 0;
+  for (let vuelta = 0; vuelta < 50; vuelta++) {
+    let p;
+    try {
+      p = await promoteOneFromWaitlist(classId);
+    } catch (err) {
+      if (RETRYABLE_PG_CODES.has(err?.code) && ++retries <= 5) continue;
+      // Las que ya subieron (y confirmaron) se avisan igual.
+      console.error(`[waitlist] subida en ${classId}:`, err?.message);
+      break;
+    }
+    if (!p) break;
+    if (p.retry) {
+      if (++retries > 5) break; // nunca un ciclo sin fin si algo no converge
+      continue;
+    }
+    retries = 0;
+    promoted.push(p);
+  }
+  const out = [];
+  for (const p of promoted) {
+    const aviso = quietUserIds.includes(String(p.userId))
+      ? { whatsapp: "skipped", email: "skipped" }
+      : await notifyWaitlistPromoted(p);
+    const u = (await pool.query("SELECT display_name, phone FROM users WHERE id = $1", [p.userId]).catch(() => ({ rows: [] }))).rows[0] ?? {};
+    out.push({ booking_id: p.bookingId, user_id: p.userId, display_name: u.display_name ?? null, phone: u.phone ?? null, ...aviso });
+  }
+  return out;
+}
+
+// Aviso de la subida, con la regla honesta del bloque 1: con el canal de
+// WhatsApp caído o los avisos apagados no se intenta y se dice
+// ("unreached" | "disabled"), para que recepción avise a mano. Va también el
+// correo de "reserva confirmada" y se sincroniza el pase. La plantilla
+// "waitlist_promoted" no está en DEFAULT_NOTIFICATION_TEMPLATES
+// (server/lib/notificationTemplates.js): sale el texto de respaldo, salvo que
+// se guarde una plantilla con esa llave.
+async function notifyWaitlistPromoted(p) {
+  const out = { whatsapp: "skipped", email: "skipped" };
+  try {
+    triggerWalletPassSync(p.userId, "waitlist_promoted");
+    const cls = p.cls;
+    const dateStr = cls.date ? new Date(cls.date).toLocaleDateString("es-MX", { weekday: "short", day: "numeric", month: "short" }) : "";
+    const timeStr = cls.start_time ? String(cls.start_time).slice(0, 5) : "";
+    const className = cls.class_name || "tu clase";
+    const notif = await getSettingsValue("notification_settings", DEFAULT_NOTIFICATION_SETTINGS);
+    const waOn = notif?.whatsapp_reminders !== false;
+    const channel = waOn ? await whatsappChannelState() : { connected: false, state: "disabled" };
+    if (!channel.connected) {
+      out.whatsapp = channel.state === "disabled" ? "disabled" : "unreached";
+    } else {
+      const r = await notifyByTemplate(
+        p.userId,
+        "waitlist_promoted",
+        { class: className, date: dateStr, time: timeStr },
+        ({ firstName }) =>
+          `${firstName}, se liberó un lugar en ${className}${dateStr ? ` del ${dateStr}` : ""}${timeStr ? ` a las ${timeStr}` : ""} y ya quedó a tu nombre: se usó una clase de tu paquete. Si no puedes ir, cancela desde la app; aplican las reglas de cancelación.`,
+      );
+      out.whatsapp = r?.sent ? "queued" : "failed";
+    }
+    const u = (await pool.query("SELECT email, display_name FROM users WHERE id = $1", [p.userId])).rows[0];
+    if (u?.email && (await areEmailNotificationsEnabled())) {
+      const mem = p.membershipId
+        ? (await pool.query("SELECT classes_remaining FROM memberships WHERE id = $1", [p.membershipId])).rows[0]
+        : null;
+      const cfg = await getLoyaltyConfig();
+      sendBookingConfirmed({
+        to: u.email, name: u.display_name || "Alumna", className, date: cls.date, startTime: cls.start_time,
+        instructor: cls.instructor_name, classesLeft: mem?.classes_remaining ?? null, isWaitlist: false,
+        cancelHours: cfg.faltas_cancel_window_hours,
+      }).catch((e) => console.error("[Email] subida de lista de espera:", e.message));
+      out.email = "queued";
+    }
+  } catch (e) {
+    console.warn("[waitlist] aviso de subida:", e?.message);
+  }
+  return out;
+}
+
+// Red de seguridad: clases con lugar libre y fila, por si una subida no ocurrió
+// (un reinicio a media cancelación o una vía sin gancho). Lo corre
+// scheduleEmailCrons cada WAITLIST_SWEEP_MINUTES, que viene APAGADO por
+// defecto (ver sweepMinutes en server/lib/waitlist.js).
+async function runWaitlistSweep() {
+  const r = await pool.query(
+    `SELECT c.id FROM classes c
+      WHERE c.status = 'scheduled'
+        AND ((c.date + c.start_time) AT TIME ZONE '${STUDIO_TIMEZONE}') >= NOW() + make_interval(hours => $1)
+        AND c.date <= (NOW() AT TIME ZONE '${STUDIO_TIMEZONE}')::date + 60
+        AND EXISTS (SELECT 1 FROM bookings w WHERE w.class_id = c.id AND w.status = 'waitlist')
+        AND (SELECT COUNT(*) FROM bookings b
+              WHERE b.class_id = c.id AND b.status IN ('confirmed', 'checked_in')) < c.max_capacity`,
+    [BOOKING_LEAD_HOURS],
+  );
+  if (r.rows.length) await onSeatReleased(r.rows.map((x) => x.id), { source: "sweep" });
 }
 
 // Responsiva firmada — helper compartido por /bookings, /bookings/with-guest
@@ -3810,6 +4058,9 @@ app.post("/api/bookings", authMiddleware, async (req, res) => {
     return res.status(403).json({ code: "WAIVER_REQUIRED", message: WAIVER_REQUIRED_MSG });
   }
   const client = await pool.connect();
+  // El cliente se suelta justo después del COMMIT: la subida de la fila pide su
+  // propia conexión (auditoría 2026-09-27, P1-1).
+  let released = false;
   try {
     await client.query("BEGIN");
 
@@ -3911,15 +4162,23 @@ app.post("/api/bookings", authMiddleware, async (req, res) => {
       return res.status(403).json({ message: weeklyCheck.message });
     }
 
-    const isWaitlist = (await liveBookingCount(classId, client)) >= cls.max_capacity;
-    const status = isWaitlist ? "waitlist" : "confirmed";
+    // Lista de espera por orden de llegada (auditoría 2026-09-27, P1-1): si ya
+    // hay fila y la subida aplica, la reserva nueva entra a la fila aunque haya
+    // lugar. Tras el COMMIT corre la subida: si las de adelante no pueden usar el
+    // lugar, sube ella. Nadie se salta la fila y el lugar no se desperdicia.
+    const liveNow = await liveBookingCount(classId, client);
+    const queueFirst = queueBlocksNewBooking({
+      waiting: await waitingCount(classId, client), startsAt: cls.starts_at, now: Date.now(), cutoffHours: BOOKING_LEAD_HOURS,
+    });
+    const insertAsWaitlist = liveNow >= cls.max_capacity || queueFirst;
+    const status = insertAsWaitlist ? "waitlist" : "confirmed";
     const result = await client.query(
       `INSERT INTO bookings (class_id, user_id, membership_id, status)
        VALUES ($1, $2, $3, $4) RETURNING *`,
       [classId, req.userId, membership.id, status]
     );
 
-    if (!isWaitlist) {
+    if (!insertAsWaitlist) {
       // Cupo: lo mantiene el trigger update_class_booking_count (auditoría 2026-09-08, P1-6).
       if (!isUnlimitedClasses(lockedMembership.classes_remaining)) {
         // Descuenta total y, si es mixto, el bucket del área de la clase.
@@ -3927,6 +4186,15 @@ app.post("/api/bookings", authMiddleware, async (req, res) => {
       }
     }
     await client.query("COMMIT");
+    client.release();
+    released = true;
+
+    if (insertAsWaitlist && liveNow < cls.max_capacity) {
+      await onSeatReleased([classId], { source: "new_booking", quietUserIds: [req.userId] });
+      const final = await pool.query("SELECT status::text AS status FROM bookings WHERE id = $1", [result.rows[0].id]);
+      if (final.rows[0]?.status) result.rows[0].status = final.rows[0].status;
+    }
+    const isWaitlist = result.rows[0].status === "waitlist";
 
     // ── Email: booking confirmed / waitlist ────────────────────────────────
     try {
@@ -4004,11 +4272,11 @@ app.post("/api/bookings", authMiddleware, async (req, res) => {
     }
     return res.status(201).json({ message: msg, booking: result.rows[0] });
   } catch (err) {
-    try { await client.query("ROLLBACK"); } catch (_) { }
+    if (!released) { try { await client.query("ROLLBACK"); } catch (_) { } }
     console.error("POST bookings error:", err);
     return res.status(500).json({ message: "Error interno" });
   } finally {
-    client.release();
+    if (!released) client.release();
   }
 });
 
@@ -9543,7 +9811,9 @@ app.put("/api/classes/:id/reopen", adminMiddleware, async (req, res) => {
     if (!r.rows.length) {
       return res.status(404).json({ message: "Clase no encontrada o no está cerrada" });
     }
-    return res.json({ data: r.rows[0] });
+    // Mientras estuvo cerrada no subió nadie: al reabrir, sube la fila (P1-1).
+    const promoted = await onSeatReleased([req.params.id], { source: "reopen" });
+    return res.json({ data: r.rows[0], waitlist_promoted: promoted });
   } catch (err) {
     console.error("[PUT /classes/:id/reopen]", err.message);
     return res.status(500).json({ message: "Error interno" });
@@ -9561,6 +9831,8 @@ app.delete("/api/admin/bookings/:id", adminMiddleware, async (req, res) => {
   if (problem) return res.status(400).json({ code: "REASON_REQUIRED", message: problem });
   const why = cleanReason(reason);
   const client = await pool.connect();
+  // Se suelta tras el COMMIT: la subida de la fila pide su propia conexión (P1-1).
+  let released = false;
   try {
     await client.query("BEGIN");
     const r = await client.query(
@@ -9600,6 +9872,8 @@ app.delete("/api/admin/bookings/:id", adminMiddleware, async (req, res) => {
       },
     });
     await client.query("COMMIT");
+    client.release();
+    released = true;
 
     // WA + wallet sync (igual que antes)
     if (booking.user_id) {
@@ -9614,13 +9888,21 @@ app.delete("/api/admin/bookings/:id", adminMiddleware, async (req, res) => {
       ).catch(() => {});
       triggerWalletPassSync(booking.user_id, "admin_booking_cancelled");
     }
-    return res.json({ data: { id: booking.id, credit_restored: rb.creditRestored, points_reverted: rb.pointsReverted, reason: why } });
+    // Si ocupaba lugar, sube la fila (P1-1). La respuesta dice a quién, para
+    // que recepción avise a mano si no le llegó el WhatsApp.
+    const promoted = ["confirmed", "checked_in"].includes(booking.status)
+      ? await onSeatReleased([booking.class_id], { source: "studio_cancel" })
+      : [];
+    return res.json({ data: {
+      id: booking.id, credit_restored: rb.creditRestored, points_reverted: rb.pointsReverted, reason: why,
+      waitlist_promoted: promoted,
+    } });
   } catch (err) {
-    await client.query("ROLLBACK").catch(() => {});
+    if (!released) await client.query("ROLLBACK").catch(() => {});
     console.error("[DELETE /admin/bookings/:id]", err.message);
     return res.status(500).json({ message: "Error interno" });
   } finally {
-    client.release();
+    if (!released) client.release();
   }
 });
 
@@ -13686,6 +13968,8 @@ app.put("/api/memberships/:id/cancel", adminMiddleware, async (req, res) => {
   const { reason } = req.body || {};
   const cancellationReason = (reason && String(reason).trim()) || "Cancelada por admin";
   const client = await pool.connect();
+  // Se suelta tras el COMMIT: la subida de la fila pide su propia conexión (P1-1).
+  let released = false;
   try {
     await client.query("BEGIN");
 
@@ -13733,21 +14017,26 @@ app.put("/api/memberships/:id/cancel", adminMiddleware, async (req, res) => {
     }
 
     await client.query("COMMIT");
+    client.release();
+    released = true;
 
     // Side effects fuera de la transacción (fire-and-forget).
     triggerWalletPassSync(membership.user_id, "membership_cancelled");
+    // Los lugares que dejan sus reservas futuras suben la fila (P1-1).
+    const promoted = await onSeatReleased(futureBookings.rows.map((b) => b.class_id), { source: "membership_cancel" });
 
     return res.json({
       data: membership,
       bookings_cancelled: bookingsCancelled,
       reason: cancellationReason,
+      waitlist_promoted: promoted,
     });
   } catch (err) {
-    await client.query("ROLLBACK").catch(() => {});
+    if (!released) await client.query("ROLLBACK").catch(() => {});
     console.error("PUT /memberships/:id/cancel error:", err);
     return res.status(500).json({ message: "Error interno" });
   } finally {
-    client.release();
+    if (!released) client.release();
   }
 });
 
@@ -14112,6 +14401,8 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
   }
   const hasGuestSale = withGuest && guestSale && typeof guestSale === "object" && guestSale.planId;
   const client = await pool.connect();
+  // Se suelta tras el COMMIT: la subida de la fila pide su propia conexión (P1-1).
+  let released = false;
   try {
     await client.query("BEGIN");
 
@@ -14193,7 +14484,15 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
       });
     }
 
-    const isWaitlist = (await liveBookingCount(classId, client)) >= cls.max_capacity;
+    // Misma regla que la app (P1-1): con fila y subida vigente, la socia entra a
+    // la fila aunque haya lugar; a menos de 2 h el lugar queda libre y se asigna.
+    // En una clase cerrada no hay subida, así que la fila no bloquea: recepción
+    // asigna el lugar libre como antes.
+    const liveNow = await liveBookingCount(classId, client);
+    const queueFirst = cls.status === "scheduled" && queueBlocksNewBooking({
+      waiting: await waitingCount(classId, client), startsAt: cls.starts_at, now: Date.now(), cutoffHours: BOOKING_LEAD_HOURS,
+    });
+    let isWaitlist = liveNow >= cls.max_capacity || queueFirst;
     const bookingStatus = isWaitlist ? "waitlist" : "confirmed";
     const result = await client.query(
       `INSERT INTO bookings (class_id, user_id, membership_id, status, waiver_override_reason, waiver_override_by, waiver_override_at)
@@ -14218,7 +14517,7 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
       if (isWaitlist) {
         await client.query("ROLLBACK");
         return res.status(409).json({
-          message: "La socia entró en lista de espera; no se puede agregar acompañante.",
+          message: "La socia quedaría en lista de espera (la clase está llena o ya tiene fila); no se puede agregar acompañante.",
         });
       }
       const occupiedAfter = await liveBookingCount(classId, client);
@@ -14345,6 +14644,18 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
     }
 
     await client.query("COMMIT");
+    client.release();
+    released = true;
+
+    if (isWaitlist && liveNow < cls.max_capacity) {
+      // Entró a la fila con lugar libre: corre la subida (quizá sube ella).
+      await onSeatReleased([classId], { source: "new_booking", quietUserIds: [userId] });
+      const st = await pool.query("SELECT status::text AS status FROM bookings WHERE id = $1", [result.rows[0].id]);
+      if (st.rows[0]?.status === "confirmed") {
+        isWaitlist = false;
+        result.rows[0].status = "confirmed";
+      }
+    }
 
     try {
       const userRes = await pool.query("SELECT email, display_name, phone FROM users WHERE id = $1", [userId]);
@@ -14421,7 +14732,7 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
       data: { booking: result.rows[0], isWaitlist, guest: guestData },
     });
   } catch (err) {
-    try { await client.query("ROLLBACK"); } catch (_) { }
+    if (!released) { try { await client.query("ROLLBACK"); } catch (_) { } }
     console.error("POST /admin/bookings/assign error:", err);
     // Devolver detalle del error de Postgres (constraint que falló) en lugar
     // del genérico "Error interno", para que la admin pueda diagnosticar y
@@ -14440,7 +14751,7 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
       ...(constraint ? { constraint } : {}),
     });
   } finally {
-    client.release();
+    if (!released) client.release();
   }
 });
 
@@ -14783,6 +15094,11 @@ app.get("/api/classes/:id/roster", adminMiddleware, async (req, res) => {
               m.plan_id, p.name AS plan_name, m.classes_remaining,
               COALESCE(u.has_injury, false) AS has_injury, u.injury_details, u.health_notes,
               NOT EXISTS (SELECT 1 FROM bookings pb WHERE pb.user_id = b.user_id AND pb.checked_in_at IS NOT NULL AND pb.id <> b.id) AS first_visit
+              , CASE WHEN b.status = 'waitlist' THEN (
+                  SELECT COUNT(*)::int + 1 FROM bookings w
+                   WHERE w.class_id = b.class_id AND w.status = 'waitlist'
+                     AND (w.created_at, w.id) < (b.created_at, b.id)
+                ) END AS waitlist_position
        FROM bookings b
        JOIN users u ON b.user_id = u.id
        LEFT JOIN memberships m ON b.membership_id = m.id
@@ -14794,6 +15110,8 @@ app.get("/api/classes/:id/roster", adminMiddleware, async (req, res) => {
          WHEN 'waitlist'   THEN 3
          WHEN 'no_show'    THEN 4
          ELSE 5 END,
+         CASE WHEN b.status = 'waitlist' THEN b.created_at END ASC NULLS LAST,
+         CASE WHEN b.status = 'waitlist' THEN b.id END ASC NULLS LAST,
          u.display_name ASC`,
       [req.params.id]
     );
@@ -16115,7 +16433,11 @@ app.put("/api/admin/classes/:id", adminMiddleware, async (req, res) => {
       ]
     );
     if (!r.rows.length) return res.status(404).json({ message: "Clase no encontrada" });
-    return res.json({ data: r.rows[0] });
+    // Más cupo = lugares nuevos, y pasarla a 'scheduled' la reabre: sube la fila (P1-1).
+    const promoted = newCap != null || status === "scheduled"
+      ? await onSeatReleased([req.params.id], { source: "capacity" })
+      : [];
+    return res.json({ data: r.rows[0], waitlist_promoted: promoted });
   } catch (err) {
     console.error("[PUT /admin/classes/:id]", err.message);
     return res.status(500).json({ message: "Error interno" });
@@ -17393,6 +17715,19 @@ function scheduleEmailCrons() {
       console.error("[Cron] class_reminder interval error:", e?.message),
     );
   }, 10 * 60 * 1000); // every 10 minutes
+
+  // ── Lista de espera: barrido de respaldo (auditoría 2026-09-27, P1-1) ──
+  // APAGADO por defecto: sólo se programa si WAITLIST_SWEEP_MINUTES es un
+  // número mayor que 0. En producción hay filas viejas en clases con lugar y,
+  // al desplegar, el barrido las inscribiría solas, les descontaría una clase y
+  // les mandaría aviso sin que el dueño lo decida. La subida por evento
+  // (onSeatReleased) corre siempre.
+  const sweepMin = sweepMinutes(process.env.WAITLIST_SWEEP_MINUTES);
+  if (sweepMin > 0) {
+    setInterval(() => {
+      runWaitlistSweep().catch((e) => console.error("[Cron] lista de espera:", e?.message));
+    }, sweepMin * 60 * 1000);
+  }
 
   // ── Wellhub: reconcile inventario cada 5 min (safety net del trigger) ──
   setInterval(async () => {

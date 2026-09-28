@@ -303,10 +303,19 @@ const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: string; onBa
       qc.invalidateQueries({ queryKey: ["my-bookings"] });
       invalidateWeek();
       const restored = res?.data?.data?.credit_restored;
+      // Si alguien subió de la lista de espera, se dice; si no le llegó el
+      // WhatsApp, recepción le avisa a mano (auditoría 2026-09-27, P1-1).
+      const subio: { display_name?: string | null; whatsapp?: string }[] = res?.data?.data?.waitlist_promoted ?? [];
+      const nombres = subio.map((p) => p.display_name ?? "una alumna").join(", ");
       toast({
         title: "Reserva cancelada",
-        description: restored ? "Crédito devuelto a la alumna." : "Cancelada (sin crédito por devolver).",
+        description: [
+          restored ? "Crédito devuelto a la alumna." : "Cancelada (sin crédito por devolver).",
+          subio.length ? `Subió de la lista de espera: ${nombres}.` : null,
+          subio.some((p) => p.whatsapp !== "queued") ? "Avísale tú: no le llegó el WhatsApp." : null,
+        ].filter(Boolean).join(" "),
       });
+      if (subio.length) qc.invalidateQueries({ queryKey: ["waitlist-roster"] });
       setCancelTarget(null);
     },
     onError: (e: any) => toast({

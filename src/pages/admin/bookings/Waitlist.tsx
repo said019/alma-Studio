@@ -28,6 +28,7 @@ type WeekClass = {
 type WaitEntry = {
   bookingId: string; status: string; displayName: string; email?: string | null; phone?: string | null;
   planName?: string | null; classesRemaining?: number | null;
+  waitlistPosition?: number | null;
 };
 
 const dateOf = (c: WeekClass) => c.date ?? String(c.start_time).split("T")[0];
@@ -121,10 +122,15 @@ const Waitlist = () => {
           {people.map((p, i) => {
             const wa = waLink(p.phone);
             const unlimited = p.classesRemaining == null || p.classesRemaining >= 9999;
-            const planText = p.planName ? `${p.planName} · ${unlimited ? "Ilimitado" : `${p.classesRemaining} clases`}` : "Sin plan";
+            const pos = p.waitlistPosition ?? i + 1;
+            // Sin clases la subida la salta (sigue en la fila, P1-1).
+            const sinClases = !unlimited && Number(p.classesRemaining) <= 0;
+            const planText = p.planName
+              ? `${p.planName} · ${unlimited ? "Ilimitado" : sinClases ? "Sin clases disponibles · se salta" : `${p.classesRemaining} clases`}`
+              : "Sin plan";
             return (
               <li key={p.bookingId} className="grid grid-cols-[48px_minmax(0,1fr)_auto] items-center gap-4 border-t border-line px-5 py-4 lg:grid-cols-[56px_minmax(0,1fr)_200px_auto] lg:px-6">
-                <span className="nums text-center font-display text-[1.75rem] font-semibold leading-none" aria-label={`Posición ${i + 1}`}>{i + 1}</span>
+                <span className="nums text-center font-display text-[1.75rem] font-semibold leading-none" aria-label={`Posición ${pos}`}>{pos}</span>
                 <div className="min-w-0">
                   <PersonCell name={p.displayName} sub={[p.email, p.phone].filter(Boolean).join(" · ")} size={40} />
                   <span className="mt-0.5 block text-xs text-ink-muted lg:hidden">{planText}</span>
@@ -152,7 +158,7 @@ const Waitlist = () => {
           <AdminPageHeader
             kicker={`Reservas · semana ${getISOWeek(weekStart)}`}
             title="Lista de espera"
-            subtitle="Quién espera lugar en las clases llenas de la semana, en orden."
+            subtitle="Por orden de llegada. Si se libera un lugar hasta 2 horas antes, sube sola la primera que tenga clases disponibles."
             actions={<ReservasTabs />}
           />
           <WeekNav weekStart={weekStart} onChange={(w) => { setWeekStart(w); setClassId(null); }} />

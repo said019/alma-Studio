@@ -54,6 +54,27 @@ describe("Lista de espera", () => {
     expect(within(liPaula).getAllByText("Paquete 4 · 1 clases").length).toBeGreaterThan(0);
   });
 
+  it("usa la posición del servidor, lo explica y marca a quien se salta por no tener clases", async () => {
+    routeApi(mockApi, {
+      "/admin/stats": { pendingAlerts: 0 },
+      "/classes?start=": { data: [clase("c11", "11:00", "Reformer Intermedio", 2)] },
+      "/classes/c11/roster": { data: {
+        class: { classTypeName: "Reformer Intermedio", startsAt: "2026-09-25T11:00:00", date: "2026-09-25" },
+        roster: [
+          { bookingId: "b3", status: "waitlist", waitlistPosition: 1, displayName: "Paula Herrera", email: null, phone: null, planName: "Paquete 4", classesRemaining: 0 },
+          { bookingId: "b2", status: "waitlist", waitlistPosition: 2, displayName: "Regina López", email: null, phone: null, planName: "Paquete 8", classesRemaining: 4 },
+        ] } },
+    });
+    renderAdmin(<Waitlist />, { route: "/admin/bookings/waitlist?clase=c11" });
+    expect(await screen.findByText("Por orden de llegada. Si se libera un lugar hasta 2 horas antes, sube sola la primera que tenga clases disponibles.")).toBeInTheDocument();
+    const detalle = await screen.findByRole("region", { name: "Quién espera" });
+    const uno = (await within(detalle).findByLabelText("Posición 1")).closest("li")!;
+    expect(within(uno).getByText("Paula Herrera")).toBeInTheDocument();
+    expect(within(uno).getAllByText("Paquete 4 · Sin clases disponibles · se salta").length).toBeGreaterThan(0);
+    const dos = within(detalle).getByLabelText("Posición 2").closest("li")!;
+    expect(within(dos).getByText("Regina López")).toBeInTheDocument();
+  });
+
   it("sin espera en la semana lo dice", async () => {
     routeApi(mockApi, { "/admin/stats": { pendingAlerts: 0 }, "/classes?start=": { data: [clase("c07", "07:00", "Reformer Básico", 0)] } });
     renderAdmin(<Waitlist />, { route: "/admin/bookings/waitlist" });
