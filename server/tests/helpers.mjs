@@ -59,8 +59,8 @@ export const bookingId = (r) => r.body?.booking?.id ?? r.body?.data?.id ?? r.bod
 
 // PNG mínimamente válida (cabecera + IHDR de w×h, con relleno) para pasar
 // signatureProblem() de server/lib/validate.js (Tarea 1, auditoría bloque 1):
-// exige prefijo data:image/png;base64,, ≥1000 caracteres base64 y una IHDR
-// de al menos 50×20 px. La firma dummy previa ("...iVBORw0KGgo=") era una
+// exige prefijo data:image/png;base64,, ≥200 caracteres base64 y ≥50×20 px
+// en la IHDR. La firma dummy previa ("...iVBORw0KGgo=") era una
 // cabecera truncada que ese chequeo ahora rechaza con 400.
 const fakeSignaturePng = (w = 600, h = 200, extraBytes = 2000) => {
   const b = Buffer.alloc(33 + extraBytes);

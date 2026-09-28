@@ -74,9 +74,9 @@ describe("checkAuth — no cierra sesión por un límite de velocidad (auditorí
     expect(state.sessionCheck).toBe("unavailable");
   });
 
-  // Ronda de ajustes 1 — ruling del controlador: un proxy o CDN puede mandar
-  // Retry-After de horas en un 5xx; sin tope, la guardia se quedaría en
-  // "Cargando…" todo ese tiempo. La espera real nunca debe pasar de 10 s.
+  // Un proxy o CDN puede mandar Retry-After de horas en un 5xx; sin tope, la
+  // guardia se quedaría en "Cargando…" todo ese tiempo. La espera real nunca
+  // debe pasar de 10 s.
   it("Retry-After de una hora: la espera se acota a 10 s, no espera los 3600 s", async () => {
     vi.useFakeTimers();
     mockGet.mockRejectedValue({ response: { status: 429, headers: { "retry-after": "3600" } } });
@@ -95,10 +95,9 @@ describe("checkAuth — no cierra sesión por un límite de velocidad (auditorí
   });
 });
 
-// Ronda de ajustes 1, hallazgo menor: logout() dejaba sessionCheck como
-// estuviera (p. ej. "unavailable" de un intento previo), y ese resto podía
-// hacer que la guardia mostrara la pantalla de reintento en vez del login
-// justo después de cerrar sesión.
+// logout() dejaba sessionCheck como estuviera (p. ej. "unavailable" de un
+// intento previo), y ese resto podía hacer que la guardia mostrara la pantalla
+// de reintento en vez del login justo después de cerrar sesión.
 describe("logout — limpia también sessionCheck", () => {
   it("vuelve a 'idle', no deja un 'unavailable' pegado", () => {
     useAuthStore.setState({ user: { id: "u", role: "admin" } as any, token: "tok", isAuthenticated: true, sessionCheck: "unavailable" });

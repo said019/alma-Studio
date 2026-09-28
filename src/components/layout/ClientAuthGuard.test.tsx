@@ -35,7 +35,7 @@ afterEach(() => {
 // Mismo patrón que AuthGuard.test.tsx (panel): auditoría 2026-09-27, riesgo
 // 3 — un 503 (servidor ocupado) al verificar la sesión no debe mandar a la
 // clienta al login, porque le borraría una sesión que podría seguir válida.
-describe("ClientAuthGuard — servidor ocupado no manda al login (Task 6, ronda de ajustes 1)", () => {
+describe("ClientAuthGuard — servidor ocupado no manda al login (Task 6)", () => {
   it("503 en los 3 intentos: muestra 'No pudimos verificar tu sesión' y 'Reintentar', sin navegar a /auth/login", async () => {
     vi.useFakeTimers();
     mockGet.mockRejectedValue({ response: { status: 503 } });

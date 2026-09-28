@@ -48,7 +48,7 @@ const buildDemoUser = (): User => {
 
 // Tope de espera cuando el servidor manda Retry-After: un proxy o CDN puede
 // mandar un valor de horas en un 5xx, y sin este tope la guardia se quedaría
-// en "Cargando…" todo ese tiempo (ronda de ajustes 1, ruling del controlador).
+// en "Cargando…" todo ese tiempo.
 const RETRY_AFTER_MAX_S = 10;
 
 // Resultado de la última verificación de sesión contra /auth/me:

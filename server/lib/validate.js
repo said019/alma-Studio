@@ -8,7 +8,6 @@ const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 // (lienzo ~330×140, un solo trazo) codifica a ~450 caracteres base64. El mínimo
 // de 1000 original rechazaba esa firma genuina. Lo que bloquea el 1×1 px del
 // caso de la auditoría es el mínimo de ancho/alto (MIN_W/MIN_H) de abajo, no éste.
-// Revisión de código, ronda 1, hallazgo importante #1.
 const MIN_BASE64 = 200;
 const MIN_W = 50;
 const MIN_H = 20;

@@ -65,7 +65,7 @@ describe("ResponsivaDialog: marcas de obligatorio (M6)", () => {
   });
 });
 
-describe("ResponsivaDialog: mensaje de error del servidor (revisión, ronda 1, hallazgo importante #2)", () => {
+describe("ResponsivaDialog: mensaje de error del servidor", () => {
   it("si el servidor rechaza la firma, el toast muestra su mensaje en vez del genérico", async () => {
     vi.mocked(api.post).mockRejectedValueOnce({
       response: { status: 400, data: { message: "La firma es demasiado pequeña." } },
