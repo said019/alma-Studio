@@ -62,6 +62,9 @@ async function render({ size, width = size, height = size, fg, bg, pad }) {
 // símbolo y la paleta que ya existen. wallet-hero-alma.png NO se borra ni se
 // renombra: un pase ya emitido podría seguir pidiéndola por URL.
 const HERO_SIZE = { width: 1032, height: 336 }; // tamaño de hero de Google Wallet
+// El hero no pasa por render() (lleva texto, no sólo el símbolo), por eso va
+// aparte de TARGETS; generate() lo escribe siempre después de ellos.
+export const HERO = { file: "wallet-hero-hive.png", ...HERO_SIZE };
 
 /** Una línea de texto del wordmark como PNG con canal alfa (Pango markup vía sharp). */
 async function renderHeroTextLine(text, fontPx, trackingEm, color, weight) {
@@ -121,8 +124,8 @@ export async function generate(outDir) {
     fs.writeFileSync(path.join(outDir, t.file), await render(t));
     written.push(t.file);
   }
-  fs.writeFileSync(path.join(outDir, "wallet-hero-hive.png"), await renderHero());
-  written.push("wallet-hero-hive.png");
+  fs.writeFileSync(path.join(outDir, HERO.file), await renderHero());
+  written.push(HERO.file);
   return written;
 }
 

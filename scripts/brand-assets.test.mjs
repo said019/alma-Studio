@@ -4,7 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import sharp from "sharp";
-import { generate, TARGETS } from "./brand-assets.mjs";
+import { generate, TARGETS, HERO } from "./brand-assets.mjs";
 import { DARK } from "../src/design/tokens.ts";
 const rgbOf = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
 const near = (a, b, tol = 10) => a.every((v, i) => Math.abs(v - b[i]) <= tol);
@@ -12,8 +12,9 @@ const near = (a, b, tol = 10) => a.every((v, i) => Math.abs(v - b[i]) <= tol);
 test("genera cada imagen con su nombre y su tamaño", async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "hive-assets-"));
   const escritos = await generate(dir);
-  assert.equal(escritos.length, TARGETS.length);
-  for (const t of TARGETS) {
+  // TARGETS (el símbolo) más el hero del pase de Google Wallet.
+  assert.deepEqual(escritos, [...TARGETS.map((t) => t.file), HERO.file]);
+  for (const t of [...TARGETS, HERO]) {
     const meta = await sharp(path.join(dir, t.file)).metadata();
     assert.equal(meta.width, t.width ?? t.size, t.file);
     assert.equal(meta.height, t.height ?? t.size, t.file);
