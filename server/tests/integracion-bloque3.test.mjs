@@ -25,6 +25,16 @@ const levantarStub = () => new Promise((resolve) => {
 });
 
 const estado = async (id) => (await sql(`SELECT status::text AS s FROM bookings WHERE id = $1`, [id]))[0].s;
+/** Sondea hasta que la reserva llegue al estado esperado (o se acabe el plazo) y devuelve el último. */
+async function estadoTras(id, esperado, ms = 5000) {
+  const hasta = Date.now() + ms;
+  let s = await estado(id);
+  while (s !== esperado && Date.now() < hasta) {
+    await new Promise((r) => setTimeout(r, 50));
+    s = await estado(id);
+  }
+  return s;
+}
 const usadas = async (userId) => (await sql(`SELECT cancellations_used FROM memberships WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1`, [userId]))[0].cancellations_used;
 async function clienta(key) {
   const c = await makeClient(PFX, key);
@@ -106,5 +116,7 @@ test("la cancelación por webhook de Wellhub sube la fila", async () => {
   const firma = crypto.createHmac("sha1", SECRET).update(raw).digest("hex");
   const r = await api("POST", "/webhooks/wellhub", { raw, headers: { "x-gympass-signature": firma } });
   assert.equal(r.status, 200, JSON.stringify(r.body));
-  assert.equal(await estado(bw), "confirmed");
+  // El webhook responde antes de la subida (no hace esperar a Wellhub): se
+  // espera con un sondeo corto a que la fila suba.
+  assert.equal(await estadoTras(bw, "confirmed"), "confirmed");
 });

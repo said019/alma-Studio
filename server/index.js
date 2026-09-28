@@ -2110,10 +2110,18 @@ async function wellhubWebhookHandler(req, res, eventTypeOverride) {
       default: result = { status: "ignored", eventType };
     }
     // Lo que liberó lugar sube la lista de espera (auditoría 2026-09-27, P1-1).
-    // Los ids de clase no van en la respuesta a Wellhub.
+    // Los ids de clase no van en la respuesta a Wellhub. Se responde ANTES de
+    // la subida: sus avisos pueden tardar varios segundos (sonda de WhatsApp) y
+    // Wellhub reintentaría el evento por timeout. El evento ya quedó en
+    // processed_events, así que un reintento no repite nada; la subida corre
+    // después y sus errores sólo van al log.
     const { classIds, ...body } = result ?? {};
-    if (Array.isArray(classIds) && classIds.length) await onSeatReleased(classIds, { source: "wellhub" });
-    return res.status(200).json(body);
+    res.status(200).json(body);
+    if (Array.isArray(classIds) && classIds.length) {
+      onSeatReleased(classIds, { source: "wellhub" })
+        .catch((e) => console.error("[wellhub] subida de la lista de espera:", e?.message));
+    }
+    return;
   } catch (err) {
     console.error("[wellhub] handler error:", err.message);
     await pool.query("DELETE FROM processed_events WHERE event_id=$1", [eventId]).catch(() => {});
