@@ -51,6 +51,7 @@ type ScheduleClass = {
   current_bookings?: number | null;
   max_capacity?: number | null;
   capacity?: number | null;
+  waitlist_count?: number | null;
 };
 
 type DecoratedClass = {
@@ -89,6 +90,9 @@ function decorateClass(cls: ScheduleClass): DecoratedClass {
   const areaFallback = classCat === "reformer_tower" ? 4 : 8;
   const capacity = Number(cls.max_capacity ?? cls.capacity ?? areaFallback);
   const booked = Number(cls.current_bookings ?? 0);
+  // Con fila, la clase se muestra como "Lista de espera" aunque haya lugares:
+  // nadie se salta la fila (auditoría 2026-09-27, P1-1).
+  const waiting = Number(cls.waitlist_count ?? 0);
   return {
     raw: cls,
     start,
@@ -102,7 +106,7 @@ function decorateClass(cls: ScheduleClass): DecoratedClass {
     classCat,
     capacity,
     booked,
-    remaining: Math.max(0, capacity - booked),
+    remaining: waiting > 0 ? 0 : Math.max(0, capacity - booked),
   };
 }
 
