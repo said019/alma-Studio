@@ -4,7 +4,12 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 export const isUuid = (value) => typeof value === "string" && UUID_RE.test(value);
 
 const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-const MIN_BASE64 = 1000;
+// 200, no 1000: una firma real de trazo corto en un teléfono a devicePixelRatio 1
+// (lienzo ~330×140, un solo trazo) codifica a ~450 caracteres base64. El mínimo
+// de 1000 original rechazaba esa firma genuina. Lo que bloquea el 1×1 px del
+// caso de la auditoría es el mínimo de ancho/alto (MIN_W/MIN_H) de abajo, no éste.
+// Revisión de código, ronda 1, hallazgo importante #1.
+const MIN_BASE64 = 200;
 const MIN_W = 50;
 const MIN_H = 20;
 
@@ -14,8 +19,7 @@ export function signatureProblem(dataUrl) {
   if (typeof dataUrl !== "string" || !dataUrl.startsWith(prefix)) return "La firma debe ser una imagen PNG.";
   const b64 = dataUrl.slice(prefix.length);
   if (b64.length < MIN_BASE64) return "La firma está vacía o es demasiado pequeña.";
-  let buf;
-  try { buf = Buffer.from(b64, "base64"); } catch { return "La firma no es válida."; }
+  const buf = Buffer.from(b64, "base64");
   if (buf.length < 24 || !buf.subarray(0, 8).equals(PNG_MAGIC) || buf.toString("ascii", 12, 16) !== "IHDR") {
     return "La firma no es una imagen PNG válida.";
   }

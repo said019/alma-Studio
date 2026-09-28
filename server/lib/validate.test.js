@@ -19,12 +19,18 @@ test("signatureProblem acepta una firma PNG razonable", () => {
   assert.equal(signatureProblem(png(600, 200)), null);
 });
 
+test("signatureProblem acepta una firma real y corta (lienzo 330×140, ~450 caracteres base64)", () => {
+  // Un trazo corto en un teléfono a devicePixelRatio 1 codifica a menos de
+  // 1000 caracteres base64; el mínimo debe dejarla pasar (MIN_BASE64 = 200).
+  assert.equal(signatureProblem(png(330, 140, 300)), null);
+});
+
 test("signatureProblem rechaza firmas vacías, diminutas o que no son PNG", () => {
   assert.ok(signatureProblem(""));
   assert.ok(signatureProblem("hola"));
   assert.ok(signatureProblem("data:image/jpeg;base64,AAAA"));
   assert.ok(signatureProblem(png(1, 1)), "1×1 px");
-  assert.ok(signatureProblem(png(600, 200, 10)), "muy poco contenido");
+  assert.ok(signatureProblem(png(600, 200, 10)), "muy poco contenido (por debajo de 200 caracteres base64)");
   assert.ok(signatureProblem("data:image/png;base64," + Buffer.from("no soy png".repeat(200)).toString("base64")), "no es PNG");
   assert.ok(signatureProblem("data:image/png;base64,iVBORw0KGgo="), "cabecera truncada");
 });
