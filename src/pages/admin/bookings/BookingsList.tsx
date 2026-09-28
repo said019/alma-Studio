@@ -522,7 +522,7 @@ const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: string; onBa
                 ? `${entry.planName} · ${unlimited ? "Ilimitado" : `${entry.classesRemaining} ${entry.classesRemaining === 1 ? "restante" : "restantes"}`}`
                 : "Sin plan";
               return (
-                <li key={entry.bookingId} className="grid grid-cols-[40px_minmax(0,1fr)] items-center gap-3 border-t border-line px-5 py-3 lg:grid-cols-[40px_minmax(0,1fr)_150px_auto] lg:gap-4 lg:px-6">
+                <li key={entry.bookingId} className="grid grid-cols-[40px_minmax(0,1fr)] items-center gap-3 border-t border-line px-5 py-3 2xl:grid-cols-[40px_minmax(0,1fr)_150px_auto] 2xl:gap-4 2xl:px-6">
                   {entry.status === "checked_in" ? (
                     <span aria-hidden="true" className="grid h-10 w-10 place-items-center rounded-full bg-success text-canvas"><Check size={18} /></span>
                   ) : (
@@ -533,8 +533,8 @@ const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: string; onBa
                     <HealthBadges hasInjury={entry.hasInjury} injuryDetails={entry.injuryDetails} healthNotes={entry.healthNotes} firstVisit={entry.firstVisit} />
                     <span className="block truncate text-xs text-ink-muted">{[plan, entry.phone].filter(Boolean).join(" · ")}</span>
                   </span>
-                  <span className="col-start-2 lg:col-start-auto"><RosterStatus status={entry.status} /></span>
-                  <span className="col-span-2 flex flex-wrap justify-end gap-1.5 lg:col-span-1">
+                  <span className="col-start-2 2xl:col-start-auto"><RosterStatus status={entry.status} /></span>
+                  <span className="col-span-2 flex flex-wrap justify-end gap-1.5 2xl:col-span-1">
                     {canCheckin && (
                       <Button variant="outline" aria-label={`Check-in de ${entry.displayName}`} onClick={() => checkinMutation.mutate(entry.bookingId)} disabled={checkinMutation.isPending}>
                         <Check size={16} aria-hidden="true" />

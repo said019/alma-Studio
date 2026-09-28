@@ -36,4 +36,10 @@ describe("HealthBadges", () => {
     render(<HealthBadges firstVisit />);
     expect(screen.getByText("Primera vez")).toBeInTheDocument();
   });
+
+  it("las píldoras no se parten en dos líneas: bajan completas con el flex-wrap del contenedor", () => {
+    render(<HealthBadges hasInjury firstVisit />);
+    expect(screen.getByText("Primera vez")).toHaveClass("whitespace-nowrap");
+    expect(screen.getByRole("button", { name: /Lesión/ })).toHaveClass("whitespace-nowrap");
+  });
 });

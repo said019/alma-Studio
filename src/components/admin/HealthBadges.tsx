@@ -7,7 +7,8 @@ type Props = { hasInjury?: boolean | null; injuryDetails?: string | null; health
  * Alertas para la coach y recepción: lesión o notas de salud, y primera visita
  * (auditoría 2026-09-27, P1-8). El detalle usa el Popover del sistema (portal
  * de Radix) para no cortarse dentro de listas con `overflow-hidden` ni
- * desbordarse a la columna vecina en un grid (ronda de ajustes 1).
+ * desbordarse a la columna vecina en un grid. Las píldoras no se parten
+ * (`whitespace-nowrap`): con poco ancho bajan completas a la línea siguiente.
  */
 export function HealthBadges({ hasInjury, injuryDetails, healthNotes, firstVisit }: Props) {
   const notes = [injuryDetails, healthNotes].map((s) => (s ?? "").trim()).filter(Boolean);
@@ -20,7 +21,7 @@ export function HealthBadges({ hasInjury, injuryDetails, healthNotes, firstVisit
           <PopoverTrigger asChild>
             <button
               type="button"
-              className="inline-flex min-h-[28px] items-center gap-1 rounded-full border border-danger/25 bg-danger/10 px-2 text-[0.75rem] font-bold text-danger"
+              className="inline-flex min-h-[28px] items-center gap-1 whitespace-nowrap rounded-full border border-danger/25 bg-danger/10 px-2 text-[0.75rem] font-bold text-danger"
             >
               <HeartPulse size={12} aria-hidden="true" /> Lesión
             </button>
@@ -31,7 +32,7 @@ export function HealthBadges({ hasInjury, injuryDetails, healthNotes, firstVisit
         </Popover>
       )}
       {firstVisit && (
-        <span className="inline-flex items-center rounded-full border border-accent/30 bg-accent-soft px-2 py-0.5 text-[0.75rem] font-bold text-accent-strong">
+        <span className="inline-flex items-center whitespace-nowrap rounded-full border border-accent/30 bg-accent-soft px-2 py-0.5 text-[0.75rem] font-bold text-accent-strong">
           Primera vez
         </span>
       )}
