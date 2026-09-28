@@ -44,6 +44,30 @@ test("P0-1 cancelar una clase con Evolution sin configurar no cuenta wa_sent: to
     assert.ok("display_name" in u && "phone" in u, "cada elemento trae display_name y phone");
   }
   assert.ok(!("wa_sent" in d), "wa_sent ya no debe existir en la respuesta");
+  assert.equal(d.wa_channel_state, "disconnected", "la respuesta dice que el canal está caído");
+});
+
+test("cancelar una clase con los avisos de WhatsApp apagados por la dueña: wa_channel_state = disabled", async () => {
+  const [previo] = await sql(`SELECT value FROM settings WHERE key = 'notification_settings'`);
+  await sql(
+    `INSERT INTO settings (key, value) VALUES ('notification_settings', $1::jsonb)
+     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+    [JSON.stringify({ ...(previo?.value ?? {}), whatsapp_reminders: false })],
+  );
+  try {
+    const c = await makeClient(PFX, "off1");
+    await giveMembership(A, c.id, f.plan.id, 8);
+    const id = await makeClass(A, f, { date: day(9) });
+    const r = await api("POST", "/api/bookings", { token: c.token, body: { classId: id } });
+    assert.equal(r.status, 201, `reserva devolvió ${r.status}`);
+    const cancel = await api("PUT", `/api/classes/${id}/cancel`, { token: A, body: {} });
+    assert.equal(cancel.status, 200);
+    assert.equal(cancel.body.data.wa_channel_state, "disabled");
+    assert.equal(cancel.body.data.wa_failed, 1);
+  } finally {
+    if (previo) await sql(`UPDATE settings SET value = $1::jsonb WHERE key = 'notification_settings'`, [JSON.stringify(previo.value)]);
+    else await sql(`DELETE FROM settings WHERE key = 'notification_settings'`);
+  }
 });
 
 // Cron de recordatorios (server/lib/classReminder.js) contra la tabla real.

@@ -9382,6 +9382,8 @@ app.put("/api/classes/:id/cancel", adminMiddleware, async (req, res) => {
         wa_queued: waQueued,
         wa_failed: waUnreached.length,
         wa_unreached: waUnreached,
+        // "disabled" = la dueña apagó los avisos; otro estado = canal caído.
+        wa_channel_state: channel.state,
         reason: reason || null,
       },
     });

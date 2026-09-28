@@ -155,9 +155,11 @@ const CancelBookingDialog = ({
 // ── Diálogo de "avisa a mano": el canal de WhatsApp estaba caído al cancelar
 // la clase, así que a estas alumnas no les llegó el aviso automático. ──
 const UnreachedDialog = ({
-  items, onClose,
+  items, channelOff, onClose,
 }: {
   items: { user_id: string; display_name: string | null; phone: string | null }[];
+  /** La dueña apagó los avisos de WhatsApp en Configuración (no es una caída del canal). */
+  channelOff: boolean;
   onClose: () => void;
 }) => {
   return (
@@ -167,7 +169,9 @@ const UnreachedDialog = ({
           <DialogTitle className="font-display text-ink">Avisa a mano a estas alumnas</DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
-          <p className="text-sm text-ink/70">WhatsApp está desconectado — no les llegó el aviso de la clase cancelada.</p>
+          <p className="text-sm text-ink/70">
+            {channelOff ? "Los avisos de WhatsApp están apagados" : "WhatsApp está desconectado"} — no les llegó el aviso de la clase cancelada.
+          </p>
           <ul className="divide-y divide-line rounded-xl border border-line">
             {items.map((u) => (
               <li key={u.user_id} className="flex items-center justify-between gap-3 px-4 py-3">
@@ -204,6 +208,7 @@ const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: string; onBa
   const { confirm, promptText, dialog } = useConfirm();
   const [cancelTarget, setCancelTarget] = useState<RosterEntry | null>(null);
   const [unreached, setUnreached] = useState<{ user_id: string; display_name: string | null; phone: string | null }[]>([]);
+  const [unreachedChannelOff, setUnreachedChannelOff] = useState(false);
   const { data: loyaltyCfgData } = useQuery<{ data: { faltas_cancel_window_hours?: number } }>({
     queryKey: ["loyalty-config"],
     queryFn: async () => (await api.get("/loyalty/config")).data,
@@ -358,8 +363,12 @@ const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: string; onBa
       invalidateWeek();
       const d = res?.data?.data ?? {};
       if ((d.wa_failed ?? 0) > 0) {
+        // "disabled": la dueña apagó los avisos en Configuración; cualquier otro
+        // estado es el canal caído.
+        const channelOff = d.wa_channel_state === "disabled";
+        setUnreachedChannelOff(channelOff);
         setUnreached(d.wa_unreached ?? []);
-        toast({ title: "Clase cancelada", description: `No se pudo avisar a ${d.wa_failed} ${d.wa_failed === 1 ? "alumna" : "alumnas"} (WhatsApp desconectado).`, variant: "destructive" });
+        toast({ title: "Clase cancelada", description: `No se pudo avisar a ${d.wa_failed} ${d.wa_failed === 1 ? "alumna" : "alumnas"} (${channelOff ? "los avisos de WhatsApp están apagados" : "WhatsApp desconectado"}).`, variant: "destructive" });
       } else {
         toast({ title: "Clase cancelada", description: `${d.bookings_cancelled ?? 0} reservas canceladas · ${d.credits_restored ?? 0} créditos devueltos · aviso por WhatsApp en cola para ${d.wa_queued ?? 0}` });
       }
@@ -930,7 +939,7 @@ const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: string; onBa
         onClose={() => setCancelTarget(null)}
       />
 
-      <UnreachedDialog items={unreached} onClose={() => setUnreached([])} />
+      <UnreachedDialog items={unreached} channelOff={unreachedChannelOff} onClose={() => setUnreached([])} />
 
       {dialog}
     </div>
