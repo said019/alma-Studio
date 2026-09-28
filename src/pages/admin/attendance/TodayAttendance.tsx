@@ -224,7 +224,7 @@ const TodayAttendance = () => {
     const name = labelOf(r);
     const reason = await promptText({
       title: `¿Corregir la falta de ${name}?`,
-      description: "Pasa a asistencia, se le quita esta falta y recibe los puntos de la clase. Sólo se puede el mismo día y queda en la bitácora con tu nombre.",
+      description: "Pasa a asistencia y se le quita esta falta. Sólo se puede el mismo día de la clase, y queda en la bitácora con tu nombre.",
       placeholder: "Motivo (obligatorio): p. ej. sí vino, se marcó por error",
       confirmLabel: "Corregir a asistencia",
       minLength: REASON_MIN_CHARS,

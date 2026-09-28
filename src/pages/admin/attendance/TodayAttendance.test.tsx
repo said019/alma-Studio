@@ -94,6 +94,8 @@ describe("Pasar lista", () => {
     const actual = await screen.findByRole("region", { name: "Reformer Intermedio 11:00" });
     fireEvent.click(within(actual).getByRole("button", { name: "Corregir a asistencia de Lucía Díaz" }));
     const dlg = await screen.findByRole("alertdialog");
+    expect(within(dlg).getByText(/Pasa a asistencia y se le quita esta falta/)).toBeInTheDocument();
+    expect(within(dlg).queryByText(/puntos/i)).toBeNull();
     const corregir = within(dlg).getByRole("button", { name: "Corregir a asistencia" });
     expect(corregir).toBeDisabled();
     fireEvent.change(within(dlg).getByRole("textbox"), { target: { value: "Sí vino, error al marcar" } });
