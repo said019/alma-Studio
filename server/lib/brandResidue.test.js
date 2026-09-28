@@ -6,7 +6,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { DEFAULT_NOTIFICATION_TEMPLATES } from "./notificationTemplates.js";
-import { PASS_DEFAULT_TEXTS, RESPONSIVA_PDF_HEADER, RESPONSIVA_PDF_SECTIONS } from "./passDefaults.js";
+import { PASS_DEFAULT_TEXTS, RESPONSIVA_PDF_HEADER, RESPONSIVA_PDF_SECTIONS, LOYALTY_MILESTONES_SEED } from "./passDefaults.js";
 
 const ALMA_RE = /alma/i;
 // Quita cualquier URL/dominio real antes de buscar "alma": así "almamovement.com.mx"
@@ -44,6 +44,15 @@ test("RESPONSIVA_PDF_SECTIONS (PDF de responsiva) no mencionan Alma", () => {
     residue.push(...residueIn(`sección ${section.n} (${section.title}) · body`, section.body));
   }
   assert.deepEqual(residue, [], `Quedó marca residual en RESPONSIVA_PDF_SECTIONS:\n${residue.join("\n")}`);
+});
+
+test("LOYALTY_MILESTONES_SEED (siembra de loyalty_milestones) no menciona Alma", () => {
+  const residue = [];
+  for (const m of LOYALTY_MILESTONES_SEED) {
+    residue.push(...residueIn(`${m.messageTemplateKey}.name`, m.name));
+    residue.push(...residueIn(`${m.messageTemplateKey}.description`, m.description));
+  }
+  assert.deepEqual(residue, [], `Quedó marca residual en LOYALTY_MILESTONES_SEED:\n${residue.join("\n")}`);
 });
 
 test("la excepción del dominio real no deja pasar 'Alma' fuera de una URL", () => {

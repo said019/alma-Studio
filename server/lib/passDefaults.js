@@ -51,3 +51,16 @@ export const RESPONSIVA_PDF_SECTIONS = [
   { n: "4", title: "Uso de imagen", body: "Autorizo a HIVE Pilates Studio a utilizar fotografías o videos tomados durante las clases para fines promocionales, redes sociales y material de comunicación, sin derecho a compensación económica. Esta autorización es opcional y la indico abajo." },
   { n: "5", title: "Firma de conformidad", body: "Declaro haber leído y comprendido completamente este documento. Al firmar, acepto los términos aquí descritos y libero de toda responsabilidad a HIVE Pilates Studio por cualquier lesión o daño derivado de mi participación." },
 ];
+
+// Siembra inicial de loyalty_milestones (sólo corre con la tabla vacía —
+// instalación nueva — ver server/index.js). Nombres/descripciones tal cual se
+// insertan; el resto de columnas (classesRequired, period, awardType,
+// awardPoints, messageTemplateKey, sortOrder) viaja en el mismo orden que la
+// tupla original para que el INSERT parametrizado no cambie de forma.
+export const LOYALTY_MILESTONES_SEED = [
+  { name: "Primera meta", description: "Primer logro: 5 clases asistidas", classesRequired: 5, period: "lifetime", awardType: "points", awardPoints: 50, messageTemplateKey: "milestone_classes_5", sortOrder: 10 },
+  { name: "Hábito en marcha", description: "10 clases. Esto ya es hábito.", classesRequired: 10, period: "lifetime", awardType: "points", awardPoints: 100, messageTemplateKey: "milestone_classes_10", sortOrder: 20 },
+  { name: "Cuerpo en cambio", description: "25 clases. El cuerpo lo nota.", classesRequired: 25, period: "lifetime", awardType: "points", awardPoints: 250, messageTemplateKey: "milestone_classes_25", sortOrder: 30 },
+  { name: "Familia HIVE", description: "50 clases. Eres parte del estudio.", classesRequired: 50, period: "lifetime", awardType: "points", awardPoints: 500, messageTemplateKey: "milestone_classes_50", sortOrder: 40 },
+  { name: "Leyenda HIVE", description: "100 clases. Imparable.", classesRequired: 100, period: "lifetime", awardType: "points", awardPoints: 1000, messageTemplateKey: "milestone_classes_100", sortOrder: 50 },
+];

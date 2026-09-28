@@ -59,7 +59,7 @@ import {
 import { ALMA_CLASS_TYPES, ALMA_SCHEDULE_SLOTS, ALMA_SCHEDULE_DAYS, ALMA_PLANS } from "./lib/almaCatalog.js";
 import { seedClassTypesIfEmpty, seedPlansIfEmpty } from "./lib/catalogSeed.js";
 import { DEFAULT_NOTIFICATION_TEMPLATES } from "./lib/notificationTemplates.js";
-import { PASS_DEFAULT_TEXTS, RESPONSIVA_PDF_HEADER, RESPONSIVA_PDF_SECTIONS } from "./lib/passDefaults.js";
+import { PASS_DEFAULT_TEXTS, RESPONSIVA_PDF_HEADER, RESPONSIVA_PDF_SECTIONS, LOYALTY_MILESTONES_SEED } from "./lib/passDefaults.js";
 import { resolveEffectivePrice } from "./lib/pricing.js";
 import { isMembershipCategoryCompatible as ruleCategoryCompatible, normalizeClassCategory as ruleNormalizeCategory, isWithinMorningWindow, categoryLabel } from "./lib/bookingRules.js";
 import { rateKey } from "./lib/rateKey.js";
@@ -87,7 +87,7 @@ const app = express();
 const PORT = process.env.PORT || 8080;
 const JWT_SECRET = process.env.JWT_SECRET || "dev_alma_secret_change_me";
 
-const APP_PUBLIC_URL = String(process.env.APP_URL || process.env.SITE_URL || "https://alma-movement.com.mx").replace(/\/+$/, "");
+const APP_PUBLIC_URL = String(process.env.APP_URL || process.env.SITE_URL || "https://www.almamovement.com.mx").replace(/\/+$/, "");
 
 // ─── Evolution API (WhatsApp) config ────────────────────────────────────────
 const EVOLUTION_API_URL = process.env.EVOLUTION_API_URL || "";
@@ -1501,18 +1501,18 @@ async function ensureSchema() {
     `).catch(() => { });
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_campaign_logs_campaign ON campaign_logs(campaign_id, status)`).catch(() => { });
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_campaign_logs_user ON campaign_logs(user_id)`).catch(() => { });
-    // Seed default Alma milestones si la tabla está vacía
+    // Seed default HIVE milestones si la tabla está vacía (LOYALTY_MILESTONES_SEED
+    // en server/lib/passDefaults.js — ver server/lib/brandResidue.test.js).
     const lmCount = await pool.query("SELECT COUNT(*)::int AS n FROM loyalty_milestones");
     if (lmCount.rows[0].n === 0) {
-      await pool.query(`
-        INSERT INTO loyalty_milestones (name, description, classes_required, period, award_type, award_points, message_template_key, sort_order) VALUES
-          ('Primera meta',          'Primer logro: 5 clases asistidas',   5,   'lifetime', 'points', 50,  'milestone_classes_5',   10),
-          ('Hábito en marcha',      '10 clases. Esto ya es hábito.',       10,  'lifetime', 'points', 100, 'milestone_classes_10',  20),
-          ('Cuerpo en cambio',      '25 clases. El cuerpo lo nota.',       25,  'lifetime', 'points', 250, 'milestone_classes_25',  30),
-          ('Familia Alma',          '50 clases. Eres parte del estudio.',  50,  'lifetime', 'points', 500, 'milestone_classes_50',  40),
-          ('Leyenda Alma',          '100 clases. Imparable.',              100, 'lifetime', 'points', 1000,'milestone_classes_100', 50)
-        ON CONFLICT DO NOTHING;
-      `).catch(() => { });
+      for (const m of LOYALTY_MILESTONES_SEED) {
+        await pool.query(
+          `INSERT INTO loyalty_milestones (name, description, classes_required, period, award_type, award_points, message_template_key, sort_order)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+           ON CONFLICT DO NOTHING`,
+          [m.name, m.description, m.classesRequired, m.period, m.awardType, m.awardPoints, m.messageTemplateKey, m.sortOrder],
+        ).catch(() => { });
+      }
     }
     // ── Review tags table ──────────────────────────────────────────────────
     await pool.query(`
@@ -5210,7 +5210,7 @@ app.post("/api/loyalty/redeem", authMiddleware, async (req, res) => {
 
 // ─── Google Wallet helpers ──────────────────────────────────────────────────
 
-const SITE_URL = process.env.SITE_URL || "https://alma-movement.com.mx";
+const SITE_URL = process.env.SITE_URL || "https://www.almamovement.com.mx";
 const GW_ISSUER_ID = process.env.GOOGLE_ISSUER_ID || "";
 const GW_ISSUER_NAME = process.env.GOOGLE_ISSUER_NAME || PASS_DEFAULT_TEXTS.issuerName;
 const GW_PROGRAM_NAME = process.env.GOOGLE_PROGRAM_NAME || PASS_DEFAULT_TEXTS.programName;
@@ -5375,7 +5375,7 @@ async function ensureGoogleWalletClass() {
         contentDescription: { defaultValue: { language: "es", value: PASS_DEFAULT_TEXTS.logoDescription } },
       },
       heroImage: {
-        sourceUri: { uri: `${SITE_URL}/wallet-hero-alma.png` },
+        sourceUri: { uri: `${SITE_URL}/wallet-hero-hive.png` },
         contentDescription: { defaultValue: { language: "es", value: PASS_DEFAULT_TEXTS.heroDescription } },
       },
       // Tarjeta cálida Desert Rock — paleta oficial HIVE (club exclusivo)
@@ -5648,7 +5648,7 @@ function buildGoogleWalletSaveUrl({ userId, userName, points, qrCode, membership
     // (sin OAuth), así que limpia el branding viejo aunque la clase persistida
     // en Google no se pueda actualizar todavía. ?v fuerza re-fetch del CDN.
     heroImage: {
-      sourceUri: { uri: `${SITE_URL}/wallet-hero-alma.png?v=warm2` },
+      sourceUri: { uri: `${SITE_URL}/wallet-hero-hive.png?v=hive1` },
       contentDescription: { defaultValue: { language: "es", value: PASS_DEFAULT_TEXTS.heroDescription } },
     },
     barcode: {
