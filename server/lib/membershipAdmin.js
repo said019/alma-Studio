@@ -5,9 +5,9 @@ import { reasonProblem, changedFields } from "./audit.js";
 
 export const MEMBERSHIP_STATUS = Object.freeze(["pending_payment", "pending_activation", "active", "expired", "paused", "cancelled"]);
 export const PAYMENT_METHODS = Object.freeze(["cash", "transfer", "card", "online"]);
-/** Cambiar alguno de estos exige motivo. Cambiar sólo el método, no. */
-export const REASON_FIELDS = Object.freeze(["classes_remaining", "start_date", "end_date", "status"]);
-const ADJUST_FIELDS = ["status", "classes_remaining", "start_date", "end_date", "payment_method"];
+/** Cambiar alguno de estos exige motivo (bloque 3: también las cancelaciones usadas). Cambiar sólo el método, no. */
+export const REASON_FIELDS = Object.freeze(["classes_remaining", "start_date", "end_date", "status", "cancellations_used"]);
+const ADJUST_FIELDS = ["status", "classes_remaining", "start_date", "end_date", "payment_method", "cancellations_used"];
 
 const given = (v) => v !== undefined && v !== null && v !== "";
 const round2 = (n) => Math.round(n * 100) / 100;
@@ -109,7 +109,7 @@ export function saleAuditAfter({ plan, listPrice, amount, paymentMethod, payment
  * "AAAA-MM-DD", `duration_days` y `plan_class_limit` del plan.
  */
 export function planMembershipAdjust({ before, input }) {
-  const { status, classesRemaining, startDate, endDate, paymentMethod } = input || {};
+  const { status, classesRemaining, startDate, endDate, paymentMethod, cancellationsUsed } = input || {};
   if (given(status) && !MEMBERSHIP_STATUS.includes(status)) {
     return { ok: false, message: `status inválido. Debe ser uno de: ${MEMBERSHIP_STATUS.join(", ")}` };
   }
@@ -122,6 +122,12 @@ export function planMembershipAdjust({ before, input }) {
   if (given(paymentMethod) && !PAYMENT_METHODS.includes(paymentMethod)) {
     return { ok: false, message: `Método de pago inválido. Opciones: ${PAYMENT_METHODS.join(", ")}.` };
   }
+  if (given(cancellationsUsed)) {
+    const n = Number(cancellationsUsed);
+    if (!Number.isInteger(n) || n < 0 || n > 1000) {
+      return { ok: false, message: "Las cancelaciones usadas deben ser un número entero de 0 en adelante." };
+    }
+  }
   const next = {};
   if (given(status)) next.status = status;
   if (given(classesRemaining)) next.classes_remaining = Number(classesRemaining);
@@ -130,12 +136,14 @@ export function planMembershipAdjust({ before, input }) {
   if (given(endDate)) next.end_date = endDate;
   else if (given(startDate) && before?.duration_days) next.end_date = addDaysYmd(startDate, before.duration_days);
   if (given(paymentMethod)) next.payment_method = paymentMethod;
+  if (given(cancellationsUsed)) next.cancellations_used = Number(cancellationsUsed);
 
   const start = next.start_date ?? before?.start_date ?? null;
   const end = next.end_date ?? before?.end_date ?? null;
   if (start && end && end < start) return { ok: false, message: "La fecha de fin no puede ser anterior a la de inicio." };
 
-  const changes = changedFields(before, next, ADJUST_FIELDS, (k, v) => (k === "classes_remaining" ? creditsKey(v) : v));
+  const changes = changedFields(before, next, ADJUST_FIELDS, (k, v) =>
+    k === "classes_remaining" ? creditsKey(v) : k === "cancellations_used" ? Number(v ?? 0) : v);
   const needsReason = changes.changed.some((k) => REASON_FIELDS.includes(k));
   const limit = before?.plan_class_limit;
   const newCredits = changes.after.classes_remaining;

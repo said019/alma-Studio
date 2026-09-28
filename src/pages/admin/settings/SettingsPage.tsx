@@ -24,6 +24,7 @@ import { useToast } from "@/hooks/use-toast";
 import { formatDateTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useCanSeeFinance } from "@/lib/roles";
+import { cancellationRules, horasTexto, useBookingPolicy } from "@/lib/booking-policy";
 import {
   Loader2,
   Send,
@@ -940,6 +941,84 @@ const VenueMediaSettings = () => {
   );
 };
 
+// ── Políticas: cuota de cancelaciones (auditoría 2026-09-27, P0-4) ──────────
+// La cuota la fija sólo la dueña; la ventana (Lealtad) y el cierre de reservas
+// se muestran de lectura. "Así se publica" usa el mismo texto que la app y
+// /legal/cancelacion. Los textos legales ya no se editan aquí.
+const CancellationPolicySettings = () => {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const isOwner = useCanSeeFinance();
+  const { policy, isLoading, isError, refetch } = useBookingPolicy();
+  const [value, setValue] = useState("");
+  useEffect(() => {
+    if (!isLoading) setValue(String(policy.cancellationLimit));
+  }, [isLoading, policy.cancellationLimit]);
+  const n = Number(value);
+  const valid = value.trim() !== "" && Number.isInteger(n) && n >= 0 && n <= 20;
+  const dirty = valid && n !== policy.cancellationLimit;
+  const save = useMutation({
+    mutationFn: () => api.put("/admin/booking-policy", { cancellationLimit: n }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["booking-policy"] });
+      toast({ title: "Política guardada", description: "La app y la política de cancelación ya muestran la nueva cuota." });
+    },
+    onError: (e: any) => toast({ title: e?.response?.data?.message ?? "No se pudo guardar", variant: "destructive" }),
+  });
+
+  if (isError) {
+    return <div className="max-w-md"><ErrorState description="No pudimos cargar la política. Revisa tu conexión y vuelve a intentarlo." onRetry={() => refetch()} /></div>;
+  }
+  return (
+    <div className="flex flex-col gap-4">
+      <Panel aria-label="Cancelaciones" className="p-6">
+        <h2 className="mb-1 text-base font-extrabold">Cancelaciones</h2>
+        <p className="mb-4 text-[13px] text-ink-muted">Se publica igual en la app, en el detalle de cada clase y en la política de cancelación.</p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="pol-limit">Cancelaciones permitidas por paquete</Label>
+            <Input id="pol-limit" type="number" inputMode="numeric" min={0} max={20} step={1} className="nums"
+              disabled={!isOwner || isLoading} value={value} onChange={(e) => setValue(e.target.value)} />
+            <p className="text-[0.75rem] text-ink-muted">0 = sin límite. Salir de la lista de espera no cuenta.</p>
+            {!isOwner && <p className="text-[0.75rem] text-ink-muted">Sólo la dueña puede cambiarlo.</p>}
+            {value.trim() !== "" && !valid && <p className="text-[0.75rem] text-danger">Escribe un número entero de 0 a 20.</p>}
+          </div>
+          <dl className="flex flex-col gap-3 text-sm">
+            <div>
+              <dt className="text-ink-muted">Ventana para cancelar sin perder la clase</dt>
+              <dd className="nums font-bold text-ink">{horasTexto(policy.cancelWindowHours)}</dd>
+            </div>
+            <div>
+              <dt className="text-ink-muted">Las reservas y la lista de espera cierran antes del inicio</dt>
+              <dd className="nums font-bold text-ink">{horasTexto(policy.bookingLeadHours)}</dd>
+            </div>
+          </dl>
+        </div>
+        <h3 className="mt-5 text-sm font-extrabold">Así se publica</h3>
+        <ul aria-label="Reglas publicadas" className="mt-2 list-disc space-y-1 pl-5 text-sm text-ink">
+          {cancellationRules({ ...policy, cancellationLimit: valid ? n : policy.cancellationLimit }).map((r) => <li key={r}>{r}</li>)}
+        </ul>
+        {isOwner && (
+          <div className="mt-5">
+            <Button disabled={!dirty || save.isPending} onClick={() => save.mutate()}>{save.isPending ? "Guardando…" : "Guardar"}</Button>
+          </div>
+        )}
+      </Panel>
+      <Panel aria-label="Textos legales" className="p-6">
+        <h2 className="mb-1 text-base font-extrabold">Textos legales</h2>
+        <p className="text-sm text-ink-muted">
+          Los términos, el aviso de privacidad y la política de cancelación se publican desde el sistema, con su fecha de versión. Para cambiar su redacción, pídelo a quien mantiene la app.
+        </p>
+        <ul className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm font-bold">
+          <li><a href="/legal/terminos" target="_blank" rel="noreferrer" className="underline underline-offset-2">Términos y condiciones</a></li>
+          <li><a href="/legal/privacidad" target="_blank" rel="noreferrer" className="underline underline-offset-2">Aviso de privacidad</a></li>
+          <li><a href="/legal/cancelacion" target="_blank" rel="noreferrer" className="underline underline-offset-2">Política de cancelación</a></li>
+        </ul>
+      </Panel>
+    </div>
+  );
+};
+
 const SETTINGS_TABS = [
   { value: "general", label: "General", icon: Store },
   { value: "payments", label: "Pagos", icon: CreditCard },
@@ -1010,14 +1089,7 @@ const SettingsPage = () => {
               </TabsContent>
 
               <TabsContent value="policies">
-                <SettingsSection
-                  settingKey="policies_settings"
-                  fields={[
-                    { key: "cancellation_policy", label: "Política de cancelación", multiline: true },
-                    { key: "terms_of_service", label: "Términos de servicio", multiline: true },
-                    { key: "privacy_policy", label: "Política de privacidad", multiline: true },
-                  ]}
-                />
+                <CancellationPolicySettings />
               </TabsContent>
 
               <TabsContent value="whatsapp">

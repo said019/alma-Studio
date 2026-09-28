@@ -233,6 +233,15 @@ function MembershipCard({ mem, clientId, showFinance, onEdit, isLoading, isError
             : ""}
         </p>
       )}
+      {mem.cancellationLimit !== undefined && (() => {
+        const usadas = Number(mem.cancellationsUsed ?? 0);
+        const tope = Number(mem.cancellationLimit ?? 0);
+        return (
+          <p className="nums text-[13px] text-ink-muted">
+            {tope > 0 ? `Cancelaciones: ${usadas} de ${tope}` : `Cancelaciones: ${usadas} ${usadas === 1 ? "usada" : "usadas"} · sin límite`}
+          </p>
+        );
+      })()}
       <div className="grid grid-cols-2 gap-2">
         <Button variant="outline" onClick={onEdit}><Pencil size={16} aria-hidden="true" />Editar</Button>
         {showFinance && (
@@ -308,6 +317,7 @@ const ClientDetail = () => {
   const [editStartDate, setEditStartDate] = useState("");
   const [editEndDate, setEditEndDate] = useState("");
   const [editReason, setEditReason] = useState("");
+  const [editCancellations, setEditCancellations] = useState("");
 
   // Paginación por pestaña
   const [memPage, setMemPage] = useState(0);
@@ -396,6 +406,7 @@ const ClientDetail = () => {
     setEditStartDate(m.startDate ? String(m.startDate).slice(0, 10) : "");
     setEditEndDate(m.endDate ? String(m.endDate).slice(0, 10) : "");
     setEditReason("");
+    setEditCancellations(String(m.cancellationsUsed ?? 0));
   };
 
   const handleEditStartDateChange = (val: string) => {
@@ -414,6 +425,7 @@ const ClientDetail = () => {
       body.classesRemaining = editUnlimited ? 9999 : Math.max(0, Number(editCredits || 0));
       if (editStartDate) body.startDate = editStartDate;
       if (editEndDate) body.endDate = editEndDate;
+      if (editCancellations.trim() !== "") body.cancellationsUsed = Number(editCancellations);
       body.reason = editReason.trim();
       return api.put(`/memberships/${editMem.id}`, body);
     },
@@ -951,6 +963,26 @@ const ClientDetail = () => {
                   {editAbovePlan && (
                     <p className="text-[0.75rem] font-bold text-danger">Queda por encima del plan ({editMem.classLimit} clases).</p>
                   )}
+                </div>
+
+                <div className="space-y-1">
+                  <Label htmlFor="mem-cancellations" className="text-xs text-ink/70">Cancelaciones usadas</Label>
+                  <Input
+                    id="mem-cancellations"
+                    type="number"
+                    min="0"
+                    step="1"
+                    inputMode="numeric"
+                    className={cn(fieldCls, "nums")}
+                    value={editCancellations}
+                    onChange={(e) => setEditCancellations(e.target.value)}
+                  />
+                  <p className="text-xs text-ink/50">
+                    {Number(editMem.cancellationLimit) > 0
+                      ? `De ${editMem.cancellationLimit} permitidas por paquete.`
+                      : "Este paquete no tiene límite de cancelaciones."}{" "}
+                    Bajarlas le deja cancelar otra vez; queda en la bitácora con el motivo del ajuste.
+                  </p>
                 </div>
 
                 <div className="space-y-1">

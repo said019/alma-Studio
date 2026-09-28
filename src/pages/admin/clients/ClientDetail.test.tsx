@@ -163,4 +163,33 @@ describe("Ficha de clienta", () => {
     fireEvent.click(guardar);
     await waitFor(() => expect(mockPut).toHaveBeenCalledWith("/memberships/m1", expect.objectContaining({ classesRemaining: 10, reason: "Compensación por clase cancelada" })));
   });
+
+  it("la tarjeta dice cuántas cancelaciones lleva y Editar las ajusta con el motivo del ajuste", async () => {
+    const mockPut = (api as unknown as { put: Mock }).put;
+    mockPut.mockReset().mockResolvedValue({ data: {} });
+    loginAs("reception");
+    routeApi(mockApi, tabla({ "/memberships?userId=u1": { data: [{ ...MEM, cancellationsUsed: 2, cancellationLimit: 2 }] } }));
+    renderAdmin(<ClientDetail />, { route: "/admin/clients/u1", path: "/admin/clients/:id" });
+    const mem = await screen.findByRole("region", { name: "Membresía" });
+    expect(await within(mem).findByText("Cancelaciones: 2 de 2")).toBeInTheDocument();
+    fireEvent.click(within(mem).getByRole("button", { name: /Editar/ }));
+    const dlg = await screen.findByRole("dialog", { name: "Editar membresía" });
+    const campo = within(dlg).getByLabelText("Cancelaciones usadas");
+    expect(campo).toHaveValue(2);
+    expect(within(dlg).getByText(/De 2 permitidas por paquete/)).toBeInTheDocument();
+    fireEvent.change(campo, { target: { value: "0" } });
+    fireEvent.change(within(dlg).getByLabelText("Motivo del ajuste"), { target: { value: "Canceló por enfermedad, trajo receta" } });
+    fireEvent.click(within(dlg).getByRole("button", { name: "Guardar" }));
+    await waitFor(() => expect(mockPut).toHaveBeenCalledWith("/memberships/m1", expect.objectContaining({
+      cancellationsUsed: 0, reason: "Canceló por enfermedad, trajo receta",
+    })));
+  });
+
+  it("sin límite de cancelaciones la tarjeta lo dice", async () => {
+    loginAs("admin");
+    routeApi(mockApi, tabla({ "/memberships?userId=u1": { data: [{ ...MEM, cancellationsUsed: 1, cancellationLimit: 0 }] } }));
+    renderAdmin(<ClientDetail />, { route: "/admin/clients/u1", path: "/admin/clients/:id" });
+    const mem = await screen.findByRole("region", { name: "Membresía" });
+    expect(await within(mem).findByText("Cancelaciones: 1 usada · sin límite")).toBeInTheDocument();
+  });
 });

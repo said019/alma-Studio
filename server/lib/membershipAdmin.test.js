@@ -113,3 +113,19 @@ test("utilidades", () => {
   assert.equal(creditsKey("3"), 3);
   assert.equal(addDaysYmd("2026-12-20", 30), "2027-01-19");
 });
+
+test("cancelaciones usadas: cambiarlas pide motivo; el mismo valor no cuenta", () => {
+  const b = { ...before, cancellations_used: 2 };
+  const r = planMembershipAdjust({ before: b, input: { cancellationsUsed: 0 } });
+  assert.equal(r.ok, true);
+  assert.equal(r.needsReason, true);
+  assert.deepEqual(r.changes, { changed: ["cancellations_used"], before: { cancellations_used: 2 }, after: { cancellations_used: 0 } });
+  const igual = planMembershipAdjust({ before: b, input: { cancellationsUsed: "2", status: "active" } });
+  assert.deepEqual(igual.changes.changed, []);
+  assert.equal(igual.needsReason, false);
+  for (const bad of [-1, 1.5, "x", 1001]) {
+    const m = planMembershipAdjust({ before: b, input: { cancellationsUsed: bad } });
+    assert.equal(m.ok, false, String(bad));
+    assert.equal(m.message, "Las cancelaciones usadas deben ser un número entero de 0 en adelante.");
+  }
+});

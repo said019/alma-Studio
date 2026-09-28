@@ -62,6 +62,7 @@ import { DEFAULT_NOTIFICATION_TEMPLATES } from "./lib/notificationTemplates.js";
 import { PASS_DEFAULT_TEXTS, LOYALTY_MILESTONES_SEED } from "./lib/passDefaults.js";
 import { resolveEffectivePrice } from "./lib/pricing.js";
 import { saleAmountPlan, planMembershipAdjust, cleanPaymentReference, saleStartProblem, saleStartDay, saleAuditAfter, PAYMENT_METHODS } from "./lib/membershipAdmin.js";
+import { cancellationLimitProblem, cancellationQuota, clientCancelDecision, normalizeCancellationSettings, publicBookingPolicy } from "./lib/cancellationPolicy.js";
 import { isMembershipCategoryCompatible as ruleCategoryCompatible, normalizeClassCategory as ruleNormalizeCategory, isWithinMorningWindow, categoryLabel } from "./lib/bookingRules.js";
 import { rateKey } from "./lib/rateKey.js";
 import { isWithinCancelWindow, penaltyDueAt, faltaReversal } from "./lib/faltas.js";
@@ -3470,6 +3471,12 @@ app.get("/api/memberships/my", authMiddleware, async (req, res) => {
     // Treat 9999 or very large numbers as unlimited (null)
     if (row.classesRemaining >= 9999) row.classesRemaining = null;
     if (row.classLimit >= 9999) row.classLimit = null;
+    // Cuota de cancelaciones del paquete (auditoría 2026-09-27, P0-4).
+    const policy = await getBookingPolicy();
+    const quota = cancellationQuota({ used: row.cancellationsUsed, limit: policy.cancellationLimit });
+    row.cancellationsUsed = quota.used;
+    row.cancellationLimit = policy.cancellationLimit;
+    row.cancellationsLeft = quota.left;
     return res.json({ data: row });
   } catch (err) {
     console.error("Memberships/my error:", err);
@@ -3504,10 +3511,12 @@ app.get("/api/memberships/mine/all", authMiddleware, async (req, res) => {
          m.created_at DESC`,
       [req.userId]
     );
+    const policy = await getBookingPolicy();
     const rows = camelRows(r.rows).map((row) => {
       if (row.classesRemaining >= 9999) row.classesRemaining = null;
       if (row.classLimit >= 9999) row.classLimit = null;
-      return row;
+      const quota = cancellationQuota({ used: row.cancellationsUsed, limit: policy.cancellationLimit });
+      return { ...row, cancellationsUsed: quota.used, cancellationLimit: policy.cancellationLimit, cancellationsLeft: quota.left };
     });
     return res.json({ data: rows });
   } catch (err) {
@@ -3972,10 +3981,19 @@ app.post("/api/bookings", authMiddleware, async (req, res) => {
   }
 });
 
-// DELETE /api/bookings/:id
+// DELETE /api/bookings/:id — la clienta cancela su reserva o sale de la lista de
+// espera. Una sola política (auditoría 2026-09-27, P0-4):
+//   - cuota de cancelaciones por paquete (settings.cancellation_settings; 0 = sin límite);
+//   - ventana configurable (loyalty_config; 12 h por defecto): cancelar tarde
+//     pierde la clase y cuenta como falta.
+// Salir de la lista de espera no consulta ni suma la cuota, ni cuenta como falta.
+// Una reserva con asistencia o falta ya no se cancela desde la app. Si se libera
+// un lugar, sube la fila (onSeatReleased, después del COMMIT y con el pool libre).
 app.delete("/api/bookings/:id", authMiddleware, async (req, res) => {
   const client = await pool.connect();
+  let released = false;
   try {
+    const policy = await getBookingPolicy();
     await client.query("BEGIN");
 
     // Load + LOCK booking (FOR UPDATE OF b) para serializar cancelaciones
@@ -3996,12 +4014,6 @@ app.delete("/api/bookings/:id", authMiddleware, async (req, res) => {
     }
     const booking = r.rows[0];
 
-    if (booking.status === "cancelled") {
-      await client.query("ROLLBACK");
-      return res.status(400).json({ message: "Esta reserva ya fue cancelada" });
-    }
-
-    // ── Check membership cancellation limit (max 2 per membership period) ──
     let membership = null;
     if (booking.membership_id) {
       const memRes = await client.query(
@@ -4010,126 +4022,116 @@ app.delete("/api/bookings/:id", authMiddleware, async (req, res) => {
       );
       membership = memRes.rows[0] ?? null;
     }
-
-    if (membership && (membership.cancellations_used ?? 0) >= 2) {
+    const limit = membership ? policy.cancellationLimit : 0;
+    const decision = clientCancelDecision({ bookingStatus: booking.status, used: membership?.cancellations_used ?? 0, limit });
+    if (!decision.ok) {
       await client.query("ROLLBACK");
-      return res.status(403).json({
-        message: "Has alcanzado el límite de 2 cancelaciones permitidas en tu membresía actual. Contacta con el studio si necesitas ayuda.",
-      });
+      return res.status(decision.status).json({ code: decision.code, message: decision.message });
     }
 
-    // ── Ventana de aviso para devolución de crédito (política Alma: 12 h) ──
-    // Las clases están en hora de Ciudad de México; comparamos contra el inicio real.
+    // Ventana para devolver la clase: hora del estudio contra el inicio real.
     const classStartRes = await client.query(
       `SELECT (c.date + c.start_time::time) AT TIME ZONE '${STUDIO_TIMEZONE}' AS class_start_utc
        FROM classes c WHERE c.id = $1`,
       [booking.class_id]
     );
-    const classStartUTC = classStartRes.rows[0]?.class_start_utc
-      ? new Date(classStartRes.rows[0].class_start_utc)
-      : null;
-    const now = new Date();
-    const minutesUntilClass = classStartUTC
-      ? (classStartUTC.getTime() - now.getTime()) / 60_000
-      : 999; // si no se puede determinar, se asume a tiempo
-    // Una sola ventana (default 12 h, configurable) decide falta Y pérdida de crédito.
-    let cancelWindowHours = 12;
-    try {
-      const _lc = await getLoyaltyConfig();
-      const w = Number(_lc.faltas_cancel_window_hours);
-      if (Number.isFinite(w) && w > 0) cancelWindowHours = w;
-    } catch (e) { console.warn("[cancel] loyalty config:", e.message); }
-    const isLate = isWithinCancelWindow(minutesUntilClass, cancelWindowHours); // dentro de la ventana = tardía
-    const wasConfirmed = booking.status === "confirmed";
+    const classStartUTC = classStartRes.rows[0]?.class_start_utc ? new Date(classStartRes.rows[0].class_start_utc) : null;
+    const minutesUntilClass = classStartUTC ? (classStartUTC.getTime() - Date.now()) / 60_000 : 999;
+    const isLate = decision.countsTowardQuota && isWithinCancelWindow(minutesUntilClass, policy.cancelWindowHours);
 
-    // Cancel the booking
-    await client.query(
-      "UPDATE bookings SET status = 'cancelled', cancelled_at = NOW() WHERE id = $1",
-      [req.params.id]
-    );
+    await client.query("UPDATE bookings SET status = 'cancelled', cancelled_at = NOW() WHERE id = $1", [req.params.id]);
+    // Cupo: lo mantiene el trigger update_class_booking_count (auditoría 2026-09-08, P1-6).
 
-    if (wasConfirmed) {
-      // Always free the class spot
-      // Cupo: lo mantiene el trigger update_class_booking_count (auditoría 2026-09-08, P1-6).
-
-      if (membership) {
-        // Increment cancellations_used regardless of timing
-        await client.query(
-          "UPDATE memberships SET cancellations_used = COALESCE(cancellations_used, 0) + 1 WHERE id = $1",
-          [membership.id]
-        );
-
-        // On-time: restore credit only if membership has a counted limit.
-        // Late: credit is LOST — do not restore.
-        if (!isLate && membership.classes_remaining !== null && membership.classes_remaining < 9999) {
-          // Devuelve total y, si es mixto, el bucket del área de la clase.
-          await restoreMembershipCredit(client, membership.id, booking.class_id);
-        }
+    let used = Number(membership?.cancellations_used ?? 0);
+    if (decision.countsTowardQuota && membership) {
+      const up = await client.query(
+        "UPDATE memberships SET cancellations_used = COALESCE(cancellations_used, 0) + 1 WHERE id = $1 RETURNING cancellations_used",
+        [membership.id]
+      );
+      used = Number(up.rows[0]?.cancellations_used ?? used + 1);
+      // A tiempo: la clase regresa al paquete (si tiene tope). Tarde: se pierde.
+      if (!isLate && !isUnlimitedClasses(membership.classes_remaining)) {
+        await restoreMembershipCredit(client, membership.id, booking.class_id);
       }
     }
+    const creditRestored = decision.countsTowardQuota && !isLate;
 
     await client.query("COMMIT");
+    client.release();
+    released = true;
 
-    // ── Side effects (best-effort, ya fuera de la transacción) ──────────────
-    // Falta por cancelación tardía (MISMA ventana). Excluye invitadas (guest).
-    if (req.userId && !booking.guest_profile_id && isLate) {
+    // ── Después del COMMIT (pool libre) ─────────────────────────────────────
+    // Falta por cancelación tardía (misma ventana). Excluye invitadas.
+    if (decision.countsTowardQuota && isLate && !booking.guest_profile_id) {
       try {
-        await recordFalta({ userId: req.userId, reason: `cancelación dentro de ${cancelWindowHours}h` });
+        await recordFalta({ userId: req.userId, reason: `cancelación dentro de ${policy.cancelWindowHours}h` });
       } catch (e) { console.warn("[faltas] late-cancel:", e.message); }
     }
+    // Se liberó un lugar: sube la primera de la fila que pueda usarlo (P1-1).
+    if (decision.freesSeat) await onSeatReleased([booking.class_id], { source: "client_cancel" });
 
-    // ── Email + WhatsApp: booking cancelled ────────────────────────────────
-    try {
-      const uRes = await pool.query("SELECT email, display_name, phone FROM users WHERE id = $1", [req.userId]);
-      const memAfter = membership
-        ? await pool.query("SELECT classes_remaining FROM memberships WHERE id = $1", [membership.id])
-        : null;
-      if (uRes.rows[0]) {
-        const u = uRes.rows[0];
-        if (await areEmailNotificationsEnabled()) {
-          sendBookingCancelled({
-            to: u.email,
-            name: u.display_name || "Alumna",
-            className: booking.class_type_name || "tu clase",
-            date: booking.date,
-            startTime: booking.start_time,
-            creditRestored: !isLate,
-            isLate,
-            classesLeft: memAfter?.rows[0]?.classes_remaining ?? null,
-          }).catch((e) => console.error("[Email] booking cancelled:", e.message));
+    // Correo + WhatsApp sólo al cancelar una reserva (salir de la fila no avisa).
+    if (!decision.leavingWaitlist) {
+      try {
+        const uRes = await pool.query("SELECT email, display_name, phone FROM users WHERE id = $1", [req.userId]);
+        const memAfter = membership
+          ? await pool.query("SELECT classes_remaining FROM memberships WHERE id = $1", [membership.id])
+          : null;
+        if (uRes.rows[0]) {
+          const u = uRes.rows[0];
+          if (await areEmailNotificationsEnabled()) {
+            sendBookingCancelled({
+              to: u.email,
+              name: u.display_name || "Alumna",
+              className: booking.class_type_name || "tu clase",
+              date: booking.date,
+              startTime: booking.start_time,
+              creditRestored,
+              isLate,
+              classesLeft: memAfter?.rows[0]?.classes_remaining ?? null,
+            }).catch((e) => console.error("[Email] booking cancelled:", e.message));
+          }
+          sendConfiguredWhatsAppTemplate({
+            templateKey: "booking_cancelled",
+            phone: u.phone,
+            vars: {
+              name: u.display_name || "Alumna",
+              class: booking.class_type_name || "tu clase",
+              date: booking.date ? new Date(booking.date).toLocaleDateString("es-MX") : "",
+              time: booking.start_time ? String(booking.start_time).slice(0, 5) : "",
+              creditRestored: creditRestored ? "Sí" : "No",
+            },
+            fallbackMessage: isLate
+              ? `Hola ${u.display_name || "Alumna"}, cancelaste tu reserva de ${booking.class_type_name || "tu clase"}. La clase no se devolvió por cancelación tardía.`
+              : `Hola ${u.display_name || "Alumna"}, cancelaste tu reserva de ${booking.class_type_name || "tu clase"}. Tu crédito fue devuelto.`,
+          }).catch((e) => console.error("[WA] booking cancelled:", e.message));
         }
-        sendConfiguredWhatsAppTemplate({
-          templateKey: "booking_cancelled",
-          phone: u.phone,
-          vars: {
-            name: u.display_name || "Alumna",
-            class: booking.class_type_name || "tu clase",
-            date: booking.date ? new Date(booking.date).toLocaleDateString("es-MX") : "",
-            time: booking.start_time ? String(booking.start_time).slice(0, 5) : "",
-            creditRestored: !isLate ? "Sí" : "No",
-          },
-          fallbackMessage: isLate
-            ? `Hola ${u.display_name || "Alumna"}, cancelaste tu reserva de ${booking.class_type_name || "tu clase"}. La clase no se devolvió por cancelación tardía.`
-            : `Hola ${u.display_name || "Alumna"}, cancelaste tu reserva de ${booking.class_type_name || "tu clase"}. Tu crédito fue devuelto.`,
-        }).catch((e) => console.error("[WA] booking cancelled:", e.message));
+      } catch (emailErr) {
+        console.error("[Email] cancelled query:", emailErr.message);
       }
-    } catch (emailErr) {
-      console.error("[Email] cancelled query:", emailErr.message);
     }
 
-    triggerWalletPassSync(req.userId, isLate ? "booking_cancelled_late" : "booking_cancelled");
+    triggerWalletPassSync(req.userId, decision.leavingWaitlist ? "waitlist_left" : isLate ? "booking_cancelled_late" : "booking_cancelled");
+    const quota = cancellationQuota({ used, limit });
     return res.json({
-      message: isLate
-        ? `Reserva cancelada. Por cancelar con menos de ${cancelWindowHours} horas de anticipación, la clase cuenta como utilizada y NO se devuelve a tu paquete.`
-        : "Reserva cancelada. Se devolvió el crédito a tu paquete.",
-      creditRestored: !isLate,
+      message: decision.leavingWaitlist
+        ? "Saliste de la lista de espera. No usa una cancelación de tu paquete."
+        : isLate
+          ? `Reserva cancelada. Por cancelar con menos de ${policy.cancelWindowHours} horas de anticipación, la clase cuenta como utilizada y NO se devuelve a tu paquete.`
+          : "Reserva cancelada. Se devolvió el crédito a tu paquete.",
+      creditRestored,
+      leftWaitlist: decision.leavingWaitlist,
+      cancellationsUsed: quota.used,
+      cancellationLimit: limit,
+      cancellationsLeft: quota.left,
+      cancelWindowHours: policy.cancelWindowHours,
     });
   } catch (err) {
-    try { await client.query("ROLLBACK"); } catch (_) { }
+    if (!released) { try { await client.query("ROLLBACK"); } catch (_) { } }
     console.error("DELETE bookings error:", err.message, err.stack);
     return res.status(500).json({ message: "Error interno" });
   } finally {
-    client.release();
+    if (!released) client.release();
   }
 });
 
@@ -11928,6 +11930,11 @@ app.get("/api/settings/:key", adminMiddleware, async (req, res) => {
 
 app.put("/api/settings/:key", adminMiddleware, async (req, res) => {
   try {
+    // La cuota de cancelaciones tiene su ruta (sólo la dueña, validada y en la
+    // bitácora): por aquí recepción podía cambiarla (auditoría 2026-09-27, P0-4).
+    if (req.params.key === "cancellation_settings") {
+      return res.status(400).json({ message: "La cuota de cancelaciones se cambia en Configuración → Políticas." });
+    }
     const { value } = req.body;
     if (value === undefined) {
       return res.status(400).json({ message: "Falta `value` en el body" });
@@ -11940,6 +11947,64 @@ app.put("/api/settings/:key", adminMiddleware, async (req, res) => {
     );
     return res.json({ data: { key: req.params.key, value: merged } });
   } catch (err) { return res.status(500).json({ message: "Error interno" }); }
+});
+
+// ── Política de reservas y cancelación (auditoría 2026-09-27, P0-4) ─────────
+// Cuota de cancelaciones por paquete (settings.cancellation_settings; 2 por
+// defecto, 0 = sin límite), ventana real (loyalty_config) y cierre de reservas y
+// de la lista de espera (BOOKING_LEAD_HOURS). La app, los legales y el panel la
+// leen de aquí: una sola política.
+async function getBookingPolicy(db = pool) {
+  const [raw, loyalty] = await Promise.all([
+    db.query("SELECT value FROM settings WHERE key = 'cancellation_settings' LIMIT 1")
+      .then((r) => r.rows[0]?.value ?? null)
+      .catch(() => null),
+    getLoyaltyConfig(db),
+  ]);
+  return publicBookingPolicy({ settings: raw, loyalty, bookingLeadHours: BOOKING_LEAD_HOURS });
+}
+
+app.get("/api/public/booking-policy", async (_req, res) => {
+  try {
+    return res.json({ data: await getBookingPolicy() });
+  } catch (err) {
+    console.error("[GET /public/booking-policy]", err.message);
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// PUT /api/admin/booking-policy — sólo la dueña fija la cuota de cancelaciones.
+app.put("/api/admin/booking-policy", ownerMiddleware, async (req, res) => {
+  const problem = cancellationLimitProblem(req.body?.cancellationLimit);
+  if (problem) return res.status(400).json({ message: problem });
+  const next = Number(req.body.cancellationLimit);
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const cur = await client.query("SELECT value FROM settings WHERE key = 'cancellation_settings' FOR UPDATE");
+    const raw = cur.rows[0]?.value && typeof cur.rows[0].value === "object" ? cur.rows[0].value : {};
+    const prev = normalizeCancellationSettings(raw).max_cancellations;
+    await client.query(
+      `INSERT INTO settings (key, value) VALUES ('cancellation_settings', $1::jsonb)
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
+      [JSON.stringify({ ...raw, max_cancellations: next })],
+    );
+    if (prev !== next) {
+      await recordAudit(client, {
+        actorId: req.userId, action: "settings.update", entityType: "settings",
+        before: { max_cancellations: prev }, after: { max_cancellations: next },
+        meta: { key: "cancellation_settings" },
+      });
+    }
+    await client.query("COMMIT");
+    return res.json({ data: await getBookingPolicy() });
+  } catch (err) {
+    await client.query("ROLLBACK").catch(() => {});
+    console.error("[PUT /admin/booking-policy]", err.message);
+    return res.status(500).json({ message: "Error interno" });
+  } finally {
+    client.release();
+  }
 });
 
 // ── Datos de transferencia bancaria — editables por el admin ─────────────────
@@ -13245,6 +13310,7 @@ app.get("/api/memberships", adminMiddleware, async (req, res) => {
     if (userId) { params.push(userId); q += ` AND m.user_id = $${params.length}`; }
     params.push(parseInt(limit)); q += ` ORDER BY m.created_at DESC LIMIT $${params.length}`;
     const r = await pool.query(q, params);
+    const policy = await getBookingPolicy();
     return res.json({
       data: r.rows.map(m => ({
         id: m.id,
@@ -13261,6 +13327,8 @@ app.get("/api/memberships", adminMiddleware, async (req, res) => {
         studioRemaining: m.studio_remaining,
         rtRemaining: m.rt_remaining,
         classLimit: m.class_limit,
+        cancellationsUsed: Number(m.cancellations_used ?? 0),
+        cancellationLimit: policy.cancellationLimit,
         durationDays: m.duration_days ?? null,
         createdAt: m.created_at,
       }))
@@ -13577,12 +13645,14 @@ app.put("/api/memberships/:id/cancel", adminMiddleware, async (req, res) => {
 // El panel manda todos los campos aunque no cambien: sólo cuenta lo que cambia
 // de verdad (9999 e ilimitado son lo mismo).
 app.put("/api/memberships/:id", adminMiddleware, async (req, res) => {
-  const { status, classesRemaining, endDate, startDate, paymentMethod, reason } = req.body || {};
+  const { status, classesRemaining, endDate, startDate, paymentMethod, reason, cancellationsUsed } = req.body || {};
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
     const cur = await client.query(
-      `SELECT m.id, m.user_id, m.status::text AS status, m.classes_remaining, m.payment_method::text AS payment_method,
+      `SELECT m.id, m.user_id, m.status::text AS status, m.classes_remaining,
+              COALESCE(m.cancellations_used, 0)::int AS cancellations_used,
+              m.payment_method::text AS payment_method,
               to_char(m.start_date, 'YYYY-MM-DD') AS start_date, to_char(m.end_date, 'YYYY-MM-DD') AS end_date,
               p.duration_days, p.class_limit AS plan_class_limit, p.name AS plan_name
          FROM memberships m
@@ -13596,7 +13666,7 @@ app.put("/api/memberships/:id", adminMiddleware, async (req, res) => {
       return res.status(404).json({ message: "Membresía no encontrada" });
     }
     const before = cur.rows[0];
-    const plan = planMembershipAdjust({ before, input: { status, classesRemaining, startDate, endDate, paymentMethod } });
+    const plan = planMembershipAdjust({ before, input: { status, classesRemaining, startDate, endDate, paymentMethod, cancellationsUsed } });
     if (!plan.ok) {
       await client.query("ROLLBACK");
       return res.status(400).json({ message: plan.message });
@@ -13628,9 +13698,10 @@ app.put("/api/memberships/:id", adminMiddleware, async (req, res) => {
          end_date = COALESCE($3, end_date),
          start_date = COALESCE($4, start_date),
          payment_method = COALESCE($5, payment_method),
+         cancellations_used = COALESCE($6, cancellations_used),
          updated_at = NOW()
-       WHERE id = $6 RETURNING *`,
-      [val("status"), val("classes_remaining"), val("end_date"), val("start_date"), val("payment_method"), req.params.id],
+       WHERE id = $7 RETURNING *`,
+      [val("status"), val("classes_remaining"), val("end_date"), val("start_date"), val("payment_method"), val("cancellations_used"), req.params.id],
     );
     // Si cambió el total de una membresía mixta, re-reparte los buckets.
     if (plan.changes.changed.includes("classes_remaining")) await resyncMixtoBuckets(client, req.params.id);
