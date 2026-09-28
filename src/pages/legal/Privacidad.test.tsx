@@ -17,7 +17,7 @@ describe("Aviso de privacidad integral (P1-10, LFPDPPP)", () => {
       "9. Seguridad y conservación", "10. Cambios a este aviso", "11. Contacto",
     ]) expect(screen.getByRole("heading", { name: h })).toBeInTheDocument();
     expect(screen.getByText("Versión 2026-09-28")).toBeInTheDocument();
-    expect(screen.getByText(/Última actualización: 29 de septiembre de 2026/)).toBeInTheDocument();
+    expect(screen.getByText(/Última actualización: 28 de septiembre de 2026/)).toBeInTheDocument();
     expect(screen.getByText(/es responsable del tratamiento de tus datos personales/)).toHaveTextContent("HIVE Pilates Studio, con domicilio en Cuauhtémoc #68, Del Carmen, Coyoacán, C.P. 04100, CDMX");
     expect(screen.getByText(/Cuando tú misma los escribes en la app.*te pedimos tu consentimiento expreso/)).toBeInTheDocument();
     expect(screen.getByText(/El equipo del estudio.*también puede registrar los datos de salud que tú le comuniques/)).toBeInTheDocument();
