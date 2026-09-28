@@ -103,7 +103,7 @@ describe("Mis clases · cancelar y lista de espera (P0-4 · P1-1)", () => {
     });
   });
 
-  it("con el paquete de la reserva vencido (no viene en mine/all) no hereda la cuota de otro paquete activo (ronda 1)", async () => {
+  it("con el paquete de la reserva vencido (no viene en mine/all) no hereda la cuota de otro paquete activo", async () => {
     vi.mocked(api.get).mockImplementation(respuestas({
       "/bookings/my-bookings": { data: [
         { id: "b5", class_id: "c5", membership_id: "m-vencida", class_type_name: "Mat", instructor_name: "Ana", start_time: "2026-09-26T10:00:00", status: "confirmed" },

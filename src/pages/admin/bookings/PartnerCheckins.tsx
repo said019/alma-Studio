@@ -38,7 +38,7 @@ const EN_ESTUDIO: Record<string, string> = { checked_in: "Asistió", no_show: "F
 
 /* Fecha de la clase ("AAAA-MM-DD"): con formatDate directo corre un día en
    CDMX (new Date("AAAA-MM-DD") se interpreta en UTC). parseISO sí la ancla en
-   la zona local (auditoría 2026-09-27, ronda de rulings del controlador, R7). */
+   la zona local. */
 const fechaClase = (d?: string | null) => (d ? formatDate(parseISO(d)) : "");
 
 /* Check-ins de Wellhub (auditoría 2026-09-27, P1-9): sólo la dueña. Concilia,

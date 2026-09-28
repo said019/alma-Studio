@@ -56,10 +56,10 @@ const ProfileEdit = () => {
   const [confirmarBorrar, setConfirmarBorrar] = useState(false);
   const yaConsintio = hasCurrentHealthConsent(user as { healthConsentVersion?: string | null; healthConsentAt?: string | null } | null);
   const consentidoEl = user?.healthConsentAt ? format(parseISO(user.healthConsentAt), "d 'de' MMMM, yyyy", { locale: es }) : null;
-  // Ronda de ajustes 1 (P1-10): una clienta con notas o lesión guardadas pero
-  // sin consentimiento vigente (dato capturado por el equipo, o de una versión
-  // anterior del aviso) también debe poder borrarlas, no sólo "retirar" un
-  // consentimiento que no tiene.
+  // Una clienta con notas o lesión guardadas pero sin consentimiento vigente
+  // (dato capturado por el equipo, o de una versión anterior del aviso)
+  // también debe poder borrarlas, no sólo "retirar" un consentimiento que no
+  // tiene.
   const tieneDatosSalud = Boolean(
     String(user?.healthNotes ?? user?.health_notes ?? "").trim() ||
     user?.hasInjury ||
@@ -286,10 +286,9 @@ const ProfileEdit = () => {
                   </a>
                 </AuthCheckbox>
 
-                {/* Ronda de ajustes 1 (P1-10): notas o lesión guardadas sin
-                    consentimiento vigente (p. ej. capturadas por el equipo, o de
-                    una versión anterior del aviso) — sin esto no había forma de
-                    borrarlas desde la app. */}
+                {/* Notas o lesión guardadas sin consentimiento vigente (p. ej.
+                    capturadas por el equipo, o de una versión anterior del
+                    aviso): sin esto no había forma de borrarlas desde la app. */}
                 {tieneDatosSalud && (
                   confirmarBorrar ? (
                     <div className="flex flex-col gap-2 rounded-2xl border border-line p-3">

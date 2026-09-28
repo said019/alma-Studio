@@ -135,17 +135,18 @@ export function auditChanges(e: AuditEntry): { key: string; label: string; befor
 
 const pluralEs = (n: number, uno: string, varios: string) => (n === 1 ? uno : varios);
 
-/** Cuántas se saltó la subida de la lista de espera (bloque 3, ronda de ajustes
- *  1): T4 manda un arreglo de `{ booking_id, position, reason }`, no un número. */
+/** Cuántas se saltó la subida de la lista de espera: el campo puede llegar
+ *  como un arreglo de `{ booking_id, position, reason }` en vez de un
+ *  número ya contado, así que se normaliza a partir de su longitud. */
 function skippedCount(skipped: unknown): number {
   if (Array.isArray(skipped)) return skipped.length;
   const n = Number(skipped);
   return Number.isFinite(n) ? n : 0;
 }
 
-/** "Se conserva: …" de un plan archivado (bloque 3, ronda de ajustes 1): T9
- *  manda un objeto `{ memberships, orders, discount_codes }` con conteos.
- *  Se acepta también arreglo o texto, por compatibilidad. */
+/** "Se conserva: …" de un plan archivado: el meta puede llegar como un
+ *  objeto `{ memberships, orders, discount_codes }` con conteos, o como
+ *  arreglo o texto simple; se acepta cualquiera de las tres formas. */
 function keptLine(kept: unknown): string | null {
   if (kept && typeof kept === "object" && !Array.isArray(kept)) {
     const k = kept as Record<string, unknown>;
@@ -183,8 +184,8 @@ export function auditMetaLines(e: Pick<AuditEntry, "action" | "meta" | "after">)
     const refunded = Number(m.penalty_refunded) || 0;
     if (refunded > 0) lines.push(`Puntos devueltos por la falta: ${refunded}`);
   }
-  // Bloque 3 (auditoría 2026-09-27, R2 del controlador; formas de meta ajustadas
-  // en la ronda 1 tras comparar con lo que escriben T4, T7 y T9)
+  // Cada acción trae su propia forma de meta (subida de fila, reembolso,
+  // archivar plan): se listan por separado para no mezclar sus campos.
   if (e.action === "booking.waitlist_promoted") {
     if (m.position !== undefined) lines.push(`Posición en la fila: ${Number(m.position) || 0}`);
     if (m.skipped !== undefined) {

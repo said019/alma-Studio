@@ -237,7 +237,7 @@ const MyBookings = () => {
   // /memberships/mine/all sólo trae vigentes: si el paquete de esta reserva ya
   // venció o se canceló, no está ahí. Sin fallback a otra membresía activa:
   // eso mostraría la cuota de un paquete distinto y podría bloquear "Sí,
-  // cancelar" sin motivo. El servidor decide en el DELETE (ronda 1, T5).
+  // cancelar" sin motivo. El servidor decide en el DELETE con sus propios datos.
   const saliendo = cancelTarget?.status === "waitlist";
   const memDeReserva = memberships.find((m) => m.id === cancelTarget?.membership_id) ?? null;
   const limite = Number(memDeReserva?.cancellationLimit ?? policy.cancellationLimit);

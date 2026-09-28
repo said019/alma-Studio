@@ -79,9 +79,9 @@ describe("Perfil · consentimiento para datos de salud (P1-10)", () => {
     await waitFor(() => expect(api.delete).toHaveBeenCalledWith("/me/health-consent"));
   });
 
-  // Ronda de ajustes 1 (P1-10): marcar la casilla sin editar las notas
-  // (p. ej. notas ya guardadas de antes, o consentimiento de una versión
-  // anterior del aviso) también debía registrar el consentimiento.
+  // Marcar la casilla sin editar las notas (p. ej. notas ya guardadas de
+  // antes, o consentimiento de una versión anterior del aviso) también debe
+  // registrar el consentimiento.
   it("marcar la casilla sin escribir notas nuevas también registra el consentimiento", async () => {
     montar({ ...U, healthNotes: "Asma" });
     fireEvent.click(screen.getByRole("checkbox", { name: /Autorizo expresamente/ }));
@@ -90,9 +90,9 @@ describe("Perfil · consentimiento para datos de salud (P1-10)", () => {
     await waitFor(() => expect(api.put).toHaveBeenCalledWith("/users/u1", expect.objectContaining({ healthConsent: true })));
   });
 
-  // Ronda de ajustes 1 (P1-10): sin esto, una clienta con notas o lesión
-  // guardadas pero sin consentimiento vigente (capturadas por el equipo, o de
-  // una versión anterior del aviso) no tenía forma de borrarlas desde la app.
+  // Una clienta con notas o lesión guardadas pero sin consentimiento vigente
+  // (capturadas por el equipo, o de una versión anterior del aviso) también
+  // debe poder borrarlas, sin esto no había forma desde la app.
   it("con notas guardadas pero sin consentimiento vigente, puede borrarlas con 'Borrar mis datos de salud'", async () => {
     montar({ ...U, healthNotes: "Asma", healthConsentVersion: null, healthConsentAt: null });
     expect(await screen.findByRole("checkbox", { name: /Autorizo expresamente/ })).toBeInTheDocument();

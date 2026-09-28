@@ -6,7 +6,7 @@ export type PaymentRow = { createdAt?: string; method?: string; total_amount?: n
    reembolsos llegan como filas negativas (bloque 3): restan del total, se
    cuentan aparte y también restan de su propio método en el desglose (no
    del método con el que se pagó originalmente), para que "Por método · mes"
-   sume lo mismo que el neto del mes (ronda de ajustes, A9). */
+   sume lo mismo que el neto del mes. */
 export function summarizePayments(payments: PaymentRow[], now: Date) {
   const weekStart = startOfWeek(now, { weekStartsOn: 1 });
   const week = { amount: 0, count: 0 };

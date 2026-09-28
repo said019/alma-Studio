@@ -103,7 +103,7 @@ describe("bitácora · textos del bloque 3", () => {
     expect(AUDIT_ENTITY_OPTIONS.map((o) => o.label)).toEqual(expect.arrayContaining(["Reembolsos", "Planes", "Configuración"]));
   });
 
-  it("meta del bloque 3 (R2 del controlador): subida de fila, reembolso y plan archivado", () => {
+  it("meta del bloque 3: subida de fila, reembolso y plan archivado", () => {
     // meta.skipped en 0 (número) no se muestra.
     expect(auditMetaLines({ action: "booking.waitlist_promoted", after: null, meta: { position: 1, skipped: 0 } }))
       .toEqual(["Posición en la fila: 1"]);
@@ -126,7 +126,7 @@ describe("bitácora · textos del bloque 3", () => {
       .toEqual(["Se conserva: membresías, órdenes", "Se pidió borrar todo: Sí"]);
   });
 
-  it("meta del bloque 3, ronda de ajustes 1: skipped como arreglo (T4) y kept como objeto de conteos (T9)", () => {
+  it("meta del bloque 3: skipped como arreglo de saltadas y kept como objeto de conteos", () => {
     expect(auditMetaLines({
       action: "booking.waitlist_promoted", after: null,
       meta: {
