@@ -20,10 +20,10 @@ describe("Responsiva, firma y consentimiento en oscuro (Tarea 12a)", () => {
     expect(dialog).not.toMatch(/Alma Movement/);
   });
 
-  it("el subtítulo legal de la responsiva no se toca (lo decide el sub-proyecto A)", () => {
-    expect(responsiva).toContain(
-      "Responsiva y consentimiento informado firmado con Alma Movement."
-    );
+  it("el subtítulo ya no dice Alma y la página muestra la versión firmada (punto 7: HIVE)", () => {
+    expect(responsiva).toContain("en la versión que firmaste");
+    expect(responsiva).not.toMatch(/Alma/);
+    expect(responsiva).toMatch(/responsivaDocument\(waiver\?\.waiver_version\)/);
   });
 
   it("el trazo de la firma usa DARK.onInverse: el lienzo pinta con un color fijo (excepción de librería)", () => {

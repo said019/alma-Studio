@@ -14,7 +14,7 @@ import {
   GhostButton,
 } from "@/components/app/AppShell";
 import { BackLink, DataRow } from "@/components/app/widgets";
-import { RESPONSIVA_TITLE, RESPONSIVA_SECTIONS } from "@/components/app/responsivaContent";
+import { responsivaDocument } from "@/components/app/responsivaContent";
 
 interface WaiverRow {
   full_name: string;
@@ -23,6 +23,7 @@ interface WaiverRow {
   image_consent: boolean;
   signature_data: string;
   signed_at: string;
+  waiver_version?: string | null;
 }
 
 const Responsiva = () => {
@@ -32,6 +33,9 @@ const Responsiva = () => {
   });
 
   const waiver = data?.data ?? null;
+
+  // La responsiva se muestra con el texto de la versión que firmó (punto 7).
+  const documento = responsivaDocument(waiver?.waiver_version);
 
   const signedDate = waiver?.signed_at
     ? format(parseISO(waiver.signed_at), "d 'de' MMMM, yyyy", { locale: es })
@@ -44,7 +48,9 @@ const Responsiva = () => {
         <PageHeader
           eyebrow="Documentos"
           title="Mi responsiva."
-          subtitle="Responsiva y consentimiento informado firmado con Alma Movement."
+          subtitle={waiver
+            ? `Tu responsiva y consentimiento informado, en la versión que firmaste (${waiver.waiver_version ?? "v1"}).`
+            : "Tu responsiva y consentimiento informado."}
           actions={
             waiver ? (
               <GhostButton onClick={() => window.print()}>
@@ -77,7 +83,7 @@ const Responsiva = () => {
                 Firmada
               </p>
               <p className="font-display text-[1.45rem] leading-none mb-3 text-ink">
-                {RESPONSIVA_TITLE}
+                {documento.title}
               </p>
 
               <DataRow label="Nombre" value={waiver.full_name} />
@@ -107,7 +113,7 @@ const Responsiva = () => {
 
             {/* Full document */}
             <Section title="Documento completo">
-              {RESPONSIVA_SECTIONS.map((section) => (
+              {documento.sections.map((section) => (
                 <div key={section.n} className="pt-4 pb-4 border-t border-line">
                   <h3 className="font-display text-[1.05rem] leading-snug mb-1.5 text-ink">
                     <span className="nums mr-1.5 text-accent-strong">

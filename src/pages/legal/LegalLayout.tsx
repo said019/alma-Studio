@@ -19,9 +19,9 @@ export type LegalPath = (typeof LEGAL_PAGES)[number]["path"];
 
 export type PolicyField = "terms_of_service" | "privacy_policy" | "cancellation_policy";
 
-/** Texto editable desde el CMS. `loading` permite mostrar el skeleton
- *  antes de decidir entre el texto dinámico y el fallback estático,
- *  evitando el salto de contenido. */
+/** Texto de policies_settings. Desde el bloque 3 las legales ya no lo usan (sus
+ *  documentos viven versionados en el código); se conserva para no romper
+ *  importaciones. */
 export const usePolicyText = (field: PolicyField) => {
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(true);
@@ -84,20 +84,19 @@ export const LegalDynamicBody = ({ text }: { text: string }) => (
   </div>
 );
 
-/** Datos de contacto del estudio. STUDIO es la única fuente: si no hay
- *  teléfono confirmado, la fila no se muestra. */
+/** Datos de contacto del estudio. STUDIO es la única fuente: una fila sin dato
+ *  confirmado no se muestra. Mientras no haya correo de privacidad, las
+ *  solicitudes se presentan en recepción (auditoría 2026-09-27, P1-10). */
 export const LegalContact = () => (
   <ul className="list-none space-y-1 p-0 m-0">
-    <li>
-      <strong className="font-semibold" style={{ color: COLOR.ink }}>Email:</strong>{" "}
-      <a
-        href="mailto:info@almamovement.mx"
-        className="underline underline-offset-2"
-        style={{ color: COLOR.accentStrong }}
-      >
-        info@almamovement.mx
-      </a>
-    </li>
+    {STUDIO.privacyEmail && (
+      <li>
+        <strong className="font-semibold" style={{ color: COLOR.ink }}>Email:</strong>{" "}
+        <a href={`mailto:${STUDIO.privacyEmail}`} className="underline underline-offset-2" style={{ color: COLOR.accentStrong }}>
+          {STUDIO.privacyEmail}
+        </a>
+      </li>
+    )}
     {whatsappUrl() && (
       <li>
         <strong className="font-semibold" style={{ color: COLOR.ink }}>WhatsApp:</strong>{" "}
@@ -119,6 +118,9 @@ export const LegalContact = () => (
     )}
     <li>
       <strong className="font-semibold" style={{ color: COLOR.ink }}>Dirección:</strong> {STUDIO.address}
+    </li>
+    <li>
+      <strong className="font-semibold" style={{ color: COLOR.ink }}>Horario:</strong> {STUDIO.hours}
     </li>
   </ul>
 );
@@ -145,13 +147,13 @@ const LegalLayout = ({ current, title, children }: LegalLayoutProps) => {
           className="font-display text-[1.15rem] tracking-tight no-underline transition-opacity hover:opacity-75"
           style={{ color: COLOR.ink, fontWeight: 420 }}
         >
-          Alma Movement
+          {STUDIO.name}
         </Link>
       </nav>
 
       <main className="w-full max-w-3xl mx-auto flex-1 px-6 pt-14 pb-20">
         <p
-          className="flex items-center gap-[10px] text-[0.7rem] uppercase tracking-[0.28em] font-medium mb-4"
+          className="flex items-center gap-[10px] text-[0.75rem] uppercase tracking-[0.28em] font-medium mb-4"
           style={{ color: COLOR.accentStrong }}
         >
           <span className="inline-block h-px w-[30px]" style={{ backgroundColor: COLOR.line }} />
@@ -192,7 +194,7 @@ const LegalLayout = ({ current, title, children }: LegalLayoutProps) => {
             </Link>
           </nav>
           <p className="m-0" style={{ color: COLOR.accentStrong, opacity: 0.75 }}>
-            © 2026 Alma Movement
+            © 2026 {STUDIO.name}
           </p>
         </div>
       </footer>

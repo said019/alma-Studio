@@ -98,3 +98,13 @@ describe("ResponsivaDialog: mensaje de error del servidor", () => {
     );
   });
 });
+
+describe("ResponsivaDialog: versión del documento (bloque 3)", () => {
+  it("muestra la responsiva de HIVE y manda la versión al firmar", async () => {
+    vi.mocked(api.post).mockResolvedValueOnce({ data: { data: {} } });
+    abrir();
+    expect(screen.getByText("HIVE Pilates Studio — Responsiva y Consentimiento Informado")).toBeInTheDocument();
+    llenarYEnviar();
+    await waitFor(() => expect(api.post).toHaveBeenCalledWith("/me/waiver", expect.objectContaining({ waiver_version: "v2" })));
+  });
+});

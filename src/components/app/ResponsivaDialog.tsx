@@ -6,7 +6,7 @@ import api from "@/lib/api";
 import { PrimaryButton } from "@/components/app/AppShell";
 import { Field } from "@/components/app/fields";
 import { SignaturePad } from "@/components/app/SignaturePad";
-import { RESPONSIVA_TITLE, RESPONSIVA_SECTIONS } from "@/components/app/responsivaContent";
+import { RESPONSIVA_TITLE, RESPONSIVA_SECTIONS, RESPONSIVA_VERSION } from "@/components/app/responsivaContent";
 import { useToast } from "@/hooks/use-toast";
 
 interface ResponsivaDialogProps {
@@ -64,6 +64,7 @@ export const ResponsivaDialog = ({
         email: email.trim() || undefined,
         image_consent: imageConsent,
         signature_data: signatureData,
+        waiver_version: RESPONSIVA_VERSION,
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["my-waiver"] });

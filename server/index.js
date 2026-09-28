@@ -74,6 +74,7 @@ import { validateWellhubVisit as wellhubValidateVisit } from "./lib/wellhub/api.
 import { handleBookingRequested, handleCheckin, handleCancel, handlePlanChange } from "./lib/wellhub/flows.js";
 import { isUuid, signatureProblem } from "./lib/validate.js";
 import { checkinRule, noShowCorrectionRule } from "./lib/checkin.js";
+import { CURRENT_RESPONSIVA_VERSION, responsivaDocument, waiverVersionProblem } from "./lib/responsiva.js";
 import { pgReminderLog, sendClassReminders } from "./lib/classReminder.js";
 import { createChannelState } from "./lib/whatsappState.js";
 import { recordAudit, recordAuditBestEffort, reasonProblem, cleanReason, buildAuditQuery, auditRowOut } from "./lib/audit.js";
@@ -213,10 +214,13 @@ async function getConfiguredBankInfo(dbClient = pool) {
   }
 }
 
+// Textos de respaldo de policies_settings. Desde el bloque 3 las páginas legales
+// ya no los muestran: los documentos viven versionados en src/pages/legal. Se
+// dejan en HIVE por si algo viejo los lee (auditoría 2026-09-27, punto 7).
 const DEFAULT_POLICIES_SETTINGS = {
-  cancellation_policy: "Si cancelas dentro de las 12 horas previas a tu clase y acumulas 5 clases reservadas sin asistir, se aplica una penalizacion con perdida de puntos.",
-  terms_of_service: "Al reservar o comprar en Alma Movement aceptas el reglamento interno, la vigencia mensual de paquetes, las politicas de cancelacion y el uso personal e intransferible de tus clases.",
-  privacy_policy: "Tus datos se usan para gestionar reservas, pagos, asistencias, recompensas y comunicacion operativa del studio. No compartimos tu informacion personal con terceros sin autorizacion.",
+  cancellation_policy: "La política de cancelación vigente de HIVE Pilates Studio está en /legal/cancelacion.",
+  terms_of_service: "Los términos y condiciones vigentes de HIVE Pilates Studio están en /legal/terminos.",
+  privacy_policy: "El aviso de privacidad vigente de HIVE Pilates Studio está en /legal/privacidad.",
 };
 
 const DEFAULT_NOTIFICATION_SETTINGS = {
@@ -3292,21 +3296,27 @@ app.get("/api/me/waiver", authMiddleware, async (req, res) => {
 });
 
 // POST: firma la responsiva (nombre + firma dibujada + consentimiento de imagen).
+// Guarda la versión del texto que la clienta leyó (auditoría 2026-09-27, punto 7):
+// la app manda `waiver_version`; sin él, la vigente. Las ya firmadas no se tocan
+// ni se piden de nuevo.
 app.post("/api/me/waiver", authMiddleware, async (req, res) => {
-  const { full_name, phone, email, image_consent, signature_data } = req.body || {};
+  const { full_name, phone, email, image_consent, signature_data, waiver_version } = req.body || {};
   if (!full_name?.trim() || !signature_data) {
     return res.status(400).json({ message: "Nombre y firma son requeridos." });
   }
   const firmaMala = signatureProblem(signature_data);
   if (firmaMala) return res.status(400).json({ message: firmaMala });
+  const versionMala = waiverVersionProblem(waiver_version);
+  if (versionMala) return res.status(400).json({ message: versionMala });
+  const version = waiver_version ?? CURRENT_RESPONSIVA_VERSION;
   try {
     const r = await pool.query(
       `INSERT INTO waivers (user_id, full_name, phone, email, image_consent, signature_data, waiver_version, signed_at)
-       VALUES ($1,$2,$3,$4,$5,$6,'v1',NOW())
+       VALUES ($1,$2,$3,$4,$5,$6,$7,NOW())
        ON CONFLICT (user_id) DO UPDATE SET
-         full_name=$2, phone=$3, email=$4, image_consent=$5, signature_data=$6, signed_at=NOW()
+         full_name=$2, phone=$3, email=$4, image_consent=$5, signature_data=$6, waiver_version=$7, signed_at=NOW()
        RETURNING *`,
-      [req.userId, full_name.trim(), phone || null, email || null, !!image_consent, signature_data]
+      [req.userId, full_name.trim(), phone || null, email || null, !!image_consent, signature_data, version]
     );
     return res.status(201).json({ data: r.rows[0] });
   } catch (err) {
@@ -8207,7 +8217,7 @@ app.get("/api/wallet/apple/pkpass", authMiddleware, async (req, res) => {
         });
         console.log("[Apple Wallet] ✅ .pkpass generated, size:", pkpassBuffer.length, "bytes");
         res.setHeader("Content-Type", "application/vnd.apple.pkpass");
-        res.setHeader("Content-Disposition", `attachment; filename="alma-pass.pkpass"`);
+        res.setHeader("Content-Disposition", `attachment; filename="hive-pass.pkpass"`);
         res.setHeader("Content-Length", pkpassBuffer.length);
         return res.send(pkpassBuffer);
       } catch (pkpassErr) {
@@ -8700,15 +8710,7 @@ app.get("/api/admin/users/:userId/waiver", adminMiddleware, async (req, res) => 
   }
 });
 
-// GET /api/admin/users/:userId/waiver/pdf — responsiva firmada como PDF descargable
-const RESPONSIVA_PDF_SECTIONS = [
-  { n: "1", title: "Aceptación de riesgo", body: "Participo de forma voluntaria en las clases, entrenamientos y actividades de Alma Movement (Pilates Reformer, Tower, Mat, Barre y Sculpt), entendiendo que la práctica de ejercicio físico implica riesgos inherentes, incluyendo lesiones musculares, articulares o caídas. Asumo la responsabilidad por cualquier lesión, accidente o daño físico que pudiera ocurrir durante o después de las clases, y libero de toda responsabilidad a Alma Movement, sus coaches, personal y representantes por cualquier incidente derivado de mi participación." },
-  { n: "2", title: "Condición física y lesiones", body: "Declaro encontrarme en condiciones físicas adecuadas para realizar actividad física. Es mi responsabilidad informar previamente a las coaches o al personal sobre cualquier lesión, molestia, condición médica, embarazo u otra situación que pueda afectar mi práctica. Alma Movement no se hace responsable por lesiones agravadas por falta de comunicación de mi parte." },
-  { n: "3", title: "Normas del estudio", body: "Para la seguridad, higiene y experiencia de todas, acepto: uso obligatorio de calcetines antiderrapantes en todas las clases; llegar 10 minutos antes; respetar el horario de inicio (no se permite el acceso una vez iniciada la clase); mantener el celular en silencio; no ingresar bajo efectos de alcohol o sustancias que alteren el estado físico; y detenerme y avisar de inmediato a la coach en caso de dolor, mareo o malestar." },
-  { n: "4", title: "Uso de imagen", body: "Autorizo a Alma Movement a utilizar fotografías o videos tomados durante las clases para fines promocionales, redes sociales y material de comunicación, sin derecho a compensación económica. Esta autorización es opcional y la indico abajo." },
-  { n: "5", title: "Firma de conformidad", body: "Declaro haber leído y comprendido completamente este documento. Al firmar, acepto los términos aquí descritos y libero de toda responsabilidad a Alma Movement por cualquier lesión o daño derivado de mi participación." },
-];
-
+// GET /api/admin/users/:userId/waiver/pdf — responsiva firmada como PDF, con el texto de SU versión (bloque 3, punto 7)
 app.get("/api/admin/users/:userId/waiver/pdf", adminMiddleware, async (req, res) => {
   try {
     const wr = await pool.query(
@@ -8717,6 +8719,7 @@ app.get("/api/admin/users/:userId/waiver/pdf", adminMiddleware, async (req, res)
     );
     const w = wr.rows[0];
     if (!w) return res.status(404).json({ message: "Sin responsiva firmada" });
+    const documento = responsivaDocument(w.waiver_version);
 
     const { default: PDFDocument } = await import("pdfkit");
     const doc = new PDFDocument({ size: "A4", margin: 50 });
@@ -8729,8 +8732,8 @@ app.get("/api/admin/users/:userId/waiver/pdf", adminMiddleware, async (req, res)
     res.setHeader("Content-Disposition", `inline; filename="responsiva_${safeName}.pdf"`);
     doc.pipe(res);
 
-    doc.fillColor(INK).font("Helvetica-Bold").fontSize(16).text("Alma Movement");
-    doc.fillColor(STONE).font("Helvetica").fontSize(11).text("Responsiva y Consentimiento Informado");
+    doc.fillColor(INK).font("Helvetica-Bold").fontSize(16).text(documento.studio);
+    doc.fillColor(STONE).font("Helvetica").fontSize(11).text(documento.title);
     doc.moveDown(0.4);
     doc.strokeColor("#E0D5C6").lineWidth(1).moveTo(50, doc.y).lineTo(545, doc.y).stroke();
     doc.moveDown(0.8);
@@ -8747,7 +8750,7 @@ app.get("/api/admin/users/:userId/waiver/pdf", adminMiddleware, async (req, res)
 
     doc.fillColor(INK).font("Helvetica-Bold").fontSize(11).text("Términos aceptados");
     doc.moveDown(0.3);
-    for (const s of RESPONSIVA_PDF_SECTIONS) {
+    for (const s of documento.sections) {
       doc.font("Helvetica-Bold").fontSize(10).fillColor(INK).text(`${s.n}. ${s.title}`);
       doc.font("Helvetica").fontSize(9).fillColor(BODY).text(s.body, { align: "justify" });
       doc.moveDown(0.5);

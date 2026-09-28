@@ -27,4 +27,8 @@ describe("datos del estudio (HIVE)", () => {
     expect(read("src/pages/client/Profile.tsx")).not.toMatch(/wa\.me\/\$\{STUDIO\.whatsapp\}/);
     expect(read("src/pages/legal/LegalLayout.tsx")).not.toMatch(/wa\.me\/\$\{STUDIO\.whatsapp\}/);
   });
+  it("sin correo de privacidad todavía: el aviso remite a recepción y no queda el de Alma", () => {
+    expect(STUDIO.privacyEmail).toBeNull();
+    expect(read("src/pages/legal/LegalLayout.tsx")).not.toMatch(/almamovement|info@/);
+  });
 });

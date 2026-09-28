@@ -8,6 +8,9 @@ export const STUDIO = {
   instagram: "hive.pilates",
   whatsapp: null as string | null,
   phone: null as string | null,
+  // Correo para solicitudes de privacidad (derechos ARCO). PENDIENTE: el dueño
+  // no ha dado uno; mientras sea null, el aviso remite a recepción.
+  privacyEmail: null as string | null,
   hours: "6 AM a 9 PM",
 } as const;
 

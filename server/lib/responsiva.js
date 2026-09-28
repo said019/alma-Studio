@@ -1,16 +1,14 @@
 // Responsiva y consentimiento informado, por versión (auditoría 2026-09-27,
-// punto 7). La v1 (Alma Movement) se conserva tal como se firmó: una responsiva
-// firmada vale con el texto de su versión. La vigente es la v2 (HIVE Pilates
-// Studio). Debe coincidir con server/lib/responsiva.js (responsivaContent.test.ts
-// lo exige). PENDIENTE: revisión de un abogado.
-export type ResponsivaVersion = "v1" | "v2";
-export type ResponsivaSection = { n: string; title: string; body: string };
-export type ResponsivaDocument = { title: string; sections: readonly ResponsivaSection[] };
+// punto 7). La v1 es la que se firmó con Alma Movement y se conserva tal cual:
+// una responsiva firmada vale con el texto de su versión. La v2 es la de HIVE
+// Pilates Studio. Debe coincidir con src/components/app/responsivaContent.ts
+// (responsivaContent.test.ts lo exige). PENDIENTE: revisión de un abogado.
 
-function documento(studio: string, disciplinas: string): ResponsivaDocument {
-  return {
-    title: `${studio} — Responsiva y Consentimiento Informado`,
-    sections: [
+function documento(studio, disciplinas) {
+  return Object.freeze({
+    studio,
+    title: "Responsiva y Consentimiento Informado",
+    sections: Object.freeze([
       {
         n: "1",
         title: "Aceptación de riesgo",
@@ -36,21 +34,24 @@ function documento(studio: string, disciplinas: string): ResponsivaDocument {
         title: "Firma de conformidad",
         body: `Declaro haber leído y comprendido completamente este documento. Al firmar, acepto los términos aquí descritos y libero de toda responsabilidad a ${studio} por cualquier lesión o daño derivado de mi participación.`,
       },
-    ],
-  };
+    ].map((s) => Object.freeze(s))),
+  });
 }
 
-export const RESPONSIVA_DOCUMENTS: Record<ResponsivaVersion, ResponsivaDocument> = {
+export const RESPONSIVA_DOCUMENTS = Object.freeze({
   v1: documento("Alma Movement", "Pilates Reformer, Tower, Mat, Barre y Sculpt"),
   v2: documento("HIVE Pilates Studio", "Pilates en Reformer y las demás clases que ofrece el estudio"),
-};
+});
+export const RESPONSIVA_VERSIONS = Object.freeze(Object.keys(RESPONSIVA_DOCUMENTS));
+export const CURRENT_RESPONSIVA_VERSION = "v2";
 
-/** La versión que se firma hoy. */
-export const RESPONSIVA_VERSION: ResponsivaVersion = "v2";
+/** El texto de una versión. Las firmas de antes del versionado no traen versión: son v1. */
+export function responsivaDocument(version) {
+  return Object.hasOwn(RESPONSIVA_DOCUMENTS, version ?? "") ? RESPONSIVA_DOCUMENTS[version] : RESPONSIVA_DOCUMENTS.v1;
+}
 
-/** El texto de una versión firmada. Las firmas de antes del versionado no traen versión: son v1. */
-export const responsivaDocument = (version?: string | null): ResponsivaDocument =>
-  version === "v1" || version === "v2" ? RESPONSIVA_DOCUMENTS[version] : RESPONSIVA_DOCUMENTS.v1;
-
-export const RESPONSIVA_TITLE = RESPONSIVA_DOCUMENTS[RESPONSIVA_VERSION].title;
-export const RESPONSIVA_SECTIONS = RESPONSIVA_DOCUMENTS[RESPONSIVA_VERSION].sections;
+/** null si la versión que manda la app sirve (o no manda ninguna); si no, el 400. */
+export function waiverVersionProblem(v) {
+  if (v === undefined || v === null) return null;
+  return RESPONSIVA_VERSIONS.includes(v) ? null : "Versión de responsiva desconocida.";
+}
