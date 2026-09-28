@@ -57,6 +57,19 @@ export async function login(email, password) {
 /** Id de la reserva: la API devuelve { message, booking }. */
 export const bookingId = (r) => r.body?.booking?.id ?? r.body?.data?.id ?? r.body?.id;
 
+// PNG mínimamente válida (cabecera + IHDR de w×h, con relleno) para pasar
+// signatureProblem() de server/lib/validate.js (Tarea 1, auditoría bloque 1):
+// exige prefijo data:image/png;base64,, ≥200 caracteres base64 y ≥50×20 px
+// en la IHDR. La firma dummy previa ("...iVBORw0KGgo=") era una
+// cabecera truncada que ese chequeo ahora rechaza con 400.
+const fakeSignaturePng = (w = 600, h = 200, extraBytes = 2000) => {
+  const b = Buffer.alloc(33 + extraBytes);
+  Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(b, 0);
+  b.writeUInt32BE(13, 8); b.write("IHDR", 12, "ascii");
+  b.writeUInt32BE(w, 16); b.writeUInt32BE(h, 20);
+  return `data:image/png;base64,${b.toString("base64")}`;
+};
+
 // Fecha civil del estudio: toISOString() devuelve UTC y despues de las 18:00
 // en CDMX sembraria las fixtures en un dia distinto al que ve el servidor.
 export const day = (n) => {
@@ -85,7 +98,7 @@ export async function makeClient(prefix, key, { role = "client", waiver = true }
   const { token } = await login(email, password);
   if (waiver && role === "client") {
     await api("POST", "/api/me/waiver", { token, body: {
-      full_name: `QA ${key}`, signature_data: "data:image/png;base64,iVBORw0KGgo=" } });
+      full_name: `QA ${key}`, signature_data: fakeSignaturePng() } });
   }
   return { id: u.id, email, password, token };
 }

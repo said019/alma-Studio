@@ -59,13 +59,19 @@ import { ALMA_CLASS_TYPES, ALMA_SCHEDULE_SLOTS, ALMA_SCHEDULE_DAYS, ALMA_PLANS }
 import { seedClassTypesIfEmpty, seedPlansIfEmpty } from "./lib/catalogSeed.js";
 import { resolveEffectivePrice } from "./lib/pricing.js";
 import { isMembershipCategoryCompatible as ruleCategoryCompatible, normalizeClassCategory as ruleNormalizeCategory, isWithinMorningWindow, categoryLabel } from "./lib/bookingRules.js";
+import { rateKey } from "./lib/rateKey.js";
 import { isWithinCancelWindow, penaltyDueAt } from "./lib/faltas.js";
 import { scheduleAt } from "./lib/schedule.js";
 import { verifyWellhubSignature, extractSignatureHeader } from "./lib/wellhub/signature.js";
 import { extractGymId, computeEventId } from "./lib/wellhub/payload.js";
 import { getWellhubCredentials } from "./lib/wellhub/credentials.js";
+import { publicPartnerSettings, mergeSecret } from "./lib/partnerSettings.js";
 import { validateWellhubVisit as wellhubValidateVisit } from "./lib/wellhub/api.js";
 import { handleBookingRequested, handleCheckin, handleCancel, handlePlanChange } from "./lib/wellhub/flows.js";
+import { isUuid, signatureProblem } from "./lib/validate.js";
+import { checkinRule } from "./lib/checkin.js";
+import { pgReminderLog, sendClassReminders } from "./lib/classReminder.js";
+import { createChannelState } from "./lib/whatsappState.js";
 import {
   validateStripeConfig,
   createOrGetStripeCustomer,
@@ -1806,6 +1812,11 @@ async function ensureSchema() {
     await pool.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS partner_metadata JSONB DEFAULT '{}'::jsonb`).catch(() => { });
     await pool.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS partner_status TEXT`).catch(() => { });
     await pool.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS partner_reported_at TIMESTAMPTZ`).catch(() => { });
+    // Responsiva con motivo — recepción puede asignar sin firma si deja constancia
+    // (auditoría 2026-09-27, bloque 1, tarea 5).
+    await pool.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS waiver_override_reason TEXT`).catch(() => { });
+    await pool.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS waiver_override_by UUID`).catch(() => { });
+    await pool.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS waiver_override_at TIMESTAMPTZ`).catch(() => { });
     await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS uq_bookings_channel_ref
       ON bookings(channel, external_ref) WHERE channel <> 'app' AND external_ref IS NOT NULL`).catch(() => { });
 
@@ -2056,18 +2067,19 @@ function getRateLimitIp(req) {
   if (forwarded) return forwarded;
   return String(req.ip || req.socket?.remoteAddress || "unknown");
 }
-function createSimpleRateLimiter({ windowMs, max, keyPrefix, shouldApply }) {
+function createSimpleRateLimiter({ windowMs, max, keyPrefix, shouldApply, keyFn }) {
   return (req, res, next) => {
     if (!shouldApply(req)) return next();
-    const ip = getRateLimitIp(req);
-    const key = `${keyPrefix}:${ip}`;
+    const id = keyFn ? keyFn(req) : getRateLimitIp(req);
+    const key = `${keyPrefix}:${id}`;
+    const limit = typeof max === "function" ? max(id) : max;
     const now = Date.now();
     const current = rateLimitBuckets.get(key);
     if (!current || current.resetAt <= now) {
       rateLimitBuckets.set(key, { count: 1, resetAt: now + windowMs });
       return next();
     }
-    if (current.count >= max) {
+    if (current.count >= limit) {
       const retryAfterSec = Math.max(1, Math.ceil((current.resetAt - now) / 1000));
       res.setHeader("Retry-After", String(retryAfterSec));
       return res.status(429).json({ message: "Demasiadas solicitudes. Intenta de nuevo en unos segundos." });
@@ -2084,10 +2096,12 @@ setInterval(() => {
   }
 }, 60_000).unref();
 
+const SECURITY_RATE_LIMIT_USER_MAX = Math.max(60, Number(process.env.API_RATE_LIMIT_USER_MAX || 600));
 app.use(createSimpleRateLimiter({
   windowMs: SECURITY_RATE_LIMIT_WINDOW_MS,
-  max: SECURITY_RATE_LIMIT_MAX,
   keyPrefix: "api",
+  keyFn: (req) => rateKey(req, (t) => jwt.verify(t, JWT_SECRET)),
+  max: (key) => (key.startsWith("user:") ? SECURITY_RATE_LIMIT_USER_MAX : SECURITY_RATE_LIMIT_MAX),
   shouldApply: (req) =>
     req.path.startsWith("/api/") &&
     !req.path.startsWith("/api/wallet/v1/") &&
@@ -2125,10 +2139,9 @@ app.use((req, res, next) => {
 // Estos nombres SÍ mapean a columnas uuid; :key, :fileId, :sessionId,
 // :deviceId, :passTypeId y :serial no, y por eso quedan fuera.
 // Auditoría 2026-09-08, familia P2.
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 for (const paramName of ["id", "userId", "eventId", "classId", "regId"]) {
   app.param(paramName, (req, res, next, value) => {
-    if (!UUID_RE.test(String(value || ""))) {
+    if (!isUuid(String(value || ""))) {
       return res.status(400).json({ message: "Identificador inválido" });
     }
     next();
@@ -2148,7 +2161,10 @@ async function wellhubWebhookHandler(req, res, eventTypeOverride) {
   const sig = extractSignatureHeader(req.headers);
   const verdict = verifyWellhubSignature(rawBuf, sig, creds.webhook_secret);
   if (verdict === false) return res.status(401).json({ message: "Firma Wellhub inválida" });
-  if (verdict === null) console.warn("[wellhub] sin webhook_secret — firma omitida (configurar en prod)");
+  if (verdict === null) {
+    console.warn("[wellhub] webhook rechazado: la integración está encendida sin webhook_secret");
+    return res.status(401).json({ message: "Wellhub sin secreto configurado" });
+  }
 
   const gymId = extractGymId(payload);
   if (gymId && creds.gym_id && String(gymId) !== String(creds.gym_id)) {
@@ -2196,16 +2212,19 @@ app.post("/webhooks/wellhub/debug/echo", express.raw({ type: "*/*" }), (req, res
 });
 
 // ─── Wellhub / partner management (admin) ───────────────────────────────────
-app.get("/api/partners/settings", adminMiddleware, async (_req, res) => {
+app.get("/api/partners/settings", ownerMiddleware, async (_req, res) => {
   try {
     const r = await pool.query("SELECT * FROM platform_credentials WHERE channel='wellhub'");
-    return res.json({ data: r.rows[0] || null });
+    return res.json({ data: publicPartnerSettings(r.rows[0] || null) });
   } catch (err) { console.error("[partners settings GET]", err.message); return res.status(500).json({ message: "Error interno" }); }
 });
 
-app.put("/api/partners/settings", adminMiddleware, async (req, res) => {
+app.put("/api/partners/settings", ownerMiddleware, async (req, res) => {
   try {
     const b = req.body || {};
+    const cur = (await pool.query("SELECT webhook_secret, access_token FROM platform_credentials WHERE channel='wellhub'")).rows[0] || {};
+    const webhookSecret = mergeSecret(b.webhook_secret, cur.webhook_secret);
+    const accessToken = mergeSecret(b.access_token, cur.access_token);
     await pool.query(
       `INSERT INTO platform_credentials (channel, environment, is_enabled, gym_id, webhook_secret, access_token, api_base_url, booking_base_url, access_base_url, webhook_url, extra_config, updated_at)
        VALUES ('wellhub', $1,$2,$3,$4,$5,$6,$7,$8,$9,$10, NOW())
@@ -2215,12 +2234,12 @@ app.put("/api/partners/settings", adminMiddleware, async (req, res) => {
          api_base_url=EXCLUDED.api_base_url, booking_base_url=EXCLUDED.booking_base_url,
          access_base_url=EXCLUDED.access_base_url, webhook_url=EXCLUDED.webhook_url,
          extra_config=EXCLUDED.extra_config, updated_at=NOW()`,
-      [b.environment || "production", b.is_enabled ?? false, b.gym_id || null, b.webhook_secret || null,
-       b.access_token || null, b.api_base_url || null, b.booking_base_url || null, b.access_base_url || null,
+      [b.environment || "production", b.is_enabled ?? false, b.gym_id || null, webhookSecret,
+       accessToken, b.api_base_url || null, b.booking_base_url || null, b.access_base_url || null,
        b.webhook_url || null, JSON.stringify(b.extra_config || {})],
     );
     const r = await pool.query("SELECT * FROM platform_credentials WHERE channel='wellhub'");
-    return res.json({ data: r.rows[0] });
+    return res.json({ data: publicPartnerSettings(r.rows[0]) });
   } catch (err) { console.error("[partners settings PUT]", err.message); return res.status(500).json({ message: "Error interno" }); }
 });
 
@@ -3184,6 +3203,8 @@ app.post("/api/me/waiver", authMiddleware, async (req, res) => {
   if (!full_name?.trim() || !signature_data) {
     return res.status(400).json({ message: "Nombre y firma son requeridos." });
   }
+  const firmaMala = signatureProblem(signature_data);
+  if (firmaMala) return res.status(400).json({ message: firmaMala });
   try {
     const r = await pool.query(
       `INSERT INTO waivers (user_id, full_name, phone, email, image_consent, signature_data, waiver_version, signed_at)
@@ -3420,15 +3441,25 @@ app.get("/api/memberships/my", authMiddleware, async (req, res) => {
               COALESCE(p.class_limit, m.class_limit_override)      AS class_limit,
               COALESCE(p.duration_days, 30)                        AS duration_days,
               p.features,
-              COALESCE(p.class_category, 'all')                    AS class_category
+              COALESCE(p.class_category, 'all')                    AS class_category,
+              (m.end_date IS NOT NULL AND m.end_date < (NOW() AT TIME ZONE '${STUDIO_TIMEZONE}')::date) AS is_expired
        FROM memberships m
        LEFT JOIN plans p ON m.plan_id = p.id
        WHERE m.user_id = $1
-       ORDER BY CASE m.status
-         WHEN 'active'              THEN 1
-         WHEN 'pending_activation'  THEN 2
-         WHEN 'pending_payment'     THEN 3
-         ELSE 4 END,
+       ORDER BY
+         -- La que la clienta puede usar primero: activa vigente, luego
+         -- pendientes, luego activa vencida (para mostrarle que venció) y al
+         -- final el resto. Una cancelada conserva su end_date, así que no
+         -- basta con "no vencida" para ganar (auditoría 2026-09-27, P1-6).
+         -- Postgres no deja usar el alias is_expired dentro de una expresión
+         -- del ORDER BY: el predicado se repite.
+         CASE
+           WHEN m.status = 'active'
+            AND NOT (m.end_date IS NOT NULL AND m.end_date < (NOW() AT TIME ZONE '${STUDIO_TIMEZONE}')::date) THEN 0
+           WHEN m.status IN ('pending_activation', 'pending_payment') THEN 1
+           WHEN m.status = 'active' THEN 2
+           ELSE 3
+         END,
          CASE
            WHEN m.status = 'active' AND (m.classes_remaining IS NULL OR m.classes_remaining >= 9999) THEN 1
            ELSE 0
@@ -3717,14 +3748,20 @@ async function liveBookingCount(classId, db = pool) {
   return r.rows[0]?.cnt ?? 0;
 }
 
+// Responsiva firmada — helper compartido por /bookings, /bookings/with-guest
+// y /admin/bookings/assign (auditoría 2026-09-27, bloque 1, tarea 5).
+const hasSignedWaiver = async (db, userId) =>
+  (await db.query("SELECT 1 FROM waivers WHERE user_id = $1 LIMIT 1", [userId]).catch(() => ({ rows: [] }))).rows.length > 0;
+const WAIVER_REQUIRED_MSG = "Antes de tu primera reserva necesitas leer y firmar la responsiva y consentimiento informado.";
+
 // POST /api/bookings
 app.post("/api/bookings", authMiddleware, async (req, res) => {
   const { classId } = req.body;
   if (!classId) return res.status(400).json({ message: "classId requerido" });
+  if (!isUuid(classId)) return res.status(400).json({ message: "Identificador inválido" });
   // Gate: la primera reserva requiere la responsiva y consentimiento firmados.
-  const waiverGate = await pool.query("SELECT 1 FROM waivers WHERE user_id = $1 LIMIT 1", [req.userId]).catch(() => ({ rows: [] }));
-  if (waiverGate.rows.length === 0) {
-    return res.status(403).json({ code: "WAIVER_REQUIRED", message: "Antes de tu primera reserva necesitas leer y firmar la responsiva y consentimiento informado." });
+  if (!(await hasSignedWaiver(pool, req.userId))) {
+    return res.status(403).json({ code: "WAIVER_REQUIRED", message: WAIVER_REQUIRED_MSG });
   }
   const client = await pool.connect();
   try {
@@ -9306,28 +9343,34 @@ app.put("/api/classes/:id/cancel", adminMiddleware, async (req, res) => {
 
     await client.query("COMMIT");
 
-    // 5) Notify each alumna (fire-and-forget WA + wallet sync, fuera de tx)
+    // 5) Notify each alumna (fire-and-forget WA + wallet sync, fuera de tx).
+    // Si el canal de WhatsApp está caído (o los recordatorios están apagados),
+    // no se intenta el envío ni se cuenta como "enviado": se junta la lista
+    // para que recepción avise a mano (auditoría 2026-09-27, P0-1).
     const dateStr = classRow.date ? new Date(classRow.date).toLocaleDateString("es-MX", { weekday: "short", day: "numeric", month: "short" }) : "";
     const timeStr = classRow.start_time ? String(classRow.start_time).slice(0, 5) : "";
-    let waSent = 0;
+    const notifSettings = await getSettingsValue("notification_settings", DEFAULT_NOTIFICATION_SETTINGS);
+    const waOn = notifSettings?.whatsapp_reminders !== false;
+    const channel = waOn ? await whatsappChannelState() : { connected: false, state: "disabled" };
+    let waQueued = 0;
+    const waUnreached = [];
     for (const b of activeBookings) {
       if (!b.user_id) continue;
+      triggerWalletPassSync(b.user_id, "admin_class_cancelled");
+      if (!channel.connected) {
+        waUnreached.push({ user_id: b.user_id, display_name: b.display_name, phone: b.phone });
+        continue;
+      }
       const className = b.class_name || "tu clase";
       const cancelReason = reason ? ` (motivo: ${reason})` : "";
       notifyByTemplate(
         b.user_id,
         "booking_cancelled",
-        {
-          class: className,
-          date: dateStr,
-          time: timeStr,
-          creditRestored: "Sí",
-        },
+        { class: className, date: dateStr, time: timeStr, creditRestored: "Sí" },
         ({ firstName }) =>
           `${firstName}, tuvimos que cancelar la clase de ${className}${dateStr ? ` del ${dateStr}` : ""}${timeStr ? ` a las ${timeStr}` : ""}.${cancelReason} Tu clase regresó a tu paquete.`,
       ).catch(() => {});
-      triggerWalletPassSync(b.user_id, "admin_class_cancelled");
-      waSent++;
+      waQueued++;
     }
 
     return res.json({
@@ -9336,7 +9379,11 @@ app.put("/api/classes/:id/cancel", adminMiddleware, async (req, res) => {
         bookings_cancelled: activeBookings.length,
         credits_restored: creditsRestored,
         points_reverted: pointsReverted,
-        wa_sent: waSent,
+        wa_queued: waQueued,
+        wa_failed: waUnreached.length,
+        wa_unreached: waUnreached,
+        // "disabled" = la dueña apagó los avisos; otro estado = canal caído.
+        wa_channel_state: channel.state,
         reason: reason || null,
       },
     });
@@ -9762,7 +9809,17 @@ app.get("/api/admin/today-roster", adminMiddleware, async (_req, res) => {
               b.guest_profile_id,
               u.id AS user_id, u.display_name, u.phone,
               gp.display_name AS guest_name,
-              host.display_name AS host_name
+              host.display_name AS host_name,
+              COALESCE(gp.has_injury, u.has_injury, false) AS has_injury,
+              COALESCE(gp.injury_details, u.injury_details) AS injury_details,
+              u.health_notes,
+              -- Las reservas de invitada también traen user_id (la usuaria
+              -- sombra de findOrCreateGuestUser, una por guest_profile) y
+              -- bookings.user_id es NOT NULL: basta con user_id, que tiene índice.
+              NOT EXISTS (
+                SELECT 1 FROM bookings pb
+                 WHERE pb.user_id = b.user_id AND pb.checked_in_at IS NOT NULL AND pb.id <> b.id
+              ) AS first_visit
          FROM bookings b
          LEFT JOIN users u ON b.user_id = u.id
          LEFT JOIN guest_profiles gp ON b.guest_profile_id = gp.id
@@ -10079,6 +10136,11 @@ app.get("/api/my-guests/search", authMiddleware, async (req, res) => {
 app.post("/api/bookings/with-guest", authMiddleware, async (req, res) => {
   const { classId, guest = {} } = req.body || {};
   if (!classId) return res.status(400).json({ message: "classId requerido" });
+  if (!isUuid(classId)) return res.status(400).json({ message: "Identificador inválido" });
+  // Gate: la anfitriona (quien reserva) debe tener su propia responsiva firmada.
+  if (!(await hasSignedWaiver(pool, req.userId))) {
+    return res.status(403).json({ code: "WAIVER_REQUIRED", message: WAIVER_REQUIRED_MSG });
+  }
   if (!guest.name) return res.status(400).json({ message: "Nombre de la acompañante requerido" });
   if (!guest.phone) return res.status(400).json({ message: "Teléfono de la acompañante requerido" });
   if (!guest.acceptedWaiver) return res.status(400).json({ message: "Confirma el waiver de la acompañante" });
@@ -11275,7 +11337,7 @@ app.get("/api/reports/overview", ownerMiddleware, async (req, res) => {
     const monthStart = range.from;
     const [members, revenue, bookings, classes, newMembers, reviews, churn,
            prevRevenue, prevBookings, prevNewMembers, prevReviews] = await Promise.all([
-      pool.query("SELECT COUNT(*) FROM memberships WHERE status='active'"),
+      pool.query(`SELECT COUNT(*) FROM memberships WHERE status = 'active' AND (end_date IS NULL OR end_date >= (NOW() AT TIME ZONE '${STUDIO_TIMEZONE}')::date)`),
       pool.query("SELECT COALESCE(SUM(total_amount),0) AS total FROM orders WHERE status='approved' AND created_at BETWEEN $1 AND $2", [range.from, range.to]),
       pool.query(
         `SELECT
@@ -12323,47 +12385,60 @@ app.post("/api/webhook/evolution", async (req, res) => {
   }
 });
 
+// Sonda cruda del canal de Evolution/WhatsApp: sin caché, golpea la API de
+// Evolution en cada llamada. `whatsappChannelState()` (justo abajo) la envuelve
+// con caché corta y timeout para no intentar envíos con el canal caído y para
+// poder avisarlo en el panel (auditoría 2026-09-27, P0-1).
+async function probeEvolution() {
+  if (!EVOLUTION_API_URL) {
+    return { connected: false, state: "disconnected", instanceExists: false };
+  }
+  // Check if instance exists first
+  let instanceExists = false;
+  try {
+    const listRes = await evolutionApi.get("/instance/fetchInstances");
+    const instances = listRes.data?.data || listRes.data || [];
+    instanceExists = Array.isArray(instances)
+      ? instances.some((i) =>
+        i.instance?.instanceName === EVOLUTION_INSTANCE ||
+        i.instanceName === EVOLUTION_INSTANCE ||
+        i.name === EVOLUTION_INSTANCE
+      )
+      : false;
+  } catch (_) { instanceExists = false; }
+
+  if (!instanceExists) {
+    return { connected: false, state: "disconnected", instanceExists: false };
+  }
+
+  const r = await evolutionApi.get(`/instance/connectionState/${EVOLUTION_INSTANCE}`);
+  const state = r.data?.instance?.state || r.data?.state || "unknown";
+
+  let qrCode = null;
+  if (state === "connecting" || state === "qr") {
+    try {
+      const qrRes = await evolutionApi.get(`/instance/connect/${EVOLUTION_INSTANCE}`);
+      qrCode = normalizeQrDataUrl(pickEvolutionQrPayload(qrRes.data));
+    } catch (_) { }
+  }
+
+  return {
+    connected: state === "open",
+    state: state === "open" ? "connected" : state === "qr" || state === "connecting" ? "qr_pending" : "disconnected",
+    number: r.data?.instance?.profileName || null,
+    instanceExists: true,
+    qrCode,
+  };
+}
+
+// Estado cacheado (60 s) del canal, usado por el flujo de cancelar clase y por
+// el cron de recordatorios para no intentar envíos con Evolution caído.
+const whatsappChannelState = createChannelState({ probe: probeEvolution });
+
 // GET /api/evolution/status
 app.get("/api/evolution/status", adminMiddleware, async (req, res) => {
   try {
-    // Check if instance exists first
-    let instanceExists = false;
-    try {
-      const listRes = await evolutionApi.get("/instance/fetchInstances");
-      const instances = listRes.data?.data || listRes.data || [];
-      instanceExists = Array.isArray(instances)
-        ? instances.some((i) =>
-          i.instance?.instanceName === EVOLUTION_INSTANCE ||
-          i.instanceName === EVOLUTION_INSTANCE ||
-          i.name === EVOLUTION_INSTANCE
-        )
-        : false;
-    } catch (_) { instanceExists = false; }
-
-    if (!instanceExists) {
-      return res.json({ data: { connected: false, state: "disconnected", instanceExists: false } });
-    }
-
-    const r = await evolutionApi.get(`/instance/connectionState/${EVOLUTION_INSTANCE}`);
-    const state = r.data?.instance?.state || r.data?.state || "unknown";
-
-    let qrCode = null;
-    if (state === "connecting" || state === "qr") {
-      try {
-        const qrRes = await evolutionApi.get(`/instance/connect/${EVOLUTION_INSTANCE}`);
-        qrCode = normalizeQrDataUrl(pickEvolutionQrPayload(qrRes.data));
-      } catch (_) { }
-    }
-
-    return res.json({
-      data: {
-        connected: state === "open",
-        state: state === "open" ? "connected" : state === "qr" || state === "connecting" ? "qr_pending" : "disconnected",
-        number: r.data?.instance?.profileName || null,
-        instanceExists: true,
-        qrCode,
-      },
-    });
+    return res.json({ data: await probeEvolution() });
   } catch (err) {
     console.error("[EVOLUTION STATUS]", err.response?.data || err.message);
     return res.json({ data: { connected: false, state: "disconnected", instanceExists: false } });
@@ -12851,7 +12926,7 @@ app.get("/api/admin/stats", adminMiddleware, async (req, res) => {
 
     const [classesToday, activeMembers, monthlyRevenue, pendingAlerts] = await Promise.all([
       pool.query("SELECT COUNT(*) FROM classes WHERE date = $1", [today]),
-      pool.query("SELECT COUNT(*) FROM memberships WHERE status = 'active'"),
+      pool.query(`SELECT COUNT(*) FROM memberships WHERE status = 'active' AND (end_date IS NULL OR end_date >= (NOW() AT TIME ZONE '${STUDIO_TIMEZONE}')::date)`),
       pool.query("SELECT COALESCE(SUM(total_amount),0) AS total FROM orders WHERE status = 'approved' AND created_at >= $1", [monthStart]),
       pool.query("SELECT COUNT(*) FROM orders WHERE status = 'pending_verification'"),
     ]);
@@ -12978,6 +13053,12 @@ app.get("/api/memberships", adminMiddleware, async (req, res) => {
              AND m.end_date IS NOT NULL
              AND m.end_date >= ((NOW() AT TIME ZONE '${STUDIO_TIMEZONE}')::date)
              AND m.end_date <= ((NOW() AT TIME ZONE '${STUDIO_TIMEZONE}')::date + INTERVAL '7 days')`;
+    } else if (status === "active") {
+      // Filtro "activas": una membresía vencida (end_date pasado) sigue con
+      // status='active' hasta el barrido de cron, pero no debe listarse aquí
+      // como si estuviera vigente.
+      q += ` AND m.status = 'active'
+             AND (m.end_date IS NULL OR m.end_date >= ((NOW() AT TIME ZONE '${STUDIO_TIMEZONE}')::date))`;
     } else if (status) {
       params.push(status); q += ` AND m.status = $${params.length}`;
     }
@@ -13572,6 +13653,16 @@ app.get("/api/bookings", adminMiddleware, async (req, res) => {
 app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
   const { classId, userId, guest, guestSale } = req.body;
   if (!classId || !userId) return res.status(400).json({ message: "classId y userId requeridos" });
+  if (!isUuid(classId) || !isUuid(userId)) return res.status(400).json({ message: "Identificador inválido" });
+  // Responsiva: recepción puede asignar sin firma si deja el motivo por el que
+  // la clienta firmará en recepción (auditoría 2026-09-27, bloque 1, tarea 5).
+  const override = req.body?.waiverOverride;
+  const overrideReason = typeof override?.reason === "string" ? override.reason.trim() : "";
+  if (override && overrideReason.length < 5) return res.status(400).json({ message: "Escribe el motivo (mínimo 5 caracteres)." });
+  const signed = await hasSignedWaiver(pool, userId);
+  if (!signed && !override) {
+    return res.status(403).json({ code: "WAIVER_REQUIRED", message: "Esta clienta no ha firmado su responsiva." });
+  }
   const withGuest = guest && typeof guest === "object" && guest.name && guest.phone;
   if (withGuest && !guest.acceptedWaiver) {
     return res.status(400).json({ message: "Confirma el waiver de la acompañante" });
@@ -13662,9 +13753,10 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
     const isWaitlist = (await liveBookingCount(classId, client)) >= cls.max_capacity;
     const bookingStatus = isWaitlist ? "waitlist" : "confirmed";
     const result = await client.query(
-      `INSERT INTO bookings (class_id, user_id, membership_id, status)
-       VALUES ($1, $2, $3, $4) RETURNING *`,
-      [classId, userId, membership.id, bookingStatus]
+      `INSERT INTO bookings (class_id, user_id, membership_id, status, waiver_override_reason, waiver_override_by, waiver_override_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      [classId, userId, membership.id, bookingStatus,
+       !signed ? overrideReason : null, !signed ? req.userId : null, !signed ? new Date() : null]
     );
 
     if (!isWaitlist) {
@@ -13909,27 +14001,60 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
   }
 });
 
+// Fecha y minuto actuales en la zona del estudio, para la regla de check-in.
+async function studioNow(client = pool) {
+  const r = await client.query(
+    `SELECT to_char((NOW() AT TIME ZONE '${STUDIO_TIMEZONE}')::date, 'YYYY-MM-DD') AS d,
+            EXTRACT(HOUR FROM (NOW() AT TIME ZONE '${STUDIO_TIMEZONE}'))::int * 60
+              + EXTRACT(MINUTE FROM (NOW() AT TIME ZONE '${STUDIO_TIMEZONE}'))::int AS m`,
+  );
+  return { nowDate: r.rows[0].d, nowMinutes: Number(r.rows[0].m) };
+}
+
+// +puntos por asistir (una sola vez por reserva): compartido por lista y QR.
+async function awardCheckinPoints(userId) {
+  try {
+    const cfg = await getLoyaltyConfig();
+    const pts = cfg.points_per_class;
+    if (cfg.enabled !== false && pts > 0) {
+      await pool.query(
+        "INSERT INTO loyalty_transactions (user_id, type, points, description) VALUES ($1, 'earn', $2, 'Clase asistida')",
+        [userId, pts],
+      );
+    }
+  } catch (e) { console.warn("[check-in] loyalty insert failed:", e?.message); }
+}
+
 // PUT /api/bookings/:id/check-in
 app.put("/api/bookings/:id/check-in", adminMiddleware, async (req, res) => {
-  // Validar UUID antes para no crashar el handler con 'undefined' o input malo
-  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  if (!UUID_RE.test(String(req.params.id))) {
-    return res.status(400).json({ message: "ID de reserva inválido" });
-  }
   try {
-    // 1) Lookup primero para saber si ya estaba checked-in y evitar duplicar puntos.
+    // 1) Lookup primero para saber si ya estaba checked-in y evitar duplicar puntos,
+    //    trae también la clase para aplicar la regla única de check-in.
     const before = await pool.query(
-      "SELECT user_id, status, checked_in_at, class_id FROM bookings WHERE id = $1",
+      `SELECT b.user_id, b.status, b.checked_in_at, b.class_id, c.status AS class_status,
+              to_char(c.date, 'YYYY-MM-DD') AS class_date, c.start_time
+         FROM bookings b JOIN classes c ON c.id = b.class_id
+        WHERE b.id = $1`,
       [req.params.id],
     );
     if (!before.rows.length) {
       return res.status(404).json({ message: "Reserva no encontrada" });
     }
+    const bk = before.rows[0];
+    // Repetir el check-in de una reserva ya asistida es idempotente aunque la
+    // clase sea de otro día: la regla decide si se puede marcar asistencia, no
+    // si ya se marcó. Sin cambios ni puntos.
+    if (bk.status === "checked_in") {
+      const current = await pool.query("SELECT * FROM bookings WHERE id = $1", [req.params.id]);
+      return res.json({ data: current.rows[0], alreadyCheckedIn: true });
+    }
+    const rule = checkinRule({ bookingStatus: bk.status, classStatus: bk.class_status, classDate: bk.class_date, startTime: String(bk.start_time), ...(await studioNow()) });
+    if (!rule.ok) return res.status(409).json({ code: rule.code, message: rule.message });
     const wasAlreadyCheckedIn = !!before.rows[0].checked_in_at;
     // 2) UPDATE (idempotente: si ya estaba, refresca el timestamp pero no doblamos puntos).
     const r = await pool.query(
-      "UPDATE bookings SET status = 'checked_in', checked_in_at = COALESCE(checked_in_at, NOW()) WHERE id = $1 RETURNING *",
-      [req.params.id],
+      "UPDATE bookings SET status = 'checked_in', checked_in_at = COALESCE(checked_in_at, NOW()), checked_in_by = COALESCE(checked_in_by, $2) WHERE id = $1 RETURNING *",
+      [req.params.id, req.userId],
     );
     const booking = r.rows[0];
     // ── Reflejar visita Wellhub si el check-in fue local (recepción/QR/coach) ──
@@ -13951,20 +14076,7 @@ app.put("/api/bookings/:id/check-in", adminMiddleware, async (req, res) => {
       })();
     }
     // 3) Otorgar +10 pts SOLO si es primer check-in.
-    if (booking.user_id && !wasAlreadyCheckedIn) {
-      try {
-        const cfg = await getLoyaltyConfig();
-        const pts = cfg.points_per_class;
-        if (cfg.enabled !== false && pts > 0) {
-          await pool.query(
-            "INSERT INTO loyalty_transactions (user_id, type, points, description) VALUES ($1, 'earn', $2, 'Clase asistida')",
-            [booking.user_id, pts],
-          );
-        }
-      } catch (loyaltyErr) {
-        console.warn("[check-in] loyalty insert failed:", loyaltyErr?.message);
-      }
-    }
+    if (booking.user_id && !wasAlreadyCheckedIn) await awardCheckinPoints(booking.user_id);
     // 4) notifyClassAttended (motivación + milestones + wallet sync) SOLO si es primer check-in.
     if (booking.user_id && !wasAlreadyCheckedIn) {
       // Get className for the notify ctx
@@ -14001,7 +14113,6 @@ app.post("/api/admin/checkin/scan", adminMiddleware, async (req, res) => {
     const raw = String(req.body?.code ?? "").trim();
     if (!raw) return res.status(400).json({ status: "error", message: "Código vacío" });
 
-    const isUuid = (s) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
     let userId = null;
     if (isUuid(raw)) {
       userId = raw;
@@ -14022,7 +14133,8 @@ app.post("/api/admin/checkin/scan", adminMiddleware, async (req, res) => {
     const name = userRes.rows[0].display_name || "Clienta";
 
     const bookingRes = await pool.query(
-      `SELECT b.id, b.status, ct.name AS class_name, c.start_time
+      `SELECT b.id, b.status, ct.name AS class_name, c.start_time,
+              c.status AS class_status, to_char(c.date,'YYYY-MM-DD') AS class_date
          FROM bookings b
          JOIN classes c ON b.class_id = c.id
          JOIN class_types ct ON c.class_type_id = ct.id
@@ -14040,6 +14152,9 @@ app.post("/api/admin/checkin/scan", adminMiddleware, async (req, res) => {
     const bk = bookingRes.rows[0];
     const timeStr = String(bk.start_time || "").slice(0, 5);
 
+    const rule = checkinRule({ bookingStatus: bk.status, classStatus: bk.class_status, classDate: bk.class_date, startTime: String(bk.start_time), ...(await studioNow()) });
+    if (!rule.ok) return res.status(409).json({ status: "rejected", code: rule.code, name, message: `${name}: ${rule.message}` });
+
     if (bk.status === "checked_in") {
       return res.json({
         status: "already", name, className: bk.class_name, time: timeStr,
@@ -14048,20 +14163,11 @@ app.post("/api/admin/checkin/scan", adminMiddleware, async (req, res) => {
     }
 
     await pool.query(
-      "UPDATE bookings SET status = 'checked_in', checked_in_at = NOW() WHERE id = $1",
-      [bk.id]
+      "UPDATE bookings SET status = 'checked_in', checked_in_at = NOW(), checked_in_by = $2 WHERE id = $1",
+      [bk.id, req.userId]
     );
     // Puntos por asistir (igual que el check-in manual del roster)
-    try {
-      const cfg = await getLoyaltyConfig();
-      const pts = cfg.points_per_class;
-      if (cfg.enabled !== false && pts > 0) {
-        await pool.query(
-          "INSERT INTO loyalty_transactions (user_id, type, points, description) VALUES ($1, 'earn', $2, 'Clase asistida')",
-          [userId, pts]
-        );
-      }
-    } catch (_) { /* no romper el check-in */ }
+    await awardCheckinPoints(userId);
 
     // Igual que el check-in manual del roster: dispara motivación, milestones y
     // sincronización del pase de wallet (antes el check-in por QR no lo hacía).
@@ -14106,7 +14212,9 @@ app.get("/api/classes/:id/roster", adminMiddleware, async (req, res) => {
     const r = await pool.query(
       `SELECT b.id AS booking_id, b.status, b.checked_in_at,
               u.id AS user_id, u.display_name, u.email, u.phone,
-              m.plan_id, p.name AS plan_name, m.classes_remaining
+              m.plan_id, p.name AS plan_name, m.classes_remaining,
+              COALESCE(u.has_injury, false) AS has_injury, u.injury_details, u.health_notes,
+              NOT EXISTS (SELECT 1 FROM bookings pb WHERE pb.user_id = b.user_id AND pb.checked_in_at IS NOT NULL AND pb.id <> b.id) AS first_visit
        FROM bookings b
        JOIN users u ON b.user_id = u.id
        LEFT JOIN memberships m ON b.membership_id = m.id
@@ -14595,7 +14703,7 @@ app.get("/api/payments", ownerMiddleware, async (req, res) => {
       FROM memberships m
       LEFT JOIN users u ON m.user_id = u.id
       LEFT JOIN plans p ON m.plan_id = p.id
-      WHERE m.status = 'active'`;
+      WHERE m.status = 'active' AND m.order_id IS NULL`;
     if (startIdx) mq += ` AND m.created_at >= $${startIdx}`;
     if (endIdx) mq += ` AND m.created_at <= $${endIdx}`;
     if (userIdx) mq += ` AND m.user_id = $${userIdx}`;
@@ -16334,43 +16442,27 @@ async function runClassReminderCron() {
     if (res.rows.length === 0) return;
     console.log(`[Cron] Class reminder — ${res.rows.length} upcoming bookings`);
 
-    for (const row of res.rows) {
-      const timeStr = row.start_time ? String(row.start_time).slice(0, 5) : "";
-      const className = row.class_name || "tu clase";
-      const reason = `class_reminder_${row.booking_id}`;
-
-      // Dedup guard: skip if already sent
-      const already = await pool.query(
-        `SELECT 1 FROM wallet_notification_logs WHERE user_id=$1 AND reason=$2 LIMIT 1`,
-        [row.user_id, reason],
-      );
-      if (already.rows.length > 0) continue; // already sent, skip
-
-      // 1. WhatsApp via notifyByTemplate (handles opt-out, phone lookup)
-      await notifyByTemplate(
-        row.user_id,
-        "class_reminder",
-        { class: className, time: timeStr },
-        ({ firstName }) =>
-          `${firstName}, te vemos en ${className} a las ${timeStr}. Llega 10 minutos antes.`,
-      ).catch((e) => console.error("[Cron] class_reminder WA:", e?.message));
-
-      // 2. APNS wallet push — updates the pass on the lockscreen
-      // Fire-and-forget: triggerWalletPassSync schedules async push internally and logs its own errors
-      triggerWalletPassSync(row.user_id, reason);
-
-      // 3. Log to wallet_notification_logs for dedup (apple_sent=0 since
-      //    triggerWalletPassSync is async; the actual push count is logged
-      //    inside notifyWalletPassesUpdatedForUser separately)
-      await pool.query(
-        `INSERT INTO wallet_notification_logs (user_id, reason, status, detail)
-         VALUES ($1, $2, 'ok', '{"source":"class_reminder_cron"}'::jsonb)`,
-        [row.user_id, reason],
-      ).catch((e) => console.error("[Cron] class_reminder log:", e?.message));
-
-      // Small delay to respect Evolution API rate limits
-      await new Promise((r) => setTimeout(r, 400));
-    }
+    // Mismo ajuste que respeta cancelar clase: con los avisos de WhatsApp
+    // apagados por la dueña no se envía ni se registra 'failed'; el pase se
+    // sincroniza igual (auditoría 2026-09-27, P0-1).
+    const notifSettings = await getSettingsValue("notification_settings", DEFAULT_NOTIFICATION_SETTINGS);
+    await sendClassReminders(res.rows, {
+      log: pgReminderLog(pool),
+      remindersOn: notifSettings?.whatsapp_reminders !== false,
+      channelState: whatsappChannelState,
+      syncPass: triggerWalletPassSync,
+      notify: (row) => {
+        const timeStr = row.start_time ? String(row.start_time).slice(0, 5) : "";
+        const className = row.class_name || "tu clase";
+        return notifyByTemplate(
+          row.user_id,
+          "class_reminder",
+          { class: className, time: timeStr },
+          ({ firstName }) =>
+            `${firstName}, te vemos en ${className} a las ${timeStr}. Llega 10 minutos antes.`,
+        );
+      },
+    });
   } catch (err) {
     console.error("[Cron] Class reminder error:", err.message);
   }

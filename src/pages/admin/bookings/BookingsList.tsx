@@ -14,6 +14,7 @@ import WeekNav from "@/components/admin/WeekNav";
 import DayStrip from "@/components/admin/DayStrip";
 import StatusDot from "@/components/admin/StatusDot";
 import { Avatar } from "@/components/admin/PersonCell";
+import { HealthBadges } from "@/components/admin/HealthBadges";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,6 +46,10 @@ interface RosterEntry {
   phone: string | null;
   planName: string | null;
   classesRemaining: number | null;
+  hasInjury?: boolean;
+  injuryDetails?: string | null;
+  healthNotes?: string | null;
+  firstVisit?: boolean;
 }
 
 interface ClientOption {
@@ -147,6 +152,47 @@ const CancelBookingDialog = ({
   );
 };
 
+// ── Diálogo de "avisa a mano": el canal de WhatsApp estaba caído al cancelar
+// la clase, así que a estas alumnas no les llegó el aviso automático. ──
+const UnreachedDialog = ({
+  items, channelOff, onClose,
+}: {
+  items: { user_id: string; display_name: string | null; phone: string | null }[];
+  /** La dueña apagó los avisos de WhatsApp en Configuración (no es una caída del canal). */
+  channelOff: boolean;
+  onClose: () => void;
+}) => {
+  return (
+    <Dialog open={items.length > 0} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-md bg-canvas border-line text-ink">
+        <DialogHeader>
+          <DialogTitle className="font-display text-ink">Avisa a mano a estas alumnas</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <p className="text-sm text-ink/70">
+            {channelOff ? "Los avisos de WhatsApp están apagados" : "WhatsApp está desconectado"} — no les llegó el aviso de la clase cancelada.
+          </p>
+          <ul className="divide-y divide-line rounded-xl border border-line">
+            {items.map((u) => (
+              <li key={u.user_id} className="flex items-center justify-between gap-3 px-4 py-3">
+                <span className="font-medium text-ink">{u.display_name || "Sin nombre"}</span>
+                {u.phone ? (
+                  <a href={`tel:${u.phone}`} className="text-sm font-bold text-ink underline underline-offset-2">{u.phone}</a>
+                ) : (
+                  <span className="text-sm text-ink/50">Sin teléfono</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+        <DialogFooter>
+          <Button onClick={onClose}>Listo</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
 function RosterStatus({ status }: { status: string }) {
   if (status === "checked_in") return <StatusDot tone="success">Asistió</StatusDot>;
   if (status === "no_show") return <StatusDot tone="danger">No asistió</StatusDot>;
@@ -161,6 +207,8 @@ const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: string; onBa
   const qc = useQueryClient();
   const { confirm, promptText, dialog } = useConfirm();
   const [cancelTarget, setCancelTarget] = useState<RosterEntry | null>(null);
+  const [unreached, setUnreached] = useState<{ user_id: string; display_name: string | null; phone: string | null }[]>([]);
+  const [unreachedChannelOff, setUnreachedChannelOff] = useState(false);
   const { data: loyaltyCfgData } = useQuery<{ data: { faltas_cancel_window_hours?: number } }>({
     queryKey: ["loyalty-config"],
     queryFn: async () => (await api.get("/loyalty/config")).data,
@@ -184,6 +232,16 @@ const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: string; onBa
   const [agSearching, setAgSearching] = useState(false);
   const [agFound, setAgFound] = useState(false);
 
+  // ── Responsiva sin firmar: recepción puede asignar igual si deja el motivo ──
+  const [waiverBlocked, setWaiverBlocked] = useState(false);
+  const [waiverSignsAtDesk, setWaiverSignsAtDesk] = useState(false);
+  const [waiverReason, setWaiverReason] = useState("");
+  const resetWaiverState = () => {
+    setWaiverBlocked(false);
+    setWaiverSignsAtDesk(false);
+    setWaiverReason("");
+  };
+
   const resetAssignForm = () => {
     setAssignWithGuest(false);
     setSelectedMember(null);
@@ -195,6 +253,7 @@ const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: string; onBa
     setGuestChargeMode("host_pack");
     setGuestSalePlanId("");
     setGuestSalePayment("cash");
+    resetWaiverState();
   };
 
   const searchAdminGuest = async () => {
@@ -259,7 +318,7 @@ const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: string; onBa
       invalidateWeek();
       toast({ title: "Check-in registrado" });
     },
-    onError: () => toast({ title: "Error al hacer check-in", variant: "destructive" }),
+    onError: (e: any) => toast({ title: "No se pudo hacer check-in", description: e?.response?.data?.message ?? "Intenta de nuevo.", variant: "destructive" }),
   });
 
   const noShowMutation = useMutation({
@@ -302,11 +361,17 @@ const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: string; onBa
       qc.invalidateQueries({ queryKey: ["roster", classId] });
       qc.invalidateQueries({ queryKey: ["classes"] });
       invalidateWeek();
-      const d = res?.data?.data || {};
-      toast({
-        title: "Clase cancelada",
-        description: `${d.bookings_cancelled ?? 0} reservas canceladas · ${d.credits_restored ?? 0} créditos devueltos · ${d.wa_sent ?? 0} WhatsApps`,
-      });
+      const d = res?.data?.data ?? {};
+      if ((d.wa_failed ?? 0) > 0) {
+        // "disabled": la dueña apagó los avisos en Configuración; cualquier otro
+        // estado es el canal caído.
+        const channelOff = d.wa_channel_state === "disabled";
+        setUnreachedChannelOff(channelOff);
+        setUnreached(d.wa_unreached ?? []);
+        toast({ title: "Clase cancelada", description: `No se pudo avisar a ${d.wa_failed} ${d.wa_failed === 1 ? "alumna" : "alumnas"} (${channelOff ? "los avisos de WhatsApp están apagados" : "WhatsApp desconectado"}).`, variant: "destructive" });
+      } else {
+        toast({ title: "Clase cancelada", description: `${d.bookings_cancelled ?? 0} reservas canceladas · ${d.credits_restored ?? 0} créditos devueltos · aviso por WhatsApp en cola para ${d.wa_queued ?? 0}` });
+      }
     },
     onError: (e: any) => toast({
       title: "Error",
@@ -316,12 +381,13 @@ const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: string; onBa
   });
 
   const assignMutation = useMutation({
-    mutationFn: (vars: { userId: string; guest?: any; guestSale?: any }) =>
+    mutationFn: (vars: { userId?: string; guest?: any; guestSale?: any; waiverOverride?: { reason: string } }) =>
       api.post("/admin/bookings/assign", {
         classId,
         userId: vars.userId,
         guest: vars.guest,
         guestSale: vars.guestSale,
+        waiverOverride: vars.waiverOverride,
       }),
     onSuccess: (res: any) => {
       qc.invalidateQueries({ queryKey: ["roster", classId] });
@@ -332,6 +398,10 @@ const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: string; onBa
       resetAssignForm();
     },
     onError: (e: any) => {
+      if (e?.response?.status === 403 && e?.response?.data?.code === "WAIVER_REQUIRED") {
+        setWaiverBlocked(true);
+        return;
+      }
       toast({ title: e?.response?.data?.message ?? "Error al asignar reserva", variant: "destructive" });
     },
   });
@@ -451,7 +521,9 @@ const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: string; onBa
         ) : (
           <ul>
             {roster.map((entry: RosterEntry) => {
-              const canCheckin = entry.status === "confirmed" || entry.status === "waitlist";
+              // Sólo una reserva confirmada: la regla de check-in del servidor
+              // (server/lib/checkin.js) rechaza lista de espera y faltas.
+              const canCheckin = entry.status === "confirmed";
               const canNoShow = entry.status === "confirmed";
               const canCancel = entry.status === "confirmed" || entry.status === "waitlist";
               const unlimited = entry.classesRemaining == null || entry.classesRemaining >= 9999;
@@ -459,7 +531,7 @@ const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: string; onBa
                 ? `${entry.planName} · ${unlimited ? "Ilimitado" : `${entry.classesRemaining} ${entry.classesRemaining === 1 ? "restante" : "restantes"}`}`
                 : "Sin plan";
               return (
-                <li key={entry.bookingId} className="grid grid-cols-[40px_minmax(0,1fr)] items-center gap-3 border-t border-line px-5 py-3 lg:grid-cols-[40px_minmax(0,1fr)_150px_auto] lg:gap-4 lg:px-6">
+                <li key={entry.bookingId} className="grid grid-cols-[40px_minmax(0,1fr)] items-center gap-3 border-t border-line px-5 py-3 2xl:grid-cols-[40px_minmax(0,1fr)_150px_auto] 2xl:gap-4 2xl:px-6">
                   {entry.status === "checked_in" ? (
                     <span aria-hidden="true" className="grid h-10 w-10 place-items-center rounded-full bg-success text-canvas"><Check size={18} /></span>
                   ) : (
@@ -467,10 +539,11 @@ const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: string; onBa
                   )}
                   <span className="min-w-0 leading-snug">
                     <span className="block truncate text-sm font-extrabold">{entry.displayName}</span>
+                    <HealthBadges hasInjury={entry.hasInjury} injuryDetails={entry.injuryDetails} healthNotes={entry.healthNotes} firstVisit={entry.firstVisit} />
                     <span className="block truncate text-xs text-ink-muted">{[plan, entry.phone].filter(Boolean).join(" · ")}</span>
                   </span>
-                  <span className="col-start-2 lg:col-start-auto"><RosterStatus status={entry.status} /></span>
-                  <span className="col-span-2 flex flex-wrap justify-end gap-1.5 lg:col-span-1">
+                  <span className="col-start-2 2xl:col-start-auto"><RosterStatus status={entry.status} /></span>
+                  <span className="col-span-2 flex flex-wrap justify-end gap-1.5 2xl:col-span-1">
                     {canCheckin && (
                       <Button variant="outline" aria-label={`Check-in de ${entry.displayName}`} onClick={() => checkinMutation.mutate(entry.bookingId)} disabled={checkinMutation.isPending}>
                         <Check size={16} aria-hidden="true" />
@@ -540,6 +613,28 @@ const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: string; onBa
               </label>
             )}
 
+            {waiverBlocked && (
+              <div className="space-y-2 rounded-xl border border-danger/25 bg-danger/10 p-3">
+                <p className="text-sm font-bold text-ink">Esta clienta no ha firmado su responsiva</p>
+                <label className="flex min-h-[44px] items-center gap-2 text-sm text-ink">
+                  <input type="checkbox" checked={waiverSignsAtDesk} onChange={(e) => setWaiverSignsAtDesk(e.target.checked)} />
+                  Firmará en recepción
+                </label>
+                {waiverSignsAtDesk && (
+                  <Input placeholder="Motivo (obligatorio)" value={waiverReason} onChange={(e) => setWaiverReason(e.target.value)} />
+                )}
+                <Button
+                  disabled={!waiverSignsAtDesk || waiverReason.trim().length < 5 || assignMutation.isPending}
+                  onClick={() => assignMutation.mutate({
+                    ...(assignMutation.variables ?? {}),
+                    waiverOverride: { reason: waiverReason.trim() },
+                  })}
+                >
+                  Asignar de todos modos
+                </Button>
+              </div>
+            )}
+
             {/* Paso 1: elegir socia */}
             {(!assignWithGuest || !selectedMember) && (
               <div className="space-y-3">
@@ -564,6 +659,7 @@ const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: string; onBa
                         type="button"
                         disabled={assignMutation.isPending}
                         onClick={() => {
+                          resetWaiverState();
                           if (assignWithGuest) {
                             setSelectedMember(u);
                           } else {
@@ -599,7 +695,7 @@ const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: string; onBa
                   <button
                     type="button"
                     className="text-[11px] text-ink/55 transition-colors hover:text-ink"
-                    onClick={() => setSelectedMember(null)}
+                    onClick={() => { setSelectedMember(null); resetWaiverState(); }}
                   >
                     Cambiar
                   </button>
@@ -842,6 +938,8 @@ const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: string; onBa
         }}
         onClose={() => setCancelTarget(null)}
       />
+
+      <UnreachedDialog items={unreached} channelOff={unreachedChannelOff} onClose={() => setUnreached([])} />
 
       {dialog}
     </div>

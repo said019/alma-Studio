@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { CheckCircle2, XCircle, Clock, Camera as CameraIcon, ListChecks } from "lucide-react";
 
 interface ScanResult {
-  status: "ok" | "already" | "no_booking" | "not_found" | "error";
+  status: "ok" | "already" | "no_booking" | "not_found" | "rejected" | "error";
   name?: string;
   className?: string;
   time?: string;
@@ -224,6 +224,7 @@ export const CheckinScanner = ({ open, onOpenChange }: Props) => {
   const styleFor = (status: ScanResult["status"]) => {
     if (status === "ok") return "bg-success/10 text-success border-success/25";
     if (status === "already") return "bg-sunken/60 text-ink border-line-strong/50";
+    if (status === "rejected") return "bg-danger/10 text-danger border-danger/25";
     return "bg-destructive/10 text-destructive border-destructive/20";
   };
 

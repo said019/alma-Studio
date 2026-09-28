@@ -260,7 +260,7 @@ const Dashboard = () => {
                   Membresía
                 </span>
                 {!membershipError && membership && classLimit !== null && (
-                  <Tag tint="success">Activa</Tag>
+                  membership.isExpired ? <Tag tint="danger">Vencida</Tag> : <Tag tint="success">Activa</Tag>
                 )}
               </div>
               {loadingMembership ? (

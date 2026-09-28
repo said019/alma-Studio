@@ -46,12 +46,25 @@ const buildDemoUser = (): User => {
   };
 };
 
+// Tope de espera cuando el servidor manda Retry-After: un proxy o CDN puede
+// mandar un valor de horas en un 5xx, y sin este tope la guardia se quedaría
+// en "Cargando…" todo ese tiempo.
+const RETRY_AFTER_MAX_S = 10;
+
+// Resultado de la última verificación de sesión contra /auth/me:
+// "idle" antes de verificar, "ok"/"unauthorized" tras una respuesta
+// concluyente, y "unavailable" cuando el servidor no pudo confirmar nada
+// (429, 5xx o red) — en ese caso NO se cierra la sesión (auditoría 2026-09-27,
+// riesgo 3: un límite de velocidad no debe verse como "no autorizada").
+export type SessionCheck = "idle" | "ok" | "unauthorized" | "unavailable";
+
 interface AuthState {
   user: User | null;
   token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
+  sessionCheck: SessionCheck;
   login: (credentials: LoginCredentials) => Promise<void>;
   register: (data: RegisterData) => Promise<void>;
   logout: () => void;
@@ -69,6 +82,7 @@ export const useAuthStore = create<AuthState>()(
       isAuthenticated: false,
       isLoading: false,
       error: null,
+      sessionCheck: "idle",
 
       login: async (credentials) => {
         set({ isLoading: true, error: null });
@@ -109,26 +123,45 @@ export const useAuthStore = create<AuthState>()(
 
       logout: () => {
         localStorage.removeItem("auth_token");
-        set({ user: null, token: null, isAuthenticated: false });
+        set({ user: null, token: null, isAuthenticated: false, sessionCheck: "idle" });
       },
 
       checkAuth: async () => {
         const token = localStorage.getItem("auth_token");
-        if (!token) { set({ isLoading: false }); return; }
+        if (!token) { set({ isLoading: false, sessionCheck: "unauthorized" }); return; }
 
         // Dev demo: mantener la sesión sintetizada sin pegarle al backend.
         if (import.meta.env.DEV && isDevDemoToken(token)) {
-          set({ user: buildDemoUser(), token, isAuthenticated: true, isLoading: false });
+          set({ user: buildDemoUser(), token, isAuthenticated: true, isLoading: false, sessionCheck: "ok" });
           return;
         }
 
         set({ isLoading: true });
-        try {
-          const res = await api.get<{ user: User }>("/auth/me");
-          set({ user: res.data.user, token, isAuthenticated: true, isLoading: false });
-        } catch {
-          localStorage.removeItem("auth_token");
-          set({ user: null, token: null, isAuthenticated: false, isLoading: false });
+        // Reintentos con backoff: un 429/5xx/red no significa "no autorizada" —
+        // sólo que el servidor no pudo confirmar la sesión todavía (auditoría
+        // 2026-09-27, riesgo 3). Sólo un 401 real cierra la sesión.
+        const waits = [1000, 2000, 4000];
+        for (let attempt = 0; ; attempt++) {
+          try {
+            const res = await api.get<{ user: User }>("/auth/me");
+            set({ user: res.data.user, token, isAuthenticated: true, isLoading: false, sessionCheck: "ok" });
+            return;
+          } catch (err: any) {
+            const status = err?.response?.status;
+            if (status === 401) {
+              localStorage.removeItem("auth_token");
+              set({ user: null, token: null, isAuthenticated: false, isLoading: false, sessionCheck: "unauthorized" });
+              return;
+            }
+            if (attempt >= waits.length - 1) {
+              // 429, 5xx o red: la sesión NO se cierra; se conserva lo que había.
+              set((s) => ({ token, isLoading: false, sessionCheck: "unavailable", isAuthenticated: Boolean(s.user) }));
+              return;
+            }
+            const ra = Number(err?.response?.headers?.["retry-after"]);
+            const waitMs = Number.isFinite(ra) && ra > 0 ? Math.min(ra, RETRY_AFTER_MAX_S) * 1000 : waits[attempt];
+            await new Promise((r) => setTimeout(r, waitMs));
+          }
         }
       },
 
@@ -141,6 +174,16 @@ export const useAuthStore = create<AuthState>()(
         set({ user, token, isAuthenticated: true });
       },
     }),
-    { name: "auth-storage" }
+    {
+      name: "auth-storage",
+      // sessionCheck (y isLoading/error) son resultado transitorio de la
+      // última verificación, no datos de sesión durables: si se persisten,
+      // un "unavailable" guardado justo antes de cerrar la pestaña se lee de
+      // vuelta al recargar y puede quedar pegado hasta que resuelva el
+      // siguiente checkAuth(). Al excluirlos, cada carga arranca en "idle" y
+      // sólo un checkAuth() fresco decide el valor real (auditoría
+      // 2026-09-27, riesgo 3).
+      partialize: (state) => ({ user: state.user, token: state.token, isAuthenticated: state.isAuthenticated }),
+    }
   )
 );

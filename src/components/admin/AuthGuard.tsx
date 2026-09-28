@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuthStore } from "@/stores/authStore";
+import { SessionUnavailable } from "@/components/auth/SessionUnavailable";
 
 const ADMIN_ROLES = ["admin", "super_admin", "reception", "instructor"];
 
@@ -10,9 +11,11 @@ interface AuthGuardProps {
 }
 
 export const AuthGuard = ({ children, requiredRoles = ADMIN_ROLES }: AuthGuardProps) => {
-  const { user, isAuthenticated, checkAuth } = useAuthStore();
+  const { user, isAuthenticated, sessionCheck, checkAuth } = useAuthStore();
   const location = useLocation();
-  const [checked, setChecked] = useState(false);
+  // Con sesión ya autenticada se pinta de inmediato (sin spinner en cada
+  // página); sin sesión se espera a checkAuth antes de decidir.
+  const [checked, setChecked] = useState(() => useAuthStore.getState().isAuthenticated);
 
   useEffect(() => {
     (async () => {
@@ -29,6 +32,15 @@ export const AuthGuard = ({ children, requiredRoles = ADMIN_ROLES }: AuthGuardPr
         Cargando...
       </div>
     );
+  }
+
+  // Un 429/5xx/red al verificar la sesión no es "no autorizada": no hay forma
+  // de saber si la usuaria sigue con sesión válida, así que no se manda al
+  // login (le borraría la sesión sin motivo) — se ofrece reintentar en vez de
+  // eso (auditoría 2026-09-27, riesgo 3). Con usuaria guardada, se sigue como
+  // hoy: se confía en la sesión local mientras el servidor no diga lo contrario.
+  if (sessionCheck === "unavailable" && !user) {
+    return <SessionUnavailable onRetry={() => { setChecked(false); checkAuth().then(() => setChecked(true)); }} />;
   }
 
   // Redirección declarativa con <Navigate>: idempotente, no apila history y

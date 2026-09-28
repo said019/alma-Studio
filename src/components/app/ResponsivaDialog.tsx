@@ -70,10 +70,10 @@ export const ResponsivaDialog = ({
       toast({ title: "Responsiva firmada. ¡Bienvenida a HIVE!" });
       onSigned();
     },
-    onError: () => {
+    onError: (e: any) => {
       toast({
         title: "No se pudo guardar la responsiva",
-        description: "Inténtalo de nuevo.",
+        description: e?.response?.data?.message ?? "Inténtalo de nuevo.",
         variant: "destructive",
       });
     },

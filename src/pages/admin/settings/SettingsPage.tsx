@@ -614,17 +614,19 @@ const NotificationTemplates = () => {
               <div key={row.id} className="rounded-lg border border-line bg-canvas px-3 py-2 text-xs">
                 <div className="flex items-center justify-between gap-2">
                   <p className="font-medium text-ink truncate">{row.display_name || row.email || row.user_id || "Usuaria"}</p>
+                  {/* skipped_disconnected: el recordatorio no se intentó porque el
+                      canal de WhatsApp estaba caído; no es un error del pase. */}
                   <Badge
                     variant="outline"
                     className={
                       row.status === "ok"
                         ? "border-transparent bg-success/15 text-success hover:bg-success/15"
-                        : row.status === "partial"
+                        : row.status === "partial" || row.status === "skipped_disconnected"
                           ? "border-line-strong/60 bg-sunken/50 text-ink"
                           : "border-transparent bg-destructive/10 text-destructive"
                     }
                   >
-                    {row.status === "ok" ? "OK" : row.status === "partial" ? "Parcial" : "Error"}
+                    {row.status === "ok" ? "OK" : row.status === "partial" ? "Parcial" : row.status === "skipped_disconnected" ? "Omitido" : "Error"}
                   </Badge>
                 </div>
                 <p className="mt-0.5 text-ink/60">

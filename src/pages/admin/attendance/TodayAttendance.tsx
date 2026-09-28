@@ -18,6 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { Camera, Check, ChevronDown, RotateCcw, UserX } from "lucide-react";
 import CheckinScanner from "@/components/admin/CheckinScanner";
+import { HealthBadges } from "@/components/admin/HealthBadges";
 import { hhmm, minutesUntil, splitDay, summarize, type TodayClass, type TodayRosterEntry } from "@/lib/today-roster";
 
 type ClassCardProps = {
@@ -89,6 +90,7 @@ function ClassCard({ cls, clock, open, onToggle, current = false, past = false, 
                     {labelOf(r)}
                     {isGuest(r) && r.host_name ? <span className="font-normal text-ink-muted"> (invitada de {r.host_name})</span> : null}
                   </span>
+                  <HealthBadges hasInjury={r.has_injury} injuryDetails={r.injury_details} healthNotes={r.health_notes} firstVisit={r.first_visit} />
                   <span className="block truncate text-xs text-ink-muted">
                     {r.phone ?? "—"}
                     {r.status === "no_show" && <span className="text-danger"> · No asistió</span>}
@@ -100,13 +102,15 @@ function ClassCard({ cls, clock, open, onToggle, current = false, past = false, 
                   </span>
                 ) : r.status === "waitlist" ? (
                   <span className="text-[13px] text-ink-muted">Lista de espera</span>
+                ) : r.status === "no_show" ? (
+                  // La regla de check-in (server/lib/checkin.js) rechaza una
+                  // reserva marcada como falta: no se ofrece el botón.
+                  <span className="text-[13px] text-ink-muted">Falta</span>
                 ) : (
                   <span className="flex gap-1.5">
-                    {r.status !== "no_show" && (
-                      <Button variant="ghost" size="icon" aria-label={`Marcar falta de ${labelOf(r)}`} onClick={() => onNoShow(r)} disabled={mutating}>
-                        <UserX size={18} />
-                      </Button>
-                    )}
+                    <Button variant="ghost" size="icon" aria-label={`Marcar falta de ${labelOf(r)}`} onClick={() => onNoShow(r)} disabled={mutating}>
+                      <UserX size={18} />
+                    </Button>
                     <Button aria-label={`Check-in de ${labelOf(r)}`} onClick={() => onCheckin(r.booking_id)} disabled={mutating}>
                       <Check size={16} aria-hidden="true" />Check-in
                     </Button>
@@ -158,8 +162,8 @@ const TodayAttendance = () => {
       if (navigator.vibrate) navigator.vibrate(60);
     },
     onError: (e: any) => toast({
-      title: "Error al hacer check-in",
-      description: e?.response?.data?.message,
+      title: "No se pudo hacer check-in",
+      description: e?.response?.data?.message ?? "Intenta de nuevo.",
       variant: "destructive",
     }),
   });
@@ -185,7 +189,7 @@ const TodayAttendance = () => {
     const name = labelOf(r);
     const ok = await confirm({
       title: `¿Marcar a ${name} como no asistió?`,
-      description: "Su reserva quedará registrada como falta. Si se equivocan, todavía pueden hacerle check-in después.",
+      description: "Su reserva quedará registrada como falta y ya no podrá marcarse como asistencia.",
       destructive: true,
       confirmLabel: "Marcar falta",
     });

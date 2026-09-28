@@ -53,6 +53,14 @@ describe("Reservas · Semana", () => {
     expect(screen.getByRole("region", { name: "Clases de la semana" })).toBeInTheDocument();
   });
 
+  it("una reserva en lista de espera no ofrece Check-in: la regla del servidor la rechaza", async () => {
+    renderAdmin(<BookingsList />, { route: "/admin/bookings?clase=c11", path: "/admin/bookings" });
+    const lista = await screen.findByRole("region", { name: "Lista de la clase" });
+    await within(lista).findByText("Regina López");
+    expect(within(lista).getByRole("button", { name: "Check-in de Camila Torres" })).toBeInTheDocument();
+    expect(within(lista).queryByRole("button", { name: "Check-in de Regina López" })).toBeNull();
+  });
+
   it("check-in también refresca la lista de la semana (M1)", async () => {
     renderAdmin(<BookingsList />, { route: "/admin/bookings?clase=c11", path: "/admin/bookings" });
     const lista = await screen.findByRole("region", { name: "Lista de la clase" });

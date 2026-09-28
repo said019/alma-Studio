@@ -16,6 +16,8 @@ interface WellhubSettings {
   gym_id?: string;
   webhook_secret?: string;
   access_token?: string;
+  has_webhook_secret?: boolean;
+  has_access_token?: boolean;
   api_base_url?: string;
   booking_base_url?: string;
   access_base_url?: string;
@@ -29,6 +31,7 @@ const PartnerPlatforms = () => {
   const { toast } = useToast();
   const qc = useQueryClient();
   const [form, setForm] = useState<WellhubSettings>({ environment: "production", is_enabled: false, extra_config: {} });
+  const [masks, setMasks] = useState<{ webhook_secret: string | null; access_token: string | null }>({ webhook_secret: null, access_token: null });
 
   const { data, isLoading } = useQuery({
     queryKey: ["partner-settings"],
@@ -37,12 +40,25 @@ const PartnerPlatforms = () => {
 
   useEffect(() => {
     const row = data?.data;
-    if (row) setForm({ ...row, extra_config: row.extra_config || {} });
+    if (row) {
+      const { webhook_secret, access_token, ...rest } = row;
+      setMasks({ webhook_secret: webhook_secret ?? null, access_token: access_token ?? null });
+      setForm({ ...rest, extra_config: row.extra_config || {} });
+    }
   }, [data]);
 
   const save = useMutation({
     mutationFn: () => api.put("/partners/settings", form),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["partner-settings"] }); toast({ title: "Configuración guardada" }); },
+    onSuccess: (res: any) => {
+      qc.invalidateQueries({ queryKey: ["partner-settings"] });
+      const row = res?.data?.data;
+      if (row) setMasks({ webhook_secret: row.webhook_secret ?? null, access_token: row.access_token ?? null });
+      setForm((f) => {
+        const { webhook_secret, access_token, ...rest } = f;
+        return rest;
+      });
+      toast({ title: "Configuración guardada" });
+    },
     onError: (e: any) => toast({ title: e?.response?.data?.message ?? "No se pudo guardar", variant: "destructive" }),
   });
 
@@ -86,14 +102,24 @@ const PartnerPlatforms = () => {
                 </select>
               </div>
 
+              <div className="space-y-1.5">
+                <Label>Gym ID (ID del studio en Wellhub)</Label>
+                <Input value={form.gym_id || ""} onChange={(e) => set("gym_id", e.target.value)} />
+              </div>
+
               {([
-                ["gym_id", "Gym ID (ID del studio en Wellhub)"],
                 ["webhook_secret", "Webhook secret (firma de los webhooks)"],
                 ["access_token", "Access token (API saliente)"],
               ] as const).map(([k, label]) => (
                 <div key={k} className="space-y-1.5">
                   <Label>{label}</Label>
-                  <Input value={(form as any)[k] || ""} onChange={(e) => set(k, e.target.value)} />
+                  <Input
+                    type="password"
+                    autoComplete="off"
+                    value={(form as any)[k] || ""}
+                    placeholder={masks[k as "webhook_secret" | "access_token"] ? `${masks[k as "webhook_secret" | "access_token"]} · déjalo vacío para no cambiarlo` : "Sin configurar"}
+                    onChange={(e) => set(k, e.target.value)}
+                  />
                 </div>
               ))}
 

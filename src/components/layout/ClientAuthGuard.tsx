@@ -1,6 +1,7 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuthStore } from "@/stores/authStore";
+import { SessionUnavailable } from "@/components/auth/SessionUnavailable";
 import type { User } from "@/types/auth";
 
 interface ClientAuthGuardProps {
@@ -9,19 +10,33 @@ interface ClientAuthGuardProps {
 }
 
 export const ClientAuthGuard = ({ children, requiredRoles }: ClientAuthGuardProps) => {
-  const { isAuthenticated, user, isLoading, checkAuth } = useAuthStore();
+  const { isAuthenticated, user, sessionCheck, checkAuth } = useAuthStore();
   const location = useLocation();
+  // Con sesión ya autenticada se pinta de inmediato (sin spinner en cada
+  // página); sin sesión se espera a checkAuth antes de decidir.
+  const [checked, setChecked] = useState(() => useAuthStore.getState().isAuthenticated);
 
   useEffect(() => {
-    if (!isAuthenticated) checkAuth();
+    (async () => {
+      if (!isAuthenticated) {
+        await checkAuth();
+      }
+      setChecked(true);
+    })();
   }, []);
 
-  if (isLoading) {
+  if (!checked) {
     return (
       <div className="flex h-screen items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
       </div>
     );
+  }
+
+  // Mismo patrón que AuthGuard (panel): un 429/5xx/red no cierra la sesión,
+  // ofrece reintentar en vez de mandar al login (auditoría 2026-09-27, riesgo 3).
+  if (sessionCheck === "unavailable" && !user) {
+    return <SessionUnavailable onRetry={() => { setChecked(false); checkAuth().then(() => setChecked(true)); }} />;
   }
 
   if (!isAuthenticated) {
