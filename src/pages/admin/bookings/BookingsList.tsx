@@ -259,7 +259,7 @@ const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: string; onBa
       invalidateWeek();
       toast({ title: "Check-in registrado" });
     },
-    onError: () => toast({ title: "Error al hacer check-in", variant: "destructive" }),
+    onError: (e: any) => toast({ title: "No se pudo hacer check-in", description: e?.response?.data?.message ?? "Intenta de nuevo.", variant: "destructive" }),
   });
 
   const noShowMutation = useMutation({

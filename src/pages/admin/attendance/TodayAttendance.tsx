@@ -158,8 +158,8 @@ const TodayAttendance = () => {
       if (navigator.vibrate) navigator.vibrate(60);
     },
     onError: (e: any) => toast({
-      title: "Error al hacer check-in",
-      description: e?.response?.data?.message,
+      title: "No se pudo hacer check-in",
+      description: e?.response?.data?.message ?? "Intenta de nuevo.",
       variant: "destructive",
     }),
   });

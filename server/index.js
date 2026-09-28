@@ -69,6 +69,7 @@ import { publicPartnerSettings, mergeSecret } from "./lib/partnerSettings.js";
 import { validateWellhubVisit as wellhubValidateVisit } from "./lib/wellhub/api.js";
 import { handleBookingRequested, handleCheckin, handleCancel, handlePlanChange } from "./lib/wellhub/flows.js";
 import { isUuid, signatureProblem } from "./lib/validate.js";
+import { checkinRule } from "./lib/checkin.js";
 import {
   validateStripeConfig,
   createOrGetStripeCustomer,
@@ -13932,27 +13933,53 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
   }
 });
 
+// Fecha y minuto actuales en la zona del estudio, para la regla de check-in.
+async function studioNow(client = pool) {
+  const r = await client.query(
+    `SELECT to_char((NOW() AT TIME ZONE '${STUDIO_TIMEZONE}')::date, 'YYYY-MM-DD') AS d,
+            EXTRACT(HOUR FROM (NOW() AT TIME ZONE '${STUDIO_TIMEZONE}'))::int * 60
+              + EXTRACT(MINUTE FROM (NOW() AT TIME ZONE '${STUDIO_TIMEZONE}'))::int AS m`,
+  );
+  return { nowDate: r.rows[0].d, nowMinutes: Number(r.rows[0].m) };
+}
+
+// +puntos por asistir (una sola vez por reserva): compartido por lista y QR.
+async function awardCheckinPoints(userId) {
+  try {
+    const cfg = await getLoyaltyConfig();
+    const pts = cfg.points_per_class;
+    if (cfg.enabled !== false && pts > 0) {
+      await pool.query(
+        "INSERT INTO loyalty_transactions (user_id, type, points, description) VALUES ($1, 'earn', $2, 'Clase asistida')",
+        [userId, pts],
+      );
+    }
+  } catch (e) { console.warn("[check-in] loyalty insert failed:", e?.message); }
+}
+
 // PUT /api/bookings/:id/check-in
 app.put("/api/bookings/:id/check-in", adminMiddleware, async (req, res) => {
-  // Validar UUID antes para no crashar el handler con 'undefined' o input malo
-  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  if (!UUID_RE.test(String(req.params.id))) {
-    return res.status(400).json({ message: "ID de reserva inválido" });
-  }
   try {
-    // 1) Lookup primero para saber si ya estaba checked-in y evitar duplicar puntos.
+    // 1) Lookup primero para saber si ya estaba checked-in y evitar duplicar puntos,
+    //    trae también la clase para aplicar la regla única de check-in.
     const before = await pool.query(
-      "SELECT user_id, status, checked_in_at, class_id FROM bookings WHERE id = $1",
+      `SELECT b.user_id, b.status, b.checked_in_at, b.class_id, c.status AS class_status,
+              to_char(c.date, 'YYYY-MM-DD') AS class_date, c.start_time
+         FROM bookings b JOIN classes c ON c.id = b.class_id
+        WHERE b.id = $1`,
       [req.params.id],
     );
     if (!before.rows.length) {
       return res.status(404).json({ message: "Reserva no encontrada" });
     }
+    const bk = before.rows[0];
+    const rule = checkinRule({ bookingStatus: bk.status, classStatus: bk.class_status, classDate: bk.class_date, startTime: String(bk.start_time), ...(await studioNow()) });
+    if (!rule.ok) return res.status(409).json({ code: rule.code, message: rule.message });
     const wasAlreadyCheckedIn = !!before.rows[0].checked_in_at;
     // 2) UPDATE (idempotente: si ya estaba, refresca el timestamp pero no doblamos puntos).
     const r = await pool.query(
-      "UPDATE bookings SET status = 'checked_in', checked_in_at = COALESCE(checked_in_at, NOW()) WHERE id = $1 RETURNING *",
-      [req.params.id],
+      "UPDATE bookings SET status = 'checked_in', checked_in_at = COALESCE(checked_in_at, NOW()), checked_in_by = COALESCE(checked_in_by, $2) WHERE id = $1 RETURNING *",
+      [req.params.id, req.userId],
     );
     const booking = r.rows[0];
     // ── Reflejar visita Wellhub si el check-in fue local (recepción/QR/coach) ──
@@ -13974,20 +14001,7 @@ app.put("/api/bookings/:id/check-in", adminMiddleware, async (req, res) => {
       })();
     }
     // 3) Otorgar +10 pts SOLO si es primer check-in.
-    if (booking.user_id && !wasAlreadyCheckedIn) {
-      try {
-        const cfg = await getLoyaltyConfig();
-        const pts = cfg.points_per_class;
-        if (cfg.enabled !== false && pts > 0) {
-          await pool.query(
-            "INSERT INTO loyalty_transactions (user_id, type, points, description) VALUES ($1, 'earn', $2, 'Clase asistida')",
-            [booking.user_id, pts],
-          );
-        }
-      } catch (loyaltyErr) {
-        console.warn("[check-in] loyalty insert failed:", loyaltyErr?.message);
-      }
-    }
+    if (booking.user_id && !wasAlreadyCheckedIn) await awardCheckinPoints(booking.user_id);
     // 4) notifyClassAttended (motivación + milestones + wallet sync) SOLO si es primer check-in.
     if (booking.user_id && !wasAlreadyCheckedIn) {
       // Get className for the notify ctx
@@ -14024,7 +14038,6 @@ app.post("/api/admin/checkin/scan", adminMiddleware, async (req, res) => {
     const raw = String(req.body?.code ?? "").trim();
     if (!raw) return res.status(400).json({ status: "error", message: "Código vacío" });
 
-    const isUuid = (s) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
     let userId = null;
     if (isUuid(raw)) {
       userId = raw;
@@ -14045,7 +14058,8 @@ app.post("/api/admin/checkin/scan", adminMiddleware, async (req, res) => {
     const name = userRes.rows[0].display_name || "Clienta";
 
     const bookingRes = await pool.query(
-      `SELECT b.id, b.status, ct.name AS class_name, c.start_time
+      `SELECT b.id, b.status, ct.name AS class_name, c.start_time,
+              c.status AS class_status, to_char(c.date,'YYYY-MM-DD') AS class_date
          FROM bookings b
          JOIN classes c ON b.class_id = c.id
          JOIN class_types ct ON c.class_type_id = ct.id
@@ -14063,6 +14077,9 @@ app.post("/api/admin/checkin/scan", adminMiddleware, async (req, res) => {
     const bk = bookingRes.rows[0];
     const timeStr = String(bk.start_time || "").slice(0, 5);
 
+    const rule = checkinRule({ bookingStatus: bk.status, classStatus: bk.class_status, classDate: bk.class_date, startTime: String(bk.start_time), ...(await studioNow()) });
+    if (!rule.ok) return res.status(409).json({ status: "rejected", code: rule.code, name, message: `${name}: ${rule.message}` });
+
     if (bk.status === "checked_in") {
       return res.json({
         status: "already", name, className: bk.class_name, time: timeStr,
@@ -14071,20 +14088,11 @@ app.post("/api/admin/checkin/scan", adminMiddleware, async (req, res) => {
     }
 
     await pool.query(
-      "UPDATE bookings SET status = 'checked_in', checked_in_at = NOW() WHERE id = $1",
-      [bk.id]
+      "UPDATE bookings SET status = 'checked_in', checked_in_at = NOW(), checked_in_by = $2 WHERE id = $1",
+      [bk.id, req.userId]
     );
     // Puntos por asistir (igual que el check-in manual del roster)
-    try {
-      const cfg = await getLoyaltyConfig();
-      const pts = cfg.points_per_class;
-      if (cfg.enabled !== false && pts > 0) {
-        await pool.query(
-          "INSERT INTO loyalty_transactions (user_id, type, points, description) VALUES ($1, 'earn', $2, 'Clase asistida')",
-          [userId, pts]
-        );
-      }
-    } catch (_) { /* no romper el check-in */ }
+    await awardCheckinPoints(userId);
 
     // Igual que el check-in manual del roster: dispara motivación, milestones y
     // sincronización del pase de wallet (antes el check-in por QR no lo hacía).
