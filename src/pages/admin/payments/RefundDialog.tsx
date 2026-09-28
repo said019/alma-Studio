@@ -64,9 +64,20 @@ export default function RefundDialog({ payment, onClose }: { payment: Refundable
   const clasesOk = kind === "total" || (Number.isInteger(clases) && clases >= 0 && (puedeQuitar ? clases <= Number(payment.classesRemaining ?? 0) : clases === 0));
   const reasonOk = reason.trim().length >= REASON_MIN_CHARS;
   const cancelaMembresia = Boolean(payment.membershipId) && payment.membershipStatus !== "cancelled";
+  const membresiaYaCancelada = Boolean(payment.membershipId) && payment.membershipStatus === "cancelled";
+  // El resumen no debe mentir (A8): un total sobre una membresía que ya
+  // estaba cancelada no vuelve a "cancelarla", pero igual cancela sus
+  // reservas futuras y deja las clases en 0; un parcial sin membresía o con
+  // la membresía cancelada no puede decir que "sigue activa".
   const resumen = kind === "total"
-    ? `Se devuelven ${formatMXN(remaining)}${cancelaMembresia ? `, se cancela la membresía${clases > 0 ? ` y se quitan sus ${clases} clases sin usar` : ""}; sus reservas futuras se cancelan` : ""}.`
-    : `Se devuelven ${amountOk ? formatMXN(amount) : "—"}${clases > 0 ? ` y se quitan ${clases} ${clases === 1 ? "clase" : "clases"}` : ""}. La membresía sigue activa.`;
+    ? `Se devuelven ${formatMXN(remaining)}${
+        cancelaMembresia
+          ? `, se cancela la membresía${clases > 0 ? ` y se quitan sus ${clases} clases sin usar` : ""}; sus reservas futuras se cancelan`
+          : membresiaYaCancelada
+            ? `; se cancelan sus reservas futuras y se dejan las clases en 0`
+            : ""
+      }.`
+    : `Se devuelven ${amountOk ? formatMXN(amount) : "—"}${clases > 0 ? ` y se quitan ${clases} ${clases === 1 ? "clase" : "clases"}` : ""}.${cancelaMembresia ? " La membresía sigue activa." : ""}`;
 
   const enviar = () => mutation.mutate({
     orderId: payment.orderId,
@@ -105,7 +116,7 @@ export default function RefundDialog({ payment, onClose }: { payment: Refundable
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label htmlFor="ref-monto">Monto a devolver</Label>
-                <Input id="ref-monto" type="number" inputMode="decimal" min={0} step="1" className="nums"
+                <Input id="ref-monto" type="number" inputMode="decimal" min={0} step="0.01" className="nums"
                   value={amountStr} onChange={(e) => setAmountStr(e.target.value)} />
                 <p className="text-[0.75rem] text-ink-muted">Quedan {formatMXN(remaining)} por devolver.</p>
               </div>
