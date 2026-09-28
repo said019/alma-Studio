@@ -53,6 +53,66 @@ async function render({ size, width = size, height = size, fg, bg, pad }) {
   return base.composite([{ input: mark, gravity: "center" }]).png().toBuffer();
 }
 
+// ─── Hero del pase de Google Wallet ─────────────────────────────────────────
+// Reemplaza wallet-hero-alma.png (una foto con el wordmark "ALMA MOVEMENT —
+// MOVE WITH INTENTION" quemado en la imagen) por una composición propia:
+// el isotipo HIVE + el wordmark "HIVE" / "PILATES STUDIO", sobre el carbón de
+// la app. Mismos tokens y mismas proporciones que BrandLogo variant="lockup"
+// (src/components/brand/BrandLogo.tsx) — sin fotos ni arte nuevo, sólo el
+// símbolo y la paleta que ya existen. wallet-hero-alma.png NO se borra ni se
+// renombra: un pase ya emitido podría seguir pidiéndola por URL.
+const HERO_SIZE = { width: 1032, height: 336 }; // tamaño de hero de Google Wallet
+
+/** Una línea de texto del wordmark como PNG con canal alfa (Pango markup vía sharp). */
+async function renderHeroTextLine(text, fontPx, trackingEm, color, weight) {
+  const sizePango = Math.round(fontPx * 1024); // unidades Pango = 1/1024 pt
+  const spacingPango = Math.round(fontPx * trackingEm * 1024);
+  const markup = `<span foreground="${color}" font_family="sans-serif" font_weight="${weight}" size="${sizePango}" letter_spacing="${spacingPango}">${text}</span>`;
+  return sharp({ text: { text: markup, rgba: true, align: "left" } }).png().toBuffer();
+}
+
+async function renderHero() {
+  const { width: W, height: H } = HERO_SIZE;
+  const iconH = 158;
+  const gap = 34;
+  const lineGap = 10;
+  // Mismas proporciones que BrandLogo variant="lockup": HIVE a 0.62× el alto
+  // del ícono, PILATES STUDIO a 0.17× (mínimo 9px), con el mismo tracking.
+  const hiveSize = Math.round(iconH * 0.62);
+  const subSize = Math.max(9, Math.round(iconH * 0.17));
+
+  const svg = fs.readFileSync(svgPath, "utf8").replace(/currentColor/g, DARK.accent);
+  const iconBuf = await sharp(Buffer.from(svg), { density: 384 })
+    .resize({ height: iconH, fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
+    .png().toBuffer();
+  const iconMeta = await sharp(iconBuf).metadata();
+
+  const [hiveBuf, subBuf] = await Promise.all([
+    renderHeroTextLine("HIVE", hiveSize, 0.04, DARK.ink, 800),
+    renderHeroTextLine("PILATES STUDIO", subSize, 0.42, DARK.inkMuted, 700),
+  ]);
+  const hiveMeta = await sharp(hiveBuf).metadata();
+  const subMeta = await sharp(subBuf).metadata();
+
+  const wordH = hiveMeta.height + lineGap + subMeta.height;
+  const groupW = iconMeta.width + gap + Math.max(hiveMeta.width, subMeta.width);
+  const groupH = Math.max(iconMeta.height, wordH);
+  const startX = Math.round((W - groupW) / 2);
+  const groupTop = Math.round((H - groupH) / 2);
+  const iconY = groupTop + Math.round((groupH - iconMeta.height) / 2);
+  const wordTop = groupTop + Math.round((groupH - wordH) / 2);
+  const wordLeft = startX + iconMeta.width + gap;
+
+  return sharp({ create: { width: W, height: H, channels: 4, background: DARK.canvas } })
+    .composite([
+      { input: iconBuf, left: startX, top: iconY },
+      { input: hiveBuf, left: wordLeft, top: wordTop },
+      { input: subBuf, left: wordLeft, top: wordTop + hiveMeta.height + lineGap },
+    ])
+    .png()
+    .toBuffer();
+}
+
 export async function generate(outDir) {
   fs.mkdirSync(outDir, { recursive: true });
   const written = [];
@@ -61,6 +121,8 @@ export async function generate(outDir) {
     fs.writeFileSync(path.join(outDir, t.file), await render(t));
     written.push(t.file);
   }
+  fs.writeFileSync(path.join(outDir, "wallet-hero-hive.png"), await renderHero());
+  written.push("wallet-hero-hive.png");
   return written;
 }
 
