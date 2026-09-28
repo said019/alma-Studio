@@ -2,11 +2,10 @@
 // Nav simple sin blur (cream sólido + hairline), H1 serif en title-case,
 // cuerpo de lectura a 70ch y footer corto con enlaces cruzados.
 // Colores SIEMPRE desde los tokens de src/design/tokens.ts (nada de paletas locales).
-import { useEffect, useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 
 import { STUDIO, whatsappUrl } from "@/lib/studio";
-import api from "@/lib/api";
 import { COLOR } from "@/design/tokens";
 
 const LEGAL_PAGES = [
@@ -18,35 +17,6 @@ const LEGAL_PAGES = [
 export type LegalPath = (typeof LEGAL_PAGES)[number]["path"];
 
 export type PolicyField = "terms_of_service" | "privacy_policy" | "cancellation_policy";
-
-/** Texto de policies_settings. Desde el bloque 3 las legales ya no lo usan (sus
- *  documentos viven versionados en el código); se conserva para no romper
- *  importaciones. */
-export const usePolicyText = (field: PolicyField) => {
-  const [text, setText] = useState("");
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let active = true;
-    api
-      .get("/public/settings/policies_settings")
-      .then(({ data }) => {
-        if (!active) return;
-        const value = data?.data;
-        const raw = value?.[field];
-        setText(typeof raw === "string" ? raw.trim() : "");
-      })
-      .catch(() => {})
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [field]);
-
-  return { text, loading };
-};
 
 /** Skeleton de párrafos mientras resolvemos el contenido del CMS. */
 export const LegalSkeleton = () => (
@@ -74,14 +44,6 @@ export const LegalUpdated = ({ children }: { children: ReactNode }) => (
   <p className="font-semibold" style={{ color: COLOR.ink }}>
     Última actualización: {children}
   </p>
-);
-
-/** Cuerpo dinámico del CMS, respetando saltos de línea del texto. */
-export const LegalDynamicBody = ({ text }: { text: string }) => (
-  <div className="space-y-6">
-    <LegalUpdated>{new Date().toLocaleDateString("es-MX")}</LegalUpdated>
-    <div className="whitespace-pre-wrap leading-[1.85]">{text}</div>
-  </div>
 );
 
 /** Datos de contacto del estudio. STUDIO es la única fuente: una fila sin dato
