@@ -247,9 +247,18 @@ function infoTable(rows) {
           </table>
           ${spacer(12)}`;
 }
-function pill(text) {
+/**
+ * Píldora de estado. El texto va en tinta sobre terracota suave (13.8:1; la
+ * convención softFg de src/design/tokens.ts): terracota sobre ese fondo no
+ * llega a AA. El ✓ opcional es decorativo y va terracota en su propio span; el
+ * estado lo dice la palabra.
+ */
+function pill(text, { check = false } = {}) {
+  const mark = check
+    ? `<span aria-hidden="true" style="color:${C.accentStrong};">✓</span>&nbsp;`
+    : "";
   return `<table role="presentation" cellpadding="0" cellspacing="0" border="0">
-            <tr><td bgcolor="${C.accentSoft}" style="background-color:${C.accentSoft};border-radius:999px;padding:6px 14px;font-family:${SANS};font-size:11px;line-height:14px;font-weight:800;letter-spacing:1.3px;text-transform:uppercase;color:${C.accentStrong};mso-line-height-rule:exactly;">${text}</td></tr>
+            <tr><td bgcolor="${C.accentSoft}" class="hive-pill" style="background-color:${C.accentSoft};border-radius:999px;padding:6px 14px;font-family:${SANS};font-size:11px;line-height:14px;font-weight:800;letter-spacing:1.3px;text-transform:uppercase;color:${C.ink};mso-line-height-rule:exactly;">${mark}${text}</td></tr>
           </table>
           ${spacer(10)}`;
 }
@@ -329,7 +338,7 @@ function renderMembershipActivated(opts) {
     title: first ? `Bienvenida a HIVE, ${esc(first)}.` : "Bienvenida a HIVE.",
     content: `
           ${p("Tu membresía ya está activa. Reserva tu primera clase: aquí te acompañamos en cada movimiento.")}
-          ${pill("✓ Activa")}
+          ${pill("Activa", { check: true })}
           ${infoTable([
             infoRow("Plan", planName),
             infoRow("Clases incluidas", classesText),
@@ -387,7 +396,7 @@ function renderBookingConfirmed(opts) {
           ${p(isWaitlist
             ? "Te añadimos a la lista de espera de esta clase:"
             : "Tu lugar está apartado. Te esperamos en la colmena.")}
-          ${pill(isWaitlist ? "Lista de espera" : "✓ Confirmada")}
+          ${isWaitlist ? pill("Lista de espera") : pill("Confirmada", { check: true })}
           ${infoTable([
             infoRow("Clase", cls),
             infoRow("Fecha", fmtDate(date)),

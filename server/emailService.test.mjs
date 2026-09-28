@@ -190,3 +190,15 @@ test("bienvenida de administradora: correo y contraseña temporal completos", ()
   assert.ok(text.includes("Contraseña temporal Hive-7kP2q9"));
   assert.ok(text.includes("Perfil → Editar perfil → Seguridad"));
 });
+
+test("píldora de estado: texto en tinta sobre terracota suave (AA); el ✓ es decorativo", () => {
+  const pildora = (html) => html.match(/<td bgcolor="#F3DED3" class="hive-pill" style="([^"]*)">([\s\S]*?)<\/td>/);
+  const conf = pildora(render(EMAIL_SAMPLES.find((x) => x.id === "2-reserva-confirmada")).html);
+  assert.ok(conf, "falta la píldora");
+  assert.match(conf[1], /;color:#1A1714;/, "el texto de la píldora va en tinta");
+  assert.match(conf[2], /^<span aria-hidden="true" style="color:#9A5236;">✓<\/span>&nbsp;Confirmada$/);
+  const espera = pildora(render(EMAIL_SAMPLES.find((x) => x.id === "2b-reserva-lista-de-espera")).html);
+  assert.equal(espera[2], "Lista de espera", "el estado se lee sin el ✓");
+  const activa = pildora(render(EMAIL_SAMPLES.find((x) => x.id === "1-membresia-activada")).html);
+  assert.match(activa[2], /✓<\/span>&nbsp;Activa$/);
+});
