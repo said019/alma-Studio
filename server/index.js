@@ -64,6 +64,7 @@ import { isWithinCancelWindow, penaltyDueAt, faltaReversal } from "./lib/faltas.
 import { scheduleAt } from "./lib/schedule.js";
 import { verifyWellhubSignature, extractSignatureHeader } from "./lib/wellhub/signature.js";
 import { extractGymId, computeEventId } from "./lib/wellhub/payload.js";
+import { planWeekClear, weekRangeProblem } from "./lib/weekClear.js";
 import { getWellhubCredentials } from "./lib/wellhub/credentials.js";
 import { publicPartnerSettings, mergeSecret } from "./lib/partnerSettings.js";
 import { createAccountGate } from "./lib/accountGate.js";
@@ -9332,112 +9333,141 @@ async function applyCancellationRollback(client, booking, opts = {}) {
   return result;
 }
 
+// ── Cancelar una clase (compartido por PUT /classes/:id/cancel y "Limpiar
+// semana"). Auditoría 2026-09-27, bloque 2. ─────────────────────────────────
+/**
+ * Dentro de una transacción abierta: marca la clase cancelada con quién y por
+ * qué, cancela sus reservas activas devolviendo crédito y puntos
+ * (applyCancellationRollback) y deja la fila en la bitácora. Devuelve null si
+ * la clase no existe o ya estaba cancelada. Los avisos van DESPUÉS del COMMIT
+ * con notifyClassCancelled().
+ */
+async function cancelClassInTx(client, classId, { actorId, reason, source = "manual" }) {
+  const actor = isUuid(actorId) ? actorId : null;
+  const why = cleanReason(reason);
+  const cls = await client.query(
+    `WITH prev AS (SELECT id, status::text AS status FROM classes WHERE id = $1 FOR UPDATE)
+     UPDATE classes c
+        SET status = 'cancelled', updated_at = NOW(), cancelled_at = NOW(),
+            cancelled_by = $2, cancellation_reason = $3
+       FROM prev
+      WHERE c.id = prev.id AND prev.status <> 'cancelled'
+      RETURNING c.id, c.date, c.start_time, c.class_type_id, to_char(c.date, 'YYYY-MM-DD') AS day, prev.status AS prev_status`,
+    [classId, actor, why],
+  );
+  if (!cls.rows.length) return null;
+  const classRow = cls.rows[0];
+
+  // Reservas activas ANTES de cancelarlas (incluye checked_in: la admin puede
+  // cancelar una clase a posteriori).
+  const bookingsRes = await client.query(
+    `SELECT b.id, b.user_id, b.class_id, b.membership_id, b.status, b.checked_in_at,
+            c.date AS class_date,
+            u.display_name, u.phone, ct.name AS class_name
+       FROM bookings b
+       LEFT JOIN users u ON u.id = b.user_id
+       LEFT JOIN classes c ON c.id = b.class_id
+       LEFT JOIN class_types ct ON ct.id = c.class_type_id
+      WHERE b.class_id = $1 AND b.status NOT IN ('cancelled', 'no_show')`,
+    [classId],
+  );
+  const activeBookings = bookingsRes.rows;
+  let creditsRestored = 0;
+  let pointsReverted = 0;
+  for (const b of activeBookings) {
+    await client.query(
+      `UPDATE bookings SET status='cancelled', cancelled_at=NOW(), cancelled_by=$2,
+              cancellation_reason = COALESCE($3, cancellation_reason)
+        WHERE id=$1`,
+      [b.id, actor, why],
+    );
+    // Al cancelar la clase completa se devuelve crédito también a quienes ya
+    // tenían check-in (la clase no ocurrió).
+    const rollback = await applyCancellationRollback(client, b, { refundCheckedIn: true });
+    if (rollback.creditRestored) creditsRestored++;
+    if (rollback.pointsReverted) pointsReverted += rollback.pointsReverted;
+  }
+  // Red de seguridad: recalcula el cupo desde las reservas vivas en vez de asumir 0.
+  await client.query(
+    `UPDATE classes c SET current_bookings = COALESCE((
+       SELECT COUNT(*) FROM bookings b WHERE b.class_id = c.id AND b.status IN ('confirmed','checked_in')
+     ), 0) WHERE c.id = $1`,
+    [classId],
+  );
+  await recordAudit(client, {
+    actorId: actor, action: "class.cancel", entityType: "class", entityId: classRow.id, reason: why,
+    before: { status: classRow.prev_status }, after: { status: "cancelled" },
+    meta: {
+      source, day: classRow.day, start_time: String(classRow.start_time).slice(0, 5),
+      bookings_cancelled: activeBookings.length, credits_restored: creditsRestored, points_reverted: pointsReverted,
+      booking_ids: activeBookings.map((b) => b.id),
+    },
+  });
+  return { classRow, activeBookings, creditsRestored, pointsReverted };
+}
+
+/** Avisos de una clase cancelada, fuera de la transacción. Con el canal caído o
+ *  los avisos apagados no se intenta y se devuelve la lista para avisar a mano
+ *  (auditoría 2026-09-27, P0-1). */
+async function notifyClassCancelled(classRow, activeBookings, reason) {
+  const dateStr = classRow.date ? new Date(classRow.date).toLocaleDateString("es-MX", { weekday: "short", day: "numeric", month: "short" }) : "";
+  const timeStr = classRow.start_time ? String(classRow.start_time).slice(0, 5) : "";
+  const notifSettings = await getSettingsValue("notification_settings", DEFAULT_NOTIFICATION_SETTINGS);
+  const waOn = notifSettings?.whatsapp_reminders !== false;
+  const channel = waOn ? await whatsappChannelState() : { connected: false, state: "disabled" };
+  let waQueued = 0;
+  const waUnreached = [];
+  for (const b of activeBookings) {
+    if (!b.user_id) continue;
+    triggerWalletPassSync(b.user_id, "admin_class_cancelled");
+    if (!channel.connected) {
+      waUnreached.push({ user_id: b.user_id, display_name: b.display_name, phone: b.phone });
+      continue;
+    }
+    const className = b.class_name || "tu clase";
+    const cancelReason = reason ? ` (motivo: ${reason})` : "";
+    notifyByTemplate(
+      b.user_id,
+      "booking_cancelled",
+      { class: className, date: dateStr, time: timeStr, creditRestored: "Sí" },
+      ({ firstName }) =>
+        `${firstName}, tuvimos que cancelar la clase de ${className}${dateStr ? ` del ${dateStr}` : ""}${timeStr ? ` a las ${timeStr}` : ""}.${cancelReason} Tu clase regresó a tu paquete.`,
+    ).catch(() => {});
+    waQueued++;
+  }
+  return { waQueued, waUnreached, channelState: channel.state };
+}
+
 // PUT /api/classes/:id/cancel — admin cancela clase completa. Cascada:
-//   1. classes.status = 'cancelled'
+//   1. classes.status = 'cancelled', con quién y por qué.
 //   2. Cada booking activo: status='cancelled', cancelled_at=NOW(), restaura
 //      crédito al membership (siempre, al cancelar el estudio la clase).
 //   3. WA a cada alumna con reason opcional.
-// Body opcional: { reason: "instructora enferma" } se incluye en el WA.
+// Body opcional: { reason: "instructora enferma" } se incluye en el WA y en la
+// bitácora. La respuesta no cambia (auditoría 2026-09-27, bloque 2).
 app.put("/api/classes/:id/cancel", adminMiddleware, async (req, res) => {
   const { reason } = req.body || {};
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-
-    // 1) Cancel class
-    const cls = await client.query(
-      `UPDATE classes SET status='cancelled', updated_at=NOW()
-        WHERE id=$1 AND status != 'cancelled'
-        RETURNING id, date, start_time, class_type_id`,
-      [req.params.id],
-    );
-    if (!cls.rows.length) {
+    const done = await cancelClassInTx(client, req.params.id, { actorId: req.userId, reason, source: "manual" });
+    if (!done) {
       await client.query("ROLLBACK");
       return res.status(404).json({ message: "Clase no encontrada o ya cancelada" });
     }
-    const classRow = cls.rows[0];
-
-    // 2) Get active bookings BEFORE cancelling them (incluye checked_in
-    //    porque la admin puede cancelar una clase a posteriori)
-    const bookingsRes = await client.query(
-      `SELECT b.id, b.user_id, b.class_id, b.membership_id, b.status, b.checked_in_at,
-              c.date AS class_date,
-              u.display_name, u.phone, ct.name AS class_name
-         FROM bookings b
-         LEFT JOIN users u ON u.id = b.user_id
-         LEFT JOIN classes c ON c.id = b.class_id
-         LEFT JOIN class_types ct ON ct.id = c.class_type_id
-        WHERE b.class_id = $1 AND b.status NOT IN ('cancelled', 'no_show')`,
-      [req.params.id],
-    );
-    const activeBookings = bookingsRes.rows;
-
-    // 3) Cancel each booking + apply full rollback (credits, loyalty)
-    let creditsRestored = 0;
-    let pointsReverted = 0;
-    for (const b of activeBookings) {
-      await client.query(
-        `UPDATE bookings SET status='cancelled', cancelled_at=NOW() WHERE id=$1`,
-        [b.id],
-      );
-      // Al cancelar la clase completa, devolver crédito también a las que
-      // tenían check-in (la clase no ocurrió, no deberían pagarla).
-      const rollback = await applyCancellationRollback(client, b, { refundCheckedIn: true });
-      if (rollback.creditRestored) creditsRestored++;
-      if (rollback.pointsReverted) pointsReverted += rollback.pointsReverted;
-    }
-    // 4) Reset class.current_bookings
-    // Red de seguridad: recalcula desde las reservas vivas en vez de asumir 0.
-      await client.query(
-        `UPDATE classes c SET current_bookings = COALESCE((
-           SELECT COUNT(*) FROM bookings b WHERE b.class_id = c.id AND b.status IN ('confirmed','checked_in')
-         ), 0) WHERE c.id = $1`,
-        [req.params.id],
-      );
-
     await client.query("COMMIT");
-
-    // 5) Notify each alumna (fire-and-forget WA + wallet sync, fuera de tx).
-    // Si el canal de WhatsApp está caído (o los recordatorios están apagados),
-    // no se intenta el envío ni se cuenta como "enviado": se junta la lista
-    // para que recepción avise a mano (auditoría 2026-09-27, P0-1).
-    const dateStr = classRow.date ? new Date(classRow.date).toLocaleDateString("es-MX", { weekday: "short", day: "numeric", month: "short" }) : "";
-    const timeStr = classRow.start_time ? String(classRow.start_time).slice(0, 5) : "";
-    const notifSettings = await getSettingsValue("notification_settings", DEFAULT_NOTIFICATION_SETTINGS);
-    const waOn = notifSettings?.whatsapp_reminders !== false;
-    const channel = waOn ? await whatsappChannelState() : { connected: false, state: "disabled" };
-    let waQueued = 0;
-    const waUnreached = [];
-    for (const b of activeBookings) {
-      if (!b.user_id) continue;
-      triggerWalletPassSync(b.user_id, "admin_class_cancelled");
-      if (!channel.connected) {
-        waUnreached.push({ user_id: b.user_id, display_name: b.display_name, phone: b.phone });
-        continue;
-      }
-      const className = b.class_name || "tu clase";
-      const cancelReason = reason ? ` (motivo: ${reason})` : "";
-      notifyByTemplate(
-        b.user_id,
-        "booking_cancelled",
-        { class: className, date: dateStr, time: timeStr, creditRestored: "Sí" },
-        ({ firstName }) =>
-          `${firstName}, tuvimos que cancelar la clase de ${className}${dateStr ? ` del ${dateStr}` : ""}${timeStr ? ` a las ${timeStr}` : ""}.${cancelReason} Tu clase regresó a tu paquete.`,
-      ).catch(() => {});
-      waQueued++;
-    }
-
+    const wa = await notifyClassCancelled(done.classRow, done.activeBookings, reason);
     return res.json({
       data: {
-        class_id: classRow.id,
-        bookings_cancelled: activeBookings.length,
-        credits_restored: creditsRestored,
-        points_reverted: pointsReverted,
-        wa_queued: waQueued,
-        wa_failed: waUnreached.length,
-        wa_unreached: waUnreached,
+        class_id: done.classRow.id,
+        bookings_cancelled: done.activeBookings.length,
+        credits_restored: done.creditsRestored,
+        points_reverted: done.pointsReverted,
+        wa_queued: wa.waQueued,
+        wa_failed: wa.waUnreached.length,
+        wa_unreached: wa.waUnreached,
         // "disabled" = la dueña apagó los avisos; otro estado = canal caído.
-        wa_channel_state: channel.state,
+        wa_channel_state: wa.channelState,
         reason: reason || null,
       },
     });
@@ -9490,24 +9520,27 @@ app.put("/api/classes/:id/reopen", adminMiddleware, async (req, res) => {
   }
 });
 
-// DELETE /api/admin/bookings/:id — admin cancela un booking individual
-// con override de política de 2h. Devuelve crédito siempre. Optional body
-// { reason } se incluye en WA.
+// DELETE /api/admin/bookings/:id — el estudio cancela una reserva (override de
+// la política de 2 h). Motivo obligatorio: queda en la reserva, en la bitácora
+// y, como antes, en el WhatsApp (auditoría 2026-09-27, P0-3).
 app.delete("/api/admin/bookings/:id", adminMiddleware, async (req, res) => {
   // refundCredit (default true): la admin decide si devolver el crédito. En false
   // se cancela y libera el lugar pero la clase cuenta como usada (ej. una falta).
   const { reason, refundCredit } = req.body || {};
+  const problem = reasonProblem(reason);
+  if (problem) return res.status(400).json({ code: "REASON_REQUIRED", message: problem });
+  const why = cleanReason(reason);
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-
     const r = await client.query(
       `SELECT b.id, b.user_id, b.class_id, b.membership_id, b.status, b.checked_in_at,
-              c.date, c.start_time, ct.name AS class_name
+              c.date, c.start_time, to_char(c.date, 'YYYY-MM-DD') AS day, ct.name AS class_name
          FROM bookings b
          JOIN classes c ON c.id = b.class_id
          JOIN class_types ct ON ct.id = c.class_type_id
-        WHERE b.id = $1`,
+        WHERE b.id = $1
+        FOR UPDATE OF b`,
       [req.params.id],
     );
     if (!r.rows.length) {
@@ -9519,49 +9552,39 @@ app.delete("/api/admin/bookings/:id", adminMiddleware, async (req, res) => {
       await client.query("ROLLBACK");
       return res.status(400).json({ message: "Esta reserva ya estaba cancelada" });
     }
-
-    // Cancel booking
     await client.query(
-      `UPDATE bookings SET status='cancelled', cancelled_at=NOW() WHERE id=$1`,
-      [req.params.id],
+      `UPDATE bookings SET status='cancelled', cancelled_at=NOW(), cancelled_by=$2, cancellation_reason=$3 WHERE id=$1`,
+      [req.params.id, req.userId, why],
     );
-
-    // Apply full rollback: credits, loyalty points. La admin
-    // que cancela manualmente espera que el crédito se devuelva incluso si
-    // la alumna ya tenía check-in (suele ser un check-in por error o
-    // re-clasificación de la asistencia).
+    // Rollback completo (créditos y puntos). La admin que cancela a mano espera
+    // que el crédito se devuelva incluso si ya tenía check-in (suele ser un
+    // check-in por error o re-clasificación de la asistencia).
     const rb = await applyCancellationRollback(client, booking, { refundCheckedIn: true, skipCreditRestore: refundCredit === false });
-
+    await recordAudit(client, {
+      actorId: req.userId, action: "booking.cancel", entityType: "booking", entityId: booking.id,
+      subjectUserId: booking.user_id, reason: why,
+      before: { status: booking.status }, after: { status: "cancelled" },
+      meta: {
+        class_id: booking.class_id, day: booking.day, class_name: booking.class_name,
+        refund_credit_requested: refundCredit !== false, credit_restored: rb.creditRestored, points_reverted: rb.pointsReverted,
+      },
+    });
     await client.query("COMMIT");
 
-    // WA + wallet sync
+    // WA + wallet sync (igual que antes)
     if (booking.user_id) {
       const dateStr = booking.date ? new Date(booking.date).toLocaleDateString("es-MX", { weekday: "short", day: "numeric", month: "short" }) : "";
       const timeStr = booking.start_time ? String(booking.start_time).slice(0, 5) : "";
-      const cancelReason = reason ? ` (motivo: ${reason})` : "";
       notifyByTemplate(
         booking.user_id,
         "booking_cancelled",
-        {
-          class: booking.class_name || "tu clase",
-          date: dateStr,
-          time: timeStr,
-          creditRestored: rb.creditRestored ? "Sí" : "No",
-        },
+        { class: booking.class_name || "tu clase", date: dateStr, time: timeStr, creditRestored: rb.creditRestored ? "Sí" : "No" },
         ({ firstName }) =>
-          `${firstName}, cancelamos tu reserva de ${booking.class_name || "la clase"}${dateStr ? ` del ${dateStr}` : ""}.${cancelReason}${rb.creditRestored ? " Tu clase regresó a tu paquete." : ""}`,
+          `${firstName}, cancelamos tu reserva de ${booking.class_name || "la clase"}${dateStr ? ` del ${dateStr}` : ""}. (motivo: ${why})${rb.creditRestored ? " Tu clase regresó a tu paquete." : ""}`,
       ).catch(() => {});
       triggerWalletPassSync(booking.user_id, "admin_booking_cancelled");
     }
-
-    return res.json({
-      data: {
-        id: booking.id,
-        credit_restored: rb.creditRestored,
-        points_reverted: rb.pointsReverted,
-        reason: reason || null,
-      },
-    });
+    return res.json({ data: { id: booking.id, credit_restored: rb.creditRestored, points_reverted: rb.pointsReverted, reason: why } });
   } catch (err) {
     await client.query("ROLLBACK").catch(() => {});
     console.error("[DELETE /admin/bookings/:id]", err.message);
@@ -10347,71 +10370,105 @@ app.post("/api/bookings/with-guest", authMiddleware, async (req, res) => {
   }
 });
 
-// DELETE /api/classes/week — clear classes in date range
+// DELETE /api/classes/week — "Limpiar semana" sin borrar historial
+// (auditoría 2026-09-27, P1-5 · I6). Borra sólo las clases sin ninguna reserva;
+// las que tienen reservas y no han empezado se cancelan con el flujo de
+// cancelar clase (devuelve créditos y avisa); las que ya empezaron no se tocan.
+// Sin force, si hay reservas activas responde 409 con el resumen; con force
+// exige motivo porque cancela reservas.
 app.delete("/api/classes/week", adminMiddleware, async (req, res) => {
+  const { startDate, endDate, force, reason } = req.body || {};
+  const start = typeof startDate === "string" ? startDate.slice(0, 10) : null;
+  const end = typeof endDate === "string" ? endDate.slice(0, 10) : null;
+  const rangeProblem = weekRangeProblem(start, end);
+  if (rangeProblem) return res.status(400).json({ message: rangeProblem });
   const client = await pool.connect();
   try {
-    // force=true: cancela las reservas activas (devolviendo crédito) y limpia igual.
-    const { startDate, endDate, force } = req.body || {};
-    const start = typeof startDate === "string" ? startDate.slice(0, 10) : null;
-    const end = typeof endDate === "string" ? endDate.slice(0, 10) : null;
-
-    if (!start || !end) {
-      client.release();
-      return res.status(400).json({ message: "startDate y endDate requeridos" });
-    }
-    if (start > end) {
-      client.release();
-      return res.status(400).json({ message: "Rango de fechas inválido" });
-    }
-
     await client.query("BEGIN");
-
-    const activeRes = await client.query(
-      `SELECT b.id, b.user_id, b.class_id, b.membership_id, b.status
-         FROM bookings b
-         JOIN classes c ON c.id = b.class_id
+    await client.query("SELECT id FROM classes WHERE date >= $1 AND date <= $2 FOR UPDATE", [start, end]);
+    const rows = (await client.query(
+      `SELECT c.id, c.status::text AS status,
+              ((c.date + c.start_time) AT TIME ZONE '${STUDIO_TIMEZONE}') <= NOW() AS started,
+              COUNT(b.id)::int AS total_bookings,
+              (COUNT(b.id) FILTER (WHERE b.status IN ('confirmed','checked_in','waitlist')))::int AS active_bookings
+         FROM classes c
+         LEFT JOIN bookings b ON b.class_id = c.id
         WHERE c.date >= $1 AND c.date <= $2
-          AND b.status != 'cancelled'`,
-      [start, end]
-    );
-    if (activeRes.rows.length > 0 && !force) {
+        GROUP BY c.id
+        ORDER BY c.date, c.start_time`,
+      [start, end],
+    )).rows;
+    const plan = planWeekClear(rows);
+    if (plan.activeBookings > 0 && !force) {
       await client.query("ROLLBACK");
       return res.status(409).json({
-        message: "No se puede limpiar esta semana porque hay reservas activas.",
-        activeBookings: activeRes.rows.length,
+        code: "ACTIVE_BOOKINGS",
+        message: "Hay reservas activas esta semana. Esas clases se cancelan (se devuelve el crédito y se avisa a cada alumna) en lugar de borrarse.",
+        activeBookings: plan.activeBookings,
+        classesToCancel: plan.cancel.length,
+        classesToDelete: plan.delete.length,
+        classesKept: plan.keep.length,
       });
     }
-
-    // Forzado: devuelve crédito (y revierte puntos) de cada reserva activa.
-    for (const b of activeRes.rows) {
-      await applyCancellationRollback(client, b, { refundCheckedIn: true });
+    if (plan.activeBookings > 0) {
+      const problem = reasonProblem(reason);
+      if (problem) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({ code: "REASON_REQUIRED", message: problem });
+      }
     }
-
-    // Borra TODAS las reservas del rango (activas + canceladas) para que el
-    // DELETE de clases no choque con la FK, y luego borra las clases.
-    await client.query(
-      `DELETE FROM bookings WHERE class_id IN (SELECT id FROM classes WHERE date >= $1 AND date <= $2)`,
-      [start, end]
-    );
-    const deleted = await client.query(
-      "DELETE FROM classes WHERE date >= $1 AND date <= $2 RETURNING id",
-      [start, end]
-    );
+    const cancelled = [];
+    for (const id of plan.cancel) {
+      const done = await cancelClassInTx(client, id, { actorId: req.userId, reason: cleanReason(reason) || "Limpieza de la semana", source: "week_clear" });
+      if (done) cancelled.push(done);
+    }
+    let deleted = 0;
+    if (plan.delete.length) {
+      // NOT EXISTS: una clase que recibió una reserva entre el conteo y aquí no se borra.
+      const del = await client.query(
+        `DELETE FROM classes c
+          WHERE c.id = ANY($1::uuid[])
+            AND NOT EXISTS (SELECT 1 FROM bookings b WHERE b.class_id = c.id)
+          RETURNING c.id`,
+        [plan.delete],
+      );
+      deleted = del.rowCount ?? del.rows.length;
+    }
+    const bookingsCancelled = cancelled.reduce((s, c) => s + c.activeBookings.length, 0);
+    const creditsRestored = cancelled.reduce((s, c) => s + c.creditsRestored, 0);
+    await recordAudit(client, {
+      actorId: req.userId, action: "class.week_clear", entityType: "class_week",
+      reason: plan.activeBookings > 0 ? reason : null,
+      after: { deleted, cancelled: cancelled.length, kept: plan.keep.length },
+      meta: {
+        start, end, deleted_ids: plan.delete, cancelled_ids: cancelled.map((c) => c.classRow.id), kept_ids: plan.keep,
+        bookings_cancelled: bookingsCancelled, credits_restored: creditsRestored,
+      },
+    });
     await client.query("COMMIT");
 
-    for (const b of activeRes.rows) {
-      if (b.user_id) triggerWalletPassSync(b.user_id, "week_cleared");
+    // Avisos después del COMMIT, igual que al cancelar una clase.
+    let waQueued = 0;
+    let channelState = null;
+    const unreached = new Map();
+    for (const c of cancelled) {
+      if (!c.activeBookings.length) continue;
+      const wa = await notifyClassCancelled(c.classRow, c.activeBookings, cleanReason(reason));
+      waQueued += wa.waQueued;
+      channelState = wa.channelState;
+      for (const u of wa.waUnreached) if (!unreached.has(u.user_id)) unreached.set(u.user_id, u);
     }
     return res.json({
-      deleted: deleted.rowCount ?? deleted.rows.length,
-      bookingsCancelled: activeRes.rows.length,
-      startDate: start,
-      endDate: end,
+      deleted, cancelled: cancelled.length, kept: plan.keep.length, bookingsCancelled, creditsRestored,
+      wa_queued: waQueued, wa_failed: unreached.size, wa_unreached: [...unreached.values()], wa_channel_state: channelState,
+      startDate: start, endDate: end,
     });
   } catch (err) {
     await client.query("ROLLBACK").catch(() => {});
-    console.error("DELETE /classes/week error:", err);
+    if (err?.code === "23503") {
+      return res.status(409).json({ message: "Alguna clase tiene registros ligados: cancélala en lugar de borrarla." });
+    }
+    console.error("[DELETE /classes/week]", err.message);
     return res.status(500).json({ message: "Error interno" });
   } finally {
     client.release();
@@ -15582,13 +15639,45 @@ app.put("/api/admin/classes/:id", adminMiddleware, async (req, res) => {
   }
 });
 
-// DELETE /api/admin/classes/:id
+// DELETE /api/admin/classes/:id — sólo borra una clase sin ninguna reserva (de
+// ningún estado): borrarla con reservas se llevaba su historial en cascada. Con
+// reservas se cancela (PUT /api/classes/:id/cancel). Auditoría 2026-09-27, P1-5.
 app.delete("/api/admin/classes/:id", adminMiddleware, async (req, res) => {
+  const client = await pool.connect();
   try {
-    await pool.query("DELETE FROM classes WHERE id = $1", [req.params.id]);
+    await client.query("BEGIN");
+    const cur = await client.query(
+      `SELECT c.id, to_char(c.date, 'YYYY-MM-DD') AS day, c.start_time, c.status::text AS status,
+              (SELECT COUNT(*)::int FROM bookings b WHERE b.class_id = c.id) AS bookings
+         FROM classes c WHERE c.id = $1 FOR UPDATE`,
+      [req.params.id],
+    );
+    if (!cur.rows.length) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ message: "Clase no encontrada" });
+    }
+    const cls = cur.rows[0];
+    if (cls.bookings > 0) {
+      await client.query("ROLLBACK");
+      return res.status(409).json({ code: "CLASS_HAS_BOOKINGS", message: "Esta clase tiene reservas o historial: cancélala en lugar de borrarla." });
+    }
+    await client.query("DELETE FROM classes WHERE id = $1", [cls.id]);
+    await recordAudit(client, {
+      actorId: req.userId, action: "class.delete", entityType: "class", entityId: cls.id,
+      before: { day: cls.day, start_time: String(cls.start_time).slice(0, 5), status: cls.status },
+      meta: { source: "manual" },
+    });
+    await client.query("COMMIT");
     return res.json({ message: "Clase eliminada" });
   } catch (err) {
+    await client.query("ROLLBACK").catch(() => {});
+    if (err?.code === "23503") {
+      return res.status(409).json({ code: "CLASS_HAS_BOOKINGS", message: "La clase tiene registros ligados: cancélala en lugar de borrarla." });
+    }
+    console.error("[DELETE /admin/classes/:id]", err.message);
     return res.status(500).json({ message: "Error interno" });
+  } finally {
+    client.release();
   }
 });
 

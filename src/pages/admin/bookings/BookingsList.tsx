@@ -33,6 +33,8 @@ import { Check, MoreHorizontal, Search, UserPlus, UserX } from "lucide-react";
 import { useDebounce } from "@/hooks/use-debounce";
 import VisitAssignDialog from "@/components/admin/VisitAssignDialog";
 import { hhmm } from "@/lib/today-roster";
+import UnreachedDialog, { type UnreachedPerson } from "@/components/admin/UnreachedDialog";
+import { REASON_MIN_CHARS } from "@/lib/audit-log";
 import ReservasTabs from "./ReservasTabs";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -68,7 +70,7 @@ const CancelBookingDialog = ({
   classStartsAt: string | null;
   windowHours: number;
   pending: boolean;
-  onConfirm: (args: { reason?: string; refundCredit: boolean }) => void;
+  onConfirm: (args: { reason: string; refundCredit: boolean }) => void;
   onClose: () => void;
 }) => {
   const [reason, setReason] = useState("");
@@ -105,15 +107,16 @@ const CancelBookingDialog = ({
           )}
 
           <div className="space-y-1.5">
-            <Label className="text-xs text-ink/70">Motivo (opcional)</Label>
+            <Label htmlFor="cancel-reason" className="text-xs text-ink/70">Motivo (obligatorio)</Label>
             <Textarea
+              id="cancel-reason"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               placeholder="Ej. nos pidió moverla por teléfono"
               rows={2}
               className="bg-canvas border-line-strong/60 text-ink placeholder:text-ink/40"
             />
-            <p className="text-[11px] text-ink/50">Se incluye en el WhatsApp que le llega a {entry.displayName}.</p>
+            <p className="text-[0.75rem] text-ink/60">Queda en la bitácora y se incluye en el WhatsApp que le llega a {entry.displayName}. Mínimo {REASON_MIN_CHARS} caracteres.</p>
           </div>
 
           <div className="flex items-center justify-between gap-4 rounded-xl border border-line bg-sunken px-4 py-3">
@@ -141,52 +144,11 @@ const CancelBookingDialog = ({
           </Button>
           <Button
             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            onClick={() => onConfirm({ reason: reason.trim() || undefined, refundCredit: isUnlimited ? false : refundCredit })}
-            disabled={pending}
+            onClick={() => onConfirm({ reason: reason.trim(), refundCredit: isUnlimited ? false : refundCredit })}
+            disabled={pending || reason.trim().length < REASON_MIN_CHARS}
           >
             {pending ? "Cancelando…" : "Cancelar reserva"}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-};
-
-// ── Diálogo de "avisa a mano": el canal de WhatsApp estaba caído al cancelar
-// la clase, así que a estas alumnas no les llegó el aviso automático. ──
-const UnreachedDialog = ({
-  items, channelOff, onClose,
-}: {
-  items: { user_id: string; display_name: string | null; phone: string | null }[];
-  /** La dueña apagó los avisos de WhatsApp en Configuración (no es una caída del canal). */
-  channelOff: boolean;
-  onClose: () => void;
-}) => {
-  return (
-    <Dialog open={items.length > 0} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="max-w-md bg-canvas border-line text-ink">
-        <DialogHeader>
-          <DialogTitle className="font-display text-ink">Avisa a mano a estas alumnas</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-3">
-          <p className="text-sm text-ink/70">
-            {channelOff ? "Los avisos de WhatsApp están apagados" : "WhatsApp está desconectado"} — no les llegó el aviso de la clase cancelada.
-          </p>
-          <ul className="divide-y divide-line rounded-xl border border-line">
-            {items.map((u) => (
-              <li key={u.user_id} className="flex items-center justify-between gap-3 px-4 py-3">
-                <span className="font-medium text-ink">{u.display_name || "Sin nombre"}</span>
-                {u.phone ? (
-                  <a href={`tel:${u.phone}`} className="text-sm font-bold text-ink underline underline-offset-2">{u.phone}</a>
-                ) : (
-                  <span className="text-sm text-ink/50">Sin teléfono</span>
-                )}
-              </li>
-            ))}
-          </ul>
-        </div>
-        <DialogFooter>
-          <Button onClick={onClose}>Listo</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -207,7 +169,7 @@ const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: string; onBa
   const qc = useQueryClient();
   const { confirm, promptText, dialog } = useConfirm();
   const [cancelTarget, setCancelTarget] = useState<RosterEntry | null>(null);
-  const [unreached, setUnreached] = useState<{ user_id: string; display_name: string | null; phone: string | null }[]>([]);
+  const [unreached, setUnreached] = useState<UnreachedPerson[]>([]);
   const [unreachedChannelOff, setUnreachedChannelOff] = useState(false);
   const { data: loyaltyCfgData } = useQuery<{ data: { faltas_cancel_window_hours?: number } }>({
     queryKey: ["loyalty-config"],
@@ -333,7 +295,7 @@ const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: string; onBa
 
   // Admin cancela reserva (override política 2h, devuelve crédito).
   const cancelMutation = useMutation({
-    mutationFn: ({ id, reason, refundCredit }: { id: string; reason?: string; refundCredit: boolean }) =>
+    mutationFn: ({ id, reason, refundCredit }: { id: string; reason: string; refundCredit: boolean }) =>
       api.delete(`/admin/bookings/${id}`, { data: { reason, refundCredit } }),
     onSuccess: (res: any) => {
       qc.invalidateQueries({ queryKey: ["roster", classId] });

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from "vitest";
-import { fireEvent, screen, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 
 vi.mock("@/lib/api", () => ({ default: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() } }));
 import api from "@/lib/api";
@@ -77,5 +77,28 @@ describe("Clases · Calendario", () => {
     const banner = await screen.findByTestId("empty-week-banner");
     expect(within(banner).getByText("Semana sin clases")).toBeInTheDocument();
     expect(within(banner).getByRole("link", { name: "Generar semana" })).toHaveAttribute("href", "/admin/class-generator");
+  });
+
+  it("Limpiar semana: con reservas pide motivo, cancela esas clases y avisa a quién no le llegó", async () => {
+    const mockDelete = (api as unknown as { delete: Mock }).delete;
+    mockDelete.mockReset()
+      .mockRejectedValueOnce({ response: { status: 409, data: { code: "ACTIVE_BOOKINGS", activeBookings: 8, classesToCancel: 1, classesToDelete: 0, classesKept: 0 } } })
+      .mockResolvedValueOnce({ data: { deleted: 0, cancelled: 1, kept: 0, bookingsCancelled: 8, wa_failed: 1, wa_unreached: [{ user_id: "u1", display_name: "Camila Torres", phone: "5512345678" }], wa_channel_state: "disconnected" } });
+    renderAdmin(<ClassesCalendar />, { route: "/admin/classes" });
+    const limpiar = await screen.findByRole("button", { name: "Limpiar semana" });
+    await waitFor(() => expect(limpiar).toBeEnabled());
+    fireEvent.click(limpiar);
+    const confirmar = await screen.findByRole("alertdialog");
+    expect(within(confirmar).getByText(/Las que ya pasaron no se tocan/)).toBeInTheDocument();
+    fireEvent.click(within(confirmar).getByRole("button", { name: "Limpiar semana" }));
+    const prompt = await screen.findByRole("alertdialog", { name: "Hay reservas activas" });
+    const seguir = within(prompt).getByRole("button", { name: "Cancelar esas clases y limpiar" });
+    expect(seguir).toBeDisabled();
+    fireEvent.change(within(prompt).getByRole("textbox"), { target: { value: "Cierre por vacaciones" } });
+    fireEvent.click(seguir);
+    await waitFor(() => expect(mockDelete).toHaveBeenLastCalledWith("/classes/week", { data: { startDate: "2026-09-21", endDate: "2026-09-27", force: true, reason: "Cierre por vacaciones" } }));
+    expect(mockDelete).toHaveBeenNthCalledWith(1, "/classes/week", { data: { startDate: "2026-09-21", endDate: "2026-09-27", force: false, reason: undefined } });
+    expect(await screen.findByText("Avisa a mano a estas alumnas")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "5512345678" })).toHaveAttribute("href", "tel:5512345678");
   });
 });

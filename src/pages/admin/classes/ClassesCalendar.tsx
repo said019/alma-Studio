@@ -31,6 +31,8 @@ import { WellhubClassControl } from "./WellhubClassControl";
 import { Avatar } from "@/components/admin/PersonCell";
 import WeekHourGrid from "./WeekHourGrid";
 import { FEATURES } from "@/config/features";
+import UnreachedDialog, { type UnreachedPerson } from "@/components/admin/UnreachedDialog";
+import { REASON_MIN_CHARS } from "@/lib/audit-log";
 
 /* ── Types ── */
 interface ClassInstance {
@@ -147,13 +149,15 @@ function CalendarView({
   const { toast } = useToast();
   const qc = useQueryClient();
   const isMobile = useIsMobile();
-  const { confirm, dialog } = useConfirm();
+  const { confirm, promptText, dialog } = useConfirm();
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
   const [createOpen, setCreateOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedClass, setSelectedClass] = useState<ClassInstance | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [mobileDay, setMobileDay] = useState(() => format(new Date(), "yyyy-MM-dd"));
+  const [unreached, setUnreached] = useState<UnreachedPerson[]>([]);
+  const [unreachedOff, setUnreachedOff] = useState(false);
 
   // Roster (alumnas inscritas) de la clase seleccionada, para mostrarlo en el
   // panel lateral. Solo corre cuando el sheet está abierto.
@@ -228,9 +232,17 @@ function CalendarView({
 
   const cancelMutation = useMutation({
     mutationFn: (id: string) => api.put("/classes/" + id + "/cancel"),
-    onSuccess: () => {
+    onSuccess: (res: any) => {
       qc.invalidateQueries({ queryKey: ["classes"] });
-      toast({ title: "Clase cancelada" });
+      const d = res?.data?.data ?? {};
+      if (Number(d.wa_failed ?? 0) > 0) {
+        const off = d.wa_channel_state === "disabled";
+        setUnreachedOff(off);
+        setUnreached(d.wa_unreached ?? []);
+        toast({ title: "Clase cancelada", description: `No se pudo avisar a ${d.wa_failed} ${d.wa_failed === 1 ? "alumna" : "alumnas"} (${off ? "los avisos de WhatsApp están apagados" : "WhatsApp desconectado"}).`, variant: "destructive" });
+      } else {
+        toast({ title: "Clase cancelada" });
+      }
       setSheetOpen(false);
     },
     onError: (e: any) => toast({
@@ -268,29 +280,45 @@ function CalendarView({
   });
 
   const clearWeekMutation = useMutation({
-    mutationFn: (force?: boolean) => api.delete("/classes/week", { data: { startDate: start, endDate: end, force } }),
+    mutationFn: (vars: { force: boolean; reason?: string }) =>
+      api.delete("/classes/week", { data: { startDate: start, endDate: end, force: vars.force, reason: vars.reason } }),
     onSuccess: (res: any) => {
       qc.invalidateQueries({ queryKey: ["classes"] });
-      const deleted = Number(res?.data?.deleted ?? 0);
-      const cancelled = Number(res?.data?.bookingsCancelled ?? 0);
+      const d = res?.data ?? {};
+      const deleted = Number(d.deleted ?? 0);
+      const cancelled = Number(d.cancelled ?? 0);
+      const bookings = Number(d.bookingsCancelled ?? 0);
+      const kept = Number(d.kept ?? 0);
+      const failed = Number(d.wa_failed ?? 0);
+      const parts = [
+        bookings > 0 ? `${bookings} ${bookings === 1 ? "reserva cancelada" : "reservas canceladas"}, crédito devuelto` : null,
+        kept > 0 ? `${kept} ${kept === 1 ? "clase que ya pasó se quedó igual" : "clases que ya pasaron se quedaron igual"}` : null,
+      ].filter(Boolean);
       toast({
-        title: deleted === 1 ? "1 clase eliminada de la semana" : `${deleted} clases eliminadas de la semana`,
-        description: cancelled > 0 ? `${cancelled} reserva${cancelled === 1 ? "" : "s"} cancelada${cancelled === 1 ? "" : "s"}, crédito devuelto.` : undefined,
+        title: `${deleted} ${deleted === 1 ? "clase borrada" : "clases borradas"} · ${cancelled} ${cancelled === 1 ? "cancelada" : "canceladas"}`,
+        description: parts.length ? `${parts.join(" · ")}.` : undefined,
+        ...(failed > 0 ? { variant: "destructive" as const } : {}),
       });
+      if (failed > 0) {
+        setUnreachedOff(d.wa_channel_state === "disabled");
+        setUnreached(d.wa_unreached ?? []);
+      }
       setSheetOpen(false);
     },
     onError: async (error: any) => {
-      // 409 = hay reservas activas: ofrecer forzar (cancela + devuelve crédito).
-      if (error?.response?.status === 409) {
-        const n = Number(error?.response?.data?.activeBookings ?? 0);
-        const force = await confirm({
+      // 409 = hay reservas activas: esas clases se cancelan (no se borran), con motivo.
+      if (error?.response?.status === 409 && error?.response?.data?.code === "ACTIVE_BOOKINGS") {
+        const n = Number(error.response.data.activeBookings ?? 0);
+        const m = Number(error.response.data.classesToCancel ?? 0);
+        const reason = await promptText({
           title: "Hay reservas activas",
-          description: `Esta semana tiene ${n} reserva${n === 1 ? "" : "s"} activa${n === 1 ? "" : "s"}. ¿Forzar la limpieza? Se cancelan y se devuelve el crédito a cada alumna.`,
-          destructive: true,
-          confirmLabel: "Forzar y limpiar",
+          description: `${n} ${n === 1 ? "reserva" : "reservas"} en ${m} ${m === 1 ? "clase" : "clases"}. Esas clases se cancelan en lugar de borrarse: se devuelve el crédito y se avisa a cada alumna. Queda en la bitácora con tu nombre.`,
+          placeholder: "Motivo (obligatorio): p. ej. cierre por vacaciones",
+          confirmLabel: "Cancelar esas clases y limpiar",
           cancelLabel: "Volver",
+          minLength: REASON_MIN_CHARS,
         });
-        if (force) clearWeekMutation.mutate(true);
+        if (reason) clearWeekMutation.mutate({ force: true, reason });
         return;
       }
       toast({ title: error?.response?.data?.message ?? "No se pudo limpiar la semana", variant: "destructive" });
@@ -363,15 +391,12 @@ function CalendarView({
   const handleClearWeek = async () => {
     if (classes.length === 0 || clearWeekMutation.isPending) return;
     const ok = await confirm({
-      title: "¿Limpiar toda la semana?",
-      description:
-        classes.length === 1
-          ? `Se eliminará la única clase de la semana (${weekLabel}), junto con sus reservas. Esta acción no se puede deshacer.`
-          : `Se eliminarán las ${classes.length} clases de la semana (${weekLabel}), junto con sus reservas. Esta acción no se puede deshacer.`,
-      confirmLabel: "Eliminar clases",
+      title: "¿Limpiar la semana?",
+      description: `Se borran las clases sin reservas de la semana (${weekLabel}). Las que tienen reservas se cancelan: se devuelve el crédito y se avisa a cada alumna. Las que ya pasaron no se tocan.`,
+      confirmLabel: "Limpiar semana",
       destructive: true,
     });
-    if (ok) clearWeekMutation.mutate(false);
+    if (ok) clearWeekMutation.mutate({ force: false });
   };
 
   const handleCancelClass = async () => {
@@ -851,6 +876,8 @@ function CalendarView({
           )}
         </SheetContent>
       </Sheet>
+
+      <UnreachedDialog items={unreached} channelOff={unreachedOff} onClose={() => setUnreached([])} />
 
       {dialog}
     </>
