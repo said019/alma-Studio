@@ -96,8 +96,9 @@ const ClientsList = () => {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const { promptText, dialog } = useConfirm();
-  // "Editar" pisa datos que el servidor sólo deja tocar a la dueña
-  // (PUT /users/:id rechaza a los demás roles) — spec §8, I3.
+  // "Editar" y "Eliminar" (dar de baja) pisan datos o cierran el acceso de la
+  // clienta: el servidor sólo deja tocarlos a la dueña (PUT /users/:id y
+  // DELETE /users/:id rechazan a los demás roles) — spec §8, I3.
   const canSeeFinance = useCanSeeFinance();
 
   // Edit sheet
@@ -162,6 +163,7 @@ const ClientsList = () => {
       description: "Se borran sus datos personales y de salud y se cierra su acceso. Sus reservas, órdenes y pagos se conservan sin su nombre. No se puede deshacer.",
       placeholder: "Motivo (opcional): p. ej. lo pidió por WhatsApp",
       confirmLabel: "Eliminar clienta",
+      destructive: true,
     });
     if (reason !== null) deleteMutation.mutate({ id: c.id, reason: reason || undefined });
   };

@@ -3,12 +3,12 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { useConfirm } from "./ConfirmDialog";
 
-function Probe({ minLength }: { minLength?: number }) {
+function Probe({ minLength, destructive }: { minLength?: number; destructive?: boolean }) {
   const { promptText, dialog } = useConfirm();
   const [res, setRes] = useState<string | null | undefined>(undefined);
   return (
     <>
-      <button onClick={async () => setRes(await promptText({ title: "Motivo", confirmLabel: "Guardar", minLength }))}>abrir</button>
+      <button onClick={async () => setRes(await promptText({ title: "Motivo", confirmLabel: "Guardar", minLength, destructive }))}>abrir</button>
       <output data-testid="res">{res === undefined ? "—" : res === null ? "cancelado" : res}</output>
       {dialog}
     </>
@@ -35,5 +35,19 @@ describe("promptText con minLength", () => {
     fireEvent.click(screen.getByText("abrir"));
     expect(await screen.findByRole("button", { name: "Guardar" })).toBeEnabled();
     expect(screen.queryByText(/Mínimo/)).toBeNull();
+  });
+
+  it("destructive: true también pinta de rojo el botón de confirmar en el prompt (ronda de ajustes 1)", async () => {
+    render(<Probe destructive />);
+    fireEvent.click(screen.getByText("abrir"));
+    const guardar = await screen.findByRole("button", { name: "Guardar" });
+    expect(guardar.className).toMatch(/bg-destructive/);
+  });
+
+  it("sin destructive el botón de confirmar del prompt no se pinta de rojo", async () => {
+    render(<Probe />);
+    fireEvent.click(screen.getByText("abrir"));
+    const guardar = await screen.findByRole("button", { name: "Guardar" });
+    expect(guardar.className).not.toMatch(/bg-destructive/);
   });
 });

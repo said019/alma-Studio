@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildAnonymizeUpdate, userAnonymizationValues, anonEmail, WAIVER_ANON_VALUES, ANON_NAME } from "./anonymize.js";
+import { buildAnonymizeUpdate, userAnonymizationValues, anonEmail, WAIVER_ANON_VALUES, ANON_NAME, eventRegistrationAnonValues } from "./anonymize.js";
 
 const ID = "3f1b2c4d-1a2b-4c3d-8e9f-0a1b2c3d4e5f";
 
@@ -29,4 +29,15 @@ test("responsiva por user_id; sin columnas → null", () => {
   const w = buildAnonymizeUpdate({ table: "waivers", values: WAIVER_ANON_VALUES, existing: new Set(["full_name", "signature_data"]), idColumn: "user_id", id: ID });
   assert.equal(w.sql, "UPDATE waivers SET full_name = $2, signature_data = $3 WHERE user_id = $1");
   assert.equal(buildAnonymizeUpdate({ table: "waivers", values: WAIVER_ANON_VALUES, existing: new Set(), id: ID }), null);
+});
+
+test("inscripciones a eventos: nombre anónimo, correo único (NOT NULL + UNIQUE por evento), teléfono null", () => {
+  const v = eventRegistrationAnonValues(ID);
+  assert.equal(v.name, ANON_NAME);
+  assert.equal(v.email, anonEmail(ID));
+  assert.equal(v.phone, null);
+  const existing = new Set(["id", "event_id", "user_id", "name", "email", "phone", "updated_at"]);
+  const r = buildAnonymizeUpdate({ table: "event_registrations", values: v, nowColumns: ["updated_at"], existing, idColumn: "user_id", id: ID });
+  assert.equal(r.sql, "UPDATE event_registrations SET name = $2, email = $3, phone = $4, updated_at = NOW() WHERE user_id = $1");
+  assert.deepEqual(r.params, [ID, ANON_NAME, anonEmail(ID), null]);
 });

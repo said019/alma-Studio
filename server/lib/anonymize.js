@@ -43,6 +43,18 @@ export const GUEST_ANON_VALUES = Object.freeze({
 });
 
 /**
+ * Columnas de `event_registrations` con el valor que las reemplaza (ronda de
+ * ajustes 1, ítem 1). `name` y `email` son NOT NULL en ambas fuentes del schema
+ * (`ensureSchema` y `schema_complete.sql`) — y `schema_complete.sql` además exige
+ * `UNIQUE (event_id, email)`, así que `email` usa `anonEmail(userId)` (único por
+ * usuaria, nunca vacío ni repetido) en vez de null o "". `phone` sí es nullable
+ * en ambas fuentes, así que va a null.
+ */
+export function eventRegistrationAnonValues(userId) {
+  return { name: ANON_NAME, email: anonEmail(userId), phone: null };
+}
+
+/**
  * UPDATE sólo con las columnas que existen en la base (producción puede no tener
  * todas las de schema_complete.sql). `table` y las columnas son constantes del
  * código, nunca entrada de usuaria. null si no hay nada que tocar.

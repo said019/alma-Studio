@@ -67,7 +67,7 @@ import { extractGymId, computeEventId } from "./lib/wellhub/payload.js";
 import { getWellhubCredentials } from "./lib/wellhub/credentials.js";
 import { publicPartnerSettings, mergeSecret } from "./lib/partnerSettings.js";
 import { createAccountGate } from "./lib/accountGate.js";
-import { userAnonymizationValues, buildAnonymizeUpdate, WAIVER_ANON_VALUES, GUEST_ANON_VALUES } from "./lib/anonymize.js";
+import { userAnonymizationValues, buildAnonymizeUpdate, WAIVER_ANON_VALUES, GUEST_ANON_VALUES, eventRegistrationAnonValues } from "./lib/anonymize.js";
 import { validateWellhubVisit as wellhubValidateVisit } from "./lib/wellhub/api.js";
 import { handleBookingRequested, handleCheckin, handleCancel, handlePlanChange } from "./lib/wellhub/flows.js";
 import { isUuid, signatureProblem } from "./lib/validate.js";
@@ -13070,25 +13070,33 @@ async function existingColumns(db, tables) {
 // personales y de salud, se cierra su acceso y se conserva todo lo demás con el
 // mismo id. Sólo la dueña: es irreversible.
 app.delete("/api/users/:id", ownerMiddleware, async (req, res) => {
-  const id = req.params.id;
-  if (!isUuid(id)) {
-    return res.status(400).json({ message: "Identificador inválido" });
-  }
-  if (id === req.userId) {
-    return res.status(400).json({ message: "No puedes eliminar tu propia cuenta." });
-  }
+  // `id` no se valida aquí: app.param("id") (arriba, registro de rutas) ya
+  // responde 400 "Identificador inválido" para cualquier valor que no sea un
+  // UUID, antes de que este handler corra. Ronda de ajustes 1, ítem 4.
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
     const cur = await client.query(
       "SELECT id, role::text AS role, is_active, anonymized_at, guest_profile_id FROM users WHERE id = $1 FOR UPDATE",
-      [id],
+      [req.params.id],
     );
     if (!cur.rows.length) {
       await client.query("ROLLBACK");
       return res.status(404).json({ message: "Clienta no encontrada" });
     }
     const target = cur.rows[0];
+    // `target.id` es el id tal como Postgres lo normaliza (uuid canónico en
+    // minúsculas), no el texto crudo de la URL: si llega en otra mayúscula o
+    // minúscula, de aquí en adelante se usa el normalizado para que el correo
+    // anónimo, el candado de caché (accountGate) y el serial de Apple Wallet
+    // coincidan exactamente con lo que ya usa el resto del sistema (que siempre
+    // trabaja con el id normalizado que devuelve la base). Ronda de ajustes 1,
+    // ítem 2.
+    const id = target.id;
+    if (id === req.userId) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({ message: "No puedes eliminar tu propia cuenta." });
+    }
     if (!["client", "guest"].includes(target.role)) {
       await client.query("ROLLBACK");
       return res.status(400).json({ message: "Sólo se pueden dar de baja clientas desde aquí." });
@@ -13117,11 +13125,12 @@ app.delete("/api/users/:id", ownerMiddleware, async (req, res) => {
     const kept = (await client.query(
       `SELECT (SELECT COUNT(*)::int FROM memberships WHERE user_id = $1) AS memberships,
               (SELECT COUNT(*)::int FROM orders WHERE user_id = $1) AS orders,
-              (SELECT COUNT(*)::int FROM bookings WHERE user_id = $1) AS bookings`,
+              (SELECT COUNT(*)::int FROM bookings WHERE user_id = $1) AS bookings,
+              (SELECT COUNT(*)::int FROM event_registrations WHERE user_id = $1) AS "eventRegistrations"`,
       [id],
     )).rows[0];
 
-    const cols = await existingColumns(client, ["users", "waivers", "guest_profiles"]);
+    const cols = await existingColumns(client, ["users", "waivers", "guest_profiles", "event_registrations", "campaign_logs"]);
     const u = buildAnonymizeUpdate({
       table: "users", values: userAnonymizationValues(id, req.userId),
       nowColumns: ["anonymized_at", "updated_at"], existing: cols.users, id,
@@ -13132,6 +13141,21 @@ app.delete("/api/users/:id", ownerMiddleware, async (req, res) => {
     if (target.guest_profile_id) {
       const g = buildAnonymizeUpdate({ table: "guest_profiles", values: GUEST_ANON_VALUES, nowColumns: ["updated_at"], existing: cols.guest_profiles, id: target.guest_profile_id });
       if (g) await client.query(g.sql, g.params);
+    }
+    // Inscripciones a eventos (auditoría, ronda de ajustes 1, ítem 1): se
+    // conserva la fila (el evento asistido queda en el historial), pero el
+    // nombre, correo y teléfono con los que se inscribió se anonimizan igual
+    // que en `users`.
+    const er = buildAnonymizeUpdate({
+      table: "event_registrations", values: eventRegistrationAnonValues(id),
+      nowColumns: ["updated_at"], existing: cols.event_registrations, idColumn: "user_id", id,
+    });
+    if (er) await client.query(er.sql, er.params);
+    // campaign_logs.phone: sólo si la tabla y sus columnas existen en esta base
+    // (no está en schema_complete.sql, sólo la crea ensureSchema). Sin forma de
+    // ligar una fila a la usuaria (sin user_id) no hay nada que anonimizar ahí.
+    if (cols.campaign_logs.has("user_id") && cols.campaign_logs.has("phone")) {
+      await client.query("UPDATE campaign_logs SET phone = NULL WHERE user_id = $1", [id]);
     }
     await client.query("UPDATE referral_codes SET is_active = false WHERE user_id = $1", [id]);
     await client.query("DELETE FROM password_reset_tokens WHERE user_id = $1", [id]);

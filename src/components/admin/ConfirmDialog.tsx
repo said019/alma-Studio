@@ -3,7 +3,7 @@
 //   const { confirm, promptText, dialog } = useConfirm();
 //   ... {dialog} en el JSX de la página ...
 //   const ok = await confirm({ title: "¿Cancelar la clase?", description: "...", destructive: true });
-//   const reason = await promptText({ title: "Motivo de cancelación", placeholder: "...", minLength: 5 });
+//   const reason = await promptText({ title: "Motivo de cancelación", placeholder: "...", minLength: 5, destructive: true });
 import { useCallback, useRef, useState, type ReactNode } from "react";
 import {
   AlertDialog,
@@ -34,6 +34,7 @@ type PromptOptions = {
   required?: boolean;
   /** Mínimo de caracteres (sin espacios en los extremos) para poder confirmar. */
   minLength?: number;
+  destructive?: boolean;
 };
 
 type PendingState =
@@ -82,7 +83,7 @@ export function useConfirm() {
   const promptOpts = isPrompt ? (pending.opts as PromptOptions) : null;
   const minChars = isPrompt ? Math.max(promptOpts?.minLength ?? 0, promptOpts?.required ? 1 : 0) : 0;
   const confirmDisabled = isPrompt && text.trim().length < minChars;
-  const destructive = !isPrompt && (pending?.opts as ConfirmOptions | undefined)?.destructive;
+  const destructive = Boolean(opts?.destructive);
 
   const dialog = (
     <AlertDialog open={pending != null} onOpenChange={(open) => { if (!open) settle(false); }}>

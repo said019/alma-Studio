@@ -37,3 +37,34 @@ test("sin id no consulta", async () => {
   assert.equal(await gate.isDisabled(undefined), false);
   assert.equal(calls, 0);
 });
+
+test("carrera: forget() a la mitad de una consulta en vuelo no vuelve a cachear el resultado viejo", async () => {
+  let calls = 0;
+  const resolvers = [];
+  const gate = createAccountGate({ lookup: () => { calls++; return new Promise((resolve) => resolvers.push(resolve)); } });
+  const p1 = gate.isDisabled("u4"); // consulta #1 en vuelo, todavía no resuelve
+  gate.forget("u4");                // la baja ocurre a la mitad de esa consulta
+  resolvers[0](false);              // la consulta #1 resuelve con el valor ya viejo
+  assert.equal(await p1, false);
+  // Si ese resultado viejo se hubiera cacheado, esta llamada no volvería a
+  // consultar dentro del TTL. Como forget() invalidó la generación, sí vuelve.
+  const p2 = gate.isDisabled("u4");
+  assert.equal(calls, 2);
+  resolvers[1](true);
+  assert.equal(await p2, true);
+});
+
+test("el caché no crece sin límite: al llegar a maxEntries se limpia entero", async () => {
+  let calls = 0;
+  const gate = createAccountGate({ lookup: async () => { calls++; return false; }, maxEntries: 2 });
+  await gate.isDisabled("a");
+  await gate.isDisabled("b");
+  assert.equal(calls, 2);
+  // La tercera llave distinta llena el caché (tamaño 2 === maxEntries) y lo limpia
+  // antes de insertar la suya.
+  await gate.isDisabled("c");
+  assert.equal(calls, 3);
+  // "a" ya no está: se limpió con el resto, así que se vuelve a consultar.
+  await gate.isDisabled("a");
+  assert.equal(calls, 4);
+});
