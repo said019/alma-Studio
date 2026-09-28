@@ -114,6 +114,7 @@ const CancelBookingDialog = ({
               onChange={(e) => setReason(e.target.value)}
               placeholder="Ej. nos pidió moverla por teléfono"
               rows={2}
+              maxLength={500}
               className="bg-canvas border-line-strong/60 text-ink placeholder:text-ink/40"
             />
             <p className="text-[0.75rem] text-ink/60">Queda en la bitácora y se incluye en el WhatsApp que le llega a {entry.displayName}. Mínimo {REASON_MIN_CHARS} caracteres.</p>

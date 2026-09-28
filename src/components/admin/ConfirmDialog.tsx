@@ -100,6 +100,7 @@ export function useConfirm() {
             onChange={(e) => setText(e.target.value)}
             placeholder={promptOpts?.placeholder}
             rows={3}
+            maxLength={500}
             autoFocus
           />
         ) : null}

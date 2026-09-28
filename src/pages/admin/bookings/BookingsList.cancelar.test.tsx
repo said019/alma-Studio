@@ -126,6 +126,7 @@ describe("Reservas · cancelar una reserva", () => {
     const boton = within(dlg).getByRole("button", { name: "Cancelar reserva" });
     expect(boton).toBeDisabled();
     expect(within(dlg).getByText(/Queda en la bitácora y se incluye en el WhatsApp/)).toBeInTheDocument();
+    expect(within(dlg).getByLabelText("Motivo (obligatorio)")).toHaveAttribute("maxLength", "500");
     fireEvent.change(within(dlg).getByLabelText("Motivo (obligatorio)"), { target: { value: "Nos pidió moverla" } });
     expect(boton).toBeEnabled();
     fireEvent.click(boton);

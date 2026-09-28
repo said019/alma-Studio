@@ -37,7 +37,7 @@ describe("promptText con minLength", () => {
     expect(screen.queryByText(/Mínimo/)).toBeNull();
   });
 
-  it("destructive: true también pinta de rojo el botón de confirmar en el prompt (ronda de ajustes 1)", async () => {
+  it("destructive: true también pinta de rojo el botón de confirmar en el prompt", async () => {
     render(<Probe destructive />);
     fireEvent.click(screen.getByText("abrir"));
     const guardar = await screen.findByRole("button", { name: "Guardar" });
@@ -49,5 +49,12 @@ describe("promptText con minLength", () => {
     fireEvent.click(screen.getByText("abrir"));
     const guardar = await screen.findByRole("button", { name: "Guardar" });
     expect(guardar.className).not.toMatch(/bg-destructive/);
+  });
+
+  it("el motivo tiene un tope de 500 caracteres", async () => {
+    render(<Probe />);
+    fireEvent.click(screen.getByText("abrir"));
+    await screen.findByRole("button", { name: "Guardar" });
+    expect(screen.getByRole("textbox")).toHaveAttribute("maxLength", "500");
   });
 });
