@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { isUuid, signatureProblem, maskSecret, isMaskedSecret } from "./validate.js";
+import { isUuid, signatureProblem, maskSecret, isMaskedSecret, isDay } from "./validate.js";
 
 const png = (w, h, extraBytes = 2000) => {
   const b = Buffer.alloc(33 + extraBytes);
@@ -33,6 +33,14 @@ test("signatureProblem rechaza firmas vacías, diminutas o que no son PNG", () =
   assert.ok(signatureProblem(png(600, 200, 10)), "muy poco contenido (por debajo de 200 caracteres base64)");
   assert.ok(signatureProblem("data:image/png;base64," + Buffer.from("no soy png".repeat(200)).toString("base64")), "no es PNG");
   assert.ok(signatureProblem("data:image/png;base64,iVBORw0KGgo="), "cabecera truncada");
+});
+
+test("isDay: AAAA-MM-DD de un día que existe", () => {
+  assert.equal(isDay("2026-09-28"), true);
+  assert.equal(isDay("2024-02-29"), true);
+  for (const bad of ["2026-02-30", "2026-13-45", "28/09/2026", "2026-9-28", "", null, undefined, 20260928]) {
+    assert.equal(isDay(bad), false, String(bad));
+  }
 });
 
 test("maskSecret e isMaskedSecret", () => {

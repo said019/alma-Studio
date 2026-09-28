@@ -72,6 +72,7 @@ import { isUuid, signatureProblem } from "./lib/validate.js";
 import { checkinRule } from "./lib/checkin.js";
 import { pgReminderLog, sendClassReminders } from "./lib/classReminder.js";
 import { createChannelState } from "./lib/whatsappState.js";
+import { recordAudit, recordAuditBestEffort, reasonProblem, cleanReason, buildAuditQuery, auditRowOut } from "./lib/audit.js";
 import {
   validateStripeConfig,
   createOrGetStripeCustomer,
@@ -1865,6 +1866,43 @@ async function ensureSchema() {
     await pool.query(`DROP TRIGGER IF EXISTS trg_channel_inventory ON bookings`).catch(() => { });
     await pool.query(`CREATE TRIGGER trg_channel_inventory AFTER INSERT OR UPDATE OR DELETE ON bookings
       FOR EACH ROW EXECUTE FUNCTION fn_update_channel_inventory()`).catch((e) => console.warn("[schema] inv trg:", e.message));
+
+    // ── Bitácora de acciones del personal (auditoría 2026-09-27, bloque 2) ──
+    // Sin llaves foráneas a propósito: la bitácora sobrevive a la persona y a la
+    // fila que describe. Nada de esto cambia datos existentes.
+    await pool.query(`CREATE TABLE IF NOT EXISTS audit_log (
+      id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+      created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      actor_id        UUID,
+      actor_role      VARCHAR(30),
+      actor_name      TEXT,
+      action          VARCHAR(60) NOT NULL,
+      entity_type     VARCHAR(30) NOT NULL,
+      entity_id       UUID,
+      subject_user_id UUID,
+      reason          TEXT,
+      before          JSONB,
+      after           JSONB,
+      meta            JSONB NOT NULL DEFAULT '{}'::jsonb
+    )`).catch((e) => console.warn("[schema] audit_log:", e.message));
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_audit_log_created ON audit_log(created_at DESC)`).catch(() => { });
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_audit_log_entity ON audit_log(entity_type, entity_id)`).catch(() => { });
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_audit_log_actor ON audit_log(actor_id, created_at DESC)`).catch(() => { });
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_audit_log_subject ON audit_log(subject_user_id, created_at DESC)`).catch(() => { });
+    // Columnas que escribe el bloque 2. Algunas existen en schema_complete.sql,
+    // pero no hay garantía de que producción las tenga.
+    await pool.query(`ALTER TABLE memberships ADD COLUMN IF NOT EXISTS activated_by UUID`).catch(() => { });
+    await pool.query(`ALTER TABLE memberships ADD COLUMN IF NOT EXISTS activated_at TIMESTAMPTZ`).catch(() => { });
+    await pool.query(`ALTER TABLE memberships ADD COLUMN IF NOT EXISTS payment_reference VARCHAR(255)`).catch(() => { });
+    await pool.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS cancellation_reason TEXT`).catch(() => { });
+    await pool.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS cancelled_by UUID`).catch(() => { });
+    // La falta que registró ESTA reserva (para poder corregirla el mismo día).
+    await pool.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS falta_recorded_at TIMESTAMPTZ`).catch(() => { });
+    await pool.query(`ALTER TABLE classes ADD COLUMN IF NOT EXISTS cancellation_reason TEXT`).catch(() => { });
+    await pool.query(`ALTER TABLE classes ADD COLUMN IF NOT EXISTS cancelled_by UUID`).catch(() => { });
+    await pool.query(`ALTER TABLE classes ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMPTZ`).catch(() => { });
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS anonymized_at TIMESTAMPTZ`).catch(() => { });
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS anonymized_by UUID`).catch(() => { });
 
     console.log("✅ Schema ensured");
   } catch (err) {
@@ -16165,6 +16203,41 @@ app.post("/api/admin/test-emails", adminMiddleware, async (req, res) => {
     fromEmail: process.env.EMAIL_FROM || "onboarding@resend.dev (default)",
     results,
   });
+});
+
+// ─── Bitácora (audit_log) ────────────────────────────────────────────────────
+// Sólo la dueña (admin, super_admin): quién cobró, ajustó, canceló, corrigió o
+// dio de baja, cuándo, por qué y el antes/después. Auditoría 2026-09-27, P0-3.
+app.get("/api/admin/audit", ownerMiddleware, async (req, res) => {
+  const q = buildAuditQuery(req.query, { timezone: STUDIO_TIMEZONE });
+  if (!q.ok) return res.status(400).json({ message: q.message });
+  try {
+    const [rows, count] = await Promise.all([pool.query(q.sql, q.params), pool.query(q.countSql, q.countParams)]);
+    return res.json({ data: rows.rows.map(auditRowOut), page: q.page, limit: q.limit, total: Number(count.rows[0]?.n ?? 0) });
+  } catch (err) {
+    console.error("[GET /admin/audit]", err.message);
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// Personas del equipo que aparecen en la bitácora (filtro "Quién").
+app.get("/api/admin/audit/actors", ownerMiddleware, async (_req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT DISTINCT ON (a.actor_id) a.actor_id AS id,
+              COALESCE(u.display_name, a.actor_name) AS name,
+              COALESCE(u.role::text, a.actor_role) AS role
+         FROM audit_log a
+         LEFT JOIN users u ON u.id = a.actor_id
+        WHERE a.actor_id IS NOT NULL
+        ORDER BY a.actor_id, a.created_at DESC`,
+    );
+    const data = r.rows.sort((x, y) => String(x.name ?? "").localeCompare(String(y.name ?? ""), "es"));
+    return res.json({ data });
+  } catch (err) {
+    console.error("[GET /admin/audit/actors]", err.message);
+    return res.status(500).json({ message: "Error interno" });
+  }
 });
 
 // ─── Healthcheck (Railway, uptime monitors) ──────────────────────────────────
