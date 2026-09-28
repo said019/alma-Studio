@@ -19,6 +19,7 @@ import { BackLink, DataRow, InfoBanner } from "@/components/app/widgets";
 import { CreditCard } from "lucide-react";
 import type { ClientMembership } from "@/types/membership";
 import type { Tone } from "@/design/tokens";
+import { cancellationRules, cancellationsLeftText, useBookingPolicy } from "@/lib/booking-policy";
 
 const STATUS: Record<string, { label: string; tone: Tone }> = {
   active: { label: "Activa", tone: "success" },
@@ -35,20 +36,22 @@ const CATEGORY_LABEL: Record<string, string> = {
   all: "Todas las disciplinas",
 };
 
-const CANCELLATION_RULES = [
-  "Cancela con más de 12 horas de anticipación sin penalización.",
-  "Cancelar dentro de las 12h previas cuenta como falta.",
-  "Al acumular 5 faltas se aplica una penalización con pérdida de puntos.",
-];
-
 const ProfileMembership = () => {
+  const { policy } = useBookingPolicy();
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["my-membership"],
     queryFn: async () => (await api.get("/memberships/my")).data,
   });
 
   const membership:
-    | (ClientMembership & { classCategory?: string; studioRemaining?: number | null; rtRemaining?: number | null })
+    | (ClientMembership & {
+        classCategory?: string;
+        studioRemaining?: number | null;
+        rtRemaining?: number | null;
+        cancellationsUsed?: number;
+        cancellationLimit?: number;
+        cancellationsLeft?: number | null;
+      })
     | null = data?.data ?? data ?? null;
   const isMixto = membership?.classCategory === "mixto";
 
@@ -71,6 +74,12 @@ const ProfileMembership = () => {
   const lowClasses = classesPercent !== null && classesPercent > 80;
   const lowDays = daysRemaining !== null && daysRemaining < 7 && membership?.status === "active";
   const isLow = lowClasses || lowDays;
+
+  // "Te quedan N cancelaciones de este paquete.", con la cuota real de
+  // /memberships/my (A3): misma fuente que MyBookings y BookClassConfirm.
+  const membresiaQuedanText = membership
+    ? cancellationsLeftText(membership.cancellationsLeft ?? null, Number(membership.cancellationLimit ?? policy.cancellationLimit))
+    : null;
 
   return (
     <ClientAuthGuard requiredRoles={["client"]}>
@@ -209,7 +218,7 @@ const ProfileMembership = () => {
 
             <Section title="Cancelaciones">
               <ol className="list-none m-0 p-0">
-                {CANCELLATION_RULES.map((line, i, arr) => (
+                {cancellationRules(policy).map((line, i, arr) => (
                   <li
                     key={line}
                     className={
@@ -226,6 +235,9 @@ const ProfileMembership = () => {
                   </li>
                 ))}
               </ol>
+              {membresiaQuedanText && (
+                <p className="m-0 mt-3 text-[0.9rem] font-medium text-ink">{membresiaQuedanText}</p>
+              )}
             </Section>
 
             {(membership.status !== "active" || (daysRemaining !== null && daysRemaining <= 7)) && (
