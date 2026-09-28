@@ -9811,11 +9811,12 @@ app.get("/api/admin/today-roster", adminMiddleware, async (_req, res) => {
               COALESCE(gp.has_injury, u.has_injury, false) AS has_injury,
               COALESCE(gp.injury_details, u.injury_details) AS injury_details,
               u.health_notes,
+              -- Las reservas de invitada también traen user_id (la usuaria
+              -- sombra de findOrCreateGuestUser, una por guest_profile) y
+              -- bookings.user_id es NOT NULL: basta con user_id, que tiene índice.
               NOT EXISTS (
                 SELECT 1 FROM bookings pb
-                 WHERE pb.checked_in_at IS NOT NULL AND pb.id <> b.id
-                   AND ((b.user_id IS NOT NULL AND pb.user_id = b.user_id)
-                     OR (b.guest_profile_id IS NOT NULL AND pb.guest_profile_id = b.guest_profile_id))
+                 WHERE pb.user_id = b.user_id AND pb.checked_in_at IS NOT NULL AND pb.id <> b.id
               ) AS first_visit
          FROM bookings b
          LEFT JOIN users u ON b.user_id = u.id
