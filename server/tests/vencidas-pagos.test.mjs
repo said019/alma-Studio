@@ -97,3 +97,44 @@ test("el filtro admin 'activas' (status=active) de la lista de membresías exclu
   assert.equal(r.body.data.length, 0,
     `el filtro 'activas' no debe listar la membresía vencida de esta clienta (data=${JSON.stringify(r.body.data)})`);
 });
+
+// /memberships/my elige la que la clienta puede usar: una activa vigente gana;
+// una cancelada no le gana a nada activo aunque conserve su end_date futura
+// (la cancelación normal no toca end_date).
+test("GET /api/memberships/my: una activa vencida le gana a una cancelada con end_date futura", async () => {
+  const cliente = await makeClient(PFX, "venc6");
+  const [vencida] = await sql(
+    `INSERT INTO memberships (user_id, plan_id, status, classes_remaining, start_date, end_date, payment_method)
+     VALUES ($1, $2, 'active', 3, $3, $4, 'cash') RETURNING id`,
+    [cliente.id, f.plan.id, day(-60), day(-10)],
+  );
+  await sql(
+    `INSERT INTO memberships (user_id, plan_id, status, classes_remaining, start_date, end_date, payment_method)
+     VALUES ($1, $2, 'cancelled', 8, $3, $4, 'cash')`,
+    [cliente.id, f.plan.id, day(-5), day(40)],
+  );
+  const r = await api("GET", "/api/memberships/my", { token: cliente.token });
+  assert.equal(r.status, 200);
+  assert.equal(r.body?.data?.id, vencida.id,
+    `debe devolver la activa vencida, no la cancelada (data=${JSON.stringify(r.body?.data)})`);
+  assert.equal(r.body?.data?.isExpired, true);
+});
+
+test("GET /api/memberships/my: con una vencida y una vigente devuelve la vigente", async () => {
+  const cliente = await makeClient(PFX, "venc7");
+  await sql(
+    `INSERT INTO memberships (user_id, plan_id, status, classes_remaining, start_date, end_date, payment_method)
+     VALUES ($1, $2, 'active', 3, $3, $4, 'cash')`,
+    [cliente.id, f.plan.id, day(-60), day(-10)],
+  );
+  const [vigente] = await sql(
+    `INSERT INTO memberships (user_id, plan_id, status, classes_remaining, start_date, end_date, payment_method)
+     VALUES ($1, $2, 'active', 8, $3, $4, 'cash') RETURNING id`,
+    [cliente.id, f.plan.id, day(0), day(30)],
+  );
+  const r = await api("GET", "/api/memberships/my", { token: cliente.token });
+  assert.equal(r.status, 200);
+  assert.equal(r.body?.data?.id, vigente.id,
+    `debe devolver la vigente (data=${JSON.stringify(r.body?.data)})`);
+  assert.equal(r.body?.data?.isExpired, false);
+});

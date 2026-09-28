@@ -3446,12 +3446,19 @@ app.get("/api/memberships/my", authMiddleware, async (req, res) => {
        LEFT JOIN plans p ON m.plan_id = p.id
        WHERE m.user_id = $1
        ORDER BY
-         CASE WHEN m.end_date IS NOT NULL AND m.end_date < (NOW() AT TIME ZONE '${STUDIO_TIMEZONE}')::date THEN 1 ELSE 0 END ASC,
-         CASE m.status
-         WHEN 'active'              THEN 1
-         WHEN 'pending_activation'  THEN 2
-         WHEN 'pending_payment'     THEN 3
-         ELSE 4 END,
+         -- La que la clienta puede usar primero: activa vigente, luego
+         -- pendientes, luego activa vencida (para mostrarle que venció) y al
+         -- final el resto. Una cancelada conserva su end_date, así que no
+         -- basta con "no vencida" para ganar (auditoría 2026-09-27, P1-6).
+         -- Postgres no deja usar el alias is_expired dentro de una expresión
+         -- del ORDER BY: el predicado se repite.
+         CASE
+           WHEN m.status = 'active'
+            AND NOT (m.end_date IS NOT NULL AND m.end_date < (NOW() AT TIME ZONE '${STUDIO_TIMEZONE}')::date) THEN 0
+           WHEN m.status IN ('pending_activation', 'pending_payment') THEN 1
+           WHEN m.status = 'active' THEN 2
+           ELSE 3
+         END,
          CASE
            WHEN m.status = 'active' AND (m.classes_remaining IS NULL OR m.classes_remaining >= 9999) THEN 1
            ELSE 0
