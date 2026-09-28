@@ -12,6 +12,20 @@ const ADJUST_FIELDS = ["status", "classes_remaining", "start_date", "end_date", 
 const given = (v) => v !== undefined && v !== null && v !== "";
 const round2 = (n) => Math.round(n * 100) / 100;
 
+/**
+ * Método de pago de las ventas rápidas del mostrador (visita, walk-in y
+ * acompañante en el roster). Sin método es efectivo, como en el panel; uno que
+ * no está en PAYMENT_METHODS devuelve null para responder 400. Esas rutas ya
+ * lo llamaban sin que existiera y daban 500 en cada venta.
+ */
+export function normalizePaymentMethod(value) {
+  if (!given(value)) return "cash";
+  if (typeof value !== "string") return null;
+  const v = value.trim().toLowerCase();
+  return PAYMENT_METHODS.includes(v) ? v : null;
+}
+export const PAYMENT_METHOD_INVALID = `Método de pago inválido. Opciones: ${PAYMENT_METHODS.join(", ")}.`;
+
 /** 9999 o más es el viejo centinela de "ilimitado"; null también lo es. */
 export const creditsKey = (v) => (v === null || v === undefined || Number(v) >= 9999 ? "ilimitado" : Number(v));
 
@@ -19,6 +33,16 @@ export function addDaysYmd(ymd, days) {
   const d = new Date(`${ymd}T12:00:00Z`);
   d.setUTCDate(d.getUTCDate() + Number(days));
   return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Fin de una membresía vendida en el mostrador rápido (visita, walk-in,
+ * acompañante): inicio + duration_days del plan (30 si no trae), igual que la
+ * venta de POST /api/memberships. Esas rutas ya la llamaban sin que existiera.
+ */
+export function calcMembershipEndDate(startYmd, plan) {
+  const days = Number(plan?.duration_days);
+  return addDaysYmd(startYmd, Number.isFinite(days) && days > 0 ? days : 30);
 }
 
 const ISO_DATETIME_RE = /^(\d{4}-\d{2}-\d{2})T\d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?(Z|[+-]\d{2}:?\d{2})?$/;

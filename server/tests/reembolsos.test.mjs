@@ -22,6 +22,10 @@ before(async () => {
 after(async () => {
   await sql(`DELETE FROM refunds WHERE user_id IN (SELECT id FROM users WHERE email LIKE $1)`, [`${PFX}%`]);
   await cleanup(PFX);
+  // Perfiles de la acompañante y de las visitas (sus usuarias ya las borró
+  // cleanup) y el paquete de visitas propio de la suite.
+  await sql(`DELETE FROM guest_profiles WHERE email LIKE $1`, [`${PFX}%`]);
+  await sql(`DELETE FROM plans WHERE name LIKE $1`, [`${PFX}%`]);
   await closeDb();
 });
 
@@ -176,7 +180,7 @@ test("/api/payments rechaza un userId que no es UUID y fechas que no son AAAA-MM
   const basura = await api("GET", "/api/payments?userId=basura", { token: A });
   assert.equal(basura.status, 400);
   assert.equal(basura.body.message, "Identificador inválido");
-  for (const q of ["startDate=2026-9-1", "endDate=ayer", "startDate=2026-09-01T00:00:00"]) {
+  for (const q of ["startDate=2026-9-1", "endDate=ayer", "startDate=2026-09-01T00:00:00", "startDate=2026-02-30", "endDate=2026-13-01", "endDate=2025-02-29"]) {
     const r = await api("GET", `/api/payments?${q}`, { token: A });
     assert.equal(r.status, 400, q);
     assert.equal(r.body.message, "Fecha inválida (usa AAAA-MM-DD).", q);
@@ -291,4 +295,119 @@ test("una reserva que se confirma mientras el reembolso espera la membresía tam
   assert.equal(r.body.data.bookings_cancelled, 1);
   assert.equal((await sql(`SELECT status::text AS s FROM bookings WHERE id = $1`, [nueva.id]))[0].s, "cancelled",
     "la reserva nueva no se queda viva sobre una membresía reembolsada");
+});
+
+// ── Vigencia bajo candado, venta de acompañante y centavos ──────────────────
+
+test("reservar sobre una membresía que se cancela o vence justo antes (p. ej. una ilimitada reembolsada): 409 y no crea la reserva", async () => {
+  const casos = [
+    { key: "vig-app", cambio: `status = 'cancelled', cancelled_at = NOW()`, reservar: (c, classId) =>
+      api("POST", "/api/bookings", { token: c.token, body: { classId } }), mensaje: "Tu paquete ya no está vigente." },
+    { key: "vig-rec", cambio: `end_date = CURRENT_DATE - 1`, reservar: (c, classId) =>
+      api("POST", "/api/admin/bookings/assign", { token: A, body: { userId: c.id, classId } }), mensaje: "El paquete de la clienta ya no está vigente." },
+  ];
+  for (const k of casos) {
+    const { c, membershipId } = await venta(k.key);
+    // Ilimitada: el tope de clases no la detiene, sólo la vigencia.
+    await sql(`UPDATE memberships SET classes_remaining = NULL WHERE id = $1`, [membershipId]);
+    const classId = await makeClass(A, f, { date: day(14) });
+    // Otra transacción la cancela (o la vence) y todavía no confirma: la reserva
+    // la elige (la ve vigente) y se forma en su candado.
+    const otra = new pg.Client({ connectionString: DB });
+    await otra.connect();
+    let r;
+    try {
+      await otra.query("BEGIN");
+      await otra.query(`UPDATE memberships SET ${k.cambio} WHERE id = $1`, [membershipId]);
+      const pendiente = k.reservar(c, classId);
+      await esperaCandado();
+      await otra.query("COMMIT");
+      r = await pendiente;
+    } finally {
+      await otra.end();
+    }
+    assert.equal(r.status, 409, `${k.key}: ${JSON.stringify(r.body).slice(0, 200)}`);
+    assert.equal(r.body.code, "MEMBERSHIP_NOT_CURRENT");
+    assert.equal(r.body.message, k.mensaje);
+    const filas = await sql(`SELECT id FROM bookings WHERE class_id = $1 AND user_id = $2`, [classId, c.id]);
+    assert.equal(filas.length, 0, `${k.key}: no crea la reserva`);
+  }
+});
+
+test("una venta de acompañante en el roster aparece una sola vez en /api/payments y su reembolso encuentra la membresía", async () => {
+  const socia = await makeClient(PFX, "socia");
+  await giveMembership(A, socia.id, f.plan.id, 8);
+  const classId = await makeClass(A, f, { date: day(15), cap: 5 });
+  const tel = `55${Math.floor(10000000 + Math.random() * 89999999)}`;
+  const r = await api("POST", "/api/admin/bookings/assign", { token: A, body: {
+    userId: socia.id, classId,
+    guest: { name: "QA Acompañante", phone: tel, email: `${PFX}_acomp@qa.local`, acceptedWaiver: true },
+    guestSale: { planId: f.plan.id, paymentMethod: "cash" },
+  } });
+  assert.equal(r.status, 201, JSON.stringify(r.body).slice(0, 300));
+  const orden = r.body.data.guest.soldOrder;
+  assert.ok(orden?.id);
+  const [m] = await sql(`SELECT id, order_id FROM memberships WHERE id = $1`, [r.body.data.guest.packMembershipId]);
+  assert.equal(m.order_id, orden.id, "la membresía nueva queda ligada a su orden");
+  const pagos = await api("GET", `/api/payments?userId=${orden.user_id}`, { token: A });
+  assert.equal(pagos.status, 200);
+  assert.equal(pagos.body.data.length, 1, `una sola fila: ${JSON.stringify(pagos.body.data.map((x) => x.source))}`);
+  assert.equal(pagos.body.data[0].source, "order");
+  assert.equal(pagos.body.data[0].membershipId, m.id);
+  const reemb = await reembolsar(orden.id, { kind: "total" });
+  assert.equal(reemb.status, 201, JSON.stringify(reemb.body).slice(0, 200));
+  assert.equal(reemb.body.data.membership?.id, m.id, "el reembolso encuentra la membresía");
+  assert.equal(reemb.body.data.membership.status, "cancelled");
+});
+
+test("las ventas de visita (mostrador y walk-in) ya no dan 500, ligan su membresía y aparecen una sola vez en /api/payments", async () => {
+  const [pack] = await sql(
+    `INSERT INTO plans (name, description, price, currency, duration_days, class_limit, class_category, is_active, is_visit_pack, sort_order)
+     VALUES ($1, 'Paquete de visitas de la regresión', 250, 'MXN', 30, 1, $2, true, true, 999) RETURNING id`,
+    [`${PFX} QA visita`, f.category],
+  );
+  const perfil = (k) => ({ name: `QA visita ${k}`, phone: `55${Math.floor(10000000 + Math.random() * 89999999)}`, email: `${PFX}_visita_${k}@qa.local` });
+  const unaVez = async (userId, orderId) => {
+    const [m] = await sql(`SELECT id, order_id FROM memberships WHERE user_id = $1`, [userId]);
+    assert.equal(m.order_id, orderId, "la membresía queda ligada a su orden");
+    const pagos = await api("GET", `/api/payments?userId=${userId}`, { token: A });
+    assert.equal(pagos.status, 200);
+    assert.deepEqual(pagos.body.data.map((x) => [x.source, x.membershipId]), [["order", m.id]], "una sola fila, la de la orden");
+  };
+
+  const venta1 = await api("POST", "/api/admin/visit-sale", { token: A, body: { profile: perfil("mostrador"), planId: pack.id, paymentMethod: "transfer" } });
+  assert.equal(venta1.status, 201, JSON.stringify(venta1.body).slice(0, 200));
+  assert.equal(venta1.body.data.order.payment_method, "transfer");
+  await unaVez(venta1.body.data.userId, venta1.body.data.order.id);
+
+  const classId = await makeClass(A, f, { date: day(16), cap: 5 });
+  const walk = await api("POST", `/api/admin/classes/${classId}/walkin-visit`, { token: A, body: { profile: perfil("walkin"), sale: { planId: pack.id, paymentMethod: "card" } } });
+  assert.equal(walk.status, 201, JSON.stringify(walk.body).slice(0, 200));
+  const [w] = await sql(`SELECT user_id FROM bookings WHERE class_id = $1`, [classId]);
+  const [wo] = await sql(`SELECT id FROM orders WHERE user_id = $1`, [w.user_id]);
+  await unaVez(w.user_id, wo.id);
+
+  const mala = await api("POST", "/api/admin/visit-sale", { token: A, body: { profile: perfil("mala"), planId: pack.id, paymentMethod: "cheque" } });
+  assert.equal(mala.status, 400);
+  assert.equal(mala.body.message, "Método de pago inválido. Opciones: cash, transfer, card, online.");
+});
+
+test("los montos netos salen a 2 decimales (sin colas de flotante)", async () => {
+  const { c, orderId } = await venta("centavos");
+  // Un monto cuyo neto en flotante deja cola (p. ej. 1000 − 300.07 = 699.9300000000001).
+  let monto = null;
+  for (let cts = 1; cts < 100 && monto === null; cts++) {
+    const m = Math.min(precio - 1, 300) + cts / 100;
+    if ((String(precio - m).split(".")[1] ?? "").length > 2) monto = m;
+  }
+  assert.ok(monto, `no encontré un monto con cola para precio=${precio}`);
+  assert.equal((await reembolsar(orderId, { kind: "partial", amount: monto })).status, 201);
+  const decimales = (x) => (String(x).split(".")[1] ?? "").length;
+  const pagos = await api("GET", `/api/payments?userId=${c.id}`, { token: A });
+  assert.equal(pagos.body.total, Math.round((precio - monto) * 100) / 100);
+  assert.ok(decimales(pagos.body.total) <= 2, `total ${pagos.body.total}`);
+  assert.ok(decimales(pagos.body.refundsTotal) <= 2, `refundsTotal ${pagos.body.refundsTotal}`);
+  const rep = await api("GET", "/api/reports/overview", { token: A });
+  assert.equal(rep.status, 200);
+  assert.ok(decimales(rep.body.data.monthlyRevenue) <= 2, `monthlyRevenue ${rep.body.data.monthlyRevenue}`);
 });

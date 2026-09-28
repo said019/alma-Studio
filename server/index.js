@@ -61,7 +61,7 @@ import { seedClassTypesIfEmpty, seedPlansIfEmpty } from "./lib/catalogSeed.js";
 import { DEFAULT_NOTIFICATION_TEMPLATES } from "./lib/notificationTemplates.js";
 import { PASS_DEFAULT_TEXTS, LOYALTY_MILESTONES_SEED } from "./lib/passDefaults.js";
 import { resolveEffectivePrice } from "./lib/pricing.js";
-import { saleAmountPlan, planMembershipAdjust, cleanPaymentReference, saleStartProblem, saleStartDay, saleAuditAfter, PAYMENT_METHODS } from "./lib/membershipAdmin.js";
+import { saleAmountPlan, planMembershipAdjust, cleanPaymentReference, saleStartProblem, saleStartDay, saleAuditAfter, PAYMENT_METHODS, normalizePaymentMethod, PAYMENT_METHOD_INVALID, calcMembershipEndDate } from "./lib/membershipAdmin.js";
 import { cancellationLimitProblem, cancellationQuota, clientCancelDecision, normalizeCancellationSettings, publicBookingPolicy } from "./lib/cancellationPolicy.js";
 import { isMembershipCategoryCompatible as ruleCategoryCompatible, normalizeClassCategory as ruleNormalizeCategory, isWithinMorningWindow, categoryLabel, canMixtoBook } from "./lib/bookingRules.js";
 import { rateKey } from "./lib/rateKey.js";
@@ -75,11 +75,11 @@ import { getWellhubCredentials } from "./lib/wellhub/credentials.js";
 import { publicPartnerSettings, mergeSecret } from "./lib/partnerSettings.js";
 import { createAccountGate } from "./lib/accountGate.js";
 import { userAnonymizationValues, buildAnonymizeUpdate, WAIVER_ANON_VALUES, GUEST_ANON_VALUES, eventRegistrationAnonValues } from "./lib/anonymize.js";
-import { refundPlan } from "./lib/refunds.js";
+import { refundPlan, round2 } from "./lib/refunds.js";
 import { validateWellhubVisit as wellhubValidateVisit } from "./lib/wellhub/api.js";
 import { handleBookingRequested, handleCheckin, handleCancel, handlePlanChange } from "./lib/wellhub/flows.js";
 import { wellhubMonthRange, summarizeWellhubMonth } from "./lib/wellhub/reconcile.js";
-import { isUuid, signatureProblem } from "./lib/validate.js";
+import { isUuid, isDay, signatureProblem } from "./lib/validate.js";
 import { checkinRule, noShowCorrectionRule } from "./lib/checkin.js";
 import { responsivaDocument, waiverVersionProblem } from "./lib/responsiva.js";
 import { pgReminderLog, sendClassReminders } from "./lib/classReminder.js";
@@ -3778,6 +3778,8 @@ app.get("/api/bookings/weekly-status", authMiddleware, async (req, res) => {
 // walk-ins de último momento desde el roster.
 const BOOKING_LEAD_HOURS = 2;
 const BOOKING_LEAD_MS = BOOKING_LEAD_HOURS * 60 * 60 * 1000;
+// Membresía vencida en el calendario del estudio (no en el del servidor).
+const MEMBERSHIP_EXPIRED_SQL = `(end_date IS NOT NULL AND end_date < (NOW() AT TIME ZONE '${STUDIO_TIMEZONE}')::date)`;
 
 // Conteo REAL de lugares ocupados (confirmadas + check-in). Fuente de verdad
 // del cupo, en lugar del contador denormalizado classes.current_bookings, que
@@ -4142,15 +4144,24 @@ app.post("/api/bookings", authMiddleware, async (req, res) => {
       });
     }
 
-    // Lock selected membership row to prevent double consumption
+    // Lock selected membership row to prevent double consumption. Bajo el
+    // candado se revisa otra vez que siga vigente: un reembolso total o una
+    // cancelación pudo confirmarse entre la elección y el candado, y en una
+    // ilimitada (clases NULL) el tope de clases no lo detecta.
     const lockedMembershipRes = await client.query(
-      "SELECT id, classes_remaining FROM memberships WHERE id = $1 FOR UPDATE",
+      `SELECT id, classes_remaining, status::text AS status, end_date,
+              ${MEMBERSHIP_EXPIRED_SQL} AS expired
+         FROM memberships WHERE id = $1 FOR UPDATE`,
       [membership.id]
     );
     const lockedMembership = lockedMembershipRes.rows[0];
     if (!lockedMembership) {
       await client.query("ROLLBACK");
       return res.status(403).json({ message: "No se encontró una membresía válida para esta reserva." });
+    }
+    if (lockedMembership.status !== "active" || lockedMembership.expired) {
+      await client.query("ROLLBACK");
+      return res.status(409).json({ code: "MEMBERSHIP_NOT_CURRENT", message: "Tu paquete ya no está vigente." });
     }
 
     if (!isMembershipCategoryCompatible(membership.class_category, clsCategory)) {
@@ -10341,19 +10352,25 @@ app.post("/api/admin/visit-sale", adminMiddleware, async (req, res) => {
     const startStr = startDate ? String(startDate).slice(0, 10) : todayInStudio();
     const endStr = calcMembershipEndDate(startStr, plan);
     const pm = normalizePaymentMethod(paymentMethod);
-    const memRes = await dbClient.query(
-      `INSERT INTO memberships
-         (user_id, plan_id, status, payment_method, start_date, end_date, classes_remaining, notes)
-       VALUES ($1, $2, 'active', $3, $4, $5, $6, $7)
-       RETURNING *`,
-      [user.id, plan.id, pm, startStr, endStr, plan.class_limit ?? null,
-       `Venta visita POS — ${guest.display_name}`]
-    );
+    if (!pm) {
+      await dbClient.query("ROLLBACK");
+      return res.status(400).json({ message: PAYMENT_METHOD_INVALID });
+    }
+    // Orden primero y membresía ligada a ella (order_id): /api/payments la
+    // cuenta una sola vez y un reembolso encuentra la membresía.
     const orderRes = await dbClient.query(
-      `INSERT INTO orders (user_id, plan_id, status, payment_method, total_amount, channel, verified_at, verified_by)
-       VALUES ($1, $2, 'approved', $3, $4, 'pos_visit', NOW(), $5)
+      `INSERT INTO orders (user_id, plan_id, status, payment_method, subtotal, total_amount, channel, verified_at, verified_by)
+       VALUES ($1, $2, 'approved', $3, $4, $4, 'pos_visit', NOW(), $5)
        RETURNING *`,
       [user.id, plan.id, pm, _eff ?? 0, req.userId || null]
+    );
+    const memRes = await dbClient.query(
+      `INSERT INTO memberships
+         (user_id, plan_id, status, payment_method, start_date, end_date, classes_remaining, notes, order_id)
+       VALUES ($1, $2, 'active', $3, $4, $5, $6, $7, $8)
+       RETURNING *`,
+      [user.id, plan.id, pm, startStr, endStr, plan.class_limit ?? null,
+       `Venta visita POS — ${guest.display_name}`, orderRes.rows[0].id]
     );
     await dbClient.query("COMMIT");
     return res.status(201).json({
@@ -10479,24 +10496,29 @@ app.post("/api/admin/classes/:id/walkin-visit", adminMiddleware, async (req, res
       const plan = planRes.rows[0];
       const _gen = await getSettingValueWithDefaults("general_settings");
       const _eff = resolveEffectivePrice(plan, _gen?.opening_pricing_active !== false);
-      const pm = normalizePaymentMethod(sale.paymentMethod || "cash");
+      const pm = normalizePaymentMethod(sale.paymentMethod);
+      if (!pm) {
+        await dbClient.query("ROLLBACK");
+        return res.status(400).json({ message: PAYMENT_METHOD_INVALID });
+      }
       const startStr = todayInStudio();
       const endStr = calcMembershipEndDate(startStr, plan);
-      const memIns = await dbClient.query(
-        `INSERT INTO memberships
-           (user_id, plan_id, status, payment_method, start_date, end_date, classes_remaining, notes)
-         VALUES ($1, $2, 'active', $3, $4, $5, $6, $7) RETURNING *`,
-        [user.id, plan.id, pm, startStr, endStr, plan.class_limit ?? 1,
-         `Venta visita en roster — ${guest.display_name}`]
-      );
-      memRow = memIns.rows[0];
+      // Orden primero y membresía ligada a ella (order_id), como en visit-sale.
       const orderIns = await dbClient.query(
-        `INSERT INTO orders (user_id, plan_id, status, payment_method, total_amount, channel, verified_at, verified_by)
-         VALUES ($1, $2, 'approved', $3, $4, 'pos_visit', NOW(), $5)
+        `INSERT INTO orders (user_id, plan_id, status, payment_method, subtotal, total_amount, channel, verified_at, verified_by)
+         VALUES ($1, $2, 'approved', $3, $4, $4, 'pos_visit', NOW(), $5)
          RETURNING *`,
         [user.id, plan.id, pm, _eff ?? 0, req.userId || null]
       );
       saleOrder = orderIns.rows[0];
+      const memIns = await dbClient.query(
+        `INSERT INTO memberships
+           (user_id, plan_id, status, payment_method, start_date, end_date, classes_remaining, notes, order_id)
+         VALUES ($1, $2, 'active', $3, $4, $5, $6, $7, $8) RETURNING *`,
+        [user.id, plan.id, pm, startStr, endStr, plan.class_limit ?? 1,
+         `Venta visita en roster — ${guest.display_name}`, saleOrder.id]
+      );
+      memRow = memIns.rows[0];
     }
 
     // Crear booking confirmed + descontar crédito + actualizar contador.
@@ -11881,10 +11903,11 @@ app.get("/api/reports/overview", ownerMiddleware, async (req, res) => {
     const churnRate = Number((100 * churn.rows[0].churned / churn.rows[0].base).toFixed(1));
     const grossRevenue = parseFloat(revenue.rows[0].gross);
     const refundsTotal = parseFloat(revenue.rows[0].refunds);
-    const monthlyRevenue = grossRevenue - refundsTotal;
+    // round2: restar flotantes dejaba colas como 699.9300000000001 en el JSON.
+    const monthlyRevenue = round2(grossRevenue - refundsTotal);
     const newMembersCount = parseInt(newMembers.rows[0].count || 0);
     const reviewsAvg = Number(parseFloat(reviews.rows[0].average || 0).toFixed(1));
-    const prevRev = parseFloat(prevRevenue.rows[0].gross) - parseFloat(prevRevenue.rows[0].refunds);
+    const prevRev = round2(parseFloat(prevRevenue.rows[0].gross) - parseFloat(prevRevenue.rows[0].refunds));
     const prevBookingsCount = parseInt(prevBookings.rows[0].total || 0);
     const prevAttended = parseInt(prevBookings.rows[0].attended || 0);
     const prevOccupancy = prevBookingsCount > 0 ? (prevAttended / prevBookingsCount) * 100 : 0;
@@ -14475,14 +14498,21 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
       return res.status(403).json({ message: "La clienta no tiene membresía activa con créditos para esta clase" });
     }
 
+    // Vigencia revisada bajo candado, como en POST /api/bookings.
     const lockedMembershipRes = await client.query(
-      "SELECT id, classes_remaining FROM memberships WHERE id = $1 FOR UPDATE",
+      `SELECT id, classes_remaining, status::text AS status, end_date,
+              ${MEMBERSHIP_EXPIRED_SQL} AS expired
+         FROM memberships WHERE id = $1 FOR UPDATE`,
       [membership.id]
     );
     const lockedMembership = lockedMembershipRes.rows[0];
     if (!lockedMembership) {
       await client.query("ROLLBACK");
       return res.status(403).json({ message: "No se encontró una membresía válida para esta clase" });
+    }
+    if (lockedMembership.status !== "active" || lockedMembership.expired) {
+      await client.query("ROLLBACK");
+      return res.status(409).json({ code: "MEMBERSHIP_NOT_CURRENT", message: "El paquete de la clienta ya no está vigente." });
     }
 
     if (!isMembershipCategoryCompatible(membership.class_category, clsCategory)) {
@@ -14604,26 +14634,33 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
         const plan = planRes.rows[0];
         const _gen = await getSettingValueWithDefaults("general_settings");
         const _eff = resolveEffectivePrice(plan, _gen?.opening_pricing_active !== false);
-        const pm = normalizePaymentMethod(guestSale.paymentMethod || "cash");
+        const pm = normalizePaymentMethod(guestSale.paymentMethod);
+        if (!pm) {
+          await client.query("ROLLBACK");
+          return res.status(400).json({ message: PAYMENT_METHOD_INVALID });
+        }
         const startStr = todayInStudio();
         const endStr = calcMembershipEndDate(startStr, plan);
         // Si no especifica class_limit, asumimos clase suelta (1).
         const credits = plan.class_limit ?? 1;
-        const memIns = await client.query(
-          `INSERT INTO memberships
-             (user_id, plan_id, status, payment_method, start_date, end_date, classes_remaining, notes)
-           VALUES ($1, $2, 'active', $3, $4, $5, $6, $7) RETURNING *`,
-          [guestUser.id, plan.id, pm, startStr, endStr, credits,
-           `Venta acompañante en roster — invitada por user ${userId}`]
-        );
-        const memRow = memIns.rows[0];
+        // Primero la orden y luego la membresía ligada a ella (order_id): así
+        // /api/payments la cuenta una sola vez (por la orden) y un reembolso
+        // encuentra la membresía. Las ventas viejas sin order_id no se tocan.
         const orderIns = await client.query(
-          `INSERT INTO orders (user_id, plan_id, status, payment_method, total_amount, channel, verified_at, verified_by)
-           VALUES ($1, $2, 'approved', $3, $4, 'pos_guest_sale', NOW(), $5)
+          `INSERT INTO orders (user_id, plan_id, status, payment_method, subtotal, total_amount, channel, verified_at, verified_by)
+           VALUES ($1, $2, 'approved', $3, $4, $4, 'pos_guest_sale', NOW(), $5)
            RETURNING *`,
           [guestUser.id, plan.id, pm, _eff ?? 0, req.userId || null]
         );
         guestSaleOrder = orderIns.rows[0];
+        const memIns = await client.query(
+          `INSERT INTO memberships
+             (user_id, plan_id, status, payment_method, start_date, end_date, classes_remaining, notes, order_id)
+           VALUES ($1, $2, 'active', $3, $4, $5, $6, $7, $8) RETURNING *`,
+          [guestUser.id, plan.id, pm, startStr, endStr, credits,
+           `Venta acompañante en roster — invitada por user ${userId}`, guestSaleOrder.id]
+        );
+        const memRow = memIns.rows[0];
         guestMembershipId = memRow.id;
         guestMembershipCreditsAfter = (memRow.classes_remaining ?? 1) - 1;
         if (memRow.classes_remaining !== null) {
@@ -15607,14 +15644,15 @@ app.put("/api/admin/orders/:id/reject", adminMiddleware, async (req, res) => {
 // membresías viejas sin orden y, desde el bloque 3, los reembolsos como filas
 // negativas en su fecha (auditoría 2026-09-27, P1-12). Cada orden trae su
 // reembolso, su canal y su membresía para el diálogo "Reembolsar". `total` es neto.
-const PAYMENTS_DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 app.get("/api/payments", ownerMiddleware, async (req, res) => {
   try {
     const { startDate, endDate, userId } = req.query;
-    // Un filtro basura daba 500 (Postgres rechazaba el uuid o la fecha).
+    // Un filtro basura daba 500 (Postgres rechazaba el uuid o la fecha). isDay
+    // pide además que el día exista (ida y vuelta por Date): "2026-02-30" pasa
+    // el formato pero Postgres lo rechaza.
     if (userId && !isUuid(String(userId))) return res.status(400).json({ message: "Identificador inválido" });
     for (const d of [startDate, endDate]) {
-      if (d && !PAYMENTS_DAY_RE.test(String(d))) return res.status(400).json({ message: "Fecha inválida (usa AAAA-MM-DD)." });
+      if (d && !isDay(d)) return res.status(400).json({ message: "Fecha inválida (usa AAAA-MM-DD)." });
     }
     const limit = Math.min(1000, Math.max(1, Number.parseInt(String(req.query.limit ?? "200"), 10) || 200));
     const params = [];
@@ -15668,8 +15706,8 @@ app.get("/api/payments", ownerMiddleware, async (req, res) => {
       `(${ordenes}) UNION ALL (${membresias}) UNION ALL (${reembolsos}) ORDER BY created_at DESC LIMIT $${params.length}`,
       params,
     );
-    const total = r.rows.reduce((sum, o) => sum + parseFloat(o.total_amount || 0), 0);
-    const refundsTotal = r.rows.filter((o) => o.source === "refund").reduce((sum, o) => sum + parseFloat(o.refunded_amount || 0), 0);
+    const total = round2(r.rows.reduce((sum, o) => sum + parseFloat(o.total_amount || 0), 0));
+    const refundsTotal = round2(r.rows.filter((o) => o.source === "refund").reduce((sum, o) => sum + parseFloat(o.refunded_amount || 0), 0));
     return res.json({
       data: r.rows.map((o) => ({
         ...o,
@@ -15762,6 +15800,10 @@ app.post("/api/admin/orders/:id/refunds", ownerMiddleware, async (req, res) => {
     //    SKIP LOCKED no se espera a la que otra transacción ya tiene (una
     //    cancelación en curso, que va de la reserva a la membresía): esperarla
     //    teniendo la membresía sería un interbloqueo.
+    //    Las saltadas no se pierden: la cancelación en curso termina sola; una
+    //    subida de la fila que esperaba esta membresía la verá cancelada y se
+    //    revierte, y la reserva que deja en 'waitlist' la cancela el barrido
+    //    que corre después del COMMIT (paso 7).
     if (membership && input.kind === "total") {
       const tarde = (await client.query(
         `SELECT b.id, b.class_id, b.status::text AS status
@@ -15850,6 +15892,30 @@ app.post("/api/admin/orders/:id/refunds", ownerMiddleware, async (req, res) => {
     // La subida de la fila pide su propia conexión: se devuelve ésta antes.
     client.release();
     released = true;
+
+    // 7. Filas en fila que siguen ligadas a la membresía reembolsada: las que el
+    //    paso 5 saltó porque una subida las tenía y cuya subida se revirtió al
+    //    ver la membresía cancelada. Best-effort, una sola sentencia fuera de la
+    //    transacción: no vuelve a tomar la orden ni la membresía. Espera, a lo
+    //    más, a que esa subida suelte la reserva.
+    if (plan.kind === "total" && membership) {
+      try {
+        const sueltas = await pool.query(
+          `UPDATE bookings b
+              SET status = 'cancelled', cancelled_at = NOW(), cancelled_by = $2, cancellation_reason = $3
+             FROM classes c
+            WHERE c.id = b.class_id AND b.membership_id = $1 AND b.status = 'waitlist'
+              AND ((c.date + c.start_time) AT TIME ZONE '${STUDIO_TIMEZONE}') > NOW()
+            RETURNING b.id`,
+          [membership.id, req.userId, `Reembolso total: ${why}`.slice(0, 500)],
+        );
+        if (sueltas.rowCount) {
+          console.warn(`[refunds] ${sueltas.rowCount} reserva(s) en fila de la membresía ${membership.id} se cancelaron después del COMMIT`);
+        }
+      } catch (e) {
+        console.warn("[refunds] no se pudieron cancelar las filas sueltas:", e?.message);
+      }
+    }
 
     const freed = [...new Set(bookings.filter((b) => b.status === "confirmed").map((b) => b.class_id))];
     if (freed.length) await onSeatReleased(freed, { source: "refund" });

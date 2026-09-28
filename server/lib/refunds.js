@@ -10,7 +10,8 @@ import { cleanPaymentReference } from "./membershipAdmin.js";
 
 export const REFUND_METHODS = Object.freeze(["cash", "transfer", "card"]);
 
-const round2 = (n) => Math.round(Number(n) * 100) / 100;
+/** Pesos a 2 decimales: restas como 1500 − 365.54 no dejan colas de flotante en el JSON. */
+export const round2 = (n) => Math.round(Number(n) * 100) / 100;
 const pesos = (n) => `$${round2(n).toLocaleString("es-MX", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
 const isUnlimited = (v) => v === null || v === undefined || Number(v) >= 9999;
 

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { refundPlan, parseMoney, REFUND_METHODS } from "./refunds.js";
+import { refundPlan, parseMoney, REFUND_METHODS, round2 } from "./refunds.js";
 
 const order = { status: "approved", payment_method: "cash", channel: "counter", total_amount: "1700.00", refunded_amount: "0", refund_status: null };
 const mem = { status: "active", classes_remaining: 6 };
@@ -63,4 +63,12 @@ test("entrada: tipo, método y motivo", () => {
   assert.deepEqual(REFUND_METHODS, ["cash", "transfer", "card"]);
   assert.equal(parseMoney("99,50"), 99.5);
   assert.ok(Number.isNaN(parseMoney("abc")));
+});
+
+test("round2: la resta de pesos no deja colas de flotante", () => {
+  assert.notEqual(1000 - 300.07, 699.93, "sin redondear, JS deja 699.9300000000001");
+  assert.equal(round2(1000 - 300.07), 699.93);
+  assert.equal(round2(1000 - 300.16), 699.84);
+  assert.equal(round2("1700.00"), 1700);
+  assert.equal(round2(0.1 + 0.2), 0.3);
 });

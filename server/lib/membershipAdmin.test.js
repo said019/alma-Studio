@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { saleAmountPlan, cleanPaymentReference, planMembershipAdjust, creditsKey, addDaysYmd, saleStartProblem, saleAuditAfter } from "./membershipAdmin.js";
+import { saleAmountPlan, cleanPaymentReference, planMembershipAdjust, creditsKey, addDaysYmd, saleStartProblem, saleAuditAfter, normalizePaymentMethod, PAYMENT_METHOD_INVALID, calcMembershipEndDate } from "./membershipAdmin.js";
 
 // "2026-02-30" no da NaN en `new Date()`: la corre silenciosamente a marzo.
 test("saleStartProblem: sin fecha o fecha válida no hay problema; una fecha que no existe en el calendario sí", () => {
@@ -128,4 +128,20 @@ test("cancelaciones usadas: cambiarlas pide motivo; el mismo valor no cuenta", (
     assert.equal(m.ok, false, String(bad));
     assert.equal(m.message, "Las cancelaciones usadas deben ser un número entero de 0 en adelante.");
   }
+});
+
+test("normalizePaymentMethod: sin método es efectivo; uno válido pasa; uno raro es null (400)", () => {
+  for (const v of [undefined, null, ""]) assert.equal(normalizePaymentMethod(v), "cash");
+  assert.equal(normalizePaymentMethod("transfer"), "transfer");
+  assert.equal(normalizePaymentMethod(" Card "), "card");
+  assert.equal(normalizePaymentMethod("cheque"), null);
+  assert.equal(normalizePaymentMethod(["cash"]), null);
+  assert.equal(PAYMENT_METHOD_INVALID, "Método de pago inválido. Opciones: cash, transfer, card, online.");
+});
+
+test("calcMembershipEndDate: inicio + duración del plan (30 días si no trae)", () => {
+  assert.equal(calcMembershipEndDate("2026-09-28", { duration_days: 30 }), "2026-10-28");
+  assert.equal(calcMembershipEndDate("2026-09-28", { duration_days: 7 }), "2026-10-05");
+  assert.equal(calcMembershipEndDate("2026-09-28", {}), "2026-10-28");
+  assert.equal(calcMembershipEndDate("2026-09-28", null), "2026-10-28");
 });
