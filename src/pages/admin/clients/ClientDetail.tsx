@@ -29,6 +29,7 @@ import { useCanSeeFinance } from "@/lib/roles";
 import { FEATURES } from "@/config/features";
 import { waLink } from "@/lib/phone";
 import { REASON_MIN_CHARS } from "@/lib/audit-log";
+import { REFUND_METHOD_LABEL } from "@/pages/admin/payments/refund-math";
 import {
   ArrowLeft, ArrowRight, CalendarDays, Camera, ChevronLeft, ChevronRight, CreditCard,
   MessageCircle, Pencil, Phone, Receipt, RefreshCw, type LucideProps,
@@ -91,6 +92,14 @@ const PAYMENT_METHOD: Record<string, string> = {
   transfer: "Transferencia",
   stripe: "Stripe",
   mercado_pago: "Mercado Pago",
+};
+
+// En una fila de reembolso, "card" es la terminal, no la tarjeta con la que se
+// pagó: mismo criterio que PaymentsHistory.tsx y el diálogo de reembolso (T7).
+const metodoDePago = (p: { method?: string; source?: string }): string => {
+  const m = p.method ?? "";
+  if (p.source === "refund" && m in REFUND_METHOD_LABEL) return REFUND_METHOD_LABEL[m as keyof typeof REFUND_METHOD_LABEL];
+  return PAYMENT_METHOD[m] ?? p.method ?? "—";
 };
 
 // ── Clases compartidas (tema claro nativo) ─────────────────────────────────────
@@ -425,7 +434,12 @@ const ClientDetail = () => {
       body.classesRemaining = editUnlimited ? 9999 : Math.max(0, Number(editCredits || 0));
       if (editStartDate) body.startDate = editStartDate;
       if (editEndDate) body.endDate = editEndDate;
-      if (editCancellations.trim() !== "") body.cancellationsUsed = Number(editCancellations);
+      // Sólo manda cancellationsUsed si de verdad cambió: si no, un guardado
+      // por otro ajuste (fechas, créditos...) reescribiría el contador con
+      // un valor que ya quedó viejo desde que se abrió el diálogo (T3).
+      if (editCancellations.trim() !== "" && editCancellations !== String(editMem.cancellationsUsed ?? 0)) {
+        body.cancellationsUsed = Number(editCancellations);
+      }
       body.reason = editReason.trim();
       return api.put(`/memberships/${editMem.id}`, body);
     },
@@ -736,7 +750,7 @@ const ClientDetail = () => {
                                   {formatMXN(Number(p.total_amount ?? p.amount ?? 0))}
                                 </TableCell>
                                 <TableCell className="text-ink/70">{p.planName ?? p.plan_name ?? "—"}</TableCell>
-                                <TableCell className="text-ink/70">{PAYMENT_METHOD[p.method] ?? p.method ?? "—"}</TableCell>
+                                <TableCell className="text-ink/70">{metodoDePago(p)}</TableCell>
                                 <TableCell className="text-ink/70 nums">{createdAt ? formatDate(createdAt) : "—"}</TableCell>
                               </TableRow>
                             );
@@ -971,6 +985,7 @@ const ClientDetail = () => {
                     id="mem-cancellations"
                     type="number"
                     min="0"
+                    max={1000}
                     step="1"
                     inputMode="numeric"
                     className={cn(fieldCls, "nums")}
