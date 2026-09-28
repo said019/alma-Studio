@@ -13,7 +13,9 @@ interface AuthGuardProps {
 export const AuthGuard = ({ children, requiredRoles = ADMIN_ROLES }: AuthGuardProps) => {
   const { user, isAuthenticated, sessionCheck, checkAuth } = useAuthStore();
   const location = useLocation();
-  const [checked, setChecked] = useState(false);
+  // Con sesión ya autenticada se pinta de inmediato (sin spinner en cada
+  // página); sin sesión se espera a checkAuth antes de decidir.
+  const [checked, setChecked] = useState(() => useAuthStore.getState().isAuthenticated);
 
   useEffect(() => {
     (async () => {
