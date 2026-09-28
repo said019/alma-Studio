@@ -44,3 +44,41 @@ export function sweepMinutes(raw) {
   const n = Number(typeof raw === "string" ? raw.trim() : raw ?? 0);
   return Number.isFinite(n) && n > 0 ? n : 0;
 }
+
+/**
+ * La regla que se le explica a quien entra a la fila, en el correo y en el
+ * WhatsApp: la subida es automática y usa una clase del paquete, así que
+ * "te avisamos si se libera" no basta para que sepa lo que va a pasar.
+ */
+export function waitlistJoinRule(cutoffHours = 2) {
+  const h = Number(cutoffHours) > 0 ? Number(cutoffHours) : 2;
+  return `Si se libera un lugar hasta ${h} ${h === 1 ? "hora" : "horas"} antes de la clase, quedas inscrita sola, se usa una clase de tu paquete y te avisamos. Desde ese momento aplican las reglas de cancelación.`;
+}
+
+/** Llave del WhatsApp de "entraste a la fila". No tiene plantilla por defecto
+ *  en DEFAULT_NOTIFICATION_TEMPLATES: sale el texto de respaldo, salvo que el
+ *  estudio guarde una plantilla con esta llave. */
+export const WAITLIST_JOINED_TEMPLATE_KEY = "booking_waitlisted";
+
+/**
+ * WhatsApp de una reserva nueva según su estado FINAL (después de la subida):
+ * "confirmed" → booking_confirmed; "waitlist" → WAITLIST_JOINED_TEMPLATE_KEY;
+ * cualquier otro (p. ej. la cancelaron a media petición) → null, sin aviso.
+ * Una reserva que quedó en la fila nunca manda la plantilla de confirmada.
+ */
+export function bookingNotice({ status, firstName, className, date, time, cutoffHours = 2 } = {}) {
+  const who = String(firstName ?? "").trim() || "Alumna";
+  const cls = className || "tu clase";
+  const when = [date, time].filter(Boolean).join(" ");
+  const cuando = when ? ` (${when})` : "";
+  if (status === "confirmed") {
+    return { templateKey: "booking_confirmed", fallbackMessage: `Hola ${who}, tu reserva para ${cls}${cuando} está confirmada.` };
+  }
+  if (status === "waitlist") {
+    return {
+      templateKey: WAITLIST_JOINED_TEMPLATE_KEY,
+      fallbackMessage: `Hola ${who}, quedaste en lista de espera para ${cls}${cuando}. ${waitlistJoinRule(cutoffHours)}`,
+    };
+  }
+  return null;
+}

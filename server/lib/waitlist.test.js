@@ -1,6 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { promotionWindowOpen, freeSeats, queueBlocksNewBooking, firstEligible, sweepMinutes } from "./waitlist.js";
+import {
+  promotionWindowOpen, freeSeats, queueBlocksNewBooking, firstEligible, sweepMinutes,
+  waitlistJoinRule, bookingNotice, WAITLIST_JOINED_TEMPLATE_KEY,
+} from "./waitlist.js";
+import { DEFAULT_NOTIFICATION_TEMPLATES } from "./notificationTemplates.js";
 
 const AHORA = Date.parse("2026-10-01T10:00:00Z");
 
@@ -46,4 +50,34 @@ test("el barrido de respaldo viene apagado: sin la variable, en 0 o con basura n
   assert.equal(sweepMinutes("cinco"), 0);
   assert.equal(sweepMinutes("5"), 5);
   assert.equal(sweepMinutes(" 10 "), 10);
+});
+
+test("entrar a la fila explica la subida automática, no promete sólo un aviso", () => {
+  assert.equal(
+    waitlistJoinRule(2),
+    "Si se libera un lugar hasta 2 horas antes de la clase, quedas inscrita sola, se usa una clase de tu paquete y te avisamos. Desde ese momento aplican las reglas de cancelación.",
+  );
+  assert.equal(waitlistJoinRule(), waitlistJoinRule(2));
+  assert.match(waitlistJoinRule(1), /hasta 1 hora antes/);
+});
+
+test("una reserva que entra a la fila no manda la plantilla de reserva confirmada", () => {
+  const base = { firstName: "Ana", className: "Reformer", date: "30/9/2026", time: "07:00", cutoffHours: 2 };
+  const fila = bookingNotice({ ...base, status: "waitlist" });
+  assert.notEqual(fila.templateKey, "booking_confirmed");
+  assert.equal(fila.templateKey, WAITLIST_JOINED_TEMPLATE_KEY);
+  assert.equal(Object.hasOwn(DEFAULT_NOTIFICATION_TEMPLATES, WAITLIST_JOINED_TEMPLATE_KEY), false,
+    "sin plantilla por defecto: sale el texto de respaldo");
+  assert.equal(fila.fallbackMessage, `Hola Ana, quedaste en lista de espera para Reformer (30/9/2026 07:00). ${waitlistJoinRule(2)}`);
+  assert.doesNotMatch(fila.fallbackMessage, /confirmada/);
+
+  const ok = bookingNotice({ ...base, status: "confirmed" });
+  assert.equal(ok.templateKey, "booking_confirmed");
+  assert.equal(ok.fallbackMessage, "Hola Ana, tu reserva para Reformer (30/9/2026 07:00) está confirmada.");
+
+  for (const otro of ["cancelled", "checked_in", undefined]) {
+    assert.equal(bookingNotice({ ...base, status: otro }), null, `${otro}: sin aviso`);
+  }
+  assert.match(bookingNotice({ status: "waitlist" }).fallbackMessage, /^Hola Alumna, quedaste en lista de espera para tu clase\. /,
+    "sin nombre ni clase no sale vacío");
 });

@@ -12,6 +12,7 @@
  */
 
 import { Resend } from "resend";
+import { waitlistJoinRule } from "./lib/waitlist.js";
 
 // Resend es opcional: si no hay API key, el servicio de email queda inactivo
 // (los envíos se omiten en vez de crashear el server). Degrada graciosamente.
@@ -369,6 +370,7 @@ async function sendMembershipActivated(opts) {
  * @param {number|null} opts.classesLeft — clases restantes después de reservar (null = ilimitado)
  * @param {boolean} opts.isWaitlist     — true si es lista de espera
  * @param {number} [opts.cancelHours]   — ventana de cancelación (default 12)
+ * @param {number} [opts.waitlistCutoffHours] — hasta cuántas horas antes sube la fila (default 2)
  */
 function renderBookingConfirmed(opts) {
   const { to, name, className, date, startTime, instructor, classesLeft, isWaitlist } = opts;
@@ -383,7 +385,7 @@ function renderBookingConfirmed(opts) {
       : `${classesLeft} clases restantes`;
 
   const waitlistNote = isWaitlist
-    ? alertBox("Estás en la <strong>lista de espera</strong>. Te notificaremos si se libera un lugar. Si quieres asegurar tu spot, reserva otra sesión.")
+    ? alertBox(`Estás en la <strong>lista de espera</strong>. ${esc(waitlistJoinRule(opts.waitlistCutoffHours ?? 2))}`)
     : "";
 
   const html = baseLayout({

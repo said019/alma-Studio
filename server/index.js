@@ -70,7 +70,7 @@ import { scheduleAt } from "./lib/schedule.js";
 import { verifyWellhubSignature, extractSignatureHeader } from "./lib/wellhub/signature.js";
 import { extractGymId, computeEventId } from "./lib/wellhub/payload.js";
 import { planWeekClear, weekRangeProblem } from "./lib/weekClear.js";
-import { promotionWindowOpen, freeSeats, queueBlocksNewBooking, firstEligible, sweepMinutes } from "./lib/waitlist.js";
+import { promotionWindowOpen, freeSeats, queueBlocksNewBooking, firstEligible, sweepMinutes, bookingNotice } from "./lib/waitlist.js";
 import { getWellhubCredentials } from "./lib/wellhub/credentials.js";
 import { publicPartnerSettings, mergeSecret } from "./lib/partnerSettings.js";
 import { createAccountGate } from "./lib/accountGate.js";
@@ -4048,6 +4048,25 @@ const hasSignedWaiver = async (db, userId) =>
   (await db.query("SELECT 1 FROM waivers WHERE user_id = $1 LIMIT 1", [userId]).catch(() => ({ rows: [] }))).rows.length > 0;
 const WAIVER_REQUIRED_MSG = "Antes de tu primera reserva necesitas leer y firmar la responsiva y consentimiento informado.";
 
+// WhatsApp de una reserva nueva (app y asignación) según su estado final: la que
+// queda en la fila usa su propia llave (bookingNotice, server/lib/waitlist.js),
+// nunca la plantilla de "reserva confirmada". Las plantillas usan {firstName}.
+function sendBookingNoticeWhatsApp(u, cl, status) {
+  const firstName = firstNameOf(u?.display_name, "Alumna");
+  const date = cl?.date ? new Date(cl.date).toLocaleDateString("es-MX") : "";
+  const time = cl?.start_time ? String(cl.start_time).slice(0, 5) : "";
+  const notice = bookingNotice({
+    status, firstName, className: cl?.class_type_name, date, time, cutoffHours: BOOKING_LEAD_HOURS,
+  });
+  if (!notice) return Promise.resolve({ sent: false, reason: "no_notice" });
+  return sendConfiguredWhatsAppTemplate({
+    templateKey: notice.templateKey,
+    phone: u?.phone,
+    vars: { firstName, name: u?.display_name || firstName, class: cl?.class_type_name || "Clase", date, time },
+    fallbackMessage: notice.fallbackMessage,
+  });
+}
+
 // POST /api/bookings
 app.post("/api/bookings", authMiddleware, async (req, res) => {
   const { classId } = req.body;
@@ -4194,7 +4213,12 @@ app.post("/api/bookings", authMiddleware, async (req, res) => {
       const final = await pool.query("SELECT status::text AS status FROM bookings WHERE id = $1", [result.rows[0].id]);
       if (final.rows[0]?.status) result.rows[0].status = final.rows[0].status;
     }
-    const isWaitlist = result.rows[0].status === "waitlist";
+    // Avisos según el estado FINAL: "Reserva confirmada" sólo si quedó
+    // exactamente confirmada (igual que en la asignación); la fila tiene su
+    // propio aviso; otro estado (la cancelaron a media petición) no avisa.
+    const finalStatus = result.rows[0].status;
+    const isWaitlist = finalStatus === "waitlist";
+    const isConfirmed = finalStatus === "confirmed";
 
     // ── Email: booking confirmed / waitlist ────────────────────────────────
     try {
@@ -4211,7 +4235,7 @@ app.post("/api/bookings", authMiddleware, async (req, res) => {
       const memAfter = await pool.query("SELECT classes_remaining FROM memberships WHERE id = $1", [membership.id]);
       const classesLeft = memAfter.rows[0]?.classes_remaining ?? null;
 
-      if (userRes.rows[0] && classFullRes.rows[0]) {
+      if (userRes.rows[0] && classFullRes.rows[0] && (isConfirmed || isWaitlist)) {
         const u = userRes.rows[0];
         const cl = classFullRes.rows[0];
         if (await areEmailNotificationsEnabled()) {
@@ -4224,23 +4248,13 @@ app.post("/api/bookings", authMiddleware, async (req, res) => {
             instructor: cl.instructor_name,
             classesLeft,
             isWaitlist,
+            waitlistCutoffHours: BOOKING_LEAD_HOURS,
           }).catch((e) => console.error("[Email] booking confirmed:", e.message));
         }
-        sendConfiguredWhatsAppTemplate({
-          templateKey: "booking_confirmed",
-          phone: u.phone,
-          vars: {
-            name: u.display_name || "Alumna",
-            class: cl.class_type_name || "Clase",
-            date: cl.date ? new Date(cl.date).toLocaleDateString("es-MX") : "",
-            time: cl.start_time ? String(cl.start_time).slice(0, 5) : "",
-          },
-          fallbackMessage: isWaitlist
-            ? `Hola ${u.display_name || "Alumna"}, quedaste en lista de espera para ${cl.class_type_name || "tu clase"} (${cl.date || ""} ${String(cl.start_time || "").slice(0, 5)}).`
-            : `Hola ${u.display_name || "Alumna"}, tu reserva para ${cl.class_type_name || "tu clase"} (${cl.date || ""} ${String(cl.start_time || "").slice(0, 5)}) está confirmada.`,
-        }).catch((e) => console.error("[WA] booking confirmed:", e.message));
+        sendBookingNoticeWhatsApp(u, cl, finalStatus)
+          .catch((e) => console.error("[WA] booking confirmed:", e.message));
         // Notificación a la dueña/admins de nueva reserva (no espera la respuesta).
-        if (!isWaitlist) {
+        if (isConfirmed) {
           const dateStr = cl.date ? new Date(cl.date).toLocaleDateString("es-MX") : "";
           const timeStr = cl.start_time ? String(cl.start_time).slice(0, 5) : "";
           notifyAdminsByTemplate(
@@ -4262,7 +4276,7 @@ app.post("/api/bookings", authMiddleware, async (req, res) => {
     const msg = isWaitlist ? "Añadido a lista de espera" : "Reserva confirmada";
     if (isWaitlist) {
       triggerWalletPassSync(req.userId, "booking_waitlist_created");
-    } else {
+    } else if (isConfirmed) {
       const booking = result.rows[0];
       const className = booking?.class_type_name;
       const startStr = booking?.start_time
@@ -7901,7 +7915,7 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
       {
         key: "intro_back",
         label: PASS_DEFAULT_TEXTS.welcomeBackLabel,
-        value: "Te recibimos como te recibe una amiga. Grupos pequeños (4 en Reformer/Tower, 8 en Studio), atención personalizada y alguien que te conoce por tu nombre.",
+        value: "Te recibimos como te recibe una amiga. Grupos pequeños: el cupo de cada clase se ve en la app. Atención personalizada y alguien que te conoce por tu nombre.",
       },
       {
         key: "muestra_back",
@@ -14699,21 +14713,11 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
             instructor: cl.instructor_name,
             classesLeft,
             isWaitlist,
+            waitlistCutoffHours: BOOKING_LEAD_HOURS,
           }).catch((e) => console.error("[Email] booking confirmed (admin):", e.message));
         }
-        sendConfiguredWhatsAppTemplate({
-          templateKey: "booking_confirmed",
-          phone: u.phone,
-          vars: {
-            name: u.display_name || "Alumna",
-            class: cl.class_type_name || "Clase",
-            date: cl.date ? new Date(cl.date).toLocaleDateString("es-MX") : "",
-            time: cl.start_time ? String(cl.start_time).slice(0, 5) : "",
-          },
-          fallbackMessage: isWaitlist
-            ? `Hola ${u.display_name || "Alumna"}, quedaste en lista de espera para ${cl.class_type_name || "tu clase"} (${cl.date || ""} ${String(cl.start_time || "").slice(0, 5)}).`
-            : `Hola ${u.display_name || "Alumna"}, tu reserva para ${cl.class_type_name || "tu clase"} (${cl.date || ""} ${String(cl.start_time || "").slice(0, 5)}) está confirmada.`,
-        }).catch((e) => console.error("[WA] booking confirmed (admin):", e.message));
+        sendBookingNoticeWhatsApp(u, cl, isWaitlist ? "waitlist" : "confirmed")
+          .catch((e) => console.error("[WA] booking confirmed (admin):", e.message));
         // Notifica a la dueña/admins (puede haber otras recepcionistas o instructoras).
         if (!isWaitlist) {
           const dateStr = cl.date ? new Date(cl.date).toLocaleDateString("es-MX") : "";

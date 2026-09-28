@@ -106,7 +106,11 @@ test("reserva confirmada: datos de la clase y política de cancelación intacta"
 test("lista de espera: aviso, píldora y paquete ilimitado", () => {
   const s = EMAIL_SAMPLES.find((x) => x.id === "2b-reserva-lista-de-espera");
   const text = visibleText(render(s).html);
-  assert.ok(text.includes("Estás en la lista de espera. Te notificaremos si se libera un lugar."));
+  assert.ok(text.includes(
+    "Estás en la lista de espera. Si se libera un lugar hasta 2 horas antes de la clase, quedas inscrita sola, se usa una clase de tu paquete y te avisamos. Desde ese momento aplican las reglas de cancelación.",
+  ));
+  assert.ok(!text.includes("Te notificaremos si se libera un lugar"), "ya no promete sólo un aviso");
+  assert.ok(!text.includes("asegurar tu spot"), "ya no manda a reservar otra sesión");
   assert.ok(text.includes("Ilimitadas"));
 });
 

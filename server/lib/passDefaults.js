@@ -22,7 +22,7 @@ export const PASS_DEFAULT_TEXTS = {
   // Apple Wallet: organización, descripción y términos del pase.
   organizationName: "HIVE Pilates Studio",
   termsDefault:
-    "Pase personal para clases en HIVE Pilates Studio. Presenta tu QR al llegar. Cancelaciones: alumnas nuevas 4-5 h antes, recurrentes 2 h antes.",
+    "Pase personal para clases en HIVE Pilates Studio. Presenta tu QR al llegar. Cancelaciones: consulta la política en la app.",
   geofenceRelevantText: "Estás cerca de HIVE. Saca tu pase para check-in.",
 
   // Datos del estudio en el reverso del pase — alineados con src/lib/studio.ts
