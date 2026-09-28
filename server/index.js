@@ -54,9 +54,12 @@ import {
   sendWeeklyReminder,
   sendRenewalReminder,
   sendPasswordResetEmail,
+  FROM_EMAIL,
 } from "./emailService.js";
 import { ALMA_CLASS_TYPES, ALMA_SCHEDULE_SLOTS, ALMA_SCHEDULE_DAYS, ALMA_PLANS } from "./lib/almaCatalog.js";
 import { seedClassTypesIfEmpty, seedPlansIfEmpty } from "./lib/catalogSeed.js";
+import { DEFAULT_NOTIFICATION_TEMPLATES } from "./lib/notificationTemplates.js";
+import { PASS_DEFAULT_TEXTS, LOYALTY_MILESTONES_SEED } from "./lib/passDefaults.js";
 import { resolveEffectivePrice } from "./lib/pricing.js";
 import { saleAmountPlan, planMembershipAdjust, cleanPaymentReference, saleStartProblem, saleStartDay, saleAuditAfter, PAYMENT_METHODS } from "./lib/membershipAdmin.js";
 import { isMembershipCategoryCompatible as ruleCategoryCompatible, normalizeClassCategory as ruleNormalizeCategory, isWithinMorningWindow, categoryLabel } from "./lib/bookingRules.js";
@@ -90,7 +93,7 @@ const app = express();
 const PORT = process.env.PORT || 8080;
 const JWT_SECRET = process.env.JWT_SECRET || "dev_alma_secret_change_me";
 
-const APP_PUBLIC_URL = String(process.env.APP_URL || process.env.SITE_URL || "https://alma-movement.com.mx").replace(/\/+$/, "");
+const APP_PUBLIC_URL = String(process.env.APP_URL || process.env.SITE_URL || "https://www.almamovement.com.mx").replace(/\/+$/, "");
 
 // ─── Evolution API (WhatsApp) config ────────────────────────────────────────
 const EVOLUTION_API_URL = process.env.EVOLUTION_API_URL || "";
@@ -103,11 +106,13 @@ const evolutionApi = axios.create({
 });
 
 const DEFAULT_GENERAL_SETTINGS = {
-  studio_name: "Alma Movement",
-  address: "Plaza Arce, Calle Acueducto de Querétaro 513, Jurica Acueducto, 76230 Juriquilla, Qro.",
-  phone: "7721119216",
-  instagram: "@movementalma",
-  facebook: "Alma Movement",
+  // Alineado con src/lib/studio.ts (única fuente de verdad de los datos
+  // públicos del estudio). Teléfono y WhatsApp: pendientes (null), igual que ahí.
+  studio_name: "HIVE Pilates Studio",
+  address: "Cuauhtémoc #68, Del Carmen, Coyoacán, C.P. 04100, CDMX",
+  phone: null,
+  instagram: "@hive.pilates",
+  facebook: "",
   timezone: "America/Mexico_City",
   currency: "MXN",
   maintenance_mode: false,
@@ -233,177 +238,10 @@ const DEFAULT_NOTIFICATION_SETTINGS = {
   admin_phones: [],
 };
 
-// Templates en voz Alma (cercana, casual, con primer nombre).
+// Templates en voz HIVE (cercana, casual, con primer nombre).
 // Editables vía system_settings.notification_templates (admin UI).
-// Variables disponibles per-template documentadas en cada body.
-const DEFAULT_NOTIFICATION_TEMPLATES = {
-  // ── Onboarding y cuenta ─────────────────────────────────────────
-  welcome: {
-    subject: "Bienvenida a Alma",
-    body: "{firstName}, bienvenida a Alma Movement. Este es un paso más hacia tus objetivos. Cuando quieras, reserva tu clase muestra desde la app.",
-  },
-  password_reset: {
-    subject: "Recuperación de contraseña",
-    body: "{firstName}, usa este enlace para restablecer tu contraseña: {link}",
-  },
-
-  // ── Reservas ────────────────────────────────────────────────────
-  booking_confirmed: {
-    subject: "Reserva confirmada",
-    body: "{firstName}, te apartamos lugar de {class} el {date} a las {time}. Tu pase Alma ya lo trae cargado. Te esperamos.",
-  },
-  booking_cancelled: {
-    subject: "Reserva cancelada",
-    body: "{firstName}, cancelaste tu reserva de {class} del {date}. Crédito devuelto: {creditRestored}. Cuando quieras volver, reservas desde la app.",
-  },
-  class_reminder: {
-    subject: "Recordatorio de clase",
-    body: "{firstName}, te recordamos tu clase de {class} a las {time}. Llega 10 minutos antes para acomodarte.",
-  },
-  class_attended: {
-    subject: "Check-in registrado",
-    body: "Listo, {firstName}. Tenemos tu check-in de {class}. Buena clase. ✨",
-  },
-
-  // ── Membresía y pagos ───────────────────────────────────────────
-  membership_activated: {
-    subject: "Tu paquete está activo",
-    body: "{firstName}, tu paquete {plan} ya quedó activo. Vigencia: {startDate} al {endDate}. Tu pase Alma está al día. Cuando quieras, reservas tu primera clase desde la app.",
-  },
-  membership_expiring_today: {
-    subject: "Tu paquete vence hoy",
-    body: "{firstName}, hoy vence tu paquete Alma. Si quieres seguir, renueva desde la app y no perdemos el ritmo.",
-  },
-  membership_expiring_tomorrow: {
-    subject: "Tu paquete vence mañana",
-    body: "{firstName}, mañana vence tu paquete Alma. Renueva desde la app para no parar.",
-  },
-  membership_expiring_n_days: {
-    subject: "Tu paquete vence pronto",
-    body: "{firstName}, te quedan {days} días en tu paquete Alma. Renueva desde la app cuando quieras y seguimos sin pausa.",
-  },
-  membership_expired: {
-    subject: "Tu paquete terminó",
-    body: "{firstName}, tu paquete terminó. Aquí seguimos cuando quieras volver. Te recibimos como siempre, como una amiga en su casa.",
-  },
-  renewal_reminder: {
-    subject: "Recordatorio de renovación",
-    body: "{firstName}, tu plan {plan} está por vencer el {expiresAt}. Renueva desde la app para no parar.",
-  },
-  transfer_rejected: {
-    subject: "Comprobante rechazado",
-    body: "{firstName}, no pudimos aprobar tu comprobante. Motivo: {reason}. Mándanos uno nuevo desde la app o por WhatsApp.",
-  },
-
-  // ── Lealtad y eventos ──────────────────────────────────────────
-  points_earned: {
-    subject: "Sumaste puntos",
-    body: "{firstName}, sumaste {points} puntos Alma. Total: {totalPoints}. Canjéalos cuando se te antoje desde la app.",
-  },
-  reward_redeemed: {
-    subject: "Recompensa canjeada",
-    body: "{firstName}, canjeaste \"{rewardName}\" por {points} pts. Pasa por recepción a reclamarlo. Disfrútalo. ✨",
-  },
-  event_registered: {
-    subject: "Inscrita al evento",
-    body: "{firstName}, quedaste inscrita a \"{eventTitle}\". En tu Alma Wallet ya tienes el pase del evento con tu QR para entrar.",
-  },
-
-  // ── Motivación por asistencia (auto, max 1/día por user) ────────
-  motivation_first_class_week: {
-    subject: "Arrancando la semana",
-    body: "{firstName}, arrancas la semana 💪. {classesThisWeek} de {weekGoal} clases esta semana. Vas muy bien.",
-  },
-  motivation_almost_ringed: {
-    subject: "Te falta una",
-    body: "{firstName}, te falta 1 clase para cumplir tu meta de la semana. Reserva la siguiente desde la app.",
-  },
-  motivation_streak_2_weeks: {
-    subject: "Dos semanas seguidas",
-    body: "{firstName}, 2 semanas seguidas asistiendo a clase. Vas con todo. ✨",
-  },
-  motivation_streak_4_weeks: {
-    subject: "Un mes completo",
-    body: "{firstName}, 1 mes completo asistiendo cada semana. Eso es disciplina real.",
-  },
-  motivation_streak_8_weeks: {
-    subject: "Imparable",
-    body: "{firstName}, 2 meses sin saltarte una semana. Imparable. ✨",
-  },
-  motivation_milestone_10_classes: {
-    subject: "10 clases",
-    body: "{firstName}, ya van 10 clases en Alma. Esto ya es hábito.",
-  },
-  motivation_milestone_25_classes: {
-    subject: "25 clases",
-    body: "{firstName}, 25 clases. Tu cuerpo ya nota el cambio.",
-  },
-  motivation_milestone_50_classes: {
-    subject: "50 clases",
-    body: "{firstName}, 50 clases. Eres parte de la familia Alma.",
-  },
-  motivation_milestone_100_classes: {
-    subject: "100 clases",
-    body: "{firstName}, 100 clases. 🌟 Eres leyenda Alma.",
-  },
-  motivation_comeback: {
-    subject: "Qué bueno tenerte de regreso",
-    body: "{firstName}, qué bueno tenerte de regreso. {daysAway} días sin verte fueron muchos.",
-  },
-  // Recordatorio de mitad de semana para socias con pack activo que aún no
-  // agendan clase esta semana. Se manda como campaña desde Promociones.
-  midweek_reservation_reminder: {
-    subject: "Ya estás a la mitad de la semana",
-    body: "{firstName}, vamos a la mitad de la semana y aún no agendas tu clase Alma. Tu paquete está al día — entra a la app y aparta tu lugar antes de que se llenen las clases. ✨",
-  },
-
-  // ── Recompensas por asistencia (loyalty_milestones) ─────────────
-  // Disparan cuando el usuario alcanza N clases lifetime/mes/año.
-  // Acompañan al award (points/reward) auto-otorgado.
-  milestone_classes_5: {
-    subject: "Primera meta",
-    body: "{firstName}, llegaste a tu primera meta: {classes} clases. +{points} puntos en tu cuenta. Esto está prendiendo. ✨",
-  },
-  milestone_classes_10: {
-    subject: "10 clases",
-    body: "{firstName}, 10 clases. Esto ya es hábito. +{points} puntos a tu cuenta como reconocimiento.",
-  },
-  milestone_classes_25: {
-    subject: "25 clases",
-    body: "{firstName}, 25 clases en Alma. Tu cuerpo ya nota el cambio. +{points} puntos.",
-  },
-  milestone_classes_50: {
-    subject: "50 clases",
-    body: "{firstName}, 50 clases. Eres parte de la familia Alma. +{points} puntos.",
-  },
-  milestone_classes_100: {
-    subject: "100 clases",
-    body: "{firstName}, 100 clases. 🌟 Leyenda Alma. +{points} puntos para canjear como tú quieras.",
-  },
-
-  // ── Promociones (broadcast manual por segmento) ─────────────────
-  // Editables. {message} es el cuerpo que la dueña escribe en el admin.
-  promo_custom: {
-    subject: "Promo Alma",
-    body: "{firstName}, {message}",
-  },
-  promo_dormant_invite: {
-    subject: "Te extrañamos en el estudio",
-    body: "{firstName}, llevamos {days} días sin verte. Te queremos de regreso. {message}",
-  },
-  promo_expiring_offer: {
-    subject: "Renueva con beneficio",
-    body: "{firstName}, tu paquete vence pronto. {message}",
-  },
-  promo_birthday_month: {
-    subject: "Feliz mes",
-    body: "{firstName}, este mes cumples años y te tenemos algo. {message}",
-  },
-  admin_new_booking: {
-    subject: "Nueva reserva",
-    body: "Nueva reserva: {clientName} en {class} el {date} a las {time}.",
-  },
-};
+// Extraído a server/lib/notificationTemplates.js (ver ese archivo para el
+// detalle de cada template y sus variables).
 
 const DEFAULT_SETTINGS_BY_KEY = {
   general_settings: DEFAULT_GENERAL_SETTINGS,
@@ -1662,18 +1500,18 @@ async function ensureSchema() {
     `).catch(() => { });
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_campaign_logs_campaign ON campaign_logs(campaign_id, status)`).catch(() => { });
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_campaign_logs_user ON campaign_logs(user_id)`).catch(() => { });
-    // Seed default Alma milestones si la tabla está vacía
+    // Seed default HIVE milestones si la tabla está vacía (LOYALTY_MILESTONES_SEED
+    // en server/lib/passDefaults.js — ver server/lib/brandResidue.test.js).
     const lmCount = await pool.query("SELECT COUNT(*)::int AS n FROM loyalty_milestones");
     if (lmCount.rows[0].n === 0) {
-      await pool.query(`
-        INSERT INTO loyalty_milestones (name, description, classes_required, period, award_type, award_points, message_template_key, sort_order) VALUES
-          ('Primera meta',          'Primer logro: 5 clases asistidas',   5,   'lifetime', 'points', 50,  'milestone_classes_5',   10),
-          ('Hábito en marcha',      '10 clases. Esto ya es hábito.',       10,  'lifetime', 'points', 100, 'milestone_classes_10',  20),
-          ('Cuerpo en cambio',      '25 clases. El cuerpo lo nota.',       25,  'lifetime', 'points', 250, 'milestone_classes_25',  30),
-          ('Familia Alma',          '50 clases. Eres parte del estudio.',  50,  'lifetime', 'points', 500, 'milestone_classes_50',  40),
-          ('Leyenda Alma',          '100 clases. Imparable.',              100, 'lifetime', 'points', 1000,'milestone_classes_100', 50)
-        ON CONFLICT DO NOTHING;
-      `).catch(() => { });
+      for (const m of LOYALTY_MILESTONES_SEED) {
+        await pool.query(
+          `INSERT INTO loyalty_milestones (name, description, classes_required, period, award_type, award_points, message_template_key, sort_order)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+           ON CONFLICT DO NOTHING`,
+          [m.name, m.description, m.classesRequired, m.period, m.awardType, m.awardPoints, m.messageTemplateKey, m.sortOrder],
+        ).catch(() => { });
+      }
     }
     // ── Review tags table ──────────────────────────────────────────────────
     await pool.query(`
@@ -2071,7 +1909,7 @@ async function ensureSchema() {
       const adminHash = await bcrypt.hash(adminPassword, 12);
       await pool.query(
         `INSERT INTO users (display_name, email, phone, password_hash, role, accepts_terms, accepts_communications)
-         VALUES ('Admin Alma', $2, '0000000000', $1, 'admin', true, false)
+         VALUES ('Admin HIVE', $2, '0000000000', $1, 'admin', true, false)
          ON CONFLICT (email) DO NOTHING`,
         [adminHash, adminEmail]
       );
@@ -3207,7 +3045,7 @@ app.post("/api/auth/register", async (req, res) => {
     const user = result.rows[0];
     // Auto-create referral code (best-effort: nunca debe tirar el registro).
     try {
-      const code = "ALMA" + Math.random().toString(36).slice(2, 7).toUpperCase();
+      const code = "HIVE" + Math.random().toString(36).slice(2, 7).toUpperCase();
       await pool.query(
         "INSERT INTO referral_codes (user_id, code) VALUES ($1, $2) ON CONFLICT DO NOTHING",
         [user.id, code]
@@ -4874,7 +4712,7 @@ app.post("/api/discount-codes/validate", authMiddleware, async (req, res) => {
 app.get("/api/wallet/pass", authMiddleware, async (req, res) => {
   try {
     const userRes = await pool.query("SELECT email, display_name FROM users WHERE id = $1 LIMIT 1", [req.userId]);
-    const userName = userRes.rows[0]?.display_name || userRes.rows[0]?.email || "Miembro Alma";
+    const userName = userRes.rows[0]?.display_name || userRes.rows[0]?.email || PASS_DEFAULT_TEXTS.memberFallbackName;
     const pointsRes = await pool.query(
       "SELECT COALESCE(SUM(CASE WHEN type='earn' THEN points WHEN type='adjust' THEN points ELSE -points END), 0) AS total FROM loyalty_transactions WHERE user_id = $1",
       [req.userId]
@@ -5371,7 +5209,7 @@ app.get("/api/me/notifications/unread-count", authMiddleware, async (req, res) =
 
 function prettyTemplateKey(key) {
   const map = {
-    welcome: "Bienvenida a Alma",
+    welcome: "Bienvenida a HIVE",
     booking_confirmed: "Reserva confirmada",
     booking_cancelled: "Reserva cancelada",
     class_reminder: "Recordatorio de clase",
@@ -5397,16 +5235,16 @@ function prettyTemplateKey(key) {
     milestone_classes_25: "25 clases",
     milestone_classes_50: "50 clases",
     milestone_classes_100: "100 clases",
-    promo_custom: "Promo Alma",
+    promo_custom: "Promo HIVE",
     promo_dormant_invite: "Te extrañamos",
     promo_expiring_offer: "Renueva con beneficio",
     promo_birthday_month: "Feliz mes",
   };
-  return map[key] || "Aviso de Alma";
+  return map[key] || "Aviso de HIVE";
 }
 
 function humanizeMotivationKey(key) {
-  if (key.startsWith("milestone_")) return "Lograste un nuevo milestone Alma.";
+  if (key.startsWith("milestone_")) return "Lograste un nuevo milestone HIVE.";
   if (key.startsWith("motivation_")) return "Te enviamos un mensaje motivacional al WhatsApp.";
   if (key.startsWith("promo_")) return "Te enviamos una promoción al WhatsApp.";
   if (key === "class_attended") return "Tenemos tu check-in.";
@@ -5491,10 +5329,10 @@ app.post("/api/loyalty/redeem", authMiddleware, async (req, res) => {
 
 // ─── Google Wallet helpers ──────────────────────────────────────────────────
 
-const SITE_URL = process.env.SITE_URL || "https://alma-movement.com.mx";
+const SITE_URL = process.env.SITE_URL || "https://www.almamovement.com.mx";
 const GW_ISSUER_ID = process.env.GOOGLE_ISSUER_ID || "";
-const GW_ISSUER_NAME = process.env.GOOGLE_ISSUER_NAME || "Alma Movement";
-const GW_PROGRAM_NAME = process.env.GOOGLE_PROGRAM_NAME || "Alma Club";
+const GW_ISSUER_NAME = process.env.GOOGLE_ISSUER_NAME || PASS_DEFAULT_TEXTS.issuerName;
+const GW_PROGRAM_NAME = process.env.GOOGLE_PROGRAM_NAME || PASS_DEFAULT_TEXTS.programName;
 const GW_HEX_BG = process.env.GOOGLE_HEX_BACKGROUND_COLOR || "#FFF7F2";
 const GW_HEX_BG_EVENT = process.env.GOOGLE_HEX_BACKGROUND_COLOR_EVENT || "#FFF7F2";
 
@@ -5653,13 +5491,13 @@ async function ensureGoogleWalletClass() {
       programName: GW_PROGRAM_NAME,
       programLogo: {
         sourceUri: { uri: `${SITE_URL}/alma-mark-light.png` },
-        contentDescription: { defaultValue: { language: "es", value: "Alma Movement" } },
+        contentDescription: { defaultValue: { language: "es", value: PASS_DEFAULT_TEXTS.logoDescription } },
       },
       heroImage: {
-        sourceUri: { uri: `${SITE_URL}/wallet-hero-alma.png` },
-        contentDescription: { defaultValue: { language: "es", value: "Alma Movement — Pilates Studio" } },
+        sourceUri: { uri: `${SITE_URL}/wallet-hero-hive.png` },
+        contentDescription: { defaultValue: { language: "es", value: PASS_DEFAULT_TEXTS.heroDescription } },
       },
-      // Tarjeta cálida Desert Rock — paleta oficial Alma (club exclusivo)
+      // Tarjeta cálida Desert Rock — paleta oficial HIVE (club exclusivo)
       hexBackgroundColor: "#A48D78",
       reviewStatus: "UNDER_REVIEW",
       countryCode: "MX",
@@ -5670,7 +5508,7 @@ async function ensureGoogleWalletClass() {
       localizedProgramName: {
         defaultValue: { language: "es", value: GW_PROGRAM_NAME },
         translatedValues: [
-          { language: "es", value: "Alma Club — Pilates · Barre · Reformer/Tower" },
+          { language: "es", value: PASS_DEFAULT_TEXTS.programNameTranslated },
         ],
       },
     };
@@ -5753,7 +5591,7 @@ function buildGoogleWalletSaveUrl({ userId, userName, points, qrCode, membership
   const nonRepeatable = hasMembership && parseBooleanFlag(membership.is_non_repeatable);
 
   // Header label
-  let passHeader = "ALMA CLUB";
+  let passHeader = PASS_DEFAULT_TEXTS.passHeader;
   if (hasEventPass) {
     passHeader = "PASE DE EVENTO";
   } else if (hasMembership) {
@@ -5856,7 +5694,7 @@ function buildGoogleWalletSaveUrl({ userId, userName, points, qrCode, membership
   // Row 5: Points
   textModules.push({
     id: "puntos",
-    header: "PUNTOS ALMA CLUB",
+    header: PASS_DEFAULT_TEXTS.pointsLabel,
     body: `${points.toLocaleString("es-MX")} pts`,
   });
 
@@ -5923,14 +5761,14 @@ function buildGoogleWalletSaveUrl({ userId, userName, points, qrCode, membership
     state: "ACTIVE",
     accountId: userId,
     accountName: userName,
-    // Tarjeta cálida Desert Rock — paleta oficial Alma (club exclusivo)
+    // Tarjeta cálida Desert Rock — paleta oficial HIVE (club exclusivo)
     hexBackgroundColor: "#A48D78",
     // Hero a nivel OBJETO: sobreescribe el hero de la clase. Se firma local
     // (sin OAuth), así que limpia el branding viejo aunque la clase persistida
     // en Google no se pueda actualizar todavía. ?v fuerza re-fetch del CDN.
     heroImage: {
-      sourceUri: { uri: `${SITE_URL}/wallet-hero-alma.png?v=warm2` },
-      contentDescription: { defaultValue: { language: "es", value: "Alma Movement" } },
+      sourceUri: { uri: `${SITE_URL}/wallet-hero-hive.png?v=hive1` },
+      contentDescription: { defaultValue: { language: "es", value: PASS_DEFAULT_TEXTS.heroDescription } },
     },
     barcode: {
       type: "QR_CODE",
@@ -7098,7 +6936,7 @@ async function notifyPointsEarned(userId, points, totalPoints) {
       userId,
       "points_earned",
       { points, totalPoints },
-      ({ firstName }) => `${firstName}, sumaste ${points} puntos Alma. Total: ${totalPoints}.`,
+      ({ firstName }) => `${firstName}, sumaste ${points} puntos HIVE. Total: ${totalPoints}.`,
     ).catch(() => {});
   }
 }
@@ -7117,7 +6955,7 @@ async function notifyMembershipRenewed(userId, planName, ctx = {}) {
       startDate: ctx.startDate || "",
       endDate: ctx.endDate || "",
     },
-    ({ firstName, plan }) => `${firstName}, tu paquete ${plan} ya quedó activo. Tu pase Alma está al día.`,
+    ({ firstName, plan }) => `${firstName}, tu paquete ${plan} ya quedó activo. Tu pase HIVE está al día.`,
   ).catch(() => {});
 }
 
@@ -7133,9 +6971,9 @@ async function notifyMembershipExpiring(userId, daysRemaining) {
     : days === 1 ? "membership_expiring_tomorrow"
     : "membership_expiring_n_days";
   const fallback = ({ firstName }) => {
-    if (days <= 0) return `${firstName}, hoy vence tu paquete Alma. Renueva desde la app.`;
-    if (days === 1) return `${firstName}, mañana vence tu paquete Alma. Renueva desde la app.`;
-    return `${firstName}, te quedan ${days} días en tu paquete Alma.`;
+    if (days <= 0) return `${firstName}, hoy vence tu paquete HIVE. Renueva desde la app.`;
+    if (days === 1) return `${firstName}, mañana vence tu paquete HIVE. Renueva desde la app.`;
+    return `${firstName}, te quedan ${days} días en tu paquete HIVE.`;
   };
   notifyByTemplate(userId, key, { days }, fallback).catch(() => {});
 }
@@ -7168,7 +7006,7 @@ async function notifyBookingConfirmed(userId, ctx = {}) {
       date: ctx.date || ctx.when || "",
       time: ctx.time || "",
     },
-    ({ firstName, class: cls }) => `${firstName}, te apartamos lugar de ${cls}. Tu pase Alma ya lo trae cargado.`,
+    ({ firstName, class: cls }) => `${firstName}, te apartamos lugar de ${cls}. Tu pase HIVE ya lo trae cargado.`,
   ).catch(() => {});
 }
 
@@ -7200,7 +7038,7 @@ async function notifyEventRegistered(userId, ctx = {}) {
     userId,
     "event_registered",
     { eventTitle: ctx.eventTitle || "tu evento" },
-    ({ firstName, eventTitle }) => `${firstName}, quedaste inscrita a ${eventTitle}. En tu Alma Wallet ya tienes el pase con QR.`,
+    ({ firstName, eventTitle }) => `${firstName}, quedaste inscrita a ${eventTitle}. En tu HIVE Wallet ya tienes el pase con QR.`,
   ).catch(() => {});
 }
 
@@ -7425,10 +7263,10 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
   const eventTimeLong = eventStartTimeLabel && eventEndTimeLabel
     ? `${eventStartTimeLabel} - ${eventEndTimeLabel}`
     : (eventStartTimeLabel || "Horario por confirmar");
-  const eventLocationShort = truncateWalletField(activeEventPass?.eventLocation || "Alma Movement", 24);
-  const eventLocationLong = truncateWalletField(activeEventPass?.eventLocation || "Alma Movement", 38);
+  const eventLocationShort = truncateWalletField(activeEventPass?.eventLocation || PASS_DEFAULT_TEXTS.eventLocationDefault, 24);
+  const eventLocationLong = truncateWalletField(activeEventPass?.eventLocation || PASS_DEFAULT_TEXTS.eventLocationDefault, 38);
   const eventCodeLabel = truncateWalletField(activeEventPass?.passCode || "—", 18);
-  // Alma lockscreen relevance:
+  // HIVE lockscreen relevance:
   // - Para membership pass: 30 min antes de la próxima clase (si existe).
   //   Apple muestra el pase en la lockscreen automáticamente alrededor de esta hora.
   // - Geofence: usar `locations` (configurada abajo) para que también aparezca
@@ -7498,7 +7336,7 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
   const hasIconStampMode = hasMembership && !isUnlimited && stripStampState.total > 0;
   const membershipHeadline = isTrialSingleSession
     ? "Clase Muestra"
-    : (isUnlimited ? "Meta abierta" : "Alma Pass");
+    : (isUnlimited ? "Meta abierta" : PASS_DEFAULT_TEXTS.membershipHeadline);
   const memberDisplayName = truncateWalletField(userName, 22);
   const planDisplayName = truncateWalletField(
     hasMembership ? (membership.plan_name || `${membershipCategoryLabel} ${isUnlimited ? "Ilimitado" : ""}`.trim()) : "",
@@ -7699,7 +7537,7 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
     backFields.push(
       {
         key: "intro_back",
-        label: "Bienvenida a Alma",
+        label: PASS_DEFAULT_TEXTS.welcomeBackLabel,
         value: "Te recibimos como te recibe una amiga. Grupos pequeños (4 en Reformer/Tower, 8 en Studio), atención personalizada y alguien que te conoce por tu nombre.",
       },
       {
@@ -7823,17 +7661,18 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
 
   backFields.push(
     { key: "cliente", label: "CLIENTE", value: userName },
-    { key: "puntos", label: "PUNTOS ALMA CLUB", value: `${points.toLocaleString("es-MX")} pts` },
-    { key: "studio", label: "ESTUDIO", value: "Plaza Arce, Calle Acueducto de Querétaro 513, Jurica Acueducto, 76230 Juriquilla, Qro." },
-    { key: "horario_studio", label: "HORARIOS", value: "Lun a Vie 7am a 3pm y 5pm a 9pm · Sáb 7am a 9am" },
-    { key: "telefono", label: "WHATSAPP", value: "444 307 3266" },
+    { key: "puntos", label: PASS_DEFAULT_TEXTS.pointsLabel, value: `${points.toLocaleString("es-MX")} pts` },
+    { key: "studio", label: "ESTUDIO", value: PASS_DEFAULT_TEXTS.studioAddress },
+    { key: "horario_studio", label: "HORARIOS", value: PASS_DEFAULT_TEXTS.studioHours },
+    // Sin WhatsApp/teléfono público todavía (STUDIO.phone es null en
+    // src/lib/studio.ts): se omite el campo en vez de mostrar un número viejo.
     { key: "web", label: "RESERVAR EN LÍNEA", value: `${SITE_URL}/app/bookings` },
     {
       key: "terms",
       label: "TÉRMINOS",
       value: hasEventPass
         ? "Pase válido para un acceso al evento indicado. Presenta el QR en recepción."
-        : "Pase personal para clases en Alma Movement. Presenta tu QR al llegar. Cancelaciones: alumnas nuevas 4-5 h antes, recurrentes 2 h antes.",
+        : PASS_DEFAULT_TEXTS.termsDefault,
     }
   );
 
@@ -7894,10 +7733,10 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
     passTypeIdentifier: APPLE_PASS_TYPE_ID,
     serialNumber,
     teamIdentifier: APPLE_TEAM_ID,
-    organizationName: "Alma Movement",
+    organizationName: PASS_DEFAULT_TEXTS.organizationName,
     description: hasEventPass
-      ? `Evento — ${activeEventPass?.eventTitle || "Alma Movement"}`
-      : `Alma Pass — ${progressSummary.goalLabel}`,
+      ? `Evento — ${activeEventPass?.eventTitle || PASS_DEFAULT_TEXTS.eventLocationDefault}`
+      : `${PASS_DEFAULT_TEXTS.membershipHeadline} — ${progressSummary.goalLabel}`,
     logoText: "",
     foregroundColor: passForeground,
     backgroundColor: passBackground,
@@ -7933,16 +7772,18 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
     authenticationToken: APPLE_AUTH_TOKEN,
     relevantDate: almaRelevantDate || eventRelevantDate,
     // Geofence: pase aparece en lockscreen cuando la alumna está cerca del estudio.
-    // Coords aproximadas de Plaza Arce, Juriquilla, Querétaro (Av. Nicolás Zapata 845).
+    // El fallback de abajo son las coords viejas de Plaza Arce, Juriquilla,
+    // Querétaro (sede anterior a HIVE) — quedan solo por si no hay env vars.
+    // En producción define BUSINESS_LATITUDE/BUSINESS_LONGITUDE con las coords
+    // reales de Cuauhtémoc #68, Del Carmen, Coyoacán, CDMX (src/lib/studio.ts).
     // Apple alerta cuando entras al radio.
     locations: [
       {
-        // Plaza Arce, Juriquilla, Querétaro (Av. Nicolás Zapata 845).
         latitude: Number(process.env.BUSINESS_LATITUDE || 22.1536775),
         longitude: Number(process.env.BUSINESS_LONGITUDE || -100.9970307),
         relevantText: hasEventPass
           ? "Estás cerca del estudio. Saca tu pase del evento."
-          : "Estás cerca de Alma. Saca tu pase para check-in.",
+          : PASS_DEFAULT_TEXTS.geofenceRelevantText,
       },
     ],
     maxDistance: Number(process.env.BUSINESS_PASS_RADIUS_M || 150),
@@ -8266,8 +8107,8 @@ app.get("/api/wallet/apple/pkpass", authMiddleware, async (req, res) => {
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Alma Club">
-<title>Alma Club — ${userName}</title>
+<meta name="apple-mobile-web-app-title" content="${PASS_DEFAULT_TEXTS.webPassTitle}">
+<title>${PASS_DEFAULT_TEXTS.webPassTitle} — ${userName}</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#241B1A;color:#FAF9F6;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
@@ -8303,7 +8144,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
 <body>
 <div class="pass">
   <div class="header">
-    <div class="logo">Alma Movement</div>
+    <div class="logo">${PASS_DEFAULT_TEXTS.webPassLogo}</div>
     <div class="badge">Club</div>
   </div>
   <div class="name">${userName}</div>
@@ -8363,7 +8204,7 @@ app.get("/api/wallet/events/apple/pkpass", authMiddleware, async (req, res) => {
     const eventTimeLong = eventStartTimeLabel && eventEndTimeLabel
       ? `${eventStartTimeLabel} - ${eventEndTimeLabel}`
       : (eventStartTimeLabel || "Horario por confirmar");
-    const eventLocationLong = truncateWalletField(activeEventPass?.eventLocation || "Alma Movement", 38);
+    const eventLocationLong = truncateWalletField(activeEventPass?.eventLocation || PASS_DEFAULT_TEXTS.eventLocationDefault, 38);
 
     if (isAppleWalletConfigured()) {
       const pkpassBuffer = await generateApplePkpass({
@@ -8386,7 +8227,7 @@ app.get("/api/wallet/events/apple/pkpass", authMiddleware, async (req, res) => {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Pase de Evento — Alma</title>
+<title>${PASS_DEFAULT_TEXTS.webEventPassTitle}</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#241B1A;color:#FAF9F6;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
@@ -8408,7 +8249,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
   <div class="pass">
     <div class="header">
       <span class="badge">Pase de evento</span>
-      <div class="title">${activeEventPass.eventTitle || "Evento Alma"}</div>
+      <div class="title">${activeEventPass.eventTitle || PASS_DEFAULT_TEXTS.eventTitleDefault}</div>
     </div>
     <div class="meta">
       <div class="meta-item">
@@ -8421,7 +8262,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
       </div>
       <div class="meta-item" style="grid-column:1 / span 2;">
         <div class="meta-label">Sede</div>
-        <div class="meta-value">${eventLocationLong || "Alma Movement"}</div>
+        <div class="meta-value">${eventLocationLong || PASS_DEFAULT_TEXTS.eventLocationDefault}</div>
       </div>
     </div>
     <div class="qr"><img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(activeEventPass.passCode || qrCode)}&bgcolor=FFFFFF&color=1F0047" alt="QR"/></div>
@@ -10765,7 +10606,7 @@ app.post("/api/schedules/reset-alma", adminMiddleware, async (req, res) => {
     const r = await pool.query("SELECT * FROM schedule_slots ORDER BY day_of_week, time_slot");
     return res.json({
       data: { slots: r.rows, classesCreated: 0 },
-      message: "Plantilla Alma restablecida (23 slots)",
+      message: "Plantilla HIVE restablecida (23 slots)",
     });
   }
 
@@ -10846,7 +10687,7 @@ app.post("/api/schedules/reset-alma", adminMiddleware, async (req, res) => {
       classTypeId,
       instructorId,
     },
-    message: `Plantilla Alma restablecida. ${created.length} clases creadas (${skipped.length} ya existían).`,
+    message: `Plantilla HIVE restablecida. ${created.length} clases creadas (${skipped.length} ya existían).`,
   });
 });
 
@@ -11944,7 +11785,7 @@ app.post("/api/admin/referrals/codes", adminMiddleware, async (req, res) => {
       // Auto-generar código corto y único
       const chars = "ABCDEFGHIJKLMNPQRSTUVWXYZ23456789";
       do {
-        code = "ALMA-" + Array.from({ length: 5 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+        code = "HIVE-" + Array.from({ length: 5 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
         const exists = await pool.query("SELECT 1 FROM referral_codes WHERE code = $1", [code]);
         if (!exists.rows.length) break;
       } while (true);
@@ -12305,7 +12146,7 @@ app.post("/api/admin/whatsapp-templates/test-send", adminMiddleware, async (req,
       startDate: "1 mayo", endDate: "31 mayo",
       expiresAt: "31 mayo",
       reason: "comprobante ilegible",
-      link: "https://alma-movement.app/test",
+      link: "https://www.almamovement.com.mx/test",
       creditRestored: "Sí",
       ...(vars || {}),
     };
@@ -12626,7 +12467,7 @@ app.get("/api/evolution/status", adminMiddleware, async (req, res) => {
 // Idempotente — se puede llamar las veces que quieras. Evolution v2 espera
 // POST /webhook/set/:instance con body { webhook: { url, events, enabled } }.
 async function configureEvolutionWebhook() {
-  const webhookUrl = (process.env.SITE_URL || "https://alma-movement-production.up.railway.app").replace(/\/$/, "") + "/api/webhook/evolution";
+  const webhookUrl = (process.env.SITE_URL || "https://www.almamovement.com.mx").replace(/\/$/, "") + "/api/webhook/evolution";
   try {
     await evolutionApi.post(`/webhook/set/${EVOLUTION_INSTANCE}`, {
       webhook: {
@@ -12728,7 +12569,7 @@ app.post("/api/evolution/connect", adminMiddleware, async (req, res) => {
 
       if (createAlreadyInUse) {
         return res.status(409).json({
-          message: `No se pudo obtener QR para la instancia "${EVOLUTION_INSTANCE}". Ese nombre ya está en uso. Cambia EVOLUTION_INSTANCE_NAME en Railway por un nombre único (ej. alma-movement-2026).`,
+          message: `No se pudo obtener QR para la instancia "${EVOLUTION_INSTANCE}". Ese nombre ya está en uso. Cambia EVOLUTION_INSTANCE_NAME en Railway por un nombre único (ej. hive-pilates-2026).`,
         });
       }
       return res.status(502).json({ message: "Evolution respondió sin QR. Intenta nuevamente en unos segundos." });
@@ -12773,7 +12614,7 @@ app.post("/api/evolution/send-test", adminMiddleware, async (req, res) => {
     const number = normalisePhone(phone);
     await queueWhatsAppSend(
       number,
-      "✅ Mensaje de prueba desde Alma Movement. ¡WhatsApp conectado correctamente!",
+      "✅ Mensaje de prueba desde HIVE Pilates Studio. ¡WhatsApp conectado correctamente!",
     );
     return res.json({ data: { message: "Mensaje de prueba enviado correctamente" } });
   } catch (err) {
@@ -16713,7 +16554,7 @@ app.post("/api/admin/test-emails", adminMiddleware, async (req, res) => {
       ? `Se enviaron ${results.filter(r => r.startsWith("✅")).length} emails de prueba a ${testTo}`
       : "⚠️ RESEND_API_KEY no está configurada. Los emails NO se enviaron.",
     resendKeySet: hasResendKey,
-    fromEmail: process.env.EMAIL_FROM || "onboarding@resend.dev (default)",
+    fromEmail: FROM_EMAIL,
     results,
   });
 });
