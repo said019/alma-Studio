@@ -10359,7 +10359,11 @@ app.post("/api/admin/visit-sale", adminMiddleware, async (req, res) => {
     const _eff = resolveEffectivePrice(plan, _gen?.opening_pricing_active !== false);
     const guest = await findOrCreateGuestProfile({ ...profile, hostUserId }, dbClient);
     const user = await findOrCreateGuestUser(guest, dbClient);
-    const startStr = startDate ? String(startDate).slice(0, 10) : todayInStudio();
+    const startStr = startDate ? saleStartDay(startDate) : todayInStudio();
+    if (!startStr) {
+      await dbClient.query("ROLLBACK");
+      return res.status(400).json({ message: "Fecha de inicio inválida (usa AAAA-MM-DD)." });
+    }
     const endStr = calcMembershipEndDate(startStr, plan);
     const pm = normalizePaymentMethod(paymentMethod);
     if (!pm) {
@@ -15812,8 +15816,8 @@ app.post("/api/admin/orders/:id/refunds", ownerMiddleware, async (req, res) => {
     //    teniendo la membresía sería un interbloqueo.
     //    Las saltadas no se pierden: la cancelación en curso termina sola; una
     //    subida de la fila que esperaba esta membresía la verá cancelada y se
-    //    revierte, y la reserva que deja en 'waitlist' la cancela el barrido
-    //    que corre después del COMMIT (paso 7).
+    //    revierte, y la reserva que deja en 'waitlist' la cancela la sentencia
+    //    del paso 7, después del COMMIT.
     if (membership && input.kind === "total") {
       const tarde = (await client.query(
         `SELECT b.id, b.class_id, b.status::text AS status

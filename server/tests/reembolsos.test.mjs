@@ -390,6 +390,9 @@ test("las ventas de visita (mostrador y walk-in) ya no dan 500, ligan su membres
   const mala = await api("POST", "/api/admin/visit-sale", { token: A, body: { profile: perfil("mala"), planId: pack.id, paymentMethod: "cheque" } });
   assert.equal(mala.status, 400);
   assert.equal(mala.body.message, "Método de pago inválido. Opciones: cash, transfer, card, online.");
+  const fecha = await api("POST", "/api/admin/visit-sale", { token: A, body: { profile: perfil("fecha"), planId: pack.id, startDate: "2026-02-30" } });
+  assert.equal(fecha.status, 400, JSON.stringify(fecha.body).slice(0, 200));
+  assert.equal(fecha.body.message, "Fecha de inicio inválida (usa AAAA-MM-DD).");
 });
 
 test("los montos netos salen a 2 decimales (sin colas de flotante)", async () => {
