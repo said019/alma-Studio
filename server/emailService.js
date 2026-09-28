@@ -1,6 +1,14 @@
 /**
- * Alma Movement — Email Service (Resend)
- * Handles all transactional emails with branded HTML templates.
+ * HIVE Pilates Studio — correos transaccionales (Resend).
+ *
+ * Cada correo tiene dos funciones: `renderX(opts)` arma el mensaje
+ * ({ from, to, subject, html }) sin enviar nada, y `sendX(opts)` se lo pasa a
+ * sendEmail. Las pruebas y la vista previa sólo usan los render.
+ *
+ * Diseño "B · banda oscura + cuerpo claro": banda carbón con el isotipo
+ * terracota, tarjeta blanca sobre Ivory Silk, CTA en píldora carbón y pie con
+ * el lema. HTML de correo: tablas, estilos en línea y bgcolor (Gmail, Apple
+ * Mail y Outlook de escritorio); nada de mask, flex ni grid.
  */
 
 import { Resend } from "resend";
@@ -9,148 +17,247 @@ import { Resend } from "resend";
 // (los envíos se omiten en vez de crashear el server). Degrada graciosamente.
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
-// Remitente. Configurable por env; el dominio debe estar verificado en Resend.
-const FROM_EMAIL = process.env.EMAIL_FROM || "Alma Movement <noreply@agendafull.com.mx>";
-const SITE_URL = process.env.SITE_URL || "https://alma-movement.com.mx";
-const LOGO_URL = `${SITE_URL}/email-logo.png`; // medallón autocontenido (visible en cualquier cliente/modo oscuro)
+// Remitente. Configurable por env; el buzón y el dominio son los verificados en Resend.
+const FROM_EMAIL = process.env.EMAIL_FROM || "HIVE Pilates Studio <noreply@agendafull.com.mx>";
+const SITE_URL = (process.env.SITE_URL || "https://www.almamovement.com.mx").replace(/\/+$/, "");
+const SITE_LABEL = SITE_URL.replace(/^https?:\/\//, "");
+// Isotipo terracota sobre transparente, a 3× (lo genera scripts/brand-assets.mjs).
+const LOGO_URL = `${SITE_URL}/email/hive-mark.png`;
+const LOGO_W = 40;
+const LOGO_H = 46;
 
-// ─── Brand palette (Alma editorial, fondo claro) ───────────────────────────────
-// Conservamos los nombres de clave (magenta/violet/lime/cream...) usados por
-// los helpers; solo cambian los valores al look claro de Alma.
-const B = {
-  bg:      "#F4F1EA", // Porcelain Mist — fondo página
-  card:    "#FAF9F6", // Feather White — tarjeta
-  border:  "#E0D5C6", // hairline
-  ink:     "#43392F", // espresso — texto/CTA
-  inkDeep: "#241B1A", // espresso profundo — header band
-  desert:  "#A48D78", // Desert Rock — acento
-  sand:    "#CBB9A4", // Soft Sandstone
-  oat:     "#E6DAC8", // Creamed Oat — tints
-  text:    "#43392F",
-  muted:   "#8C7A68", // gris cálido
-  // Alias legacy (los pasan algunas funciones como color; el diseño ya los ignora).
-  purple: "#43392F", magenta: "#A48D78", violet: "#CBB9A4",
-  lime: "#A48D78", cream: "#43392F", lilac: "#E6DAC8",
+// Datos públicos del estudio. Copia de src/lib/studio.ts (el servidor no
+// importa TypeScript); emailService.test.mjs verifica que sigan iguales.
+const STUDIO = {
+  name: "HIVE Pilates Studio",
+  address: "Cuauhtémoc #68, Del Carmen, Coyoacán, C.P. 04100, CDMX",
+  instagram: "hive.pilates",
 };
-const SERIF = "Georgia, 'Times New Roman', Times, serif";
-const SANS = "'Helvetica Neue', Helvetica, Arial, sans-serif";
+const MOTTO = "MOVIMIENTO · BIENESTAR · COMUNIDAD";
+
+// ─── Paleta (src/design/tokens.ts, LIGHT + banda de DARK) ─────────────────────
+const C = {
+  page: "#F2EFEA",        // Ivory Silk — fondo
+  band: "#141210",        // carbón — banda superior
+  onBand: "#F2EFEA",      // wordmark
+  onBandMuted: "#A69C91", // "PILATES STUDIO"
+  card: "#FFFFFF",
+  line: "#DDD6CD",
+  ink: "#1A1714",
+  muted: "#6B6259",
+  accentStrong: "#9A5236", // eyebrow, lema y píldora
+  accentSoft: "#F3DED3",
+};
+const DISPLAY = "'Unbounded','Arial Black',Helvetica,Arial,sans-serif";
+const SANS = "'Manrope',Helvetica,Arial,sans-serif";
+
+// ─── Utilidades de texto ──────────────────────────────────────────────────────
+/** Escapa un dato (nombre, clase, motivo…) antes de meterlo al HTML. */
+function esc(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+/** Primer nombre, o "" si no hay nombre. */
+function firstNameOf(name) {
+  return String(name ?? "").trim().split(/\s+/)[0] || "";
+}
+/** Sin límite: null, o el centinela 9999 que usa el servidor. */
+function isUnlimited(n) {
+  return n === null || Number(n) >= 9999;
+}
+/** <strong> en tinta dentro de textos grises. */
+function emphasize(html) {
+  return String(html).replace(/<strong>/g, `<strong style="color:${C.ink};font-weight:700;">`);
+}
+
+/**
+ * Canal de contacto honesto: WhatsApp sólo si el estudio configuró su número
+ * (STUDIO_PHONE); si no, Instagram, igual que la landing.
+ */
+function contactChannel() {
+  const phone = String(process.env.STUDIO_PHONE || "").trim();
+  return phone
+    ? { name: "WhatsApp", url: `https://wa.me/521${phone}`, cta: "Contactar por WhatsApp" }
+    : {
+        name: `Instagram (@${STUDIO.instagram})`,
+        url: `https://www.instagram.com/${STUDIO.instagram}`,
+        cta: "Escríbenos por Instagram",
+      };
+}
 
 // ─── Base layout ──────────────────────────────────────────────────────────────
-function baseLayout({ preheader = "", content = "", ctaUrl = "", ctaText = "" } = {}) {
+function spacer(height) {
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td height="${height}" style="height:${height}px;font-size:0;line-height:0;mso-line-height-rule:exactly;">&nbsp;</td></tr></table>`;
+}
+
+/**
+ * @param {object} o
+ * @param {string} o.preheader  texto de vista previa en la bandeja
+ * @param {string} o.eyebrow    rótulo terracota sobre el título
+ * @param {string} o.title      título (HTML ya escapado)
+ * @param {string} o.content    cuerpo: párrafos, píldora, tabla de datos, avisos
+ * @param {string} [o.ctaUrl]   botón principal
+ * @param {string} [o.ctaText]
+ * @param {string} [o.note]     nota gris después del botón
+ */
+function baseLayout({ preheader = "", eyebrow = "", title = "", content = "", ctaUrl = "", ctaText = "", note = "" } = {}) {
   const ctaBlock = ctaUrl
-    ? `<tr><td align="center" style="padding:26px 0 6px;">
-         <a href="${ctaUrl}"
-            style="display:inline-block;background:${B.ink};color:${B.card};
-                   font-family:${SANS};font-size:12px;font-weight:600;letter-spacing:1.6px;
-                   text-transform:uppercase;text-decoration:none;border-radius:50px;padding:15px 38px;">
-           ${ctaText}
-         </a>
-       </td></tr>`
+    ? `${spacer(10)}
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+            <tr><td align="center" bgcolor="${C.ink}" style="background-color:${C.ink};border-radius:999px;mso-padding-alt:15px 24px;">
+              <a href="${esc(ctaUrl)}" target="_blank" class="hive-cta"
+                 style="display:block;padding:15px 24px;font-family:${SANS};font-size:13px;line-height:18px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:${C.onBand};text-decoration:none;border-radius:999px;mso-line-height-rule:exactly;">${ctaText}</a>
+            </td></tr>
+          </table>`
     : "";
+  const noteBlock = note
+    ? `${spacer(16)}
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+            <tr><td bgcolor="${C.page}" style="background-color:${C.page};border-radius:12px;padding:13px 16px;font-family:${SANS};font-size:13px;line-height:20px;color:${C.muted};mso-line-height-rule:exactly;">${emphasize(note)}</td></tr>
+          </table>`
+    : "";
+  const year = new Date().getFullYear();
 
   return `<!DOCTYPE html>
-<html lang="es">
+<html lang="es" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Alma Movement</title>
-  <!--[if mso]><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml><![endif]-->
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="x-apple-disable-message-reformatting">
+  <meta name="format-detection" content="telephone=no,date=no,address=no,email=no,url=no">
+  <meta name="color-scheme" content="light">
+  <meta name="supported-color-schemes" content="light">
+  <title>${STUDIO.name}</title>
+  <!--[if mso]>
+  <xml><o:OfficeDocumentSettings><o:AllowPNG/><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml>
+  <style>
+    td, th, p, a, span, div, h1, h2 { font-family: Arial, Helvetica, sans-serif !important; }
+    .hive-display { font-family: 'Arial Black', Arial, sans-serif !important; }
+  </style>
+  <![endif]-->
+  <!--[if !mso]><!-->
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Unbounded:wght@700;800&display=swap" rel="stylesheet">
+  <!--<![endif]-->
+  <style>
+    :root { color-scheme: light; supported-color-schemes: light; }
+    body { margin: 0 !important; padding: 0 !important; width: 100% !important; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+    table { border-collapse: collapse; mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
+    img { border: 0; outline: none; text-decoration: none; -ms-interpolation-mode: bicubic; }
+    a[x-apple-data-detectors] { color: inherit !important; text-decoration: none !important; font-size: inherit !important; font-family: inherit !important; font-weight: inherit !important; line-height: inherit !important; }
+    @media only screen and (max-width: 480px) {
+      .hive-band { padding: 26px 16px 22px !important; }
+      .hive-outer { padding: 14px 10px 26px !important; }
+      .hive-card { padding: 26px 20px 24px !important; }
+      .hive-title { font-size: 21px !important; line-height: 27px !important; }
+      .hive-motto { letter-spacing: 1.6px !important; }
+    }
+  </style>
+  <style>
+    /* Resplandor terracota de la banda (sólo clientes que lo soportan; el resto ve carbón liso). */
+    .hive-band { background-image: radial-gradient(90% 100% at 50% 0%, rgba(169,96,63,0.35), rgba(20,18,16,0) 70%); }
+  </style>
 </head>
-<body style="margin:0;padding:0;background-color:${B.bg};">
+<body style="margin:0;padding:0;background-color:${C.page};" bgcolor="${C.page}">
+  <div role="article" aria-roledescription="email" aria-label="${STUDIO.name}" lang="es" style="background-color:${C.page};">
   <!-- preheader -->
-  <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">
-    ${preheader}&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;
+  <div style="display:none;font-size:1px;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;mso-hide:all;color:${C.page};">
+    ${preheader}&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;
   </div>
 
-  <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background-color:${B.bg};">
-    <tr><td align="center" style="padding:32px 16px 40px;">
-
-      <!-- Card -->
-      <table role="presentation" cellpadding="0" cellspacing="0" width="560"
-             style="max-width:560px;width:100%;background-color:${B.card};
-                    border:1px solid ${B.border};border-radius:22px;overflow:hidden;
-                    box-shadow:0 22px 60px -30px rgba(36,27,26,.38);">
-
-        <!-- Header: medallón Alma autocontenido sobre la tarjeta clara (robusto en dark mode) -->
-        <tr><td align="center" style="background-color:${B.card};padding:34px 40px 16px;">
-          <img src="${LOGO_URL}" alt="Alma Movement" width="88" height="88"
-               style="display:block;width:88px;height:88px;border-radius:50%;margin:0 auto 12px;" />
-          <div style="font-family:${SANS};font-size:10px;letter-spacing:4px;text-transform:uppercase;color:${B.desert};">
-            Move with intention
-          </div>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${C.page}" style="background-color:${C.page};">
+    <!-- Banda carbón: isotipo + wordmark -->
+    <tr><td align="center" bgcolor="${C.band}" class="hive-band" style="background-color:${C.band};padding:32px 20px 26px;">
+      <table role="presentation" align="center" cellpadding="0" cellspacing="0" border="0">
+        <tr><td align="center" style="padding:0 0 12px;">
+          <img src="${LOGO_URL}" width="${LOGO_W}" height="${LOGO_H}" alt="HIVE"
+               style="display:block;width:${LOGO_W}px;height:${LOGO_H}px;border:0;margin:0 auto;font-family:${SANS};font-size:14px;font-weight:800;color:${C.onBand};">
         </td></tr>
-
-        <!-- Content -->
-        <tr><td style="padding:18px 40px 6px;">
-          ${content}
-        </td></tr>
-
-        <!-- CTA -->
-        ${ctaBlock}
-
-        <!-- Divider -->
-        <tr><td style="padding:12px 40px 0;">
-          <hr style="border:none;border-top:1px solid ${B.border};margin:18px 0 0;" />
-        </td></tr>
-
-        <!-- Footer -->
-        <tr><td align="center" style="padding:22px 40px 34px;">
-          <p style="font-family:${SANS};font-size:10px;letter-spacing:1.8px;text-transform:uppercase;color:${B.desert};margin:0 0 9px;">
-            Pilates Reformer · Tower · Mat · Barre · Sculpt
-          </p>
-          <p style="font-family:${SANS};font-size:12px;color:${B.muted};margin:0;line-height:1.7;">
-            Alma Movement · Juriquilla, Querétaro<br>
-            <a href="${SITE_URL}" style="color:${B.ink};text-decoration:none;">alma-movement.com.mx</a>
-          </p>
-        </td></tr>
-
+        <tr><td align="center" class="hive-display" style="font-family:${DISPLAY};font-size:22px;line-height:26px;font-weight:800;letter-spacing:1px;color:${C.onBand};mso-line-height-rule:exactly;">HIVE</td></tr>
+        <tr><td align="center" style="padding:5px 0 0 3px;font-family:${SANS};font-size:9px;line-height:13px;font-weight:700;letter-spacing:3px;color:${C.onBandMuted};mso-line-height-rule:exactly;">PILATES STUDIO</td></tr>
       </table>
-      <p style="font-family:${SANS};font-size:11px;color:${B.muted};margin:16px 0 0;">
-        © ${new Date().getFullYear()} Alma Movement
-      </p>
+    </td></tr>
+
+    <tr><td align="center" class="hive-outer" style="padding:24px 16px 32px;">
+      <!--[if mso]><table role="presentation" width="600" align="center" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;margin:0 auto;border-collapse:separate;">
+        <!-- Tarjeta -->
+        <tr><td bgcolor="${C.card}" class="hive-card" style="background-color:${C.card};border:1px solid ${C.line};border-radius:16px;padding:34px 36px 32px;">
+          ${eyebrow ? `<p style="margin:0 0 10px;font-family:${SANS};font-size:11px;line-height:16px;font-weight:800;letter-spacing:2.2px;text-transform:uppercase;color:${C.accentStrong};mso-line-height-rule:exactly;">${eyebrow}</p>` : ""}
+          <h1 class="hive-display hive-title" style="margin:0 0 14px;font-family:${DISPLAY};font-size:25px;line-height:31px;font-weight:800;text-transform:uppercase;color:${C.ink};mso-line-height-rule:exactly;">${title}</h1>
+          ${content}
+          ${ctaBlock}
+          ${noteBlock}
+        </td></tr>
+
+        <!-- Pie -->
+        <tr><td align="center" style="padding:28px 12px 0;font-family:${SANS};">
+          <p class="hive-motto" style="margin:0 0 12px;font-family:${SANS};font-size:10px;line-height:15px;font-weight:800;letter-spacing:2.8px;color:${C.accentStrong};mso-line-height-rule:exactly;">${MOTTO}</p>
+          <p style="margin:0 0 6px;font-family:${SANS};font-size:12px;line-height:19px;color:${C.muted};">${STUDIO.name} · ${STUDIO.address}</p>
+          <p style="margin:0 0 10px;font-family:${SANS};font-size:12px;line-height:19px;color:${C.muted};">
+            <a href="${SITE_URL}" target="_blank" style="color:${C.ink};font-weight:700;text-decoration:none;">${SITE_LABEL}</a>
+            &nbsp;·&nbsp;
+            <a href="https://www.instagram.com/${STUDIO.instagram}" target="_blank" style="color:${C.ink};font-weight:700;text-decoration:none;">@${STUDIO.instagram}</a>
+          </p>
+          <p style="margin:0;font-family:${SANS};font-size:11px;line-height:17px;color:${C.muted};">© ${year} ${STUDIO.name}</p>
+        </td></tr>
+      </table>
+      <!--[if mso]></td></tr></table><![endif]-->
     </td></tr>
   </table>
+  </div>
 </body>
 </html>`;
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-function h1(text) {
-  return `<h1 style="font-family:${SERIF};font-size:27px;font-weight:500;color:${B.ink};margin:0 0 10px;line-height:1.25;letter-spacing:-.01em;">${text}</h1>`;
-}
+// ─── Helpers (el título va en baseLayout: { eyebrow, title }) ────────────────
 function h2(text) {
-  return `<h2 style="font-family:${SERIF};font-size:18px;font-weight:500;color:${B.desert};margin:20px 0 6px;">${text}</h2>`;
+  return `<h2 class="hive-display" style="margin:10px 0 8px;font-family:${DISPLAY};font-size:15px;line-height:21px;font-weight:800;letter-spacing:.3px;text-transform:uppercase;color:${C.ink};mso-line-height-rule:exactly;">${text}</h2>`;
 }
 function p(text) {
-  return `<p style="font-family:${SANS};font-size:15px;color:${B.text};line-height:1.75;margin:0 0 14px;">${text}</p>`;
+  return `<p style="margin:0 0 16px;font-family:${SANS};font-size:15px;line-height:24px;color:${C.muted};mso-line-height-rule:exactly;">${emphasize(text)}</p>`;
 }
-function small(text) {
-  return `<p style="font-family:${SANS};font-size:13px;color:${B.muted};line-height:1.6;margin:0 0 10px;">${text}</p>`;
-}
+const LABEL_STYLE = `font-family:${SANS};font-size:11px;line-height:16px;font-weight:700;letter-spacing:1.3px;text-transform:uppercase;color:${C.muted};mso-line-height-rule:exactly;`;
+const shownValue = (value) => (value === null || value === undefined || value === "" ? "—" : esc(value));
+/** Fila etiqueta | valor, como la maqueta. */
 function infoRow(label, value) {
   return `<tr>
-    <td style="font-family:${SANS};font-size:11px;letter-spacing:.6px;text-transform:uppercase;
-               color:${B.muted};padding:9px 0;border-bottom:1px solid ${B.border};">${label}</td>
-    <td style="font-family:${SANS};font-size:14px;color:${B.ink};font-weight:600;padding:9px 0 9px 12px;
-               border-bottom:1px solid ${B.border};text-align:right;">${value}</td>
-  </tr>`;
+              <td class="hive-label" style="border-top:1px solid ${C.line};padding:12px 12px 12px 0;vertical-align:middle;${LABEL_STYLE}">${label}</td>
+              <td align="right" style="border-top:1px solid ${C.line};padding:12px 0;font-family:${SANS};font-size:14px;line-height:20px;font-weight:700;color:${C.ink};text-align:right;vertical-align:middle;overflow-wrap:break-word;word-wrap:break-word;mso-line-height-rule:exactly;">${shownValue(value)}</td>
+            </tr>`;
+}
+/** Fila apilada (etiqueta arriba, valor abajo) para valores largos que se copian: correo, contraseña. */
+function infoRowStacked(label, value, { mono = false } = {}) {
+  const font = mono ? "Menlo,Consolas,'Courier New',monospace" : SANS;
+  return `<tr>
+              <td class="hive-label" colspan="2" style="border-top:1px solid ${C.line};padding:12px 0 4px;${LABEL_STYLE}">${label}</td>
+            </tr>
+            <tr>
+              <td colspan="2" style="padding:0 0 12px;font-family:${font};font-size:15px;line-height:22px;font-weight:700;color:${C.ink};word-break:break-all;mso-line-height-rule:exactly;">${shownValue(value)}</td>
+            </tr>`;
 }
 function infoTable(rows) {
-  return `<table role="presentation" cellpadding="0" cellspacing="0" width="100%"
-                  style="border-top:1px solid ${B.border};margin:18px 0 22px;">
-    ${rows.join("")}
-  </table>`;
+  return `${spacer(6)}
+          <table role="presentation" class="hive-datos" width="100%" cellpadding="0" cellspacing="0" border="0">
+            ${rows.join("")}
+          </table>
+          ${spacer(12)}`;
 }
 function pill(text) {
-  return `<span style="display:inline-block;background:${B.oat};border:1px solid ${B.sand};
-                        color:${B.ink};border-radius:50px;font-family:${SANS};font-size:11px;font-weight:600;
-                        padding:5px 14px;letter-spacing:1px;text-transform:uppercase;">${text}</span>`;
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0">
+            <tr><td bgcolor="${C.accentSoft}" style="background-color:${C.accentSoft};border-radius:999px;padding:6px 14px;font-family:${SANS};font-size:11px;line-height:14px;font-weight:800;letter-spacing:1.3px;text-transform:uppercase;color:${C.accentStrong};mso-line-height-rule:exactly;">${text}</td></tr>
+          </table>
+          ${spacer(10)}`;
 }
 function alertBox(text) {
-  return `<table role="presentation" cellpadding="0" cellspacing="0" width="100%"
-                  style="background:${B.oat};border:1px solid ${B.sand};border-radius:14px;margin:14px 0 20px;">
-    <tr><td style="padding:15px 18px;font-family:${SANS};font-size:14px;color:${B.ink};line-height:1.65;">${text}</td></tr>
-  </table>`;
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+            <tr><td bgcolor="${C.accentSoft}" style="background-color:${C.accentSoft};border-radius:12px;padding:15px 18px;font-family:${SANS};font-size:14px;line-height:22px;color:${C.ink};mso-line-height-rule:exactly;">${text}</td></tr>
+          </table>
+          ${spacer(18)}`;
 }
 
 // ─── Format helpers ───────────────────────────────────────────────────────────
@@ -169,7 +276,11 @@ function fmtTime(timeStr) {
 }
 
 // ─── Core send function ───────────────────────────────────────────────────────
-async function sendEmail({ to, subject, html }) {
+function message({ to, subject, html }) {
+  return { from: FROM_EMAIL, to, subject, html };
+}
+
+async function sendEmail({ from = FROM_EMAIL, to, subject, html }) {
   if (!process.env.RESEND_API_KEY) {
     console.log(`[Email] RESEND_API_KEY not set — skipping email to ${to} (${subject})`);
     return;
@@ -183,7 +294,7 @@ async function sendEmail({ to, subject, html }) {
       .map((e) => e.trim())
       .filter(Boolean);
     const { data, error } = await resend.emails.send({
-      from: FROM_EMAIL,
+      from,
       to: Array.isArray(to) ? to : [to],
       ...(bccList.length ? { bcc: bccList } : {}),
       subject,
@@ -208,27 +319,31 @@ async function sendEmail({ to, subject, html }) {
  * @param {string} opts.endDate     — fecha fin
  * @param {number|null} opts.classLimit — clases totales (null = ilimitado)
  */
-async function sendMembershipActivated(opts) {
+function renderMembershipActivated(opts) {
   const { to, name, planName, startDate, endDate, classLimit } = opts;
-  const classesText = classLimit ? `${classLimit} clases` : "Clases ilimitadas";
-  const content = `
-    ${h1(`Bienvenida a Alma, ${name.split(" ")[0]}`)}
-    ${p("Tu membresía ya está activa. Reserva tu primera clase y empieza a moverte con intención; aquí te acompañamos en cada movimiento.")}
-    ${infoTable([
-    infoRow("Plan", planName),
-    infoRow("Clases incluidas", classesText),
-    infoRow("Inicio", fmtDate(startDate)),
-    infoRow("Vencimiento", fmtDate(endDate)),
-  ])}
-    ${p("Entra a tu perfil para reservar tus primeras clases y ver el horario disponible.")}
-  `;
+  const first = firstNameOf(name);
+  const classesText = classLimit && !isUnlimited(classLimit) ? `${classLimit} clases` : "Clases ilimitadas";
   const html = baseLayout({
-    preheader: `¡Tu membresía ${planName} está activa! Reserva tus clases ahora.`,
-    content,
+    preheader: `¡Tu membresía ${esc(planName || "")} está activa! Reserva tus clases ahora.`,
+    eyebrow: "Membresía activa",
+    title: first ? `Bienvenida a HIVE, ${esc(first)}.` : "Bienvenida a HIVE.",
+    content: `
+          ${p("Tu membresía ya está activa. Reserva tu primera clase: aquí te acompañamos en cada movimiento.")}
+          ${pill("✓ Activa")}
+          ${infoTable([
+            infoRow("Plan", planName),
+            infoRow("Clases incluidas", classesText),
+            infoRow("Inicio", fmtDate(startDate)),
+            infoRow("Vencimiento", fmtDate(endDate)),
+          ])}
+          ${p("Entra a tu perfil para reservar tus primeras clases y ver el horario disponible.")}`,
     ctaUrl: `${SITE_URL}/app/classes`,
     ctaText: "Reservar clases",
   });
-  await sendEmail({ to, subject: `Tu membresía en Alma ya está activa`, html });
+  return message({ to, subject: "Tu membresía en HIVE ya está activa", html });
+}
+async function sendMembershipActivated(opts) {
+  await sendEmail(renderMembershipActivated(opts));
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -244,49 +359,51 @@ async function sendMembershipActivated(opts) {
  * @param {string} opts.instructor      — nombre instructor
  * @param {number|null} opts.classesLeft — clases restantes después de reservar (null = ilimitado)
  * @param {boolean} opts.isWaitlist     — true si es lista de espera
+ * @param {number} [opts.cancelHours]   — ventana de cancelación (default 12)
  */
-async function sendBookingConfirmed(opts) {
+function renderBookingConfirmed(opts) {
   const { to, name, className, date, startTime, instructor, classesLeft, isWaitlist } = opts;
   const cancelHours = Number(opts.cancelHours) > 0 ? Number(opts.cancelHours) : 12;
+  const first = firstNameOf(name);
+  const cls = className || "tu clase";
 
-  const statusPill = isWaitlist
-    ? pill("Lista de espera")
-    : pill("Confirmada");
-
-  const classesLeftText = classesLeft === null
-    ? "Ilimitadas"
-    : classesLeft !== undefined
-      ? `${classesLeft} clases restantes`
-      : null;
+  const classesLeftText = classesLeft === undefined
+    ? null
+    : isUnlimited(classesLeft)
+      ? "Ilimitadas"
+      : `${classesLeft} clases restantes`;
 
   const waitlistNote = isWaitlist
-    ? alertBox("Estás en la <strong>lista de espera</strong>. Te notificaremos si se libera un lugar. Si quieres asegurar tu spot, reserva otra sesión.", B.lime)
+    ? alertBox("Estás en la <strong>lista de espera</strong>. Te notificaremos si se libera un lugar. Si quieres asegurar tu spot, reserva otra sesión.")
     : "";
 
-  const content = `
-    ${h1(isWaitlist ? `En lista de espera, ${name.split(" ")[0]}` : `Nos vemos en clase, ${name.split(" ")[0]}`)}
-    ${p(isWaitlist
-    ? "Te hemos añadido a la lista de espera para la siguiente clase:"
-    : "Tu clase ha sido reservada con éxito. ¡Te esperamos!"
-  )}
-    <div style="text-align:center;margin:6px 0 16px;">${statusPill}</div>
-    ${infoTable([
-    infoRow("Clase", className),
-    infoRow("Fecha", fmtDate(date)),
-    infoRow("Hora", fmtTime(startTime)),
-    ...(instructor ? [infoRow("Instructor", instructor)] : []),
-    ...(classesLeftText ? [infoRow("Tu paquete", classesLeftText)] : []),
-  ])}
-    ${waitlistNote}
-    ${p(`Recuerda que puedes cancelar tu reserva hasta <strong>${cancelHours} horas antes</strong> para recuperar tu crédito de clase.`)}
-  `;
   const html = baseLayout({
-    preheader: isWaitlist ? `Estás en lista de espera para ${className}` : `Reserva confirmada para ${className} el ${fmtDate(date)}`,
-    content,
+    preheader: isWaitlist ? `Estás en lista de espera para ${esc(cls)}` : `Reserva confirmada para ${esc(cls)} el ${fmtDate(date)}`,
+    eyebrow: isWaitlist ? "Tu reserva" : "Clase reservada",
+    title: isWaitlist
+      ? (first ? `En lista de espera, ${esc(first)}.` : "Estás en lista de espera.")
+      : (first ? `Nos vemos en clase, ${esc(first)}.` : "Nos vemos en clase."),
+    content: `
+          ${p(isWaitlist
+            ? "Te añadimos a la lista de espera de esta clase:"
+            : "Tu lugar está apartado. Te esperamos en la colmena.")}
+          ${pill(isWaitlist ? "Lista de espera" : "✓ Confirmada")}
+          ${infoTable([
+            infoRow("Clase", cls),
+            infoRow("Fecha", fmtDate(date)),
+            infoRow("Hora", fmtTime(startTime)),
+            ...(instructor ? [infoRow("Coach", instructor)] : []),
+            ...(classesLeftText ? [infoRow("Tu paquete", classesLeftText)] : []),
+          ])}
+          ${waitlistNote}`,
     ctaUrl: `${SITE_URL}/app/bookings`,
     ctaText: "Ver mis reservas",
+    note: `Puedes cancelar tu reserva hasta <strong>${cancelHours} horas antes</strong> para recuperar tu clase.`,
   });
-  await sendEmail({ to, subject: isWaitlist ? `En lista de espera — ${className}` : `Reserva confirmada — ${className}`, html });
+  return message({ to, subject: isWaitlist ? `En lista de espera — ${cls}` : `Reserva confirmada — ${cls}`, html });
+}
+async function sendBookingConfirmed(opts) {
+  await sendEmail(renderBookingConfirmed(opts));
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -300,40 +417,47 @@ async function sendBookingConfirmed(opts) {
  * @param {string}  opts.date
  * @param {string}  opts.startTime
  * @param {boolean} opts.creditRestored  — true si se devolvió el crédito
- * @param {boolean} opts.isLate          — cancelación tardía (<2h)
+ * @param {boolean} opts.isLate          — cancelación tardía (dentro de la ventana)
  * @param {number|null} opts.classesLeft — clases restantes después de cancelar
+ * @param {number} [opts.cancelHours]    — ventana de cancelación (default 12)
  */
-async function sendBookingCancelled(opts) {
+function renderBookingCancelled(opts) {
   const { to, name, className, date, startTime, creditRestored, isLate, classesLeft } = opts;
+  const cancelHours = Number(opts.cancelHours) > 0 ? Number(opts.cancelHours) : 12;
+  const first = firstNameOf(name);
+  const cls = className || "tu clase";
+  const contact = contactChannel();
 
-  const classesLeftText = classesLeft === null ? "Ilimitadas" : classesLeft !== undefined ? `${classesLeft} clases` : null;
+  const classesLeftText = classesLeft === undefined ? null : isUnlimited(classesLeft) ? "Ilimitadas" : `${classesLeft} clases`;
 
   const creditBlock = creditRestored
-    ? alertBox(`<strong>Tu clase regresó a tu paquete.</strong> Cancelaste con más de 12 horas de anticipación.`)
-    : alertBox(`<strong>Esta vez la clase no regresó a tu paquete.</strong> La cancelación fue con menos de 12 horas de anticipación, como indica nuestra política.`);
+    ? alertBox(`<strong>Tu clase regresó a tu paquete.</strong> Cancelaste con más de ${cancelHours} horas de anticipación.`)
+    : alertBox(`<strong>Esta vez la clase no regresó a tu paquete.</strong> La cancelación fue con menos de ${cancelHours} horas de anticipación, como indica nuestra política.`);
 
-  const content = `
-    ${h1(`Reserva cancelada, ${name.split(" ")[0]}`)}
-    ${p("Tu reserva para la siguiente clase ha sido cancelada:")}
-    ${infoTable([
-    infoRow("Clase", className),
-    infoRow("Fecha", fmtDate(date)),
-    infoRow("Hora", fmtTime(startTime)),
-    ...(classesLeftText ? [infoRow("Clases restantes", classesLeftText)] : []),
-  ])}
-    ${creditBlock}
-    ${isLate
-      ? small("Si tienes dudas sobre la política de cancelación, contáctanos por WhatsApp o visita tu perfil.")
-      : p("¿Quieres reservar otra clase? Hay muchos horarios disponibles.")
-    }
-  `;
   const html = baseLayout({
     preheader: creditRestored ? "Tu clase fue devuelta al paquete." : "Cancelación tardía — crédito no recuperado.",
-    content,
+    eyebrow: "Cancelación",
+    title: first ? `Reserva cancelada, ${esc(first)}.` : "Reserva cancelada.",
+    content: `
+          ${p("Tu reserva para la siguiente clase ha sido cancelada:")}
+          ${infoTable([
+            infoRow("Clase", cls),
+            infoRow("Fecha", fmtDate(date)),
+            infoRow("Hora", fmtTime(startTime)),
+            ...(classesLeftText ? [infoRow("Clases restantes", classesLeftText)] : []),
+          ])}
+          ${creditBlock}
+          ${isLate ? "" : p("¿Quieres reservar otra clase? Hay muchos horarios disponibles.")}`,
     ctaUrl: `${SITE_URL}/app/classes`,
     ctaText: "Ver horario",
+    note: isLate
+      ? `Si tienes dudas sobre la política de cancelación, escríbenos por <a href="${esc(contact.url)}" target="_blank" style="color:${C.accentStrong};font-weight:700;text-decoration:underline;">${contact.name}</a> o visita tu perfil.`
+      : "",
   });
-  await sendEmail({ to, subject: `Reserva cancelada — ${className}`, html });
+  return message({ to, subject: `Reserva cancelada — ${cls}`, html });
+}
+async function sendBookingCancelled(opts) {
+  await sendEmail(renderBookingCancelled(opts));
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -346,32 +470,37 @@ async function sendBookingCancelled(opts) {
  * @param {number|null} opts.classesLeft — null = ilimitado
  * @param {string|null} opts.endDate     — fecha de vencimiento del paquete
  */
-async function sendWeeklyReminder(opts) {
+function renderWeeklyReminder(opts) {
   const { to, name, classesLeft, endDate } = opts;
+  const first = firstNameOf(name);
+  const unlimited = isUnlimited(classesLeft ?? null);
+  const n = Number(classesLeft);
 
-  const classesText = classesLeft === null
-    ? "Tienes clases <strong>ilimitadas</strong> esta semana."
-    : `Tienes <strong>${classesLeft} clase${classesLeft !== 1 ? "s" : ""}</strong> disponible${classesLeft !== 1 ? "s" : ""} en tu paquete.`;
+  const classesText = unlimited
+    ? "Clases ilimitadas"
+    : `${n} clase${n !== 1 ? "s" : ""} disponible${n !== 1 ? "s" : ""}`;
 
   const expiryNote = endDate
     ? alertBox(`Tu membresía vence el <strong>${fmtDate(endDate)}</strong>. Aún estás a tiempo de aprovechar tus clases.`)
     : "";
 
-  const content = `
-    ${h1(`Tu semana en Alma, ${name.split(" ")[0]}`)}
-    ${p("Empieza una semana nueva y el horario ya está abierto. Aparta tus clases y date ese tiempo para ti.")}
-    ${p(classesText)}
-    ${expiryNote}
-    ${h2("Date la cita contigo")}
-    ${p("Grupos pequeños, técnica cuidada y alguien que te recibe por tu nombre. Reserva tus lugares antes de que se llenen.")}
-  `;
   const html = baseLayout({
-    preheader: `Nueva semana en Alma. Tienes ${classesLeft === null ? "clases ilimitadas" : `${classesLeft} clases`} para reservar.`,
-    content,
+    preheader: `Nueva semana en HIVE. Tienes ${unlimited ? "clases ilimitadas" : `${n} clases`} para reservar.`,
+    eyebrow: "Nueva semana",
+    title: first ? `Tu semana en HIVE, ${esc(first)}.` : "Tu semana en HIVE.",
+    content: `
+          ${p("Empieza una semana nueva y el horario ya está abierto. Aparta tus clases y date ese tiempo para ti.")}
+          ${infoTable([infoRow("Tu paquete", classesText)])}
+          ${expiryNote}
+          ${h2("Date la cita contigo")}
+          ${p("Grupos pequeños, técnica cuidada y alguien que te recibe por tu nombre. Reserva tus lugares antes de que se llenen.")}`,
     ctaUrl: `${SITE_URL}/app/classes`,
     ctaText: "Reservar mi semana",
   });
-  await sendEmail({ to, subject: `Tu semana en Alma — reserva tus clases`, html });
+  return message({ to, subject: "Tu semana en HIVE — reserva tus clases", html });
+}
+async function sendWeeklyReminder(opts) {
+  await sendEmail(renderWeeklyReminder(opts));
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -386,44 +515,45 @@ async function sendWeeklyReminder(opts) {
  * @param {string|null} opts.endDate
  * @param {'last_class'|'expiring_soon'} opts.reason
  */
-async function sendRenewalReminder(opts) {
+function renderRenewalReminder(opts) {
   const { to, name, planName, classesLeft, endDate, reason } = opts;
+  const first = firstNameOf(name);
+  const plan = esc(planName || "tu membresía");
 
   const isLastClass = reason === "last_class";
-  const isExpiring = reason === "expiring_soon";
 
   const urgencyBlock = isLastClass
-    ? alertBox(`Te queda <strong>1 clase</strong> en tu paquete ${planName}. Renuévalo para no quedarte sin acceso.`)
-    : alertBox(`Tu membresía <strong>${planName}</strong> vence el <strong>${fmtDate(endDate)}</strong>. Renuévala para mantener tu ritmo.`);
+    ? alertBox(`Te queda <strong>1 clase</strong> en tu paquete ${plan}. Renuévalo para no quedarte sin acceso.`)
+    : alertBox(`Tu membresía <strong>${plan}</strong> vence el <strong>${fmtDate(endDate)}</strong>. Renuévala para mantener tu ritmo.`);
 
   const benefit = isLastClass
     ? p("Aprovecha y reserva esa última clase hoy, y de paso renueva tu paquete para seguir entrenando sin interrupciones.")
     : p("Renovar antes del vencimiento es la mejor forma de mantener tu constancia. ¡No dejes que el progreso se detenga!");
 
-  const content = `
-    ${h1(`${name.split(" ")[0]}, es momento de renovar`)}
-    ${urgencyBlock}
-    ${p("En Alma cuidamos tu constancia: renovar a tiempo es la forma de no perder el hilo de tu práctica.")}
-    ${infoTable([
-    infoRow("Plan actual", planName),
-    ...(classesLeft !== null ? [infoRow("Clases restantes", `${classesLeft}`)] : []),
-    ...(endDate ? [infoRow("Vencimiento", fmtDate(endDate))] : []),
-  ])}
-    ${benefit}
-  `;
   const html = baseLayout({
-    preheader: isLastClass ? `Te queda 1 clase. Renueva tu paquete.` : `Tu membresía vence pronto. Renueva para seguir tu práctica.`,
-    content,
+    preheader: isLastClass ? "Te queda 1 clase. Renueva tu paquete." : "Tu membresía vence pronto. Renueva para seguir tu práctica.",
+    eyebrow: "Renovación",
+    title: first ? `${esc(first)}, es momento de renovar.` : "Es momento de renovar.",
+    content: `
+          ${urgencyBlock}
+          ${p("En HIVE cuidamos tu constancia: renovar a tiempo es la forma de no perder el hilo de tu práctica.")}
+          ${infoTable([
+            infoRow("Plan actual", planName || "Tu membresía"),
+            ...(classesLeft !== null && classesLeft !== undefined && !isUnlimited(classesLeft) ? [infoRow("Clases restantes", `${classesLeft}`)] : []),
+            ...(endDate ? [infoRow("Vencimiento", fmtDate(endDate))] : []),
+          ])}
+          ${benefit}`,
     ctaUrl: `${SITE_URL}/app/checkout`,
     ctaText: "Renovar mi membresía",
   });
-  await sendEmail({
+  return message({
     to,
-    subject: isLastClass
-      ? `Te queda 1 clase — renueva tu membresía`
-      : `Tu membresía vence pronto — Alma`,
+    subject: isLastClass ? "Te queda 1 clase — renueva tu membresía" : "Tu membresía vence pronto — HIVE",
     html,
   });
+}
+async function sendRenewalReminder(opts) {
+  await sendEmail(renderRenewalReminder(opts));
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -436,27 +566,27 @@ async function sendRenewalReminder(opts) {
  * @param {string} opts.token
  * @param {string=} opts.resetUrl
  */
-async function sendPasswordResetEmail(opts) {
+function renderPasswordResetEmail(opts) {
   const { to, name, token, resetUrl } = opts;
-  const safeName = String(name || "Clienta");
-  const firstName = safeName.trim().split(/\s+/)[0] || "Clienta";
+  const firstName = firstNameOf(name) || "Clienta";
   const resolvedResetUrl = String(
     resetUrl || `${SITE_URL}/auth/reset-password?token=${encodeURIComponent(token)}`,
   );
-  const content = `
-    ${h1(`Recupera tu contraseña, ${firstName}`)}
-    ${p("Hemos recibido una solicitud para cambiar la contraseña de tu cuenta en Alma Movement.")}
-    ${p("Si fuiste tú, haz clic en el siguiente enlace para crear una contraseña nueva. Este enlace expirará en 2 horas.")}
-    ${p("Si no solicitaste este cambio, puedes ignorar este correo; tu cuenta seguirá segura.")}
-    ${small(`Si el botón no abre, copia y pega este enlace en tu navegador:<br><a href="${resolvedResetUrl}" style="color:${B.magenta};word-break:break-all;">${resolvedResetUrl}</a>`)}
-  `;
   const html = baseLayout({
-    preheader: "Recupera el acceso a tu cuenta de Alma Movement",
-    content,
+    preheader: "Recupera el acceso a tu cuenta de HIVE Pilates Studio",
+    eyebrow: "Tu cuenta",
+    title: `Recupera tu contraseña, ${esc(firstName)}.`,
+    content: `
+          ${p("Recibimos una solicitud para cambiar la contraseña de tu cuenta en HIVE Pilates Studio.")}
+          ${p("Si fuiste tú, usa el botón para crear una contraseña nueva. El enlace expira en <strong>2 horas</strong>.")}`,
     ctaUrl: resolvedResetUrl,
-    ctaText: "Reestablecer mi contraseña",
+    ctaText: "Restablecer mi contraseña",
+    note: `Si no solicitaste este cambio, puedes ignorar este correo; tu cuenta seguirá segura.<br><br>Si el botón no abre, copia y pega este enlace en tu navegador:<br><a href="${esc(resolvedResetUrl)}" target="_blank" style="color:${C.accentStrong};word-break:break-all;">${esc(resolvedResetUrl)}</a>`,
   });
-  await sendEmail({ to, subject: "Restablecer tu contraseña — Alma", html });
+  return message({ to, subject: "Restablecer tu contraseña — HIVE", html });
+}
+async function sendPasswordResetEmail(opts) {
+  await sendEmail(renderPasswordResetEmail(opts));
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -468,21 +598,25 @@ async function sendPasswordResetEmail(opts) {
  * @param {string} opts.name
  * @param {string} opts.reason
  */
-async function sendOrderRejected(opts) {
+function renderOrderRejected(opts) {
   const { to, name, reason } = opts;
-  const content = `
-    ${h1(`Revisamos tu comprobante`)}
-    ${p(`Hola ${name.split(" ")[0]}, revisamos tu comprobante de pago y por ahora <strong>no pudimos aprobarlo</strong>.`)}
-    ${alertBox(`<strong>Motivo:</strong> ${reason}`)}
-    ${p("Si crees que hubo un error, escríbenos por WhatsApp o responde este correo y lo resolvemos contigo.")}
-  `;
+  const first = firstNameOf(name);
+  const contact = contactChannel();
   const html = baseLayout({
-    preheader: "Tu comprobante de pago fue revisado — Alma Movement",
-    content,
-    ctaUrl: `https://wa.me/521${process.env.STUDIO_PHONE || ""}`,
-    ctaText: "Contactar por WhatsApp",
+    preheader: "Tu comprobante de pago fue revisado — HIVE Pilates Studio",
+    eyebrow: "Comprobante de pago",
+    title: "Revisamos tu comprobante.",
+    content: `
+          ${p(`${first ? `Hola ${esc(first)}, revisamos` : "Revisamos"} tu comprobante de pago y por ahora <strong>no pudimos aprobarlo</strong>.`)}
+          ${alertBox(`<strong>Motivo:</strong> ${esc(reason || "No especificado")}`)}
+          ${p(`Si crees que hubo un error, escríbenos por ${contact.name} y lo resolvemos contigo.`)}`,
+    ctaUrl: contact.url,
+    ctaText: contact.cta,
   });
-  await sendEmail({ to, subject: "Comprobante de pago no aprobado — Alma Movement", html });
+  return message({ to, subject: "Comprobante de pago no aprobado — HIVE Pilates Studio", html });
+}
+async function sendOrderRejected(opts) {
+  await sendEmail(renderOrderRejected(opts));
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -495,33 +629,48 @@ async function sendOrderRejected(opts) {
  * @param {string} opts.tempPassword  Contraseña temporal en claro (la cambia al entrar)
  * @param {string} [opts.loginUrl]    URL de acceso (default: SITE_URL/auth/login)
  */
-async function sendAdminWelcome(opts) {
+function renderAdminWelcome(opts) {
   const { to, name, tempPassword, loginUrl } = opts;
-  const safeName = String(name || "").trim();
-  const firstName = safeName.split(/\s+/)[0] || "Hola";
+  const first = firstNameOf(name);
   const resolvedLoginUrl = String(loginUrl || `${SITE_URL}/auth/login`);
-  const content = `
-    ${h1(`Bienvenida al equipo, ${firstName}`)}
-    ${p("Te damos acceso de <strong>administradora</strong> a la plataforma de Alma Movement. Desde tu cuenta podrás gestionar clases, reservas, membresías, comprobantes y más.")}
-    ${p("Estos son tus datos de acceso:")}
-    ${infoTable([
-      infoRow("Correo", to),
-      infoRow("Contraseña temporal", tempPassword),
-    ])}
-    ${alertBox("Por tu seguridad, <strong>cambia esta contraseña</strong> la primera vez que entres: Perfil → Editar perfil → Seguridad.")}
-    ${small("Si no esperabas este correo, ignóralo o escríbenos y lo revisamos.")}
-  `;
   const html = baseLayout({
-    preheader: "Tu acceso de administradora a Alma Movement",
-    content,
+    preheader: "Tu acceso de administradora a HIVE Pilates Studio",
+    eyebrow: "Equipo HIVE",
+    title: first ? `Bienvenida al equipo, ${esc(first)}.` : "Bienvenida al equipo.",
+    content: `
+          ${p("Te damos acceso de <strong>administradora</strong> a la plataforma de HIVE Pilates Studio. Desde tu cuenta podrás gestionar clases, reservas, membresías, comprobantes y más.")}
+          ${p("Estos son tus datos de acceso:")}
+          ${infoTable([
+            infoRowStacked("Correo", to),
+            infoRowStacked("Contraseña temporal", tempPassword, { mono: true }),
+          ])}
+          ${alertBox("Por tu seguridad, <strong>cambia esta contraseña</strong> la primera vez que entres: Perfil → Editar perfil → Seguridad.")}`,
     ctaUrl: resolvedLoginUrl,
     ctaText: "Entrar a la plataforma",
+    note: "Si no esperabas este correo, ignóralo o escríbenos y lo revisamos.",
   });
-  await sendEmail({ to, subject: "Tu acceso de administradora — Alma Movement", html });
+  return message({ to, subject: "Tu acceso de administradora — HIVE Pilates Studio", html });
+}
+async function sendAdminWelcome(opts) {
+  await sendEmail(renderAdminWelcome(opts));
 }
 
 // ─── Exports ──────────────────────────────────────────────────────────────────
 export {
+  FROM_EMAIL,
+  SITE_URL,
+  LOGO_URL,
+  LOGO_W,
+  LOGO_H,
+  STUDIO,
+  renderMembershipActivated,
+  renderBookingConfirmed,
+  renderBookingCancelled,
+  renderWeeklyReminder,
+  renderRenewalReminder,
+  renderPasswordResetEmail,
+  renderOrderRejected,
+  renderAdminWelcome,
   sendMembershipActivated,
   sendBookingConfirmed,
   sendBookingCancelled,
