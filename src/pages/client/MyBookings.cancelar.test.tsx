@@ -74,8 +74,33 @@ describe("Mis clases · cancelar y lista de espera (P0-4 · P1-1)", () => {
     expect(within(dlg).getByText("Dejas tu lugar en la fila. No usa una cancelación de tu paquete.")).toBeInTheDocument();
     vi.mocked(api.delete).mockResolvedValue({ data: { message: "Saliste de la lista de espera. No usa una cancelación de tu paquete.", creditRestored: false, leftWaitlist: true } } as never);
     fireEvent.click(within(dlg).getByRole("button", { name: "Sí, salir" }));
-    await waitFor(() => expect(api.delete).toHaveBeenCalledWith("/bookings/b4"));
+    await waitFor(() => expect(api.delete).toHaveBeenCalledWith("/bookings/b4", { params: { expect: "waitlist" } }));
     await waitFor(() => expect(toastSpy).toHaveBeenCalledWith(expect.objectContaining({ title: "Saliste de la lista de espera" })));
+  });
+
+  it("si ya subió de la fila antes de confirmar, el servidor da 409 ALREADY_PROMOTED: muestra su mensaje y refresca la lista (A1)", async () => {
+    montar(0);
+    await screen.findByText("Lugar 2 en la fila");
+    const llamadasPrevias = vi.mocked(api.get).mock.calls.filter((c) => c[0] === "/bookings/my-bookings").length;
+    fireEvent.click(screen.getByRole("button", { name: "Salir de la lista de espera" }));
+    const dlg = await screen.findByRole("alertdialog", { name: "¿Salir de la lista de espera?" });
+    vi.mocked(api.delete).mockRejectedValue({
+      response: {
+        status: 409,
+        data: { code: "ALREADY_PROMOTED", message: "Ya subiste de la lista de espera: tu lugar está confirmado. Si quieres cancelarlo, aplican las reglas de cancelación." },
+      },
+    });
+    fireEvent.click(within(dlg).getByRole("button", { name: "Sí, salir" }));
+    await waitFor(() => expect(api.delete).toHaveBeenCalledWith("/bookings/b4", { params: { expect: "waitlist" } }));
+    await waitFor(() => expect(toastSpy).toHaveBeenCalledWith(expect.objectContaining({
+      title: "Tu lugar ya está confirmado",
+      description: "Ya subiste de la lista de espera: tu lugar está confirmado. Si quieres cancelarlo, aplican las reglas de cancelación.",
+    })));
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+    await waitFor(() => {
+      const llamadasAhora = vi.mocked(api.get).mock.calls.filter((c) => c[0] === "/bookings/my-bookings").length;
+      expect(llamadasAhora).toBeGreaterThan(llamadasPrevias);
+    });
   });
 
   it("con el paquete de la reserva vencido (no viene en mine/all) no hereda la cuota de otro paquete activo (ronda 1)", async () => {

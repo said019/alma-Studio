@@ -119,7 +119,10 @@ const MyBookings = () => {
   }, [bookings, nowTick]);
 
   const cancelMutation = useMutation({
-    mutationFn: (id: string) => api.delete(`/bookings/${id}`),
+    mutationFn: ({ id, isWaitlist }: { id: string; isWaitlist: boolean }) =>
+      isWaitlist
+        ? api.delete(`/bookings/${id}`, { params: { expect: "waitlist" } })
+        : api.delete(`/bookings/${id}`),
     onSuccess: (res) => {
       qc.invalidateQueries({ queryKey: ["my-bookings"] });
       qc.invalidateQueries({ queryKey: ["my-membership"] });
@@ -133,6 +136,16 @@ const MyBookings = () => {
       setCancelTarget(null);
     },
     onError: (err: any) => {
+      // Pantalla desfasada: ya subió de la fila antes de que la clienta confirme
+      // salir. El servidor no cambia nada; sólo refrescamos para que se vea
+      // "Confirmada" en vez de reintentar sobre una fila que ya no existe.
+      if (err?.response?.status === 409 && err?.response?.data?.code === "ALREADY_PROMOTED") {
+        const msg = err.response.data.message || "Ya subiste de la lista de espera: tu lugar está confirmado.";
+        toast({ title: "Tu lugar ya está confirmado", description: msg });
+        setCancelTarget(null);
+        qc.invalidateQueries({ queryKey: ["my-bookings"] });
+        return;
+      }
       const msg = err?.response?.data?.message || "No se pudo cancelar.";
       toast({ title: "No pudimos cancelar", description: msg, variant: "destructive" });
       setCancelTarget(null);
@@ -344,7 +357,7 @@ const MyBookings = () => {
               {!agotada && (
                 <AlertDialogAction
                   className="h-11 rounded-full px-5 text-[0.75rem] font-medium uppercase tracking-[0.18em] bg-danger text-canvas hover:bg-danger/90"
-                  onClick={() => cancelTarget && cancelMutation.mutate(cancelTarget.id)}
+                  onClick={() => cancelTarget && cancelMutation.mutate({ id: cancelTarget.id, isWaitlist: saliendo })}
                 >
                   {saliendo ? "Sí, salir" : "Sí, cancelar"}
                 </AlertDialogAction>
