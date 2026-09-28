@@ -80,4 +80,43 @@ describe("Lista de espera", () => {
     renderAdmin(<Waitlist />, { route: "/admin/bookings/waitlist" });
     expect(await screen.findByText("Nadie en lista de espera esta semana.")).toBeInTheDocument();
   });
+
+  it("con fila pero un lugar libre (se saltó a alguien), no dice 'llena' porque no lo está (A6)", async () => {
+    routeApi(mockApi, {
+      "/admin/stats": { pendingAlerts: 0 },
+      "/classes?start=": { data: [{ id: "c11", date: "2026-09-25", start_time: "2026-09-25T11:00:00", class_type_name: "Reformer Intermedio", instructor_name: "Fer", max_capacity: 8, current_bookings: 7, waitlist_count: 1 }] },
+      "/classes/c11/roster": { data: {
+        class: { classTypeName: "Reformer Intermedio", startsAt: "2026-09-25T11:00:00", date: "2026-09-25", maxCapacity: 8, currentBookings: 7 },
+        roster: [
+          { bookingId: "b3", status: "waitlist", waitlistPosition: 1, displayName: "Paula Herrera", email: null, phone: null, planName: "Paquete 4", classesRemaining: 2 },
+        ] } },
+    });
+    renderAdmin(<Waitlist />, { route: "/admin/bookings/waitlist" });
+    const lista = await screen.findByRole("region", { name: "Clases con lista de espera" });
+    const boton = await within(lista).findByRole("button", { name: /Reformer Intermedio/ });
+    expect(within(boton).queryByText(/· llena/)).toBeNull();
+    fireEvent.click(boton);
+    const detalle = await screen.findByRole("region", { name: "Quién espera" });
+    expect(await within(detalle).findByText("Lista de espera · se actualiza sola cada 15 s")).toBeInTheDocument();
+    expect(within(detalle).queryByText(/^Llena/)).toBeNull();
+  });
+
+  it("de verdad llena, sí lo dice (A6)", async () => {
+    routeApi(mockApi, {
+      "/admin/stats": { pendingAlerts: 0 },
+      "/classes?start=": { data: [clase("c11", "11:00", "Reformer Intermedio", 1)] },
+      "/classes/c11/roster": { data: {
+        class: { classTypeName: "Reformer Intermedio", startsAt: "2026-09-25T11:00:00", date: "2026-09-25", maxCapacity: 8, currentBookings: 8 },
+        roster: [
+          { bookingId: "b3", status: "waitlist", waitlistPosition: 1, displayName: "Paula Herrera", email: null, phone: null, planName: "Paquete 4", classesRemaining: 2 },
+        ] } },
+    });
+    renderAdmin(<Waitlist />, { route: "/admin/bookings/waitlist" });
+    const lista = await screen.findByRole("region", { name: "Clases con lista de espera" });
+    const boton = await within(lista).findByRole("button", { name: /Reformer Intermedio/ });
+    expect(within(boton).getByText(/· llena/)).toBeInTheDocument();
+    fireEvent.click(boton);
+    const detalle = await screen.findByRole("region", { name: "Quién espera" });
+    expect(await within(detalle).findByText("Llena · se actualiza sola cada 15 s")).toBeInTheDocument();
+  });
 });
