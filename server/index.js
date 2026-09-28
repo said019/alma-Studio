@@ -9447,16 +9447,19 @@ async function notifyClassCancelled(classRow, activeBookings, reason) {
 // bitácora. La respuesta no cambia (auditoría 2026-09-27, bloque 2).
 app.put("/api/classes/:id/cancel", adminMiddleware, async (req, res) => {
   const { reason } = req.body || {};
+  // Mismo motivo limpio (recortado, sin espacios en los extremos) en la clase,
+  // la bitácora, el WhatsApp y la respuesta — no el crudo del body.
+  const why = cleanReason(reason);
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-    const done = await cancelClassInTx(client, req.params.id, { actorId: req.userId, reason, source: "manual" });
+    const done = await cancelClassInTx(client, req.params.id, { actorId: req.userId, reason: why, source: "manual" });
     if (!done) {
       await client.query("ROLLBACK");
       return res.status(404).json({ message: "Clase no encontrada o ya cancelada" });
     }
     await client.query("COMMIT");
-    const wa = await notifyClassCancelled(done.classRow, done.activeBookings, reason);
+    const wa = await notifyClassCancelled(done.classRow, done.activeBookings, why);
     return res.json({
       data: {
         class_id: done.classRow.id,
@@ -9468,7 +9471,7 @@ app.put("/api/classes/:id/cancel", adminMiddleware, async (req, res) => {
         wa_unreached: wa.waUnreached,
         // "disabled" = la dueña apagó los avisos; otro estado = canal caído.
         wa_channel_state: wa.channelState,
-        reason: reason || null,
+        reason: why,
       },
     });
   } catch (err) {
@@ -10423,6 +10426,7 @@ app.delete("/api/classes/week", adminMiddleware, async (req, res) => {
       if (done) cancelled.push(done);
     }
     let deleted = 0;
+    let deletedIds = [];
     if (plan.delete.length) {
       // NOT EXISTS: una clase que recibió una reserva entre el conteo y aquí no se borra.
       const del = await client.query(
@@ -10432,16 +10436,21 @@ app.delete("/api/classes/week", adminMiddleware, async (req, res) => {
           RETURNING c.id`,
         [plan.delete],
       );
-      deleted = del.rowCount ?? del.rows.length;
+      deletedIds = del.rows.map((r) => r.id);
+      deleted = deletedIds.length;
     }
+    // Si el NOT EXISTS salvó alguna (le llegó una reserva entre el conteo y el
+    // DELETE), esa clase se conserva, no se borró: va con las que ya se conservaban.
+    const savedIds = plan.delete.filter((id) => !deletedIds.includes(id));
+    const keptIds = [...plan.keep, ...savedIds];
     const bookingsCancelled = cancelled.reduce((s, c) => s + c.activeBookings.length, 0);
     const creditsRestored = cancelled.reduce((s, c) => s + c.creditsRestored, 0);
     await recordAudit(client, {
       actorId: req.userId, action: "class.week_clear", entityType: "class_week",
       reason: plan.activeBookings > 0 ? reason : null,
-      after: { deleted, cancelled: cancelled.length, kept: plan.keep.length },
+      after: { deleted, cancelled: cancelled.length, kept: keptIds.length },
       meta: {
-        start, end, deleted_ids: plan.delete, cancelled_ids: cancelled.map((c) => c.classRow.id), kept_ids: plan.keep,
+        start, end, deleted_ids: deletedIds, cancelled_ids: cancelled.map((c) => c.classRow.id), kept_ids: keptIds,
         bookings_cancelled: bookingsCancelled, credits_restored: creditsRestored,
       },
     });
@@ -10459,7 +10468,7 @@ app.delete("/api/classes/week", adminMiddleware, async (req, res) => {
       for (const u of wa.waUnreached) if (!unreached.has(u.user_id)) unreached.set(u.user_id, u);
     }
     return res.json({
-      deleted, cancelled: cancelled.length, kept: plan.keep.length, bookingsCancelled, creditsRestored,
+      deleted, cancelled: cancelled.length, kept: keptIds.length, bookingsCancelled, creditsRestored,
       wa_queued: waQueued, wa_failed: unreached.size, wa_unreached: [...unreached.values()], wa_channel_state: channelState,
       startDate: start, endDate: end,
     });
@@ -15647,8 +15656,7 @@ app.delete("/api/admin/classes/:id", adminMiddleware, async (req, res) => {
   try {
     await client.query("BEGIN");
     const cur = await client.query(
-      `SELECT c.id, to_char(c.date, 'YYYY-MM-DD') AS day, c.start_time, c.status::text AS status,
-              (SELECT COUNT(*)::int FROM bookings b WHERE b.class_id = c.id) AS bookings
+      `SELECT c.id, to_char(c.date, 'YYYY-MM-DD') AS day, c.start_time, c.status::text AS status
          FROM classes c WHERE c.id = $1 FOR UPDATE`,
       [req.params.id],
     );
@@ -15657,11 +15665,17 @@ app.delete("/api/admin/classes/:id", adminMiddleware, async (req, res) => {
       return res.status(404).json({ message: "Clase no encontrada" });
     }
     const cls = cur.rows[0];
-    if (cls.bookings > 0) {
+    // NOT EXISTS dentro del propio DELETE (no un SELECT COUNT aparte): si algo
+    // reserva la clase entre el SELECT de arriba y aquí, esta consulta ya no
+    // borra nada — nunca una foto vieja del conteo (Review Focus 4).
+    const del = await client.query(
+      `DELETE FROM classes c WHERE c.id = $1 AND NOT EXISTS (SELECT 1 FROM bookings b WHERE b.class_id = c.id)`,
+      [cls.id],
+    );
+    if (del.rowCount === 0) {
       await client.query("ROLLBACK");
       return res.status(409).json({ code: "CLASS_HAS_BOOKINGS", message: "Esta clase tiene reservas o historial: cancélala en lugar de borrarla." });
     }
-    await client.query("DELETE FROM classes WHERE id = $1", [cls.id]);
     await recordAudit(client, {
       actorId: req.userId, action: "class.delete", entityType: "class", entityId: cls.id,
       before: { day: cls.day, start_time: String(cls.start_time).slice(0, 5), status: cls.status },

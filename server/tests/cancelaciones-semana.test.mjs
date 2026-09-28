@@ -99,6 +99,8 @@ test("limpiar semana con motivo: borra vacías, cancela las que tienen reservas 
   assert.equal(r.body.deleted, 1);
   assert.equal(r.body.cancelled, 2);
   assert.equal(r.body.bookingsCancelled, 1);
+  assert.equal(r.body.creditsRestored, 1, "sólo conReserva tenía un crédito vivo que devolver");
+  assert.equal(r.body.kept, 0, "nada quedó sin tocar en este rango");
   assert.equal(r.body.wa_failed, 1, "sin Evolution configurado: hay que avisar a mano");
   assert.equal(await cuantas(vacia), 0, "la vacía se borró");
   const [cr] = await sql(`SELECT status, cancelled_by, cancellation_reason FROM classes WHERE id=$1`, [conReserva]);
@@ -128,6 +130,36 @@ test("limpiar semana no toca clases que ya ocurrieron", async () => {
   assert.notEqual((await sql(`SELECT status FROM classes WHERE id=$1`, [classId]))[0].status, "cancelled");
   assert.equal((await sql(`SELECT status FROM bookings WHERE id=$1`, [bookingId]))[0].status, "checked_in");
   assert.equal(await credits(c.id), antes, "no se devuelve crédito de una clase que ocurrió");
+});
+
+test("limpiar semana conserva una clase vacía que ya pasó, no la borra (R4)", async () => {
+  const vaciaPasada = await makeClass(A, f, { date: day(-150) });
+  const r = await api("DELETE", "/api/classes/week", { token: A, body: { startDate: day(-150), endDate: day(-150) } });
+  assert.equal(r.status, 200, JSON.stringify(r.body).slice(0, 200));
+  assert.equal(r.body.kept, 1, "started le gana a total===0: una vacía que ya pasó se conserva, no se borra");
+  assert.equal(r.body.deleted, 0);
+  assert.equal(await cuantas(vaciaPasada), 1, "la clase sigue existiendo");
+  const [cl] = await sql(`SELECT status FROM classes WHERE id=$1`, [vaciaPasada]);
+  assert.notEqual(cl.status, "cancelled");
+});
+
+test("cancelar una reserva con refundCredit:false no devuelve el crédito y lo dice en la bitácora", async () => {
+  const { c, bookingId } = await reserva("sincredito", day(32));
+  const antes = await credits(c.id);
+  const r = await api("DELETE", `/api/admin/bookings/${bookingId}`, { token: A, body: { reason: "Falta sin aviso", refundCredit: false } });
+  assert.equal(r.status, 200, JSON.stringify(r.body).slice(0, 200));
+  assert.equal(r.body.data.credit_restored, false);
+  assert.equal(await credits(c.id), antes, "no se devuelve el crédito");
+  const [log] = await sql(`SELECT meta FROM audit_log WHERE entity_id=$1 AND action='booking.cancel'`, [bookingId]);
+  assert.equal(log.meta.credit_restored, false);
+  assert.equal(log.meta.refund_credit_requested, false);
+});
+
+test("un id que no es UUID da 400, no 500 (lo valida app.param, no la ruta)", async () => {
+  const putCancel = await api("PUT", "/api/classes/abc/cancel", { token: A, body: { reason: "x" } });
+  assert.equal(putCancel.status, 400);
+  const del = await api("DELETE", "/api/admin/classes/abc", { token: A });
+  assert.equal(del.status, 400);
 });
 
 test("rango inválido → 400, nunca 500", async () => {

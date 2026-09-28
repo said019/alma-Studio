@@ -292,7 +292,9 @@ function CalendarView({
       const failed = Number(d.wa_failed ?? 0);
       const parts = [
         bookings > 0 ? `${bookings} ${bookings === 1 ? "reserva cancelada" : "reservas canceladas"}, crédito devuelto` : null,
-        kept > 0 ? `${kept} ${kept === 1 ? "clase que ya pasó se quedó igual" : "clases que ya pasaron se quedaron igual"}` : null,
+        // "Conservada" y no "ya pasó": aquí también caen las que ya estaban
+        // canceladas antes de limpiar, que no necesariamente ya ocurrieron.
+        kept > 0 ? `${kept} ${kept === 1 ? "clase se conservó sin cambios" : "clases se conservaron sin cambios"}` : null,
       ].filter(Boolean);
       toast({
         title: `${deleted} ${deleted === 1 ? "clase borrada" : "clases borradas"} · ${cancelled} ${cancelled === 1 ? "cancelada" : "canceladas"}`,

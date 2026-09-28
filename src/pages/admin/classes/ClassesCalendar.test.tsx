@@ -101,4 +101,22 @@ describe("Clases · Calendario", () => {
     expect(await screen.findByText("Avisa a mano a estas alumnas")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "5512345678" })).toHaveAttribute("href", "tel:5512345678");
   });
+
+  it("cancelar una clase suelta desde el calendario también abre 'Avisa a mano' si el WhatsApp no le llegó a todas", async () => {
+    const mockPut = (api as unknown as { put: Mock }).put;
+    mockPut.mockReset().mockResolvedValue({ data: { data: {
+      bookings_cancelled: 2, credits_restored: 2, points_reverted: 0,
+      wa_queued: 0, wa_failed: 1,
+      wa_unreached: [{ user_id: "u1", display_name: "Camila Torres", phone: "5512345678" }],
+      wa_channel_state: "disconnected",
+    } } });
+    renderAdmin(<ClassesCalendar />, { route: "/admin/classes" });
+    fireEvent.click(await screen.findByRole("button", { name: /Reformer Intermedio.*8 de 8, llena/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "Cancelar clase" }));
+    const confirmar = await screen.findByRole("alertdialog");
+    fireEvent.click(within(confirmar).getByRole("button", { name: "Cancelar clase" }));
+    await waitFor(() => expect(mockPut).toHaveBeenCalledWith("/classes/c11/cancel"));
+    expect(await screen.findByText("Avisa a mano a estas alumnas")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "5512345678" })).toHaveAttribute("href", "tel:5512345678");
+  });
 });
