@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { api, login, sql, makeClient, cleanup, closeDb, ADMIN } from "./helpers.mjs";
 
 const PFX = "rgpriv";
-const VERSION = "2026-09-29";
+const VERSION = "2026-09-28";
 let A;
 
 const registrar = (key, extra = {}) => api("POST", "/api/auth/register", { body: {

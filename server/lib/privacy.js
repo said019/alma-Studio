@@ -3,7 +3,7 @@
 // src/lib/legal/privacy-notice.ts (privacy-notice.test.ts lo exige). Cambiar el
 // aviso = versión nueva: el consentimiento de la versión anterior deja de valer
 // y se vuelve a pedir la próxima vez que la clienta escriba datos de salud.
-export const PRIVACY_NOTICE_VERSION = "2026-09-29";
+export const PRIVACY_NOTICE_VERSION = "2026-09-28";
 
 export const HEALTH_CONSENT_REQUIRED_MESSAGE =
   "Para guardar datos de salud necesitamos tu consentimiento expreso: marca la casilla del aviso de privacidad.";

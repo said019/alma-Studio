@@ -12,7 +12,7 @@ test("sólo cuenta escribir un dato de salud nuevo", () => {
 });
 
 test("consentimiento vigente = con fecha y de la versión actual del aviso", () => {
-  assert.equal(PRIVACY_NOTICE_VERSION, "2026-09-29");
+  assert.equal(PRIVACY_NOTICE_VERSION, "2026-09-28");
   assert.equal(hasCurrentHealthConsent({ health_consent_at: new Date(), health_consent_version: PRIVACY_NOTICE_VERSION }), true);
   assert.equal(hasCurrentHealthConsent({ health_consent_at: new Date(), health_consent_version: "2025-01-01" }), false);
   assert.equal(hasCurrentHealthConsent({ health_consent_at: null, health_consent_version: PRIVACY_NOTICE_VERSION }), false);

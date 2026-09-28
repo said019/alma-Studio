@@ -69,7 +69,7 @@ describe("Perfil · consentimiento para datos de salud (P1-10)", () => {
   });
 
   it("con consentimiento vigente lo dice y permite retirarlo, que borra sus datos de salud", async () => {
-    montar({ ...U, healthNotes: "Asma", healthConsentVersion: "2026-09-29", healthConsentAt: "2026-09-20T16:00:00Z" });
+    montar({ ...U, healthNotes: "Asma", healthConsentVersion: "2026-09-28", healthConsentAt: "2026-09-20T16:00:00Z" });
     expect(await screen.findByText("Autorizaste el tratamiento de tus datos de salud el 20 de septiembre, 2026.")).toBeInTheDocument();
     expect(screen.queryByRole("checkbox", { name: /Autorizo expresamente/ })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Retirar mi consentimiento" }));
@@ -85,7 +85,7 @@ describe("Perfil · consentimiento para datos de salud (P1-10)", () => {
   it("marcar la casilla sin escribir notas nuevas también registra el consentimiento", async () => {
     montar({ ...U, healthNotes: "Asma" });
     fireEvent.click(screen.getByRole("checkbox", { name: /Autorizo expresamente/ }));
-    vi.mocked(api.put).mockResolvedValue({ data: { user: { ...U, healthNotes: "Asma", healthConsentVersion: "2026-09-29" } } } as never);
+    vi.mocked(api.put).mockResolvedValue({ data: { user: { ...U, healthNotes: "Asma", healthConsentVersion: "2026-09-28" } } } as never);
     fireEvent.click(screen.getByRole("button", { name: "Guardar cambios" }));
     await waitFor(() => expect(api.put).toHaveBeenCalledWith("/users/u1", expect.objectContaining({ healthConsent: true })));
   });
