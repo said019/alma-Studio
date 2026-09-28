@@ -21,6 +21,7 @@
  *   - `/admin/class-generator` y `/admin/class-types`: son el destino real de
  *     `/admin/classes/generate` y `/admin/classes/types`, que Velan sí tiene.
  *   - `/app/wallet`: equivale a `/app/pass` de Velan.
+ *   - `/admin/bitacora`: la pidió la auditoría de producción (2026-09-27, P0-3).
  */
 export const FEATURES = {
   // ── Panel ────────────────────────────────────────────────────────────────
@@ -40,6 +41,8 @@ export const FEATURES = {
   scheduleTemplates: false,
   /** Wellhub: configuración y check-ins. `/admin/settings/platforms`, `/admin/bookings/partners-checkins` */
   partnerPlatforms: false,
+  /** Bitácora de la dueña: quién cobró, ajustó, canceló o dio de baja. `/admin/bitacora` */
+  auditLog: true,
 
   // ── App de la clienta ────────────────────────────────────────────────────
   /** Historial y recompensas del monedero. `/app/wallet/history`, `/app/wallet/rewards` */

@@ -63,6 +63,7 @@ import AdminReviewsDashboard from "./pages/admin/reviews/AdminReviewsDashboard";
 import SettingsPage from "./pages/admin/settings/SettingsPage";
 import PartnerPlatforms from "./pages/admin/settings/PartnerPlatforms";
 import PartnerCheckins from "./pages/admin/bookings/PartnerCheckins";
+import AuditLogPage from "./pages/admin/audit/AuditLogPage";
 
 // Legal pages
 import Privacidad from "./pages/legal/Privacidad";
@@ -186,6 +187,9 @@ const App = () => (
             <Route path="/admin/reviews" element={<AdminReviewsDashboard />} />
           )}
           <Route path="/admin/settings" element={<SettingsPage />} />
+          {FEATURES.auditLog && (
+            <Route path="/admin/bitacora" element={<AuditLogPage />} />
+          )}
           {FEATURES.partnerPlatforms && (
             <Route path="/admin/settings/platforms" element={<PartnerPlatforms />} />
           )}

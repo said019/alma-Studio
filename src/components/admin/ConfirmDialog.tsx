@@ -3,7 +3,7 @@
 //   const { confirm, promptText, dialog } = useConfirm();
 //   ... {dialog} en el JSX de la página ...
 //   const ok = await confirm({ title: "¿Cancelar la clase?", description: "...", destructive: true });
-//   const reason = await promptText({ title: "Motivo de cancelación", placeholder: "..." });
+//   const reason = await promptText({ title: "Motivo de cancelación", placeholder: "...", minLength: 5 });
 import { useCallback, useRef, useState, type ReactNode } from "react";
 import {
   AlertDialog,
@@ -32,6 +32,8 @@ type PromptOptions = {
   confirmLabel?: string;
   cancelLabel?: string;
   required?: boolean;
+  /** Mínimo de caracteres (sin espacios en los extremos) para poder confirmar. */
+  minLength?: number;
 };
 
 type PendingState =
@@ -78,7 +80,8 @@ export function useConfirm() {
   const opts = pending?.opts;
   const isPrompt = pending?.kind === "prompt";
   const promptOpts = isPrompt ? (pending.opts as PromptOptions) : null;
-  const confirmDisabled = isPrompt && promptOpts?.required ? text.trim().length === 0 : false;
+  const minChars = isPrompt ? Math.max(promptOpts?.minLength ?? 0, promptOpts?.required ? 1 : 0) : 0;
+  const confirmDisabled = isPrompt && text.trim().length < minChars;
   const destructive = !isPrompt && (pending?.opts as ConfirmOptions | undefined)?.destructive;
 
   const dialog = (
@@ -98,6 +101,9 @@ export function useConfirm() {
             rows={3}
             autoFocus
           />
+        ) : null}
+        {isPrompt && promptOpts?.minLength ? (
+          <p className="text-[0.75rem] text-ink-muted">Mínimo {promptOpts.minLength} caracteres.</p>
         ) : null}
         <AlertDialogFooter>
           <AlertDialogCancel onClick={() => settle(false)}>

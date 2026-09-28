@@ -46,6 +46,7 @@ const EXCEPCIONES: Record<string, string> = {
   "/admin/class-generator": "destino real de /admin/classes/generate, que Velan sí tiene",
   "/admin/class-types": "destino real de /admin/classes/types, que Velan sí tiene",
   "/app/wallet": "equivale a /app/pass de Velan",
+  "/admin/bitacora": "bitácora de la dueña pedida por la auditoría de producción (2026-09-27, P0-3)",
 };
 
 describe("paridad de vistas con Velan", () => {

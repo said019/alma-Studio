@@ -12,6 +12,7 @@ import {
   BookOpen, DollarSign,
   ShoppingCart, BarChart2, Bell, MessageCircle, Award, Percent,
   Settings, ChevronLeft, ArrowLeft, LogOut, Globe, Menu, X, Search,
+  ScrollText,
 } from "lucide-react";
 import { BrandLogo } from "@/components/brand/BrandLogo";
 import AdminTopBar from "./AdminTopBar";
@@ -50,6 +51,7 @@ const NAV_GROUPS = [
     items: [
       { path: "/admin/settings?tab=whatsapp", label: "WhatsApp", icon: MessageCircle, feature: "whatsappTemplates" },
       { path: "/admin/settings", label: "Configuración", icon: Settings },
+      { path: "/admin/bitacora", label: "Bitácora", icon: ScrollText, ownerOnly: true, feature: "auditLog" },
       { path: "/admin/settings/platforms", label: "Wellhub", icon: Package, feature: "partnerPlatforms" },
       { path: "/admin/bookings/partners-checkins", label: "Check-ins Wellhub", icon: BookOpen , feature: "partnerPlatforms" },
     ],
