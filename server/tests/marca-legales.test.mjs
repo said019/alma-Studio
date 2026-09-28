@@ -26,15 +26,21 @@ before(async () => {
 });
 after(async () => { await cleanup(PFX); await closeDb(); });
 
-test("firmar hoy guarda la versión vigente v2, la mande la app o no", async () => {
+test("firmar hoy con waiver_version:\"v2\" guarda v2", async () => {
   const a = await makeClient(PFX, "conver", { waiver: false });
   const r1 = await api("POST", "/api/me/waiver", { token: a.token, body: { full_name: "QA conver", signature_data: firma(), waiver_version: "v2" } });
   assert.equal(r1.status, 201, JSON.stringify(r1.body).slice(0, 200));
   assert.equal(r1.body.data.waiver_version, "v2");
+});
+
+// Ronda de ajustes 1: una firma sin `waiver_version` viene de una pestaña con el
+// bundle anterior al versionado, que le mostró a la clienta el texto v1 (Alma).
+// Guardarla como v2 dejaría registrado que aceptó un texto que nunca vio.
+test("firmar sin mandar waiver_version guarda v1 (app en caché de antes del versionado)", async () => {
   const b = await makeClient(PFX, "sinver", { waiver: false });
   const r2 = await api("POST", "/api/me/waiver", { token: b.token, body: { full_name: "QA sinver", signature_data: firma() } });
   assert.equal(r2.status, 201);
-  assert.equal(r2.body.data.waiver_version, "v2");
+  assert.equal(r2.body.data.waiver_version, "v1");
 });
 
 test("una versión desconocida → 400 y no guarda nada", async () => {

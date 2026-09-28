@@ -74,7 +74,7 @@ import { validateWellhubVisit as wellhubValidateVisit } from "./lib/wellhub/api.
 import { handleBookingRequested, handleCheckin, handleCancel, handlePlanChange } from "./lib/wellhub/flows.js";
 import { isUuid, signatureProblem } from "./lib/validate.js";
 import { checkinRule, noShowCorrectionRule } from "./lib/checkin.js";
-import { CURRENT_RESPONSIVA_VERSION, responsivaDocument, waiverVersionProblem } from "./lib/responsiva.js";
+import { responsivaDocument, waiverVersionProblem } from "./lib/responsiva.js";
 import { pgReminderLog, sendClassReminders } from "./lib/classReminder.js";
 import { createChannelState } from "./lib/whatsappState.js";
 import { recordAudit, recordAuditBestEffort, reasonProblem, cleanReason, buildAuditQuery, auditRowOut } from "./lib/audit.js";
@@ -3297,8 +3297,9 @@ app.get("/api/me/waiver", authMiddleware, async (req, res) => {
 
 // POST: firma la responsiva (nombre + firma dibujada + consentimiento de imagen).
 // Guarda la versión del texto que la clienta leyó (auditoría 2026-09-27, punto 7):
-// la app manda `waiver_version`; sin él, la vigente. Las ya firmadas no se tocan
-// ni se piden de nuevo.
+// la app manda `waiver_version`; sin él, v1 — una app en caché de antes del
+// versionado mostró la v1, y sin este resguardo quedaría registrado que aceptó
+// un texto (v2) que nunca vio. Las ya firmadas no se tocan ni se piden de nuevo.
 app.post("/api/me/waiver", authMiddleware, async (req, res) => {
   const { full_name, phone, email, image_consent, signature_data, waiver_version } = req.body || {};
   if (!full_name?.trim() || !signature_data) {
@@ -3308,7 +3309,7 @@ app.post("/api/me/waiver", authMiddleware, async (req, res) => {
   if (firmaMala) return res.status(400).json({ message: firmaMala });
   const versionMala = waiverVersionProblem(waiver_version);
   if (versionMala) return res.status(400).json({ message: versionMala });
-  const version = waiver_version ?? CURRENT_RESPONSIVA_VERSION;
+  const version = waiver_version ?? "v1";
   try {
     const r = await pool.query(
       `INSERT INTO waivers (user_id, full_name, phone, email, image_consent, signature_data, waiver_version, signed_at)
