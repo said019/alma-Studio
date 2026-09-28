@@ -104,8 +104,10 @@ describe("bitácora · textos del bloque 3", () => {
   });
 
   it("meta del bloque 3 (R2 del controlador): subida de fila, reembolso y plan archivado", () => {
+    // meta.skipped en 0 (número) no se muestra.
     expect(auditMetaLines({ action: "booking.waitlist_promoted", after: null, meta: { position: 1, skipped: 0 } }))
-      .toEqual(["Posición en la fila: 1", "Personas saltadas: 0"]);
+      .toEqual(["Posición en la fila: 1"]);
+    // meta.skipped como número > 0 (compatibilidad).
     expect(auditMetaLines({ action: "booking.waitlist_promoted", after: null, meta: { position: 3, skipped: 2 } }))
       .toEqual(["Posición en la fila: 3", "Personas saltadas: 2"]);
     expect(auditMetaLines({
@@ -122,5 +124,33 @@ describe("bitácora · textos del bloque 3", () => {
       .toEqual(["Se conserva: membresías"]);
     expect(auditMetaLines({ action: "plan.archive", after: null, meta: { kept: ["membresías", "órdenes"], cascade_requested: true } }))
       .toEqual(["Se conserva: membresías, órdenes", "Se pidió borrar todo: Sí"]);
+  });
+
+  it("meta del bloque 3, ronda de ajustes 1: skipped como arreglo (T4) y kept como objeto de conteos (T9)", () => {
+    expect(auditMetaLines({
+      action: "booking.waitlist_promoted", after: null,
+      meta: {
+        position: 2,
+        skipped: [
+          { booking_id: "b1", position: 1, reason: "sin clases" },
+          { booking_id: "b2", position: 2, reason: "membresía vencida" },
+        ],
+      },
+    })).toEqual(["Posición en la fila: 2", "Personas saltadas: 2"]);
+
+    expect(auditMetaLines({
+      action: "plan.archive", after: null,
+      meta: { kept: { memberships: 1, orders: 1, discount_codes: 0 } },
+    })).toEqual(["Se conserva: 1 membresía, 1 orden"]);
+
+    expect(auditMetaLines({
+      action: "plan.archive", after: null,
+      meta: { kept: { memberships: 2, orders: 0, discount_codes: 3 } },
+    })).toEqual(["Se conserva: 2 membresías, 3 códigos de descuento"]);
+
+    expect(auditMetaLines({
+      action: "plan.archive", after: null,
+      meta: { kept: { memberships: 0, orders: 0, discount_codes: 0 } },
+    })).toEqual([]);
   });
 });

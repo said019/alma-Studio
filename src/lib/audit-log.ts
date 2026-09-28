@@ -133,6 +133,36 @@ export function auditChanges(e: AuditEntry): { key: string; label: string; befor
   }));
 }
 
+const pluralEs = (n: number, uno: string, varios: string) => (n === 1 ? uno : varios);
+
+/** Cuántas se saltó la subida de la lista de espera (bloque 3, ronda de ajustes
+ *  1): T4 manda un arreglo de `{ booking_id, position, reason }`, no un número. */
+function skippedCount(skipped: unknown): number {
+  if (Array.isArray(skipped)) return skipped.length;
+  const n = Number(skipped);
+  return Number.isFinite(n) ? n : 0;
+}
+
+/** "Se conserva: …" de un plan archivado (bloque 3, ronda de ajustes 1): T9
+ *  manda un objeto `{ memberships, orders, discount_codes }` con conteos.
+ *  Se acepta también arreglo o texto, por compatibilidad. */
+function keptLine(kept: unknown): string | null {
+  if (kept && typeof kept === "object" && !Array.isArray(kept)) {
+    const k = kept as Record<string, unknown>;
+    const memberships = Number(k.memberships) || 0;
+    const orders = Number(k.orders) || 0;
+    const discountCodes = Number(k.discount_codes) || 0;
+    const parts: string[] = [];
+    if (memberships > 0) parts.push(`${memberships} ${pluralEs(memberships, "membresía", "membresías")}`);
+    if (orders > 0) parts.push(`${orders} ${pluralEs(orders, "orden", "órdenes")}`);
+    if (discountCodes > 0) parts.push(`${discountCodes} ${pluralEs(discountCodes, "código de descuento", "códigos de descuento")}`);
+    return parts.length ? `Se conserva: ${parts.join(", ")}` : null;
+  }
+  if (Array.isArray(kept)) return kept.length ? `Se conserva: ${kept.join(", ")}` : null;
+  if (kept !== undefined && kept !== null && kept !== "") return `Se conserva: ${String(kept)}`;
+  return null;
+}
+
 /** Líneas de resumen de `meta` (crédito, puntos, conteos): sólo campos
  *  agregados o sí/no, nunca datos personales. */
 export function auditMetaLines(e: Pick<AuditEntry, "action" | "meta" | "after">): string[] {
@@ -153,10 +183,14 @@ export function auditMetaLines(e: Pick<AuditEntry, "action" | "meta" | "after">)
     const refunded = Number(m.penalty_refunded) || 0;
     if (refunded > 0) lines.push(`Puntos devueltos por la falta: ${refunded}`);
   }
-  // Bloque 3 (auditoría 2026-09-27, R2 del controlador)
+  // Bloque 3 (auditoría 2026-09-27, R2 del controlador; formas de meta ajustadas
+  // en la ronda 1 tras comparar con lo que escriben T4, T7 y T9)
   if (e.action === "booking.waitlist_promoted") {
     if (m.position !== undefined) lines.push(`Posición en la fila: ${Number(m.position) || 0}`);
-    if (m.skipped !== undefined) lines.push(`Personas saltadas: ${Number(m.skipped) || 0}`);
+    if (m.skipped !== undefined) {
+      const n = skippedCount(m.skipped);
+      if (n > 0) lines.push(`Personas saltadas: ${n}`);
+    }
   }
   if (e.action === "order.refund") {
     if (m.amount !== undefined) lines.push(`Monto: ${formatMXN(Number(m.amount) || 0)}`);
@@ -166,7 +200,10 @@ export function auditMetaLines(e: Pick<AuditEntry, "action" | "meta" | "after">)
     if (m.bookings_cancelled !== undefined) lines.push(`Reservas canceladas: ${Number(m.bookings_cancelled) || 0}`);
   }
   if (e.action === "plan.archive") {
-    if (m.kept !== undefined) lines.push(`Se conserva: ${Array.isArray(m.kept) ? m.kept.join(", ") : String(m.kept)}`);
+    if (m.kept !== undefined) {
+      const line = keptLine(m.kept);
+      if (line) lines.push(line);
+    }
     if (m.cascade_requested !== undefined) lines.push(`Se pidió borrar todo: ${m.cascade_requested ? "Sí" : "No"}`);
   }
   return lines;
