@@ -64,6 +64,7 @@ import { scheduleAt } from "./lib/schedule.js";
 import { verifyWellhubSignature, extractSignatureHeader } from "./lib/wellhub/signature.js";
 import { extractGymId, computeEventId } from "./lib/wellhub/payload.js";
 import { getWellhubCredentials } from "./lib/wellhub/credentials.js";
+import { publicPartnerSettings, mergeSecret } from "./lib/partnerSettings.js";
 import { validateWellhubVisit as wellhubValidateVisit } from "./lib/wellhub/api.js";
 import { handleBookingRequested, handleCheckin, handleCancel, handlePlanChange } from "./lib/wellhub/flows.js";
 import {
@@ -2148,7 +2149,10 @@ async function wellhubWebhookHandler(req, res, eventTypeOverride) {
   const sig = extractSignatureHeader(req.headers);
   const verdict = verifyWellhubSignature(rawBuf, sig, creds.webhook_secret);
   if (verdict === false) return res.status(401).json({ message: "Firma Wellhub inválida" });
-  if (verdict === null) console.warn("[wellhub] sin webhook_secret — firma omitida (configurar en prod)");
+  if (verdict === null) {
+    console.warn("[wellhub] webhook rechazado: la integración está encendida sin webhook_secret");
+    return res.status(401).json({ message: "Wellhub sin secreto configurado" });
+  }
 
   const gymId = extractGymId(payload);
   if (gymId && creds.gym_id && String(gymId) !== String(creds.gym_id)) {
@@ -2196,16 +2200,19 @@ app.post("/webhooks/wellhub/debug/echo", express.raw({ type: "*/*" }), (req, res
 });
 
 // ─── Wellhub / partner management (admin) ───────────────────────────────────
-app.get("/api/partners/settings", adminMiddleware, async (_req, res) => {
+app.get("/api/partners/settings", ownerMiddleware, async (_req, res) => {
   try {
     const r = await pool.query("SELECT * FROM platform_credentials WHERE channel='wellhub'");
-    return res.json({ data: r.rows[0] || null });
+    return res.json({ data: publicPartnerSettings(r.rows[0] || null) });
   } catch (err) { console.error("[partners settings GET]", err.message); return res.status(500).json({ message: "Error interno" }); }
 });
 
-app.put("/api/partners/settings", adminMiddleware, async (req, res) => {
+app.put("/api/partners/settings", ownerMiddleware, async (req, res) => {
   try {
     const b = req.body || {};
+    const cur = (await pool.query("SELECT webhook_secret, access_token FROM platform_credentials WHERE channel='wellhub'")).rows[0] || {};
+    const webhookSecret = mergeSecret(b.webhook_secret, cur.webhook_secret);
+    const accessToken = mergeSecret(b.access_token, cur.access_token);
     await pool.query(
       `INSERT INTO platform_credentials (channel, environment, is_enabled, gym_id, webhook_secret, access_token, api_base_url, booking_base_url, access_base_url, webhook_url, extra_config, updated_at)
        VALUES ('wellhub', $1,$2,$3,$4,$5,$6,$7,$8,$9,$10, NOW())
@@ -2215,12 +2222,12 @@ app.put("/api/partners/settings", adminMiddleware, async (req, res) => {
          api_base_url=EXCLUDED.api_base_url, booking_base_url=EXCLUDED.booking_base_url,
          access_base_url=EXCLUDED.access_base_url, webhook_url=EXCLUDED.webhook_url,
          extra_config=EXCLUDED.extra_config, updated_at=NOW()`,
-      [b.environment || "production", b.is_enabled ?? false, b.gym_id || null, b.webhook_secret || null,
-       b.access_token || null, b.api_base_url || null, b.booking_base_url || null, b.access_base_url || null,
+      [b.environment || "production", b.is_enabled ?? false, b.gym_id || null, webhookSecret,
+       accessToken, b.api_base_url || null, b.booking_base_url || null, b.access_base_url || null,
        b.webhook_url || null, JSON.stringify(b.extra_config || {})],
     );
     const r = await pool.query("SELECT * FROM platform_credentials WHERE channel='wellhub'");
-    return res.json({ data: r.rows[0] });
+    return res.json({ data: publicPartnerSettings(r.rows[0]) });
   } catch (err) { console.error("[partners settings PUT]", err.message); return res.status(500).json({ message: "Error interno" }); }
 });
 
