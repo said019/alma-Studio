@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { api, login, sql, makeClient, cleanup, closeDb, ADMIN } from "./helpers.mjs";
 
 const PFX = "rgpriv";
-const VERSION = "2026-09-28";
+const VERSION = "2026-09-29";
 let A;
 
 const registrar = (key, extra = {}) => api("POST", "/api/auth/register", { body: {
@@ -101,4 +101,72 @@ test("el personal que edita su propio perfil no queda bloqueado por la casilla (
   const r = await api("PUT", `/api/users/${staff.id}`, { token: staff.token, body: { healthNotes: "Notas del staff" } });
   assert.equal(r.status, 200, JSON.stringify(r.body).slice(0, 200));
   assert.equal((await salud(staff.id)).health_notes, "Notas del staff");
+});
+
+// Ronda de ajustes 1 (P1-10): R12 también aplica a recepción, no sólo a admin.
+test("el personal de recepción que edita su propio perfil tampoco queda bloqueado (R12)", async () => {
+  const staff = await makeClient(PFX, "recepself", { role: "reception", waiver: false });
+  const r = await api("PUT", `/api/users/${staff.id}`, { token: staff.token, body: { healthNotes: "Notas de recepción" } });
+  assert.equal(r.status, 200, JSON.stringify(r.body).slice(0, 200));
+  assert.equal((await salud(staff.id)).health_notes, "Notas de recepción");
+});
+
+// Ronda de ajustes 1 (P1-10): un tipo raro en healthNotes no debe reventar ni
+// escribir nada; 400 en español, antes de tocar la fila.
+test("healthNotes con un tipo que no es texto → 400 en español y no cambia nada", async () => {
+  const c = await makeClient(PFX, "tiporaro");
+  const antes = await salud(c.id);
+  const r = await api("PUT", `/api/users/${c.id}`, { token: c.token, body: { healthNotes: 12345 } });
+  assert.equal(r.status, 400, JSON.stringify(r.body).slice(0, 200));
+  assert.equal(r.body.message, "Las notas de salud deben ser texto.");
+  assert.deepEqual(await salud(c.id), antes);
+  const rArr = await api("PUT", `/api/users/${c.id}`, { token: c.token, body: { healthNotes: ["Asma"] } });
+  assert.equal(rArr.status, 400);
+});
+
+// Ronda de ajustes 1 (P1-10): retirar el consentimiento sólo borra las 5
+// columnas de salud; el resto de la fila (cuestionario, contacto de
+// emergencia) queda intacto.
+test("retirar el consentimiento deja intacto el resto de la fila", async () => {
+  const c = await makeClient(PFX, "retiraintacto");
+  await sql(
+    `UPDATE users SET emergency_contact_name = 'Mamá', emergency_contact_phone = '+525599998888', practiced_barre_before = true WHERE id = $1`,
+    [c.id],
+  );
+  assert.equal((await editar(c, { healthNotes: "Hernia", healthConsent: true })).status, 200);
+  const r = await api("DELETE", "/api/me/health-consent", { token: c.token });
+  assert.equal(r.status, 200);
+  const [row] = await sql(
+    `SELECT emergency_contact_name, emergency_contact_phone, practiced_barre_before FROM users WHERE id = $1`, [c.id],
+  );
+  assert.equal(row.emergency_contact_name, "Mamá");
+  assert.equal(row.emergency_contact_phone, "+525599998888");
+  assert.equal(row.practiced_barre_before, true);
+});
+
+// Ronda de ajustes 1 (P1-10): el 400 del cuestionario (falta la casilla) no
+// deja nada a medias en la fila.
+test("el 400 del cuestionario por falta de consentimiento no cambia nada", async () => {
+  const c = await makeClient(PFX, "onboarding400");
+  const antes = await sql(
+    `SELECT has_injury, injury_details, practiced_barre_before, onboarding_completed FROM users WHERE id = $1`, [c.id],
+  );
+  const r = await api("POST", "/api/auth/onboarding", { token: c.token, body: { hasInjury: true, practicedBarreBefore: true, injuryDetails: "Rodilla" } });
+  assert.equal(r.status, 400);
+  assert.equal(r.body.code, "HEALTH_CONSENT_REQUIRED");
+  const despues = await sql(
+    `SELECT has_injury, injury_details, practiced_barre_before, onboarding_completed FROM users WHERE id = $1`, [c.id],
+  );
+  assert.deepEqual(despues, antes);
+});
+
+// Ronda de ajustes 1 (P1-10): el registro no acepta datos de salud directos
+// (sólo la casilla healthConsent); si alguien los manda igual, se descartan.
+test("un registro con datos de salud en el cuerpo los descarta", async () => {
+  const r = await registrar("saludenregistro", { healthNotes: "Debe ignorarse", injuryDetails: "Tampoco esto", hasInjury: true });
+  assert.equal(r.status, 201, JSON.stringify(r.body).slice(0, 200));
+  const s = await salud(r.body.user.id);
+  assert.equal(s.health_notes, null);
+  assert.equal(s.has_injury, null);
+  assert.equal(s.injury_details, null);
 });

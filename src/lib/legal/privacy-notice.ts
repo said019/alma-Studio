@@ -3,8 +3,8 @@
 // (privacy-notice.test.ts lo exige): cambiar el aviso = versión nueva.
 // PENDIENTE (dueño y abogado): revisión legal del texto, nombre o razón social del
 // responsable y correo para solicitudes ARCO (STUDIO.privacyEmail).
-export const PRIVACY_NOTICE_VERSION = "2026-09-28";
-export const PRIVACY_NOTICE_UPDATED = "28 de septiembre de 2026";
+export const PRIVACY_NOTICE_VERSION = "2026-09-29";
+export const PRIVACY_NOTICE_UPDATED = "29 de septiembre de 2026";
 
 /** Texto de la casilla de consentimiento expreso (registro, perfil y cuestionario). */
 export const HEALTH_CONSENT_TEXT =

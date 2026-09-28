@@ -53,8 +53,18 @@ const ProfileEdit = () => {
   const [consent, setConsent] = useState(false);
   const [consentError, setConsentError] = useState<string | null>(null);
   const [confirmarRetiro, setConfirmarRetiro] = useState(false);
+  const [confirmarBorrar, setConfirmarBorrar] = useState(false);
   const yaConsintio = hasCurrentHealthConsent(user as { healthConsentVersion?: string | null; healthConsentAt?: string | null } | null);
   const consentidoEl = user?.healthConsentAt ? format(parseISO(user.healthConsentAt), "d 'de' MMMM, yyyy", { locale: es }) : null;
+  // Ronda de ajustes 1 (P1-10): una clienta con notas o lesión guardadas pero
+  // sin consentimiento vigente (dato capturado por el equipo, o de una versión
+  // anterior del aviso) también debe poder borrarlas, no sólo "retirar" un
+  // consentimiento que no tiene.
+  const tieneDatosSalud = Boolean(
+    String(user?.healthNotes ?? user?.health_notes ?? "").trim() ||
+    user?.hasInjury ||
+    String(user?.injuryDetails ?? "").trim(),
+  );
 
   const { register, handleSubmit, reset, formState: { errors, isDirty } } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -103,16 +113,20 @@ const ProfileEdit = () => {
   });
 
   const retirar = useMutation({
-    mutationFn: () => api.delete("/me/health-consent"),
-    onSuccess: (res) => {
+    mutationFn: (_origen: "retirar" | "borrar") => api.delete("/me/health-consent"),
+    onSuccess: (res, origen) => {
       const updated = res.data?.user;
       if (updated) updateUser(updated);
       setConfirmarRetiro(false);
+      setConfirmarBorrar(false);
       setConsent(false);
       reset({ ...(user as unknown as Record<string, unknown>), healthNotes: "" } as never);
-      toast({ title: "Retiraste tu consentimiento", description: "Borramos tus datos de salud de tu perfil." });
+      toast({
+        title: origen === "retirar" ? "Retiraste tu consentimiento" : "Borramos tus datos de salud",
+        description: "Borramos tus datos de salud de tu perfil.",
+      });
     },
-    onError: () => toast({ title: "No pudimos retirarlo", description: "Inténtalo de nuevo o pídelo en recepción.", variant: "destructive" }),
+    onError: () => toast({ title: "No pudimos borrarlos", description: "Inténtalo de nuevo o pídelo en recepción.", variant: "destructive" }),
   });
 
   const onSubmit = (data: FormValues) => {
@@ -132,7 +146,7 @@ const ProfileEdit = () => {
       emergencyContactName: data.emergencyContactName || undefined,
       emergencyContactPhone: data.emergencyContactPhone || undefined,
       healthNotes: data.healthNotes || undefined,
-      ...(escribeSalud && !yaConsintio ? { healthConsent: true } : {}),
+      ...(!yaConsintio && consent ? { healthConsent: true } : {}),
     } as any);
   };
 
@@ -249,7 +263,7 @@ const ProfileEdit = () => {
                   <div className="flex flex-col gap-2 rounded-2xl border border-line p-3">
                     <p className="m-0 text-[0.8125rem] text-ink">Se borran tus notas de salud y tus lesiones registradas. El equipo ya no las verá.</p>
                     <div className="flex flex-wrap gap-2">
-                      <GhostButton tone="danger" onClick={() => retirar.mutate()} disabled={retirar.isPending}>Sí, retirar y borrar</GhostButton>
+                      <GhostButton tone="danger" onClick={() => retirar.mutate("retirar")} disabled={retirar.isPending}>Sí, retirar y borrar</GhostButton>
                       <GhostButton onClick={() => setConfirmarRetiro(false)}>Volver</GhostButton>
                     </div>
                   </div>
@@ -260,7 +274,7 @@ const ProfileEdit = () => {
                 )}
               </div>
             ) : (
-              <div className="mt-3">
+              <div className="mt-3 flex flex-col gap-3">
                 <AuthCheckbox
                   checked={consent}
                   onChange={(v) => { setConsent(v); if (v) setConsentError(null); }}
@@ -271,6 +285,26 @@ const ProfileEdit = () => {
                     Leer el aviso
                   </a>
                 </AuthCheckbox>
+
+                {/* Ronda de ajustes 1 (P1-10): notas o lesión guardadas sin
+                    consentimiento vigente (p. ej. capturadas por el equipo, o de
+                    una versión anterior del aviso) — sin esto no había forma de
+                    borrarlas desde la app. */}
+                {tieneDatosSalud && (
+                  confirmarBorrar ? (
+                    <div className="flex flex-col gap-2 rounded-2xl border border-line p-3">
+                      <p className="m-0 text-[0.8125rem] text-ink">Se borran tus notas de salud y tus lesiones registradas. El equipo ya no las verá.</p>
+                      <div className="flex flex-wrap gap-2">
+                        <GhostButton tone="danger" onClick={() => retirar.mutate("borrar")} disabled={retirar.isPending}>Sí, borrar mis datos</GhostButton>
+                        <GhostButton onClick={() => setConfirmarBorrar(false)}>Volver</GhostButton>
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <GhostButton tone="danger" onClick={() => setConfirmarBorrar(true)}>Borrar mis datos de salud</GhostButton>
+                    </div>
+                  )
+                )}
               </div>
             )}
           </Section>

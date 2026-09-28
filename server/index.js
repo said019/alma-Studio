@@ -8720,6 +8720,12 @@ app.put("/api/users/:id", authMiddleware, async (req, res) => {
       acceptsCommunications,
       role, healthConsent,
     } = req.body;
+    // Ronda de ajustes 1 (P1-10): un tipo raro en un dato de salud (número,
+    // arreglo, objeto…) no debe tirar 500 al escribirlo en la base; se
+    // rechaza aquí, antes de tocar nada.
+    if (healthNotes !== undefined && healthNotes !== null && typeof healthNotes !== "string") {
+      return res.status(400).json({ message: "Las notas de salud deben ser texto." });
+    }
     // Non-admins cannot change role
     const newRole = isAdminCaller && role ? role : null;
     const targetId = req.params.id;

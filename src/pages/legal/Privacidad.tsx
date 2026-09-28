@@ -36,6 +36,7 @@ const Privacidad = () => (
         <li><strong className={fuerte} style={{ color: COLOR.ink }}>Identificación y contacto:</strong> nombre, correo electrónico, teléfono o WhatsApp, fecha de nacimiento, sexo y, si la subes, tu foto de perfil.</li>
         <li><strong className={fuerte} style={{ color: COLOR.ink }}>Contacto de emergencia:</strong> nombre y teléfono de la persona que nos indiques. Al dárnoslos, confirmas que esa persona está de acuerdo.</li>
         <li><strong className={fuerte} style={{ color: COLOR.ink }}>Datos de salud (sensibles):</strong> lesiones, condiciones físicas o médicas, embarazo y las notas de salud que nos compartas.</li>
+        <li><strong className={fuerte} style={{ color: COLOR.ink }}>Acompañantes:</strong> si registras a alguien que te acompaña a una clase, su nombre y, si nos los compartes, sus datos de salud para esa clase.</li>
         <li><strong className={fuerte} style={{ color: COLOR.ink }}>Responsiva:</strong> tu nombre, tu firma, la fecha y la versión del documento que firmaste, y si autorizas el uso de tu imagen.</li>
         <li><strong className={fuerte} style={{ color: COLOR.ink }}>Reservas y asistencia:</strong> clases que reservas, lista de espera, asistencias, faltas, cancelaciones, puntos y reseñas.</li>
         <li><strong className={fuerte} style={{ color: COLOR.ink }}>Pagos:</strong> paquete, monto, método, referencia o comprobante de transferencia y reembolsos. Los pagos en línea con tarjeta los procesa un proveedor de pagos: no guardamos el número completo de tu tarjeta.</li>
@@ -69,10 +70,10 @@ const Privacidad = () => (
 
       <LegalH2>5. Datos de salud y consentimiento expreso</LegalH2>
       <p>
-        Tus datos de salud son datos personales sensibles. Los pedimos sólo para cuidarte en clase y adaptar los ejercicios. Sólo los guardamos si nos das tu consentimiento expreso, marcando la casilla al registrarte o al escribirlos en tu perfil; guardamos la fecha y la versión de este aviso que aceptaste. Sólo el equipo del estudio (dueña, recepción y coaches) los ve.
+        Tus datos de salud son datos personales sensibles. Los pedimos para cuidarte en clase y adaptar los ejercicios. Cuando tú misma los escribes en la app —al registrarte o en tu perfil— te pedimos tu consentimiento expreso marcando la casilla de este aviso; guardamos la fecha y la versión que aceptaste. El equipo del estudio (dueña, recepción y coaches) también puede registrar los datos de salud que tú le comuniques de viva voz o por otro medio, para cuidarte en clase. Sólo el equipo del estudio los ve.
       </p>
       <p>
-        Puedes retirar tu consentimiento cuando quieras desde tu perfil ("Retirar mi consentimiento") o en recepción. Al hacerlo borramos tus datos de salud de tu perfil.
+        Puedes retirar tu consentimiento o pedir que borremos tus datos de salud cuando quieras desde tu perfil ("Retirar mi consentimiento" o "Borrar mis datos de salud") o en recepción. Al hacerlo borramos tus datos de salud de tu perfil.
       </p>
 
       <LegalH2>6. Con quién compartimos tus datos</LegalH2>
@@ -118,7 +119,7 @@ const Privacidad = () => (
 
       <LegalH2>10. Cambios a este aviso</LegalH2>
       <p>
-        Si cambiamos este aviso, publicamos la versión nueva en esta página con su fecha. Si el cambio toca las finalidades o tus datos de salud, te pediremos de nuevo tu consentimiento en la app.
+        Si cambiamos este aviso, publicamos la versión nueva en esta página con su fecha. Si cambian las finalidades, te lo informaremos y, cuando la ley lo exija, te pediremos de nuevo tu consentimiento.
       </p>
 
       <LegalH2>11. Contacto</LegalH2>
