@@ -74,6 +74,7 @@ import { getWellhubCredentials } from "./lib/wellhub/credentials.js";
 import { publicPartnerSettings, mergeSecret } from "./lib/partnerSettings.js";
 import { createAccountGate } from "./lib/accountGate.js";
 import { userAnonymizationValues, buildAnonymizeUpdate, WAIVER_ANON_VALUES, GUEST_ANON_VALUES, eventRegistrationAnonValues } from "./lib/anonymize.js";
+import { refundPlan } from "./lib/refunds.js";
 import { validateWellhubVisit as wellhubValidateVisit } from "./lib/wellhub/api.js";
 import { handleBookingRequested, handleCheckin, handleCancel, handlePlanChange } from "./lib/wellhub/flows.js";
 import { wellhubMonthRange, summarizeWellhubMonth } from "./lib/wellhub/reconcile.js";
@@ -11477,6 +11478,13 @@ function pctChange(curr, prev) {
   return Number((((curr - prev) / prev) * 100).toFixed(1));
 }
 
+// Ingreso neto en caja de un rango: ventas aprobadas − reembolsos registrados en
+// el rango (auditoría 2026-09-27, P1-12). Un reembolso resta en su fecha: no
+// reescribe meses cerrados.
+const NET_REVENUE_SQL = `SELECT
+    (SELECT COALESCE(SUM(total_amount), 0) FROM orders WHERE status = 'approved' AND created_at BETWEEN $1 AND $2) AS gross,
+    (SELECT COALESCE(SUM(amount), 0) FROM refunds WHERE created_at BETWEEN $1 AND $2) AS refunds`;
+
 app.get("/api/reports/overview", ownerMiddleware, async (req, res) => {
   try {
     const range = parseDateRange(req);
@@ -11484,7 +11492,7 @@ app.get("/api/reports/overview", ownerMiddleware, async (req, res) => {
     const [members, revenue, bookings, classes, newMembers, reviews, churn,
            prevRevenue, prevBookings, prevNewMembers, prevReviews] = await Promise.all([
       pool.query(`SELECT COUNT(*) FROM memberships WHERE status = 'active' AND (end_date IS NULL OR end_date >= (NOW() AT TIME ZONE '${STUDIO_TIMEZONE}')::date)`),
-      pool.query("SELECT COALESCE(SUM(total_amount),0) AS total FROM orders WHERE status='approved' AND created_at BETWEEN $1 AND $2", [range.from, range.to]),
+      pool.query(NET_REVENUE_SQL, [range.from, range.to]),
       pool.query(
         `SELECT
             COUNT(*) FILTER (WHERE status != 'cancelled') AS total,
@@ -11526,7 +11534,7 @@ app.get("/api/reports/overview", ownerMiddleware, async (req, res) => {
            GREATEST(1, (SELECT COUNT(*) FROM active_30d_ago))::int AS base`,
       ),
       // Previous period (mismo número de días hacia atrás)
-      pool.query("SELECT COALESCE(SUM(total_amount),0) AS total FROM orders WHERE status='approved' AND created_at BETWEEN $1 AND $2", [range.prevFrom, range.prevTo]),
+      pool.query(NET_REVENUE_SQL, [range.prevFrom, range.prevTo]),
       pool.query(
         `SELECT
             COUNT(*) FILTER (WHERE status != 'cancelled') AS total,
@@ -11553,10 +11561,12 @@ app.get("/api/reports/overview", ownerMiddleware, async (req, res) => {
       ? Number(((cancelled / totalIncludingCancelled) * 100).toFixed(1))
       : 0;
     const churnRate = Number((100 * churn.rows[0].churned / churn.rows[0].base).toFixed(1));
-    const monthlyRevenue = parseFloat(revenue.rows[0].total);
+    const grossRevenue = parseFloat(revenue.rows[0].gross);
+    const refundsTotal = parseFloat(revenue.rows[0].refunds);
+    const monthlyRevenue = grossRevenue - refundsTotal;
     const newMembersCount = parseInt(newMembers.rows[0].count || 0);
     const reviewsAvg = Number(parseFloat(reviews.rows[0].average || 0).toFixed(1));
-    const prevRev = parseFloat(prevRevenue.rows[0].total);
+    const prevRev = parseFloat(prevRevenue.rows[0].gross) - parseFloat(prevRevenue.rows[0].refunds);
     const prevBookingsCount = parseInt(prevBookings.rows[0].total || 0);
     const prevAttended = parseInt(prevBookings.rows[0].attended || 0);
     const prevOccupancy = prevBookingsCount > 0 ? (prevAttended / prevBookingsCount) * 100 : 0;
@@ -11572,6 +11582,8 @@ app.get("/api/reports/overview", ownerMiddleware, async (req, res) => {
       data: {
         activeMembers: parseInt(members.rows[0].count),
         monthlyRevenue,
+        grossRevenue,
+        refundsTotal,
         monthlyBookings, // ahora excluye canceladas
         cancelledBookings: cancelled,
         cancelRate,
@@ -11604,16 +11616,25 @@ app.get("/api/reports/overview", ownerMiddleware, async (req, res) => {
 // Sparkline data: ingresos por semana últimas 12 semanas
 app.get("/api/reports/revenue-sparkline", ownerMiddleware, async (req, res) => {
   try {
+    // Neto: ventas de la semana − reembolsos de la semana (auditoría 2026-09-27, P1-12).
     const r = await pool.query(`
       WITH weeks AS (
         SELECT DATE_TRUNC('week', CURRENT_DATE) - (INTERVAL '1 week' * gs.n) AS week_start
         FROM generate_series(0, 11) AS gs(n)
+      ),
+      sales AS (
+        SELECT DATE_TRUNC('week', created_at) AS week_start, SUM(total_amount) AS amount
+          FROM orders WHERE status = 'approved' GROUP BY 1
+      ),
+      refunded AS (
+        SELECT DATE_TRUNC('week', created_at) AS week_start, SUM(amount) AS amount
+          FROM refunds GROUP BY 1
       )
       SELECT w.week_start AS week,
-             COALESCE(SUM(o.total_amount), 0)::int AS amount
+             (COALESCE(s.amount, 0) - COALESCE(rf.amount, 0))::int AS amount
         FROM weeks w
-        LEFT JOIN orders o ON DATE_TRUNC('week', o.created_at) = w.week_start AND o.status = 'approved'
-       GROUP BY w.week_start
+        LEFT JOIN sales s ON s.week_start = w.week_start
+        LEFT JOIN refunded rf ON rf.week_start = w.week_start
        ORDER BY w.week_start ASC
     `);
     return res.json({ data: r.rows });
@@ -11634,12 +11655,21 @@ app.get("/api/reports/revenue", ownerMiddleware, async (req, res) => {
            FROM orders
           WHERE status = 'approved'
           GROUP BY 1
+       ),
+       -- Reembolsos en el mes en que se registraron (auditoría 2026-09-27, P1-12):
+       -- amount es neto y no reescribe meses cerrados.
+       refunds_by_month AS (
+         SELECT DATE_TRUNC('month', created_at) AS month_start, COALESCE(SUM(amount), 0) AS total
+           FROM refunds
+          GROUP BY 1
        )
        SELECT m.month_start AS month,
-              COALESCE(o.total, 0) AS amount,
-              COALESCE(o.count, 0) AS count
+              COALESCE(o.total, 0) - COALESCE(rf.total, 0) AS amount,
+              COALESCE(o.count, 0) AS count,
+              COALESCE(rf.total, 0) AS refunds
          FROM months m
          LEFT JOIN orders_by_month o ON o.month_start = m.month_start
+         LEFT JOIN refunds_by_month rf ON rf.month_start = m.month_start
         ORDER BY m.month_start ASC`
     );
     return res.json({ data: r.rows });
@@ -13136,7 +13166,12 @@ app.get("/api/admin/stats", adminMiddleware, async (req, res) => {
     const [classesToday, activeMembers, monthlyRevenue, pendingAlerts] = await Promise.all([
       pool.query("SELECT COUNT(*) FROM classes WHERE date = $1", [today]),
       pool.query(`SELECT COUNT(*) FROM memberships WHERE status = 'active' AND (end_date IS NULL OR end_date >= (NOW() AT TIME ZONE '${STUDIO_TIMEZONE}')::date)`),
-      pool.query("SELECT COALESCE(SUM(total_amount),0) AS total FROM orders WHERE status = 'approved' AND created_at >= $1", [monthStart]),
+      // Neto: ventas del mes − reembolsos del mes (auditoría 2026-09-27, P1-12).
+      pool.query(
+        `SELECT (SELECT COALESCE(SUM(total_amount), 0) FROM orders WHERE status = 'approved' AND created_at >= $1)
+              - (SELECT COALESCE(SUM(amount), 0) FROM refunds WHERE created_at >= $1) AS total`,
+        [monthStart],
+      ),
       pool.query("SELECT COUNT(*) FROM orders WHERE status = 'pending_verification'"),
     ]);
 
@@ -15222,69 +15257,271 @@ app.put("/api/admin/orders/:id/reject", adminMiddleware, async (req, res) => {
 
 // ─── Payments admin ──────────────────────────────────────────────────────────
 
-// GET /api/payments
+// GET /api/payments — el libro de cobros de la dueña: órdenes aprobadas,
+// membresías viejas sin orden y, desde el bloque 3, los reembolsos como filas
+// negativas en su fecha (auditoría 2026-09-27, P1-12). Cada orden trae su
+// reembolso, su canal y su membresía para el diálogo "Reembolsar". `total` es neto.
+const PAYMENTS_DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 app.get("/api/payments", ownerMiddleware, async (req, res) => {
   try {
-    const { startDate, endDate, userId, limit = 200 } = req.query;
+    const { startDate, endDate, userId } = req.query;
+    // Un filtro basura daba 500 (Postgres rechazaba el uuid o la fecha).
+    if (userId && !isUuid(String(userId))) return res.status(400).json({ message: "Identificador inválido" });
+    for (const d of [startDate, endDate]) {
+      if (d && !PAYMENTS_DAY_RE.test(String(d))) return res.status(400).json({ message: "Fecha inválida (usa AAAA-MM-DD)." });
+    }
+    const limit = Math.min(1000, Math.max(1, Number.parseInt(String(req.query.limit ?? "200"), 10) || 200));
     const params = [];
-    let startIdx = null;
-    let endIdx = null;
-    let userIdx = null;
-    if (startDate) { params.push(startDate); startIdx = params.length; }
-    if (endDate) { params.push(endDate); endIdx = params.length; }
-    // Filtro por user_id — la ficha del cliente (ClientDetail) llama a este
-    // endpoint con ?userId=<uuid>; sin este filtro veía pagos/membresías
-    // globales en la pestaña Pagos de cada cliente. Se aplica a ambas
-    // subqueries del UNION (orders y memberships).
-    if (userId) { params.push(userId); userIdx = params.length; }
-    // Include approved orders AND manually-assigned memberships
-    let q = `
-      SELECT
-        o.id,
-        o.user_id,
-        u.display_name AS user_name,
-        p.name AS plan_name,
-        o.total_amount,
-        o.payment_method AS method,
-        o.status::text AS status,
-        o.created_at,
-        'order' AS source
-      FROM orders o
-      LEFT JOIN users u ON o.user_id = u.id
-      LEFT JOIN plans p ON o.plan_id = p.id
-      WHERE o.status = 'approved'`;
-    if (startIdx) q += ` AND o.created_at >= $${startIdx}`;
-    if (endIdx) q += ` AND o.created_at <= $${endIdx}`;
-    if (userIdx) q += ` AND o.user_id = $${userIdx}`;
-
-    // Also fetch memberships assigned directly (cash/card/transfer)
-    let mq = `
-      SELECT
-        m.id,
-        m.user_id,
-        u.display_name AS user_name,
-        p.name AS plan_name,
-        p.price AS total_amount,
-        m.payment_method AS method,
-        m.status::text AS status,
-        m.created_at,
-        'membership' AS source
-      FROM memberships m
-      LEFT JOIN users u ON m.user_id = u.id
-      LEFT JOIN plans p ON m.plan_id = p.id
-      WHERE m.status = 'active' AND m.order_id IS NULL`;
-    if (startIdx) mq += ` AND m.created_at >= $${startIdx}`;
-    if (endIdx) mq += ` AND m.created_at <= $${endIdx}`;
-    if (userIdx) mq += ` AND m.user_id = $${userIdx}`;
-
-    const combined = `(${q}) UNION ALL (${mq}) ORDER BY created_at DESC LIMIT $${params.length + 1}`;
-    params.push(parseInt(limit));
-    const r = await pool.query(combined, params);
+    const filtros = (col, userCol) => {
+      let w = "";
+      if (startDate) { params.push(startDate); w += ` AND ${col} >= $${params.length}`; }
+      if (endDate) { params.push(endDate); w += ` AND ${col} <= $${params.length}`; }
+      if (userId) { params.push(userId); w += ` AND ${userCol} = $${params.length}`; }
+      return w;
+    };
+    const ordenes = `
+      SELECT o.id, o.user_id, u.display_name AS user_name, p.name AS plan_name,
+             o.total_amount::numeric AS total_amount, o.payment_method::text AS method, o.status::text AS status,
+             o.created_at, 'order'::text AS source, o.id AS order_id, o.channel::text AS channel,
+             COALESCE(o.refunded_amount, 0)::numeric AS refunded_amount, o.refund_status::text AS refund_status,
+             mm.id AS membership_id, mm.status::text AS membership_status, mm.classes_remaining, p.class_limit,
+             NULL::text AS reason
+        FROM orders o
+        LEFT JOIN users u ON o.user_id = u.id
+        LEFT JOIN plans p ON o.plan_id = p.id
+        LEFT JOIN LATERAL (
+          SELECT m.id, m.status, m.classes_remaining FROM memberships m
+           WHERE m.order_id = o.id ORDER BY m.created_at ASC LIMIT 1
+        ) mm ON true
+       WHERE o.status = 'approved'${filtros("o.created_at", "o.user_id")}`;
+    const membresias = `
+      SELECT m.id, m.user_id, u.display_name AS user_name, p.name AS plan_name,
+             p.price::numeric AS total_amount, m.payment_method::text AS method, m.status::text AS status,
+             m.created_at, 'membership'::text AS source, NULL::uuid AS order_id, NULL::text AS channel,
+             0::numeric AS refunded_amount, NULL::text AS refund_status,
+             m.id AS membership_id, m.status::text AS membership_status, m.classes_remaining, p.class_limit,
+             NULL::text AS reason
+        FROM memberships m
+        LEFT JOIN users u ON m.user_id = u.id
+        LEFT JOIN plans p ON m.plan_id = p.id
+       WHERE m.status = 'active' AND m.order_id IS NULL${filtros("m.created_at", "m.user_id")}`;
+    const reembolsos = `
+      SELECT r.id, r.user_id, u.display_name AS user_name, p.name AS plan_name,
+             (-r.amount)::numeric AS total_amount, r.method::text AS method, 'refunded'::text AS status,
+             r.created_at, 'refund'::text AS source, r.order_id, NULL::text AS channel,
+             r.amount::numeric AS refunded_amount, NULL::text AS refund_status,
+             r.membership_id, NULL::text AS membership_status, NULL::int AS classes_remaining, NULL::int AS class_limit,
+             r.reason
+        FROM refunds r
+        LEFT JOIN users u ON r.user_id = u.id
+        LEFT JOIN orders o ON o.id = r.order_id
+        LEFT JOIN plans p ON p.id = o.plan_id
+       WHERE true${filtros("r.created_at", "r.user_id")}`;
+    params.push(limit);
+    const r = await pool.query(
+      `(${ordenes}) UNION ALL (${membresias}) UNION ALL (${reembolsos}) ORDER BY created_at DESC LIMIT $${params.length}`,
+      params,
+    );
     const total = r.rows.reduce((sum, o) => sum + parseFloat(o.total_amount || 0), 0);
-    return res.json({ data: r.rows.map((o) => ({ ...o, userName: o.user_name, planName: o.plan_name })), total });
+    const refundsTotal = r.rows.filter((o) => o.source === "refund").reduce((sum, o) => sum + parseFloat(o.refunded_amount || 0), 0);
+    return res.json({
+      data: r.rows.map((o) => ({
+        ...o,
+        userName: o.user_name,
+        userId: o.user_id,
+        planName: o.source === "refund" ? `Reembolso · ${o.plan_name ?? "orden"}` : o.plan_name,
+        createdAt: o.created_at,
+        orderId: o.order_id ?? null,
+        refundedAmount: Number(o.refunded_amount ?? 0),
+        refundStatus: o.refund_status ?? null,
+        membershipId: o.membership_id ?? null,
+        membershipStatus: o.membership_status ?? null,
+        classesRemaining: o.classes_remaining ?? null,
+        classLimit: o.class_limit ?? null,
+      })),
+      total,
+      refundsTotal,
+    });
   } catch (err) {
     console.error("[GET /payments]", err);
     return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// ─── Reembolsos (auditoría 2026-09-27, P1-12) ───────────────────────────────
+// La dueña registra un reembolso total o parcial de una orden aprobada. El
+// dinero se devuelve fuera del sistema (efectivo, transferencia o terminal):
+// aquí no se llama a ninguna pasarela.
+//   - Total: cancela la membresía de la orden, deja sus clases en 0 y cancela
+//     sus reservas futuras (confirmadas y en fila), aunque la membresía ya
+//     estuviera cancelada; los lugares suben la fila.
+//   - Parcial: resta las clases que eligió la dueña; la membresía sigue activa.
+// La orden queda approved con refunded_amount y refund_status; los reportes
+// restan el reembolso en su fecha. Todo en una transacción con la orden
+// bloqueada: dos totales a la vez no pasan (el segundo espera y da 409).
+// Orden de candados: orden → reservas → membresía, el mismo que la subida de la
+// lista de espera (clase → reservas de la fila → membresía). Si el reembolso
+// tomara la membresía antes que las reservas, una subida que ya tiene la fila y
+// va por la membresía de esta clienta se interbloquearía con él.
+app.post("/api/admin/orders/:id/refunds", ownerMiddleware, async (req, res) => {
+  if (!isUuid(req.params.id)) return res.status(400).json({ message: "Identificador inválido" });
+  const input = req.body || {};
+  const client = await pool.connect();
+  let released = false;
+  try {
+    await client.query("BEGIN");
+    // 1. La orden, con candado.
+    const o = await client.query(
+      `SELECT o.id, o.user_id, o.status::text AS status, o.payment_method::text AS payment_method, o.channel,
+              o.total_amount, COALESCE(o.refunded_amount, 0) AS refunded_amount, o.refund_status, o.order_number,
+              p.name AS plan_name
+         FROM orders o
+         LEFT JOIN plans p ON p.id = o.plan_id
+        WHERE o.id = $1
+        FOR UPDATE OF o`,
+      [req.params.id],
+    );
+    if (!o.rows.length) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ message: "Orden no encontrada" });
+    }
+    const order = o.rows[0];
+    // 2. El id de la membresía de la orden, sin candado todavía.
+    const membershipId = (await client.query(
+      `SELECT id FROM memberships WHERE order_id = $1 ORDER BY created_at ASC LIMIT 1`,
+      [order.id],
+    )).rows[0]?.id ?? null;
+    // 3. Si es total: sus reservas futuras confirmadas y en fila, con candado.
+    let futuras = [];
+    if (membershipId && input.kind === "total") {
+      futuras = (await client.query(
+        `SELECT b.id, b.class_id, b.status::text AS status
+           FROM bookings b JOIN classes c ON c.id = b.class_id
+          WHERE b.membership_id = $1 AND b.status IN ('confirmed', 'waitlist')
+            AND ((c.date + c.start_time) AT TIME ZONE '${STUDIO_TIMEZONE}') > NOW()
+          ORDER BY b.id
+          FOR UPDATE OF b`,
+        [membershipId],
+      )).rows;
+    }
+    // 4. Sólo entonces la membresía, con candado.
+    const membership = membershipId
+      ? (await client.query(
+          `SELECT id, user_id, status::text AS status, classes_remaining FROM memberships WHERE id = $1 FOR UPDATE`,
+          [membershipId],
+        )).rows[0] ?? null
+      : null;
+    // 5. Una reserva nueva toma la membresía antes de insertarse: la que se
+    //    confirmó mientras esperábamos ese candado no salió en el paso 3. Con
+    //    SKIP LOCKED no se espera a la que otra transacción ya tiene (una
+    //    cancelación en curso, que va de la reserva a la membresía): esperarla
+    //    teniendo la membresía sería un interbloqueo.
+    if (membership && input.kind === "total") {
+      const tarde = (await client.query(
+        `SELECT b.id, b.class_id, b.status::text AS status
+           FROM bookings b JOIN classes c ON c.id = b.class_id
+          WHERE b.membership_id = $1 AND b.status IN ('confirmed', 'waitlist')
+            AND ((c.date + c.start_time) AT TIME ZONE '${STUDIO_TIMEZONE}') > NOW()
+            AND NOT (b.id = ANY($2::uuid[]))
+          ORDER BY b.id
+          FOR UPDATE OF b SKIP LOCKED`,
+        [membership.id, futuras.map((b) => b.id)],
+      )).rows;
+      futuras = futuras.concat(tarde);
+    }
+    const plan = refundPlan({ order, membership, input });
+    if (!plan.ok) {
+      await client.query("ROLLBACK");
+      return res.status(plan.status).json({ ...(plan.code ? { code: plan.code } : {}), message: plan.message });
+    }
+    const why = cleanReason(input.reason);
+    let membershipAfter = membership;
+    let bookings = [];
+    if (plan.kind === "total" && membership) {
+      // Si ya estaba cancelada, conserva su fecha y su motivo de cancelación;
+      // sólo le deja las clases en 0.
+      membershipAfter = (await client.query(
+        `UPDATE memberships
+            SET cancelled_at = CASE WHEN status = 'cancelled' THEN cancelled_at ELSE NOW() END,
+                cancellation_reason = CASE WHEN status = 'cancelled' THEN cancellation_reason ELSE $2 END,
+                status = 'cancelled',
+                classes_remaining = CASE WHEN classes_remaining IS NULL OR classes_remaining >= 9999
+                                         THEN classes_remaining ELSE 0 END,
+                updated_at = NOW()
+          WHERE id = $1
+          RETURNING id, status::text AS status, classes_remaining`,
+        [membership.id, `Reembolso total: ${why}`.slice(0, 500)],
+      )).rows[0];
+      await resyncMixtoBuckets(client, membership.id);
+      if (futuras.length) {
+        await client.query(
+          `UPDATE bookings SET status = 'cancelled', cancelled_at = NOW(), cancelled_by = $2, cancellation_reason = $3
+            WHERE id = ANY($1::uuid[])`,
+          [futuras.map((b) => b.id), req.userId, `Reembolso total: ${why}`.slice(0, 500)],
+        );
+        // Cupo: lo mantiene el trigger update_class_booking_count (auditoría 2026-09-08, P1-6).
+        bookings = futuras;
+      }
+    } else if (plan.classesToRemove > 0) {
+      membershipAfter = (await client.query(
+        `UPDATE memberships SET classes_remaining = GREATEST(classes_remaining - $2, 0), updated_at = NOW()
+          WHERE id = $1
+          RETURNING id, status::text AS status, classes_remaining`,
+        [membership.id, plan.classesToRemove],
+      )).rows[0];
+      await resyncMixtoBuckets(client, membership.id);
+    }
+    const refund = (await client.query(
+      `INSERT INTO refunds (order_id, membership_id, user_id, amount, kind, method, reference, reason,
+                            classes_removed, membership_cancelled, bookings_cancelled, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+       RETURNING *`,
+      [order.id, membership?.id ?? null, order.user_id, plan.amount, plan.kind, plan.method, plan.reference, why,
+       plan.classesToRemove, plan.cancelMembership, bookings.length, req.userId],
+    )).rows[0];
+    await client.query(
+      `UPDATE orders SET refunded_amount = $2, refund_status = $3, refunded_at = NOW() WHERE id = $1`,
+      [order.id, plan.newRefunded, plan.newStatus],
+    );
+    await recordAudit(client, {
+      actorId: req.userId, action: "order.refund", entityType: "order", entityId: order.id, subjectUserId: order.user_id,
+      reason: why,
+      before: {
+        refunded_amount: Number(order.refunded_amount), refund_status: order.refund_status ?? null,
+        ...(membership ? { classes_remaining: membership.classes_remaining, membership_status: membership.status } : {}),
+      },
+      after: {
+        refunded_amount: plan.newRefunded, refund_status: plan.newStatus,
+        ...(membershipAfter ? { classes_remaining: membershipAfter.classes_remaining, membership_status: membershipAfter.status } : {}),
+      },
+      meta: {
+        refund_id: refund.id, kind: plan.kind, amount: plan.amount, method: plan.method, reference: plan.reference,
+        classes_removed: plan.classesToRemove, bookings_cancelled: bookings.length,
+        order_number: order.order_number ?? null, plan_name: order.plan_name ?? null,
+      },
+    });
+    await client.query("COMMIT");
+    // La subida de la fila pide su propia conexión: se devuelve ésta antes.
+    client.release();
+    released = true;
+
+    const freed = [...new Set(bookings.filter((b) => b.status === "confirmed").map((b) => b.class_id))];
+    if (freed.length) await onSeatReleased(freed, { source: "refund" });
+    if (order.user_id) triggerWalletPassSync(order.user_id, "refund");
+    return res.status(201).json({
+      data: {
+        refund,
+        order: { id: order.id, refunded_amount: plan.newRefunded, refund_status: plan.newStatus },
+        membership: membershipAfter ?? null,
+        bookings_cancelled: bookings.length,
+      },
+    });
+  } catch (err) {
+    if (!released) await client.query("ROLLBACK").catch(() => {});
+    console.error("[POST /admin/orders/:id/refunds]", err.message);
+    return res.status(500).json({ message: "Error interno" });
+  } finally {
+    if (!released) client.release();
   }
 });
 

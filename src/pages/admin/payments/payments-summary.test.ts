@@ -20,4 +20,15 @@ describe("summarizePayments", () => {
     const s = summarizePayments([{ method: "cash" }, { createdAt: "x", total_amount: "abc" }], now);
     expect(s.month).toEqual({ amount: 0, count: 0 });
   });
+  it("los reembolsos (filas negativas) restan del mes y se cuentan aparte", () => {
+    const s = summarizePayments([
+      p("2026-09-24T10:00:00", "cash", 1700),
+      p("2026-09-25T09:00:00", "transfer", -500),
+      p("2026-09-10T12:00:00", "cash", 0),
+    ], now);
+    expect(s.month).toEqual({ amount: 1200, count: 2 });
+    expect(s.refunds).toEqual({ amount: 500, count: 1 });
+    expect(s.byMethod).toEqual({ cash: 1700 });
+    expect(s.week).toEqual({ amount: 1200, count: 1 });
+  });
 });
