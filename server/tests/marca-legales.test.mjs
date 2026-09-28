@@ -33,8 +33,8 @@ test("firmar hoy con waiver_version:\"v2\" guarda v2", async () => {
   assert.equal(r1.body.data.waiver_version, "v2");
 });
 
-// Ronda de ajustes 1: una firma sin `waiver_version` viene de una pestaña con el
-// bundle anterior al versionado, que le mostró a la clienta el texto v1 (Alma).
+// Una firma sin `waiver_version` viene de una pestaña con el bundle anterior al
+// versionado, que le mostró a la clienta el texto v1 (Alma).
 // Guardarla como v2 dejaría registrado que aceptó un texto que nunca vio.
 test("firmar sin mandar waiver_version guarda v1 (app en caché de antes del versionado)", async () => {
   const b = await makeClient(PFX, "sinver", { waiver: false });

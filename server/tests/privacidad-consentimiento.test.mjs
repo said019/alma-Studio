@@ -96,23 +96,24 @@ test("el cuestionario también pide la casilla cuando reporta una lesión", asyn
   assert.equal(r.status, 200, "sin lesión no se pide la casilla");
 });
 
-test("el personal que edita su propio perfil no queda bloqueado por la casilla (R12)", async () => {
+test("el personal que edita su propio perfil no queda bloqueado por la casilla", async () => {
   const staff = await makeClient(PFX, "staffself", { role: "admin", waiver: false });
   const r = await api("PUT", `/api/users/${staff.id}`, { token: staff.token, body: { healthNotes: "Notas del staff" } });
   assert.equal(r.status, 200, JSON.stringify(r.body).slice(0, 200));
   assert.equal((await salud(staff.id)).health_notes, "Notas del staff");
 });
 
-// Ronda de ajustes 1 (P1-10): R12 también aplica a recepción, no sólo a admin.
-test("el personal de recepción que edita su propio perfil tampoco queda bloqueado (R12)", async () => {
+// La casilla la da la titular de los datos: recepción tampoco queda bloqueada
+// al editar su propio perfil, no sólo admin.
+test("el personal de recepción que edita su propio perfil tampoco queda bloqueado", async () => {
   const staff = await makeClient(PFX, "recepself", { role: "reception", waiver: false });
   const r = await api("PUT", `/api/users/${staff.id}`, { token: staff.token, body: { healthNotes: "Notas de recepción" } });
   assert.equal(r.status, 200, JSON.stringify(r.body).slice(0, 200));
   assert.equal((await salud(staff.id)).health_notes, "Notas de recepción");
 });
 
-// Ronda de ajustes 1 (P1-10): un tipo raro en healthNotes no debe reventar ni
-// escribir nada; 400 en español, antes de tocar la fila.
+// Un tipo raro en healthNotes haría fallar la escritura con un 500: debe dar
+// 400 en español antes de tocar la fila.
 test("healthNotes con un tipo que no es texto → 400 en español y no cambia nada", async () => {
   const c = await makeClient(PFX, "tiporaro");
   const antes = await salud(c.id);
@@ -124,9 +125,8 @@ test("healthNotes con un tipo que no es texto → 400 en español y no cambia na
   assert.equal(rArr.status, 400);
 });
 
-// Ronda de ajustes 1 (P1-10): retirar el consentimiento sólo borra las 5
-// columnas de salud; el resto de la fila (cuestionario, contacto de
-// emergencia) queda intacto.
+// Retirar el consentimiento sólo borra las 5 columnas de salud; el resto de la
+// fila (cuestionario, contacto de emergencia) no depende de él y queda intacto.
 test("retirar el consentimiento deja intacto el resto de la fila", async () => {
   const c = await makeClient(PFX, "retiraintacto");
   await sql(
@@ -144,7 +144,7 @@ test("retirar el consentimiento deja intacto el resto de la fila", async () => {
   assert.equal(row.practiced_barre_before, true);
 });
 
-// Ronda de ajustes 1 (P1-10): el 400 del cuestionario (falta la casilla) no
+// El 400 del cuestionario (falta la casilla) se decide antes de escribir: no
 // deja nada a medias en la fila.
 test("el 400 del cuestionario por falta de consentimiento no cambia nada", async () => {
   const c = await makeClient(PFX, "onboarding400");
@@ -160,8 +160,9 @@ test("el 400 del cuestionario por falta de consentimiento no cambia nada", async
   assert.deepEqual(despues, antes);
 });
 
-// Ronda de ajustes 1 (P1-10): el registro no acepta datos de salud directos
-// (sólo la casilla healthConsent); si alguien los manda igual, se descartan.
+// El registro no acepta datos de salud directos (sólo la casilla
+// healthConsent): se capturan después, con el consentimiento a la vista. Si
+// alguien los manda igual, se descartan.
 test("un registro con datos de salud en el cuerpo los descarta", async () => {
   const r = await registrar("saludenregistro", { healthNotes: "Debe ignorarse", injuryDetails: "Tampoco esto", hasInjury: true });
   assert.equal(r.status, 201, JSON.stringify(r.body).slice(0, 200));

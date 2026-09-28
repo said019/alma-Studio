@@ -236,7 +236,7 @@ test("cancelación y reserva nueva a la vez: sube la de la fila y la nueva queda
   assert.equal(await liveBookings(classId), 1);
 });
 
-// ── Revisión previa del plan: R5, R14 y la ráfaga de concurrencia ──────────
+// ── Membresía que cambia bajo candado, bajas en la fila y ráfaga de concurrencia ──
 
 test("membresía cancelada justo antes de la subida: no sube con ella y sube la siguiente", async () => {
   const a = await clienta("f1");

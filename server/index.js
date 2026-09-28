@@ -9028,7 +9028,8 @@ app.get("/api/admin/users/:userId/waiver/pdf", adminMiddleware, async (req, res)
 // Si una clienta escribe datos de salud nuevos sin consentimiento expreso
 // vigente, pide la casilla (400 HEALTH_CONSENT_REQUIRED) y no guarda nada. Editar
 // otros datos nunca lo pide, y el personal no queda bloqueado ni al editar su
-// propio perfil (auditoría 2026-09-27, P1-10; ruling R12).
+// propio perfil: el consentimiento lo da la titular de los datos, y el personal
+// no captura salud propia por aquí (auditoría 2026-09-27, P1-10).
 app.put("/api/users/:id", authMiddleware, async (req, res) => {
   try {
     const selfRes = await pool.query("SELECT role FROM users WHERE id = $1", [req.userId]);
@@ -9044,9 +9045,9 @@ app.put("/api/users/:id", authMiddleware, async (req, res) => {
       acceptsCommunications,
       role, healthConsent,
     } = req.body;
-    // Ronda de ajustes 1 (P1-10): un tipo raro en un dato de salud (número,
-    // arreglo, objeto…) no debe tirar 500 al escribirlo en la base; se
-    // rechaza aquí, antes de tocar nada.
+    // Un tipo raro en un dato de salud (número, arreglo, objeto…) haría fallar
+    // la escritura en la base con un 500; se rechaza aquí con 400, antes de
+    // tocar nada.
     if (healthNotes !== undefined && healthNotes !== null && typeof healthNotes !== "string") {
       return res.status(400).json({ message: "Las notas de salud deben ser texto." });
     }
@@ -9059,8 +9060,9 @@ app.put("/api/users/:id", authMiddleware, async (req, res) => {
     );
     if (!cur.rows.length) return res.status(404).json({ message: "Usuario no encontrado" });
     const selfEdit = targetId === req.userId;
-    // R12: la casilla sólo se exige si la clienta edita su propio perfil; el
-    // personal no queda bloqueado, ni siquiera al editar el suyo.
+    // La casilla sólo se exige si la clienta edita su propio perfil: es ella
+    // quien consiente sobre sus datos. El personal no queda bloqueado, ni
+    // siquiera al editar el suyo.
     const consentApplies = selfEdit && callerRole === "client";
     const hasConsent = hasCurrentHealthConsent(cur.rows[0]);
     const consentGiven = healthConsent === true;

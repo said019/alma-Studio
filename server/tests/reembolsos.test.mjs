@@ -174,7 +174,7 @@ test("un parcial sobre una membresía ilimitada no quita clases", async () => {
   assert.equal((await reembolsar(orderId, { kind: "partial", amount: parte })).status, 201);
 });
 
-// ── Rulings del controlador (R4, R8, R17) ───────────────────────────────────
+// ── Filtros de /api/payments, total sobre una cancelada y candados con la fila ──
 
 test("/api/payments rechaza un userId que no es UUID y fechas que no son AAAA-MM-DD (400, no 500)", async () => {
   const basura = await api("GET", "/api/payments?userId=basura", { token: A });
