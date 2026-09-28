@@ -152,6 +152,43 @@ const CancelBookingDialog = ({
   );
 };
 
+// ── Diálogo de "avisa a mano": el canal de WhatsApp estaba caído al cancelar
+// la clase, así que a estas alumnas no les llegó el aviso automático. ──
+const UnreachedDialog = ({
+  items, onClose,
+}: {
+  items: { user_id: string; display_name: string | null; phone: string | null }[];
+  onClose: () => void;
+}) => {
+  return (
+    <Dialog open={items.length > 0} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-md bg-canvas border-line text-ink">
+        <DialogHeader>
+          <DialogTitle className="font-display text-ink">Avisa a mano a estas alumnas</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <p className="text-sm text-ink/70">WhatsApp está desconectado — no les llegó el aviso de la clase cancelada.</p>
+          <ul className="divide-y divide-line rounded-xl border border-line">
+            {items.map((u) => (
+              <li key={u.user_id} className="flex items-center justify-between gap-3 px-4 py-3">
+                <span className="font-medium text-ink">{u.display_name || "Sin nombre"}</span>
+                {u.phone ? (
+                  <a href={`tel:${u.phone}`} className="text-sm font-bold text-ink underline underline-offset-2">{u.phone}</a>
+                ) : (
+                  <span className="text-sm text-ink/50">Sin teléfono</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+        <DialogFooter>
+          <Button onClick={onClose}>Listo</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
 function RosterStatus({ status }: { status: string }) {
   if (status === "checked_in") return <StatusDot tone="success">Asistió</StatusDot>;
   if (status === "no_show") return <StatusDot tone="danger">No asistió</StatusDot>;
@@ -166,6 +203,7 @@ const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: string; onBa
   const qc = useQueryClient();
   const { confirm, promptText, dialog } = useConfirm();
   const [cancelTarget, setCancelTarget] = useState<RosterEntry | null>(null);
+  const [unreached, setUnreached] = useState<{ user_id: string; display_name: string | null; phone: string | null }[]>([]);
   const { data: loyaltyCfgData } = useQuery<{ data: { faltas_cancel_window_hours?: number } }>({
     queryKey: ["loyalty-config"],
     queryFn: async () => (await api.get("/loyalty/config")).data,
@@ -318,11 +356,13 @@ const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: string; onBa
       qc.invalidateQueries({ queryKey: ["roster", classId] });
       qc.invalidateQueries({ queryKey: ["classes"] });
       invalidateWeek();
-      const d = res?.data?.data || {};
-      toast({
-        title: "Clase cancelada",
-        description: `${d.bookings_cancelled ?? 0} reservas canceladas · ${d.credits_restored ?? 0} créditos devueltos · ${d.wa_sent ?? 0} WhatsApps`,
-      });
+      const d = res?.data?.data ?? {};
+      if ((d.wa_failed ?? 0) > 0) {
+        setUnreached(d.wa_unreached ?? []);
+        toast({ title: "Clase cancelada", description: `No se pudo avisar a ${d.wa_failed} ${d.wa_failed === 1 ? "alumna" : "alumnas"} (WhatsApp desconectado).`, variant: "destructive" });
+      } else {
+        toast({ title: "Clase cancelada", description: `${d.bookings_cancelled ?? 0} reservas canceladas · ${d.credits_restored ?? 0} créditos devueltos · aviso por WhatsApp en cola para ${d.wa_queued ?? 0}` });
+      }
     },
     onError: (e: any) => toast({
       title: "Error",
@@ -887,6 +927,8 @@ const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: string; onBa
         }}
         onClose={() => setCancelTarget(null)}
       />
+
+      <UnreachedDialog items={unreached} onClose={() => setUnreached([])} />
 
       {dialog}
     </div>

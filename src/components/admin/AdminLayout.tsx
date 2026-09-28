@@ -17,6 +17,7 @@ import { BrandLogo } from "@/components/brand/BrandLogo";
 import AdminTopBar from "./AdminTopBar";
 import ClientSearch from "./ClientSearch";
 import { Avatar } from "./PersonCell";
+import WhatsAppBanner from "./WhatsAppBanner";
 
 const NAV_GROUPS = [
   {
@@ -275,6 +276,8 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
             <ClientSearch autoFocus label="Buscar clienta (celular)" onSelect={(c) => navigate(`/admin/clients/${c.id}`)} />
           </div>
         )}
+
+        <WhatsAppBanner />
 
         <main className="admin-mobile-main flex-1 overflow-auto bg-canvas pb-[96px] lg:pb-0">{children}</main>
 

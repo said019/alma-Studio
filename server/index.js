@@ -70,6 +70,7 @@ import { validateWellhubVisit as wellhubValidateVisit } from "./lib/wellhub/api.
 import { handleBookingRequested, handleCheckin, handleCancel, handlePlanChange } from "./lib/wellhub/flows.js";
 import { isUuid, signatureProblem } from "./lib/validate.js";
 import { checkinRule } from "./lib/checkin.js";
+import { createChannelState } from "./lib/whatsappState.js";
 import {
   validateStripeConfig,
   createOrGetStripeCustomer,
@@ -9334,28 +9335,34 @@ app.put("/api/classes/:id/cancel", adminMiddleware, async (req, res) => {
 
     await client.query("COMMIT");
 
-    // 5) Notify each alumna (fire-and-forget WA + wallet sync, fuera de tx)
+    // 5) Notify each alumna (fire-and-forget WA + wallet sync, fuera de tx).
+    // Si el canal de WhatsApp está caído (o los recordatorios están apagados),
+    // no se intenta el envío ni se cuenta como "enviado": se junta la lista
+    // para que recepción avise a mano (auditoría 2026-09-27, P0-1).
     const dateStr = classRow.date ? new Date(classRow.date).toLocaleDateString("es-MX", { weekday: "short", day: "numeric", month: "short" }) : "";
     const timeStr = classRow.start_time ? String(classRow.start_time).slice(0, 5) : "";
-    let waSent = 0;
+    const notifSettings = await getSettingsValue("notification_settings", DEFAULT_NOTIFICATION_SETTINGS);
+    const waOn = notifSettings?.whatsapp_reminders !== false;
+    const channel = waOn ? await whatsappChannelState() : { connected: false, state: "disabled" };
+    let waQueued = 0;
+    const waUnreached = [];
     for (const b of activeBookings) {
       if (!b.user_id) continue;
+      triggerWalletPassSync(b.user_id, "admin_class_cancelled");
+      if (!channel.connected) {
+        waUnreached.push({ user_id: b.user_id, display_name: b.display_name, phone: b.phone });
+        continue;
+      }
       const className = b.class_name || "tu clase";
       const cancelReason = reason ? ` (motivo: ${reason})` : "";
       notifyByTemplate(
         b.user_id,
         "booking_cancelled",
-        {
-          class: className,
-          date: dateStr,
-          time: timeStr,
-          creditRestored: "Sí",
-        },
+        { class: className, date: dateStr, time: timeStr, creditRestored: "Sí" },
         ({ firstName }) =>
           `${firstName}, tuvimos que cancelar la clase de ${className}${dateStr ? ` del ${dateStr}` : ""}${timeStr ? ` a las ${timeStr}` : ""}.${cancelReason} Tu clase regresó a tu paquete.`,
       ).catch(() => {});
-      triggerWalletPassSync(b.user_id, "admin_class_cancelled");
-      waSent++;
+      waQueued++;
     }
 
     return res.json({
@@ -9364,7 +9371,9 @@ app.put("/api/classes/:id/cancel", adminMiddleware, async (req, res) => {
         bookings_cancelled: activeBookings.length,
         credits_restored: creditsRestored,
         points_reverted: pointsReverted,
-        wa_sent: waSent,
+        wa_queued: waQueued,
+        wa_failed: waUnreached.length,
+        wa_unreached: waUnreached,
         reason: reason || null,
       },
     });
@@ -12365,47 +12374,60 @@ app.post("/api/webhook/evolution", async (req, res) => {
   }
 });
 
+// Sonda cruda del canal de Evolution/WhatsApp: sin caché, golpea la API de
+// Evolution en cada llamada. `whatsappChannelState()` (justo abajo) la envuelve
+// con caché corta y timeout para no intentar envíos con el canal caído y para
+// poder avisarlo en el panel (auditoría 2026-09-27, P0-1).
+async function probeEvolution() {
+  if (!EVOLUTION_API_URL) {
+    return { connected: false, state: "disconnected", instanceExists: false };
+  }
+  // Check if instance exists first
+  let instanceExists = false;
+  try {
+    const listRes = await evolutionApi.get("/instance/fetchInstances");
+    const instances = listRes.data?.data || listRes.data || [];
+    instanceExists = Array.isArray(instances)
+      ? instances.some((i) =>
+        i.instance?.instanceName === EVOLUTION_INSTANCE ||
+        i.instanceName === EVOLUTION_INSTANCE ||
+        i.name === EVOLUTION_INSTANCE
+      )
+      : false;
+  } catch (_) { instanceExists = false; }
+
+  if (!instanceExists) {
+    return { connected: false, state: "disconnected", instanceExists: false };
+  }
+
+  const r = await evolutionApi.get(`/instance/connectionState/${EVOLUTION_INSTANCE}`);
+  const state = r.data?.instance?.state || r.data?.state || "unknown";
+
+  let qrCode = null;
+  if (state === "connecting" || state === "qr") {
+    try {
+      const qrRes = await evolutionApi.get(`/instance/connect/${EVOLUTION_INSTANCE}`);
+      qrCode = normalizeQrDataUrl(pickEvolutionQrPayload(qrRes.data));
+    } catch (_) { }
+  }
+
+  return {
+    connected: state === "open",
+    state: state === "open" ? "connected" : state === "qr" || state === "connecting" ? "qr_pending" : "disconnected",
+    number: r.data?.instance?.profileName || null,
+    instanceExists: true,
+    qrCode,
+  };
+}
+
+// Estado cacheado (60 s) del canal, usado por el flujo de cancelar clase y por
+// el cron de recordatorios para no intentar envíos con Evolution caído.
+const whatsappChannelState = createChannelState({ probe: probeEvolution });
+
 // GET /api/evolution/status
 app.get("/api/evolution/status", adminMiddleware, async (req, res) => {
   try {
-    // Check if instance exists first
-    let instanceExists = false;
-    try {
-      const listRes = await evolutionApi.get("/instance/fetchInstances");
-      const instances = listRes.data?.data || listRes.data || [];
-      instanceExists = Array.isArray(instances)
-        ? instances.some((i) =>
-          i.instance?.instanceName === EVOLUTION_INSTANCE ||
-          i.instanceName === EVOLUTION_INSTANCE ||
-          i.name === EVOLUTION_INSTANCE
-        )
-        : false;
-    } catch (_) { instanceExists = false; }
-
-    if (!instanceExists) {
-      return res.json({ data: { connected: false, state: "disconnected", instanceExists: false } });
-    }
-
-    const r = await evolutionApi.get(`/instance/connectionState/${EVOLUTION_INSTANCE}`);
-    const state = r.data?.instance?.state || r.data?.state || "unknown";
-
-    let qrCode = null;
-    if (state === "connecting" || state === "qr") {
-      try {
-        const qrRes = await evolutionApi.get(`/instance/connect/${EVOLUTION_INSTANCE}`);
-        qrCode = normalizeQrDataUrl(pickEvolutionQrPayload(qrRes.data));
-      } catch (_) { }
-    }
-
-    return res.json({
-      data: {
-        connected: state === "open",
-        state: state === "open" ? "connected" : state === "qr" || state === "connecting" ? "qr_pending" : "disconnected",
-        number: r.data?.instance?.profileName || null,
-        instanceExists: true,
-        qrCode,
-      },
-    });
+    return res.json({ data: await probeEvolution() });
   } catch (err) {
     console.error("[EVOLUTION STATUS]", err.response?.data || err.message);
     return res.json({ data: { connected: false, state: "disconnected", instanceExists: false } });
@@ -16402,26 +16424,42 @@ async function runClassReminderCron() {
     if (res.rows.length === 0) return;
     console.log(`[Cron] Class reminder — ${res.rows.length} upcoming bookings`);
 
+    // Un solo chequeo del canal por corrida (cacheado 60 s): si Evolution está
+    // caído no tiene caso intentar cada envío ni contarlo como enviado
+    // (auditoría 2026-09-27, P0-1).
+    const channel = await whatsappChannelState();
+
     for (const row of res.rows) {
       const timeStr = row.start_time ? String(row.start_time).slice(0, 5) : "";
       const className = row.class_name || "tu clase";
       const reason = `class_reminder_${row.booking_id}`;
 
-      // Dedup guard: skip if already sent
+      // Dedup guard: sólo cuenta un envío que sí quedó 'ok' — un intento
+      // 'skipped_disconnected' o 'failed' debe poder reintentarse en la
+      // siguiente corrida cuando el canal vuelva.
       const already = await pool.query(
-        `SELECT 1 FROM wallet_notification_logs WHERE user_id=$1 AND reason=$2 LIMIT 1`,
+        `SELECT 1 FROM wallet_notification_logs WHERE user_id=$1 AND reason=$2 AND status = 'ok' LIMIT 1`,
         [row.user_id, reason],
       );
       if (already.rows.length > 0) continue; // already sent, skip
 
+      if (!channel.connected) {
+        await pool.query(
+          `INSERT INTO wallet_notification_logs (user_id, reason, status, detail)
+           VALUES ($1, $2, 'skipped_disconnected', $3::jsonb)`,
+          [row.user_id, reason, JSON.stringify({ source: "class_reminder_cron", reason: "channel_disconnected" })],
+        ).catch((e) => console.error("[Cron] class_reminder log:", e?.message));
+        continue;
+      }
+
       // 1. WhatsApp via notifyByTemplate (handles opt-out, phone lookup)
-      await notifyByTemplate(
+      const r = await notifyByTemplate(
         row.user_id,
         "class_reminder",
         { class: className, time: timeStr },
         ({ firstName }) =>
           `${firstName}, te vemos en ${className} a las ${timeStr}. Llega 10 minutos antes.`,
-      ).catch((e) => console.error("[Cron] class_reminder WA:", e?.message));
+      ).catch((e) => ({ sent: false, reason: "exception", error: e?.message }));
 
       // 2. APNS wallet push — updates the pass on the lockscreen
       // Fire-and-forget: triggerWalletPassSync schedules async push internally and logs its own errors
@@ -16432,8 +16470,8 @@ async function runClassReminderCron() {
       //    inside notifyWalletPassesUpdatedForUser separately)
       await pool.query(
         `INSERT INTO wallet_notification_logs (user_id, reason, status, detail)
-         VALUES ($1, $2, 'ok', '{"source":"class_reminder_cron"}'::jsonb)`,
-        [row.user_id, reason],
+         VALUES ($1, $2, $3, $4::jsonb)`,
+        [row.user_id, reason, r?.sent ? "ok" : "failed", JSON.stringify({ source: "class_reminder_cron", reason: r?.reason ?? null })],
       ).catch((e) => console.error("[Cron] class_reminder log:", e?.message));
 
       // Small delay to respect Evolution API rate limits
