@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   normalizeCancellationSettings, cancellationLimitProblem, cancellationQuota, clientCancelDecision, publicBookingPolicy,
+  ALREADY_PROMOTED_MESSAGE,
 } from "./cancellationPolicy.js";
 
 test("la cuota arranca en 2 y 0 es sin límite", () => {
@@ -45,6 +46,20 @@ test("decisión al cancelar: fila, confirmada, cuota agotada, asistencia y ya ca
   const ya = clientCancelDecision({ bookingStatus: "cancelled" });
   assert.equal(ya.status, 400);
   assert.equal(ya.message, "Esta reserva ya fue cancelada");
+});
+
+test("?expect=waitlist con la reserva ya subida: 409 ALREADY_PROMOTED y no se cancela", () => {
+  const r = clientCancelDecision({ bookingStatus: "confirmed", used: 0, limit: 2, expectWaitlist: true });
+  assert.deepEqual(r, {
+    ok: false, status: 409, code: "ALREADY_PROMOTED",
+    message: "Ya subiste de la lista de espera: tu lugar está confirmado. Si quieres cancelarlo, aplican las reglas de cancelación.",
+  });
+  assert.equal(r.message, ALREADY_PROMOTED_MESSAGE);
+  assert.deepEqual(clientCancelDecision({ bookingStatus: "waitlist", used: 2, limit: 2, expectWaitlist: true }),
+    { ok: true, leavingWaitlist: true, countsTowardQuota: false, freesSeat: false }, "sigue en la fila: sale sin cuota");
+  assert.equal(clientCancelDecision({ bookingStatus: "cancelled", expectWaitlist: true }).code, "ALREADY_CANCELLED");
+  assert.equal(clientCancelDecision({ bookingStatus: "checked_in", expectWaitlist: true }).code, "ATTENDANCE_RECORDED");
+  assert.equal(clientCancelDecision({ bookingStatus: "confirmed", used: 0, limit: 2 }).ok, true, "sin expect, igual que antes");
 });
 
 test("política pública: cuota, ventana real, cierres y faltas", () => {

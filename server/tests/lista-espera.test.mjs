@@ -335,3 +335,38 @@ test("ráfaga: 3 liberaciones y 3 reservas nuevas en una clase de cupo 2 no pasa
   assert.equal(await credits(w1.id), 8, "la cancelada no pierde su clase");
   for (const n of nuevas) assert.equal(await credits(n.id), 8, "estar en la fila no usa clase");
 });
+
+// ── La pantalla de la app puede ir atrás de la subida ──────────────────────
+
+test("salir de la fila con la pantalla desfasada: si ya subió, 409 ALREADY_PROMOTED y no cambia nada", async () => {
+  const a = await clienta("s1a");
+  const w = await clienta("s1w");
+  const classId = await makeClass(A, f, { date: day(23), cap: 1 });
+  const ra = await reservar(a, classId);
+  const rw = await reservar(w, classId);
+  assert.equal(rw.status, "waitlist");
+  await cancelarEstudio(ra.id);
+  assert.equal(await estado(rw.id), "confirmed", "la subió el estudio mientras la app la mostraba en la fila");
+  const foto = async () => (await sql(
+    `SELECT m.cancellations_used, m.classes_remaining, u.faltas_count
+       FROM memberships m JOIN users u ON u.id = m.user_id WHERE m.user_id = $1`, [w.id]))[0];
+  const antes = await foto();
+  const r = await api("DELETE", `/api/bookings/${rw.id}?expect=waitlist`, { token: w.token });
+  assert.equal(r.status, 409, JSON.stringify(r.body).slice(0, 200));
+  assert.deepEqual(r.body, {
+    code: "ALREADY_PROMOTED",
+    message: "Ya subiste de la lista de espera: tu lugar está confirmado. Si quieres cancelarlo, aplican las reglas de cancelación.",
+  });
+  assert.equal(await estado(rw.id), "confirmed");
+  assert.deepEqual(await foto(), antes, "ni cuota, ni clase, ni falta");
+  assert.equal(await liveBookings(classId), 1);
+  // Si de verdad sigue en la fila, ?expect=waitlist sale como siempre y sin cuota.
+  const w2 = await clienta("s1w2");
+  const rw2 = await reservar(w2, classId);
+  assert.equal(rw2.status, "waitlist");
+  const sale = await api("DELETE", `/api/bookings/${rw2.id}?expect=waitlist`, { token: w2.token });
+  assert.equal(sale.status, 200, JSON.stringify(sale.body).slice(0, 200));
+  assert.equal(sale.body.leftWaitlist, true);
+  assert.equal(sale.body.cancellationsUsed, 0);
+  assert.equal(await estado(rw2.id), "cancelled");
+});

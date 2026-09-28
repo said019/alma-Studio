@@ -4288,11 +4288,23 @@ app.post("/api/bookings", authMiddleware, async (req, res) => {
 // Salir de la lista de espera no consulta ni suma la cuota, ni cuenta como falta.
 // Una reserva con asistencia o falta ya no se cancela desde la app. Si se libera
 // un lugar, sube la fila (onSeatReleased, después del COMMIT y con el pool libre).
+// ?expect=waitlist: la app cree que la reserva sigue en la fila. Si ya subió, 409
+// ALREADY_PROMOTED sin tocar nada; se revisa con la reserva bloqueada, así que
+// la subida y la salida no se cruzan.
 app.delete("/api/bookings/:id", authMiddleware, async (req, res) => {
+  // La política se lee antes de tomar el cliente: con el pool lleno, pedir otra
+  // conexión teniendo ésta podía dejar a la petición esperándose a sí misma.
+  let policy;
+  try {
+    policy = await getBookingPolicy();
+  } catch (err) {
+    console.error("DELETE bookings policy error:", err.message);
+    return res.status(500).json({ message: "Error interno" });
+  }
+  const expectWaitlist = req.query?.expect === "waitlist";
   const client = await pool.connect();
   let released = false;
   try {
-    const policy = await getBookingPolicy();
     await client.query("BEGIN");
 
     // Load + LOCK booking (FOR UPDATE OF b) para serializar cancelaciones
@@ -4322,7 +4334,7 @@ app.delete("/api/bookings/:id", authMiddleware, async (req, res) => {
       membership = memRes.rows[0] ?? null;
     }
     const limit = membership ? policy.cancellationLimit : 0;
-    const decision = clientCancelDecision({ bookingStatus: booking.status, used: membership?.cancellations_used ?? 0, limit });
+    const decision = clientCancelDecision({ bookingStatus: booking.status, used: membership?.cancellations_used ?? 0, limit, expectWaitlist });
     if (!decision.ok) {
       await client.query("ROLLBACK");
       return res.status(decision.status).json({ code: decision.code, message: decision.message });
@@ -4388,6 +4400,7 @@ app.delete("/api/bookings/:id", authMiddleware, async (req, res) => {
               creditRestored,
               isLate,
               classesLeft: memAfter?.rows[0]?.classes_remaining ?? null,
+              cancelHours: policy.cancelWindowHours,
             }).catch((e) => console.error("[Email] booking cancelled:", e.message));
           }
           sendConfiguredWhatsAppTemplate({
@@ -12386,7 +12399,9 @@ app.put("/api/admin/booking-policy", ownerMiddleware, async (req, res) => {
       });
     }
     await client.query("COMMIT");
-    return res.json({ data: await getBookingPolicy() });
+    // Con el mismo cliente: pedir otra conexión del pool teniendo ésta puede
+    // quedarse esperando si el pool está lleno.
+    return res.json({ data: await getBookingPolicy(client) });
   } catch (err) {
     await client.query("ROLLBACK").catch(() => {});
     console.error("[PUT /admin/booking-policy]", err.message);

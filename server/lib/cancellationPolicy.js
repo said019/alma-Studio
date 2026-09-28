@@ -26,8 +26,17 @@ export function cancellationQuota({ used = 0, limit = 0 } = {}) {
   return { limited: l > 0, used: u, limit: l, left: l > 0 ? Math.max(0, l - u) : null, exhausted: l > 0 && u >= l };
 }
 
-/** Qué pasa cuando la clienta cancela desde la app (DELETE /api/bookings/:id). */
-export function clientCancelDecision({ bookingStatus, used = 0, limit = 0 }) {
+export const ALREADY_PROMOTED_MESSAGE =
+  "Ya subiste de la lista de espera: tu lugar está confirmado. Si quieres cancelarlo, aplican las reglas de cancelación.";
+
+/**
+ * Qué pasa cuando la clienta cancela desde la app (DELETE /api/bookings/:id).
+ * expectWaitlist (?expect=waitlist): la pantalla de la app todavía la muestra en
+ * la fila. Si la reserva ya subió (está confirmada), no se cancela: salir de la
+ * fila no gasta cuota, cancelar un lugar sí, y la clienta no pidió lo segundo.
+ * Ya cancelada o con asistencia conservan su respuesta, que sigue siendo cierta.
+ */
+export function clientCancelDecision({ bookingStatus, used = 0, limit = 0, expectWaitlist = false }) {
   if (bookingStatus === "cancelled") {
     return { ok: false, status: 400, code: "ALREADY_CANCELLED", message: "Esta reserva ya fue cancelada" };
   }
@@ -36,6 +45,9 @@ export function clientCancelDecision({ bookingStatus, used = 0, limit = 0 }) {
       ok: false, status: 409, code: "ATTENDANCE_RECORDED",
       message: "Esta reserva ya tiene la asistencia registrada. Si hay un error, habla con recepción.",
     };
+  }
+  if (expectWaitlist && bookingStatus !== "waitlist") {
+    return { ok: false, status: 409, code: "ALREADY_PROMOTED", message: ALREADY_PROMOTED_MESSAGE };
   }
   if (bookingStatus === "waitlist") {
     return { ok: true, leavingWaitlist: true, countsTowardQuota: false, freesSeat: false };
