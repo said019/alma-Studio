@@ -50,7 +50,7 @@ const SAMPLE_VARS: Record<string, string | number> = {
   plan: "Reformer 4 clases por semana",
   expiresAt: "31 mayo",
   reason: "comprobante ilegible",
-  link: "https://alma-movement.app/r/xyz",
+  link: "https://www.almamovement.com.mx/r/xyz",
   creditRestored: "Sí",
   classesThisWeek: 1,
   weekGoal: 4,
@@ -156,7 +156,7 @@ const TemplateCard = ({
   const handleResetClick = async () => {
     const ok = await confirm({
       title: "¿Restaurar al texto default?",
-      description: `Tu versión editada de "${templateKey}" se reemplaza por el texto original de Alma y no se puede recuperar.`,
+      description: `Tu versión editada de "${templateKey}" se reemplaza por el texto original de HIVE y no se puede recuperar.`,
       confirmLabel: "Restaurar",
       destructive: true,
     });
@@ -349,7 +349,7 @@ const WhatsAppTemplatesPage = () => {
     mutationFn: () => api.post("/admin/whatsapp-templates/reset"),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["whatsapp-templates"] });
-      toast({ title: "Templates restaurados a defaults Alma" });
+      toast({ title: "Templates restaurados a defaults HIVE" });
     },
   });
 
@@ -428,7 +428,7 @@ const WhatsAppTemplatesPage = () => {
   const handleResetAll = async () => {
     const ok = await confirm({
       title: "¿Restaurar todos los templates?",
-      description: "Todos los templates vuelven al texto original de Alma y se pierde el copy editado. Esta acción no se puede deshacer.",
+      description: "Todos los templates vuelven al texto original de HIVE y se pierde el copy editado. Esta acción no se puede deshacer.",
       confirmLabel: "Restaurar todo",
       destructive: true,
     });

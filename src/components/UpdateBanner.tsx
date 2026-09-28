@@ -51,7 +51,7 @@ export default function UpdateBanner() {
     >
       <div className="pointer-events-auto flex w-full max-w-[440px] items-center gap-3 rounded-2xl bg-inverse px-4 py-3 text-inverse-foreground shadow-[0_12px_34px_theme(colors.ink.DEFAULT/28%)]">
         <span className="flex-1 text-[13px] leading-snug">
-          Hay una nueva versión de Alma disponible.
+          Hay una nueva versión de HIVE disponible.
         </span>
         <button
           type="button"

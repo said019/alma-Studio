@@ -78,7 +78,7 @@ export function InstallAppPrompt({ force, onClose }: InstallAppPromptProps) {
 
           <div className="flex items-center gap-4">
             <div className="w-14 h-14 rounded-2xl bg-background border border-border flex items-center justify-center overflow-hidden shadow-lg">
-              <img src="/icon-192.png" alt="Alma" className="w-10 h-10 object-contain" />
+              <img src="/icon-192.png" alt="HIVE" className="w-10 h-10 object-contain" />
             </div>
             <div>
               <h3 className="font-display text-2xl text-foreground leading-none tracking-wide">
@@ -198,7 +198,7 @@ export function InstallAppPrompt({ force, onClose }: InstallAppPromptProps) {
                   text={
                     <>
                       Abre{" "}
-                      <strong className="text-foreground">alma-movement.com.mx</strong> desde tu celular
+                      <strong className="text-foreground">almamovement.com.mx</strong> desde tu celular
                     </>
                   }
                 />
