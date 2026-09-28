@@ -91,10 +91,29 @@ test("entradas malas en la venta → 400, nunca 500", async () => {
     { userId: c.id, planId: f.plan.id, paymentReference: "x".repeat(101) },
     { userId: c.id, planId: f.plan.id, startDate: "no-es-fecha" },
     { userId: c.id, planId: f.plan.id, startDate: "2026-02-30" },
+    { userId: c.id, planId: f.plan.id, startDate: "2026-09-25Tbasura" },
   ]) {
     const r = await venta(body);
     assert.equal(r.status, 400, JSON.stringify(body).slice(0, 80));
   }
+});
+
+test("venta de un plan con precio de apertura: cobra el efectivo, sin motivo ni descuento falso", async () => {
+  const c = await makeClient(PFX, "apertura");
+  const [op] = await sql(
+    `INSERT INTO plans (name, description, price, opening_price, currency, duration_days, class_limit, class_category, is_active, sort_order)
+     VALUES ($1, 'QA apertura', 2700, 2300, 'MXN', 30, NULL, $2, true, 999) RETURNING id`,
+    [`${PFX} apertura`, f.category],
+  );
+  const r = await venta({ userId: c.id, planId: op.id });
+  assert.equal(r.status, 201, JSON.stringify(r.body).slice(0, 200));
+  const m = await membresiaDe(c.id);
+  assert.equal(Number(m.total_amount), 2300, "cobra el precio efectivo (de apertura), no el de lista");
+  assert.equal(Number(m.discount_amount), 0, "sin descuento falso: lo cobrado es el precio de lista de apertura");
+  const [log] = await auditOf(m.id, "membership.sale");
+  assert.equal(log.reason, null);
+  assert.equal(log.meta.courtesy, false);
+  assert.equal(log.meta.price_differs, false);
 });
 
 test("ajuste de saldo: sin motivo → 400 y no cambia; con motivo → 200 y bitácora antes/después", async () => {
@@ -114,6 +133,63 @@ test("ajuste de saldo: sin motivo → 400 y no cambia; con motivo → 200 y bit�
   assert.equal(log.reason, "Compensación por clase cancelada");
   assert.deepEqual(log.before, { classes_remaining: 1 });
   assert.deepEqual(log.after, { classes_remaining: 3 });
+});
+
+test("ajuste con un id de membresía inválido → 400, nunca 500", async () => {
+  const r = await api("PUT", `/api/memberships/basura`, { token: A, body: { classesRemaining: 3, reason: "Motivo válido" } });
+  assert.equal(r.status, 400, JSON.stringify(r.body).slice(0, 200));
+});
+
+test("ajuste que deja el saldo por encima del plan: meta.above_plan en la bitácora", async () => {
+  const c = await makeClient(PFX, "porencima");
+  await venta({ userId: c.id, planId: f.plan.id });
+  const m = await membresiaDe(c.id);
+  const [{ class_limit }] = await sql(`SELECT class_limit FROM plans WHERE id=$1`, [f.plan.id]);
+  const r = await api("PUT", `/api/memberships/${m.id}`, {
+    token: A, body: { classesRemaining: Number(class_limit) + 5, reason: "Cortesía de clases extra por su cumpleaños" },
+  });
+  assert.equal(r.status, 200, JSON.stringify(r.body).slice(0, 200));
+  const [log] = await auditOf(m.id, "membership.adjust");
+  assert.equal(log.meta.above_plan, true);
+});
+
+test("9999 sobre una membresía ilimitada (NULL): cambiar sólo el estado no toca classes_remaining", async () => {
+  const c = await makeClient(PFX, "ilimitada");
+  const [unl] = await sql(
+    `INSERT INTO plans (name, description, price, currency, duration_days, class_limit, class_category, is_active, sort_order)
+     VALUES ($1, 'QA ilimitado', 1900, 'MXN', 30, NULL, $2, true, 999) RETURNING id`,
+    [`${PFX} ilimitado`, f.category],
+  );
+  await venta({ userId: c.id, planId: unl.id });
+  const m = await membresiaDe(c.id);
+  assert.equal(m.classes_remaining, null, "arranca ilimitada (NULL)");
+  const r = await api("PUT", `/api/memberships/${m.id}`, {
+    token: A, body: { status: "paused", classesRemaining: 9999, reason: "Pausa acordada con la clienta" },
+  });
+  assert.equal(r.status, 200, JSON.stringify(r.body).slice(0, 200));
+  assert.equal((await membresiaDe(c.id)).classes_remaining, null, "9999 y NULL son el mismo valor: no debe escribirse");
+  const [log] = await auditOf(m.id, "membership.adjust");
+  assert.deepEqual(log.after, { status: "paused" }, "classes_remaining no cambió de verdad: no va en la bitácora");
+});
+
+test("venta normal + recalcular puntos: una sola fila, no duplica", async () => {
+  const c = await makeClient(PFX, "lealtad-normal");
+  await venta({ userId: c.id, planId: f.plan.id });
+  const antes = await sql(`SELECT COUNT(*)::int n FROM loyalty_transactions WHERE user_id=$1 AND type='earn'`, [c.id]);
+  assert.equal(antes[0].n, 1, "la venta ya dejó su fila de puntos");
+  const r = await api("POST", `/api/admin/loyalty/recalculate/${c.id}`, { token: A });
+  assert.equal(r.status, 200, JSON.stringify(r.body).slice(0, 200));
+  const despues = await sql(`SELECT COUNT(*)::int n FROM loyalty_transactions WHERE user_id=$1 AND type='earn'`, [c.id]);
+  assert.equal(despues[0].n, 1, "recalcular no debe duplicar la fila de la venta");
+});
+
+test("cortesía + recalcular puntos: no da puntos retroactivos", async () => {
+  const c = await makeClient(PFX, "lealtad-cortesia");
+  await venta({ userId: c.id, planId: f.plan.id, amount: 0, reason: "Cortesía por evento de apertura" });
+  const r = await api("POST", `/api/admin/loyalty/recalculate/${c.id}`, { token: A });
+  assert.equal(r.status, 200, JSON.stringify(r.body).slice(0, 200));
+  const pts = await sql(`SELECT COUNT(*)::int n FROM loyalty_transactions WHERE user_id=$1 AND type='earn'`, [c.id]);
+  assert.equal(pts[0].n, 0, "una cortesía no debe recibir puntos retroactivos al recalcular");
 });
 
 test("guardar sin cambios (como el panel) no pide motivo ni escribe bitácora", async () => {

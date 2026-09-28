@@ -275,7 +275,7 @@ function CashAssignment() {
               <p className="text-[0.75rem] text-ink">
                 {courtesy ? "Es una cortesía ($0)." : "Lo cobrado es distinto al precio del plan."} Queda en la bitácora con tu nombre.
               </p>
-              <Textarea id="cobro-motivo" rows={2} value={reason} onChange={(e) => setReason(e.target.value)}
+              <Textarea id="cobro-motivo" rows={2} maxLength={500} value={reason} onChange={(e) => setReason(e.target.value)}
                 placeholder="Ej. cortesía por evento de apertura" />
               {!reasonOk && <p className="text-[0.75rem] text-ink-muted">Mínimo {REASON_MIN_CHARS} caracteres.</p>}
             </div>

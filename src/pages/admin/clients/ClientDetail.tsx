@@ -993,7 +993,7 @@ const ClientDetail = () => {
                 )}
                 <div className="space-y-1">
                   <Label htmlFor="mem-reason" className="text-xs text-ink/70">Motivo del ajuste</Label>
-                  <Textarea id="mem-reason" rows={2} className={fieldCls} value={editReason} onChange={(e) => setEditReason(e.target.value)}
+                  <Textarea id="mem-reason" rows={2} maxLength={500} className={fieldCls} value={editReason} onChange={(e) => setEditReason(e.target.value)}
                     placeholder="Obligatorio: p. ej. compensación por clase cancelada" />
                   <p className="text-xs text-ink/50">Queda en la bitácora con tu nombre. Mínimo {REASON_MIN_CHARS} caracteres.</p>
                 </div>

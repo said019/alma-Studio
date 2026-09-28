@@ -213,7 +213,7 @@ const MembershipTable = ({
             )}
             <div className="space-y-1.5">
               <Label htmlFor="m-reason">Motivo del ajuste</Label>
-              <Textarea id="m-reason" rows={2} value={reasonVal} onChange={(e) => setReasonVal(e.target.value)}
+              <Textarea id="m-reason" rows={2} maxLength={500} value={reasonVal} onChange={(e) => setReasonVal(e.target.value)}
                 placeholder="Obligatorio: p. ej. preventa acordada con la clienta" />
               <p className="text-xs text-ink/50">Queda en la bitácora con tu nombre. Mínimo {REASON_MIN_CHARS} caracteres.</p>
             </div>

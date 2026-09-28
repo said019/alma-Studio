@@ -13331,10 +13331,15 @@ app.post("/api/memberships", adminMiddleware, async (req, res) => {
       });
     }
     // "2026-02-30" no da NaN en `new Date()`: se corre silenciosamente a marzo.
-    // Auditoría 2026-09-27, R10.
+    // Auditoría 2026-09-27, R10. `saleStartProblem` sólo mira los primeros 10
+    // caracteres (AAAA-MM-DD): basura después de ahí ("2026-09-25Tbasura") la
+    // deja pasar, y `start.toISOString()` más abajo revienta con 500. Por eso
+    // se conserva también el chequeo de `Number.isNaN`. Ronda de ajustes 1,
+    // 2026-09-28.
     const startProblem = saleStartProblem(startDate);
     if (startProblem) return res.status(400).json({ message: startProblem });
     const start = startDate ? new Date(startDate) : new Date();
+    if (Number.isNaN(start.getTime())) return res.status(400).json({ message: "Fecha de inicio inválida (usa AAAA-MM-DD)." });
     const ref = cleanPaymentReference(req.body.paymentReference);
     if (!ref.ok) return res.status(400).json({ message: ref.message });
 
@@ -13429,6 +13434,10 @@ app.post("/api/memberships", adminMiddleware, async (req, res) => {
     }
 
     // ── Puntos por compra: sobre lo cobrado (una cortesía no da puntos) ──
+    // La descripción se queda con `plan.price` (no `sale.amount`): así sigue
+    // coincidiendo con la que arma /admin/loyalty/recalculate/:userId para no
+    // duplicar puntos al recalcular; los PUNTOS sí se calculan sobre lo
+    // cobrado. Ronda de ajustes 1, 2026-09-28.
     if (userId && sale.amount > 0) {
       try {
         const cfg = await getLoyaltyConfig();
@@ -13436,7 +13445,7 @@ app.post("/api/memberships", adminMiddleware, async (req, res) => {
         if (cfg.enabled !== false && pts > 0) {
           await pool.query(
             "INSERT INTO loyalty_transactions (user_id, type, points, description) VALUES ($1, 'earn', $2, $3)",
-            [userId, pts, `Membresía asignada — ${plan.name} ($${sale.amount})`]
+            [userId, pts, `Membresía asignada — ${plan.name} ($${plan.price})`]
           );
         }
       } catch (e) { /* loyalty error shouldn't fail membership creation */ }
@@ -13644,7 +13653,14 @@ app.put("/api/memberships/:id", adminMiddleware, async (req, res) => {
         return res.status(400).json({ code: "REASON_REQUIRED", message: problem });
       }
     }
+    // Sólo se escriben los campos que de verdad cambiaron (`plan.changes`), no
+    // todo `plan.next`: si el panel manda 9999 sobre una membresía ilimitada
+    // (NULL) para otro campo (p. ej. sólo el estado), 9999 y NULL son el mismo
+    // valor y no debe grabarse — si se grabara, quedaría un cambio real de
+    // dato sin motivo ni bitácora. Ronda de ajustes 1, 2026-09-28.
     const n = plan.next;
+    const changed = new Set(plan.changes.changed);
+    const val = (key) => (changed.has(key) ? n[key] ?? null : null);
     const r = await client.query(
       `UPDATE memberships SET
          status = COALESCE($1, status),
@@ -13654,7 +13670,7 @@ app.put("/api/memberships/:id", adminMiddleware, async (req, res) => {
          payment_method = COALESCE($5, payment_method),
          updated_at = NOW()
        WHERE id = $6 RETURNING *`,
-      [n.status ?? null, n.classes_remaining ?? null, n.end_date ?? null, n.start_date ?? null, n.payment_method ?? null, req.params.id],
+      [val("status"), val("classes_remaining"), val("end_date"), val("start_date"), val("payment_method"), req.params.id],
     );
     // Si cambió el total de una membresía mixta, re-reparte los buckets.
     if (plan.changes.changed.includes("classes_remaining")) await resyncMixtoBuckets(client, req.params.id);
@@ -15401,11 +15417,14 @@ app.post("/api/admin/loyalty/recalculate/:userId", adminMiddleware, async (req, 
     const ppp = Number(cfg.points_per_peso);
     if (cfg.enabled === false) return res.json({ data: { awarded: 0, message: "Loyalty desactivado en configuración" } });
 
-    // Get all active/expired memberships for this user
+    // Get all active/expired memberships for this user, con el total de la
+    // orden ligada (si la hay): una cortesía es una orden en $0 y no debe
+    // recibir puntos retroactivos. Ronda de ajustes 1, 2026-09-28.
     const mRes = await pool.query(
-      `SELECT m.id, p.price, p.name
+      `SELECT m.id, p.price, p.name, o.total_amount
        FROM memberships m
        JOIN plans p ON m.plan_id = p.id
+       LEFT JOIN orders o ON o.id = m.order_id
        WHERE m.user_id = $1 AND m.status IN ('active','expired')`,
       [userId]
     );
@@ -15423,7 +15442,11 @@ app.post("/api/admin/loyalty/recalculate/:userId", adminMiddleware, async (req, 
       const desc = `Membresía asignada — ${m.name} ($${m.price})`;
       // Skip if already awarded for this membership (by description match)
       if (existingDescs.has(desc)) continue;
-      const pts = Math.floor(parseFloat(m.price) * ppp);
+      // Cortesía (orden ligada en $0): sin puntos, sin movimiento.
+      const orderAmount = m.total_amount == null ? null : Number(m.total_amount);
+      if (orderAmount === 0) continue;
+      const charged = orderAmount != null ? orderAmount : parseFloat(m.price);
+      const pts = Math.floor(charged * ppp);
       if (pts <= 0) continue;
       await pool.query(
         "INSERT INTO loyalty_transactions (user_id, type, points, description) VALUES ($1, 'earn', $2, $3)",
