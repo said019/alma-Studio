@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { reasonProblem, cleanReason, changedFields, recordAudit, recordAuditBestEffort, buildAuditQuery, auditRowOut, AUDIT_ACTIONS } from "./audit.js";
+import { reasonProblem, cleanReason, changedFields, recordAudit, recordAuditBestEffort, buildAuditQuery, auditRowOut, AUDIT_ACTIONS, AUDIT_ENTITY_TYPES, SYSTEM_ACTORS } from "./audit.js";
 
 const U = "3f1b2c4d-1a2b-4c3d-8e9f-0a1b2c3d4e5f";
 const V = "4f1b2c4d-1a2b-4c3d-8e9f-0a1b2c3d4e5f";
@@ -116,4 +116,39 @@ test("auditRowOut pasa a camelCase", () => {
 test("acciones conocidas", () => {
   assert.ok(AUDIT_ACTIONS.includes("booking.no_show_corrected"));
   assert.ok(AUDIT_ACTIONS.includes("user.anonymize"));
+});
+
+test("recordAudit con actor de sistema: sin persona, con su nombre y meta.actor", async () => {
+  const calls = [];
+  const db = { query: async (sql, params) => { calls.push({ sql, params }); return { rows: [] }; } };
+  await recordAudit(db, {
+    systemActor: "system", action: "booking.waitlist_promoted", entityType: "booking",
+    entityId: V, subjectUserId: U, before: { status: "waitlist" }, after: { status: "confirmed" }, meta: { position: 1 },
+  });
+  await recordAudit(db, { systemActor: "wellhub", actorId: U, action: "booking.checkin", entityType: "booking", entityId: V, meta: { method: "wellhub" } });
+  assert.equal(calls[0].params[0], null, "sin actor_id");
+  assert.equal(calls[0].params[9], "Sistema");
+  assert.deepEqual(JSON.parse(calls[0].params[8]), { position: 1, actor: "system" });
+  assert.equal(calls[1].params[0], null, "systemActor gana a un actorId");
+  assert.equal(calls[1].params[9], "Wellhub");
+  assert.match(calls[0].sql, /COALESCE\(\(SELECT display_name FROM users WHERE id = \$1::uuid\), \$10\)/);
+  await assert.rejects(recordAudit(db, { systemActor: "robot", action: "booking.checkin", entityType: "booking" }), /desconocido/);
+});
+
+test("sin actor de sistema el nombre sale de users, como en el bloque 2", async () => {
+  const calls = [];
+  const db = { query: async (_s, p) => { calls.push(p); return { rows: [] }; } };
+  await recordAudit(db, { actorId: U, action: "membership.adjust", entityType: "membership", meta: { a: 1 } });
+  assert.equal(calls[0][0], U);
+  assert.equal(calls[0][9], null);
+  assert.deepEqual(JSON.parse(calls[0][8]), { a: 1 });
+});
+
+test("acciones y entidades del bloque 3", () => {
+  for (const a of ["booking.waitlist_promoted", "order.refund", "plan.archive", "plan.delete", "settings.update"]) {
+    assert.ok(AUDIT_ACTIONS.includes(a), a);
+  }
+  for (const t of ["order", "plan", "settings"]) assert.ok(AUDIT_ENTITY_TYPES.includes(t), t);
+  assert.deepEqual(SYSTEM_ACTORS, { system: "Sistema", wellhub: "Wellhub" });
+  assert.equal(buildAuditQuery({ entityType: "order" }).ok, true, "el filtro de la bitácora acepta las entidades nuevas");
 });

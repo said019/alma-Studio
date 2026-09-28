@@ -1291,18 +1291,11 @@ async function ensureSchema() {
       );
     `).catch(() => { });
     await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_waivers_user ON waivers(user_id)`).catch(() => { });
-    // ── Reconcile cancellations_used with actual cancelled bookings ────────
-    await pool.query(`
-      UPDATE memberships m
-      SET cancellations_used = sub.cnt
-      FROM (
-        SELECT b.membership_id, COUNT(*) AS cnt
-        FROM bookings b
-        WHERE b.status = 'cancelled' AND b.membership_id IS NOT NULL
-        GROUP BY b.membership_id
-      ) sub
-      WHERE m.id = sub.membership_id AND m.cancellations_used != sub.cnt;
-    `).catch(() => { });
+    // (Bloque 3, auditoría 2026-09-27, P0-4: aquí corría en cada arranque una
+    // "reconciliación" que igualaba cancellations_used al total de reservas
+    // canceladas de la membresía. Contaba también las cancelaciones del estudio y
+    // las salidas de la lista de espera, y deshacía los ajustes de recepción. El
+    // contador lo mueven sólo la cancelación de la clienta y el ajuste con motivo.)
     // (homepage_video_cards retirada junto con la feature de videos — ver DROP arriba)
     // ── discount_codes: normalise discount_type values ────────────────────
     await pool.query(`ALTER TABLE discount_codes ADD COLUMN IF NOT EXISTS min_order_amount DECIMAL(10,2) DEFAULT 0`).catch(() => { });
@@ -1904,6 +1897,43 @@ async function ensureSchema() {
     await pool.query(`ALTER TABLE classes ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMPTZ`).catch(() => { });
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS anonymized_at TIMESTAMPTZ`).catch(() => { });
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS anonymized_by UUID`).catch(() => { });
+
+    // ── Bloque 3 de la auditoría (2026-09-27): lista de espera, reembolsos,
+    // planes archivados y consentimiento de datos de salud. Sólo CREATE / ADD
+    // COLUMN / CREATE INDEX: nada de esto cambia datos existentes.
+    await pool.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS promoted_at TIMESTAMPTZ`).catch(() => { });
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_bookings_class_waitlist
+      ON bookings(class_id, created_at, id) WHERE status = 'waitlist'`).catch(() => { });
+    await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS refunded_amount NUMERIC(10,2) NOT NULL DEFAULT 0`).catch(() => { });
+    await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS refund_status VARCHAR(20)`).catch(() => { });
+    await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS refunded_at TIMESTAMPTZ`).catch(() => { });
+    // Reembolsos registrados por la dueña. Sin llaves foráneas, como audit_log:
+    // el registro sobrevive a la fila que describe.
+    await pool.query(`CREATE TABLE IF NOT EXISTS refunds (
+      id                   UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+      created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      order_id             UUID NOT NULL,
+      membership_id        UUID,
+      user_id              UUID,
+      amount               NUMERIC(10,2) NOT NULL CHECK (amount > 0),
+      kind                 VARCHAR(10) NOT NULL CHECK (kind IN ('total', 'partial')),
+      method               VARCHAR(20) NOT NULL,
+      reference            VARCHAR(100),
+      reason               TEXT NOT NULL,
+      classes_removed      INTEGER NOT NULL DEFAULT 0,
+      membership_cancelled BOOLEAN NOT NULL DEFAULT false,
+      bookings_cancelled   INTEGER NOT NULL DEFAULT 0,
+      created_by           UUID
+    )`).catch((e) => console.warn("[schema] refunds:", e.message));
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_refunds_order ON refunds(order_id)`).catch(() => { });
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_refunds_created ON refunds(created_at DESC)`).catch(() => { });
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_refunds_user ON refunds(user_id, created_at DESC)`).catch(() => { });
+    await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ`).catch(() => { });
+    await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS archived_by UUID`).catch(() => { });
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS privacy_notice_version VARCHAR(20)`).catch(() => { });
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS privacy_accepted_at TIMESTAMPTZ`).catch(() => { });
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS health_consent_version VARCHAR(20)`).catch(() => { });
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS health_consent_at TIMESTAMPTZ`).catch(() => { });
 
     console.log("✅ Schema ensured");
   } catch (err) {
@@ -3810,6 +3840,20 @@ async function liveBookingCount(classId, db = pool) {
     [classId]
   );
   return r.rows[0]?.cnt ?? 0;
+}
+
+// Se liberó uno o más lugares (bloque 3, auditoría 2026-09-27, P1-1). Lo llaman,
+// DESPUÉS de su COMMIT y con await, todas las vías que liberan cupo:
+//   - la clienta que cancela y el estudio que cancela una reserva;
+//   - subir el cupo, cancelar una membresía o reembolsarla;
+//   - la cancelación por webhook de Wellhub, reabrir una clase;
+//   - la reserva nueva que entra a la fila.
+// La Tarea 4 del bloque 3 le pone el cuerpo (la subida de la lista de espera).
+// Contrato: nunca lanza y devuelve las subidas
+// [{ booking_id, user_id, display_name, phone, whatsapp, email }].
+// ctx: { source?: string, quietUserIds?: string[] }.
+async function onSeatReleased(classIds, ctx = {}) {
+  return [];
 }
 
 // Responsiva firmada — helper compartido por /bookings, /bookings/with-guest

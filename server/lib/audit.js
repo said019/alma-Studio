@@ -16,9 +16,19 @@ export const AUDIT_ACTIONS = Object.freeze([
   "class.delete",
   "class.week_clear",
   "user.anonymize",
+  // Bloque 3 (auditoría 2026-09-27)
+  "booking.waitlist_promoted",
+  "order.refund",
+  "plan.archive",
+  "plan.delete",
+  "settings.update",
 ]);
 
-export const AUDIT_ENTITY_TYPES = Object.freeze(["membership", "booking", "class", "class_week", "user"]);
+export const AUDIT_ENTITY_TYPES = Object.freeze(["membership", "booking", "class", "class_week", "user", "order", "plan", "settings"]);
+
+/** Quien actúa sin ser una persona del equipo (bloque 3): la subida automática
+ *  de la lista de espera y los webhooks de Wellhub. */
+export const SYSTEM_ACTORS = Object.freeze({ system: "Sistema", wellhub: "Wellhub" });
 
 /** null si el motivo sirve; si no, el texto del 400. */
 export function reasonProblem(reason, min = REASON_MIN) {
@@ -59,26 +69,34 @@ const toJson = (v) => (v === undefined || v === null ? null : JSON.stringify(v))
 /**
  * Escribe una fila en audit_log. `db` es el pool o el cliente de la transacción
  * en curso: dentro de una transacción, la bitácora se confirma o se revierte con
- * la acción. Lanza si la acción o la entidad no son conocidas, o si la base falla.
+ * la acción. Lanza si la acción, la entidad o el actor de sistema no son
+ * conocidos, o si la base falla. Con `systemActor` ("system" | "wellhub") no hay
+ * persona: actor_id queda NULL y actor_name es "Sistema" o "Wellhub".
  */
 export async function recordAudit(db, entry) {
   const {
     actorId = null, action, entityType, entityId = null, subjectUserId = null,
-    reason = null, before = null, after = null, meta = {},
+    reason = null, before = null, after = null, meta = {}, systemActor = null,
   } = entry || {};
   if (!AUDIT_ACTIONS.includes(action)) throw new Error(`Acción de bitácora desconocida: ${action}`);
   if (!AUDIT_ENTITY_TYPES.includes(entityType)) throw new Error(`Entidad de bitácora desconocida: ${entityType}`);
+  if (systemActor !== null && !Object.hasOwn(SYSTEM_ACTORS, systemActor)) {
+    throw new Error(`Actor de sistema desconocido: ${systemActor}`);
+  }
+  const actor = systemActor ? null : (isUuid(actorId) ? actorId : null);
+  const metaOut = systemActor ? { ...(meta ?? {}), actor: systemActor } : (meta ?? {});
   await db.query(
     `INSERT INTO audit_log (actor_id, actor_role, actor_name, action, entity_type, entity_id,
                             subject_user_id, reason, before, after, meta)
      VALUES ($1::uuid,
              (SELECT role::text FROM users WHERE id = $1::uuid),
-             (SELECT display_name FROM users WHERE id = $1::uuid),
+             COALESCE((SELECT display_name FROM users WHERE id = $1::uuid), $10),
              $2, $3, $4::uuid, $5::uuid, $6, $7::jsonb, $8::jsonb, $9::jsonb)`,
     [
-      isUuid(actorId) ? actorId : null, action, entityType,
+      actor, action, entityType,
       isUuid(entityId) ? entityId : null, isUuid(subjectUserId) ? subjectUserId : null,
-      cleanReason(reason), toJson(before), toJson(after), JSON.stringify(meta ?? {}),
+      cleanReason(reason), toJson(before), toJson(after), JSON.stringify(metaOut),
+      systemActor ? SYSTEM_ACTORS[systemActor] : null,
     ],
   );
 }

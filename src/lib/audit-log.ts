@@ -32,6 +32,9 @@ export const AUDIT_ENTITY_OPTIONS: { value: string; label: string }[] = [
   { value: "class", label: "Clases" },
   { value: "class_week", label: "Limpiezas de semana" },
   { value: "user", label: "Bajas de clientas" },
+  { value: "order", label: "Reembolsos" },
+  { value: "plan", label: "Planes" },
+  { value: "settings", label: "Configuración" },
 ];
 
 const ACTION_LABEL: Record<string, string> = {
@@ -45,13 +48,23 @@ const ACTION_LABEL: Record<string, string> = {
   "class.delete": "Clase borrada (sin reservas)",
   "class.week_clear": "Limpieza de semana",
   "user.anonymize": "Clienta dada de baja (anonimizada)",
+  // Bloque 3 (auditoría 2026-09-27)
+  "booking.waitlist_promoted": "Subió de la lista de espera",
+  "order.refund": "Reembolso",
+  "plan.archive": "Plan archivado",
+  "plan.delete": "Plan borrado (sin historial)",
+  "settings.update": "Política de cancelación cambiada",
 };
 
 export function actionLabel(e: Pick<AuditEntry, "action" | "meta">): string {
   const m = e.meta ?? {};
   if (e.action === "membership.sale" && m.courtesy) return "Cortesía en mostrador ($0)";
   if (e.action === "membership.sale" && m.price_differs) return "Venta en mostrador con precio distinto";
-  if (e.action === "booking.checkin") return m.method === "qr" ? "Check-in (QR)" : "Check-in (lista)";
+  if (e.action === "booking.checkin") {
+    if (m.method === "wellhub") return "Check-in (Wellhub)";
+    return m.method === "qr" ? "Check-in (QR)" : "Check-in (lista)";
+  }
+  if (e.action === "order.refund") return m.kind === "partial" ? "Reembolso parcial" : m.kind === "total" ? "Reembolso total" : "Reembolso";
   return ACTION_LABEL[e.action] ?? e.action;
 }
 
@@ -70,8 +83,15 @@ const FIELD_LABEL: Record<string, string> = {
   deleted: "Borradas",
   cancelled: "Canceladas",
   kept: "Sin tocar",
+  // Bloque 3 (auditoría 2026-09-27)
+  cancellations_used: "Cancelaciones usadas",
+  refunded_amount: "Reembolsado",
+  refund_status: "Pago",
+  membership_status: "Membresía",
+  for_sale: "En venta",
+  max_cancellations: "Cancelaciones por paquete",
 };
-const MONEY = new Set(["amount", "list_price"]);
+const MONEY = new Set(["amount", "list_price", "refunded_amount"]);
 const STATUS_LABEL: Record<string, string> = {
   active: "Activa", expired: "Vencida", cancelled: "Cancelada", paused: "Pausada",
   pending_payment: "Pendiente de pago", pending_activation: "Pendiente de activar",
@@ -79,14 +99,22 @@ const STATUS_LABEL: Record<string, string> = {
   scheduled: "Programada", closed: "Cerrada",
 };
 const METHOD_LABEL: Record<string, string> = { cash: "Efectivo", card: "Tarjeta", transfer: "Transferencia", online: "En línea" };
-// En un borrado no hay "después": se muestra la clase en "sobre quién".
-const NO_CHANGES = new Set(["class.delete"]);
+// Métodos de un reembolso (bloque 3): "Terminal", no "Tarjeta", para no
+// confundirlo con el cobro original.
+const REFUND_METHOD_LABEL: Record<string, string> = { cash: "Efectivo", card: "Terminal", transfer: "Transferencia" };
+const REFUND_LABEL: Record<string, string> = { refunded: "Reembolsado", partially_refunded: "Reembolso parcial" };
+// En un borrado no hay "después": se muestra la clase (o el plan) en "sobre quién".
+const NO_CHANGES = new Set(["class.delete", "plan.delete"]);
 
 export function formatAuditValue(key: string, v: unknown): string {
   if (key === "classes_remaining") return v === null || v === undefined || Number(v) >= 9999 ? "Ilimitadas" : String(v);
+  if (key === "refund_status") return REFUND_LABEL[String(v)] ?? "Sin reembolso";
+  if (key === "for_sale") return v ? "Sí" : "No";
   if (v === null || v === undefined || v === "") return "—";
   if (MONEY.has(key)) return formatMXN(Number(v));
   if (key === "status") return STATUS_LABEL[String(v)] ?? String(v);
+  if (key === "membership_status") return STATUS_LABEL[String(v)] ?? String(v);
+  if (key === "max_cancellations") return Number(v) === 0 ? "Sin límite" : String(v);
   if (key === "payment_method") return METHOD_LABEL[String(v)] ?? String(v);
   if (key === "is_active") return v ? "Activo" : "Cerrado";
   return String(v);
@@ -125,6 +153,22 @@ export function auditMetaLines(e: Pick<AuditEntry, "action" | "meta" | "after">)
     const refunded = Number(m.penalty_refunded) || 0;
     if (refunded > 0) lines.push(`Puntos devueltos por la falta: ${refunded}`);
   }
+  // Bloque 3 (auditoría 2026-09-27, R2 del controlador)
+  if (e.action === "booking.waitlist_promoted") {
+    if (m.position !== undefined) lines.push(`Posición en la fila: ${Number(m.position) || 0}`);
+    if (m.skipped !== undefined) lines.push(`Personas saltadas: ${Number(m.skipped) || 0}`);
+  }
+  if (e.action === "order.refund") {
+    if (m.amount !== undefined) lines.push(`Monto: ${formatMXN(Number(m.amount) || 0)}`);
+    if (m.method !== undefined) lines.push(`Método: ${REFUND_METHOD_LABEL[String(m.method)] ?? String(m.method)}`);
+    if (m.reference) lines.push(`Referencia: ${String(m.reference)}`);
+    if (m.classes_removed !== undefined) lines.push(`Clases quitadas: ${Number(m.classes_removed) || 0}`);
+    if (m.bookings_cancelled !== undefined) lines.push(`Reservas canceladas: ${Number(m.bookings_cancelled) || 0}`);
+  }
+  if (e.action === "plan.archive") {
+    if (m.kept !== undefined) lines.push(`Se conserva: ${Array.isArray(m.kept) ? m.kept.join(", ") : String(m.kept)}`);
+    if (m.cascade_requested !== undefined) lines.push(`Se pidió borrar todo: ${m.cascade_requested ? "Sí" : "No"}`);
+  }
   return lines;
 }
 
@@ -138,5 +182,7 @@ export function auditSubject(e: AuditEntry): string | null {
     return `la clase del ${day}${hora ? ` ${hora}` : ""}`;
   }
   if (e.entityType === "class_week" && m.start) return `la semana del ${String(m.start)} al ${String(m.end)}`;
+  if (e.entityType === "plan") return m.plan_name ? `el plan ${String(m.plan_name)}` : "un plan";
+  if (e.entityType === "settings") return "la política de cancelación";
   return null;
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { actionLabel, auditChanges, auditMetaLines, auditSubject, formatAuditValue, type AuditEntry } from "./audit-log";
+import { actionLabel, auditChanges, auditMetaLines, auditSubject, formatAuditValue, AUDIT_ENTITY_OPTIONS, type AuditEntry } from "./audit-log";
 
 const base: AuditEntry = {
   id: "e1", createdAt: "2026-09-28T16:00:00Z", actorId: "a1", actorName: "Dueña HIVE", actorRole: "admin",
@@ -65,5 +65,62 @@ describe("bitácora · textos", () => {
       .toEqual(["Puntos devueltos por la falta: 50"]);
     expect(auditMetaLines({ action: "booking.no_show_corrected", after: null, meta: { penalty_refunded: 0 } })).toEqual([]);
     expect(auditMetaLines({ action: "membership.adjust", after: null, meta: { classes_remaining: 3 } })).toEqual([]);
+  });
+});
+
+describe("bitácora · textos del bloque 3", () => {
+  it("nombra las acciones nuevas", () => {
+    expect(actionLabel({ ...base, action: "booking.waitlist_promoted" })).toBe("Subió de la lista de espera");
+    expect(actionLabel({ ...base, action: "order.refund", meta: { kind: "total" } })).toBe("Reembolso total");
+    expect(actionLabel({ ...base, action: "order.refund", meta: { kind: "partial" } })).toBe("Reembolso parcial");
+    expect(actionLabel({ ...base, action: "plan.archive" })).toBe("Plan archivado");
+    expect(actionLabel({ ...base, action: "plan.delete" })).toBe("Plan borrado (sin historial)");
+    expect(actionLabel({ ...base, action: "settings.update" })).toBe("Política de cancelación cambiada");
+    expect(actionLabel({ ...base, action: "booking.checkin", meta: { method: "wellhub" } })).toBe("Check-in (Wellhub)");
+  });
+
+  it("antes → después de cancelaciones, reembolsos, planes y política", () => {
+    expect(auditChanges({ ...base, before: { cancellations_used: 2 }, after: { cancellations_used: 0 } })).toEqual([
+      { key: "cancellations_used", label: "Cancelaciones usadas", before: "2", after: "0" },
+    ]);
+    expect(auditChanges({ ...base, action: "order.refund", before: { refunded_amount: 0, refund_status: null }, after: { refunded_amount: 500, refund_status: "partially_refunded" } })).toEqual([
+      { key: "refunded_amount", label: "Reembolsado", before: "$0", after: "$500" },
+      { key: "refund_status", label: "Pago", before: "Sin reembolso", after: "Reembolso parcial" },
+    ]);
+    expect(auditChanges({ ...base, action: "plan.archive", before: { for_sale: true }, after: { for_sale: false } })).toEqual([
+      { key: "for_sale", label: "En venta", before: "Sí", after: "No" },
+    ]);
+    expect(formatAuditValue("max_cancellations", 0)).toBe("Sin límite");
+    expect(formatAuditValue("membership_status", "cancelled")).toBe("Cancelada");
+  });
+
+  it("sobre qué: plan y política", () => {
+    expect(auditSubject({ ...base, subjectName: null, entityType: "plan", meta: { plan_name: "Paquete 8" } })).toBe("el plan Paquete 8");
+    expect(auditSubject({ ...base, subjectName: null, entityType: "settings", meta: {} })).toBe("la política de cancelación");
+  });
+
+  it("filtros nuevos", () => {
+    expect(AUDIT_ENTITY_OPTIONS.map((o) => o.label)).toEqual(expect.arrayContaining(["Reembolsos", "Planes", "Configuración"]));
+  });
+
+  it("meta del bloque 3 (R2 del controlador): subida de fila, reembolso y plan archivado", () => {
+    expect(auditMetaLines({ action: "booking.waitlist_promoted", after: null, meta: { position: 1, skipped: 0 } }))
+      .toEqual(["Posición en la fila: 1", "Personas saltadas: 0"]);
+    expect(auditMetaLines({ action: "booking.waitlist_promoted", after: null, meta: { position: 3, skipped: 2 } }))
+      .toEqual(["Posición en la fila: 3", "Personas saltadas: 2"]);
+    expect(auditMetaLines({
+      action: "order.refund", after: null,
+      meta: { amount: 500, kind: "partial", method: "card", reference: "AUTH123", classes_removed: 2, bookings_cancelled: 1 },
+    })).toEqual([
+      "Monto: $500", "Método: Terminal", "Referencia: AUTH123", "Clases quitadas: 2", "Reservas canceladas: 1",
+    ]);
+    expect(auditMetaLines({
+      action: "order.refund", after: null,
+      meta: { amount: 1200, kind: "total", method: "cash", classes_removed: 0, bookings_cancelled: 0 },
+    })).toEqual(["Monto: $1,200", "Método: Efectivo", "Clases quitadas: 0", "Reservas canceladas: 0"]);
+    expect(auditMetaLines({ action: "plan.archive", after: null, meta: { kept: "membresías" } }))
+      .toEqual(["Se conserva: membresías"]);
+    expect(auditMetaLines({ action: "plan.archive", after: null, meta: { kept: ["membresías", "órdenes"], cascade_requested: true } }))
+      .toEqual(["Se conserva: membresías, órdenes", "Se pidió borrar todo: Sí"]);
   });
 });
