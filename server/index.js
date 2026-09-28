@@ -14038,6 +14038,13 @@ app.put("/api/bookings/:id/check-in", adminMiddleware, async (req, res) => {
       return res.status(404).json({ message: "Reserva no encontrada" });
     }
     const bk = before.rows[0];
+    // Repetir el check-in de una reserva ya asistida es idempotente aunque la
+    // clase sea de otro día: la regla decide si se puede marcar asistencia, no
+    // si ya se marcó. Sin cambios ni puntos.
+    if (bk.status === "checked_in") {
+      const current = await pool.query("SELECT * FROM bookings WHERE id = $1", [req.params.id]);
+      return res.json({ data: current.rows[0], alreadyCheckedIn: true });
+    }
     const rule = checkinRule({ bookingStatus: bk.status, classStatus: bk.class_status, classDate: bk.class_date, startTime: String(bk.start_time), ...(await studioNow()) });
     if (!rule.ok) return res.status(409).json({ code: rule.code, message: rule.message });
     const wasAlreadyCheckedIn = !!before.rows[0].checked_in_at;

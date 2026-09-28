@@ -94,3 +94,30 @@ test("check-in manual dos veces sobre la misma reserva no duplica los puntos", a
   );
   assert.equal(puntos[0].n, 1, "dos check-in de la misma reserva deben dejar una sola fila de puntos");
 });
+
+test("repetir el check-in de una reserva ya asistida de otro día → 200 idempotente, sin puntos ni cambios", async () => {
+  const cliente = await makeClient(PFX, "repite");
+  await giveMembership(A, cliente.id, f.plan.id, 8);
+  const classId = await makeClass(A, f, { date: day(80) });
+  const asg = await api("POST", "/api/admin/bookings/assign", { token: A, body: { userId: cliente.id, classId } });
+  assert.ok(asg.status < 300, `asignar devolvió ${asg.status}: ${JSON.stringify(asg.body).slice(0, 150)}`);
+  const [bk] = await sql(`SELECT id FROM bookings WHERE class_id=$1 AND user_id=$2`, [classId, cliente.id]);
+  // La clase fue ayer y la reserva quedó asistida entonces.
+  await sql(`UPDATE classes SET date = $2 WHERE id = $1`, [classId, day(-1)]);
+  await sql(
+    `UPDATE bookings SET status = 'checked_in', checked_in_at = NOW() - INTERVAL '1 day', checked_in_by = $2 WHERE id = $1`,
+    [bk.id, adminId],
+  );
+  const [antes] = await sql(`SELECT status, checked_in_at, checked_in_by FROM bookings WHERE id=$1`, [bk.id]);
+  const puntosAntes = await sql(`SELECT count(*)::int n FROM loyalty_transactions WHERE user_id=$1`, [cliente.id]);
+
+  const r = await api("PUT", `/api/bookings/${bk.id}/check-in`, { token: A });
+  assert.equal(r.status, 200, `repetir check-in devolvió ${r.status}: ${JSON.stringify(r.body).slice(0, 150)}`);
+  assert.equal(r.body.alreadyCheckedIn, true);
+  assert.equal(r.body.data?.id, bk.id);
+
+  const [despues] = await sql(`SELECT status, checked_in_at, checked_in_by FROM bookings WHERE id=$1`, [bk.id]);
+  assert.deepEqual(despues, antes, "la reserva no debe cambiar");
+  const puntosDespues = await sql(`SELECT count(*)::int n FROM loyalty_transactions WHERE user_id=$1`, [cliente.id]);
+  assert.equal(puntosDespues[0].n, puntosAntes[0].n, "no debe haber puntos nuevos");
+});
