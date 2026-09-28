@@ -73,4 +73,24 @@ describe("checkAuth — no cierra sesión por un límite de velocidad (auditorí
     const state = useAuthStore.getState();
     expect(state.sessionCheck).toBe("unavailable");
   });
+
+  // Ronda de ajustes 1 — ruling del controlador: un proxy o CDN puede mandar
+  // Retry-After de horas en un 5xx; sin tope, la guardia se quedaría en
+  // "Cargando…" todo ese tiempo. La espera real nunca debe pasar de 10 s.
+  it("Retry-After de una hora: la espera se acota a 10 s, no espera los 3600 s", async () => {
+    vi.useFakeTimers();
+    mockGet.mockRejectedValue({ response: { status: 429, headers: { "retry-after": "3600" } } });
+
+    const promise = useAuthStore.getState().checkAuth();
+    expect(mockGet).toHaveBeenCalledTimes(1);
+
+    // Si la espera respetara los 3600 s del header, este avance de 10 s no
+    // alcanzaría para un segundo intento.
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(mockGet).toHaveBeenCalledTimes(2);
+
+    await vi.runAllTimersAsync();
+    await promise;
+    expect(useAuthStore.getState().sessionCheck).toBe("unavailable");
+  });
 });

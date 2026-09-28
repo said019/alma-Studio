@@ -46,6 +46,11 @@ const buildDemoUser = (): User => {
   };
 };
 
+// Tope de espera cuando el servidor manda Retry-After: un proxy o CDN puede
+// mandar un valor de horas en un 5xx, y sin este tope la guardia se quedaría
+// en "Cargando…" todo ese tiempo (ronda de ajustes 1, ruling del controlador).
+const RETRY_AFTER_MAX_S = 10;
+
 // Resultado de la última verificación de sesión contra /auth/me:
 // "idle" antes de verificar, "ok"/"unauthorized" tras una respuesta
 // concluyente, y "unavailable" cuando el servidor no pudo confirmar nada
@@ -118,7 +123,7 @@ export const useAuthStore = create<AuthState>()(
 
       logout: () => {
         localStorage.removeItem("auth_token");
-        set({ user: null, token: null, isAuthenticated: false });
+        set({ user: null, token: null, isAuthenticated: false, sessionCheck: "idle" });
       },
 
       checkAuth: async () => {
@@ -154,7 +159,8 @@ export const useAuthStore = create<AuthState>()(
               return;
             }
             const ra = Number(err?.response?.headers?.["retry-after"]);
-            await new Promise((r) => setTimeout(r, Number.isFinite(ra) && ra > 0 ? ra * 1000 : waits[attempt]));
+            const waitMs = Number.isFinite(ra) && ra > 0 ? Math.min(ra, RETRY_AFTER_MAX_S) * 1000 : waits[attempt];
+            await new Promise((r) => setTimeout(r, waitMs));
           }
         }
       },
