@@ -47,7 +47,9 @@ test("dar de baja: borra datos personales y de salud, conserva historial y cierr
   await sql(`UPDATE memberships SET status = 'expired', end_date = $2 WHERE user_id = $1`, [c.id, day(-1)]);
   await sql(
     `UPDATE users SET has_injury = true, injury_details = 'Rodilla derecha', health_notes = 'Asma',
-            date_of_birth = '1990-05-05', emergency_contact_name = 'Mamá', emergency_contact_phone = '5511112222'
+            date_of_birth = '1990-05-05', emergency_contact_name = 'Mamá', emergency_contact_phone = '5511112222',
+            health_consent_version = '2026-09-28', health_consent_at = NOW(),
+            privacy_notice_version = '2026-09-28', privacy_accepted_at = NOW()
       WHERE id = $1`, [c.id]);
 
   // Inscripción a un evento gratuito (confirma sin pago): la fila se conserva
@@ -83,13 +85,18 @@ test("dar de baja: borra datos personales y de salud, conserva historial y cierr
 
   const [u] = await sql(
     `SELECT display_name, email, phone, has_injury, injury_details, health_notes, date_of_birth,
-            emergency_contact_name, password_hash, is_active, anonymized_at, anonymized_by
+            emergency_contact_name, password_hash, is_active, anonymized_at, anonymized_by,
+            health_consent_version, health_consent_at, privacy_notice_version, privacy_accepted_at
        FROM users WHERE id=$1`, [c.id]);
   assert.equal(u.display_name, "Clienta dada de baja");
   assert.match(u.email, /^baja\+[0-9a-f]{32}@hive\.invalid$/);
-  for (const k of ["phone", "has_injury", "injury_details", "health_notes", "date_of_birth", "emergency_contact_name", "password_hash"]) {
+  for (const k of ["phone", "has_injury", "injury_details", "health_notes", "date_of_birth", "emergency_contact_name", "password_hash",
+                   "health_consent_version", "health_consent_at"]) {
     assert.equal(u[k], null, k);
   }
+  // Qué aviso de privacidad aceptó y cuándo se conserva como evidencia.
+  assert.equal(u.privacy_notice_version, "2026-09-28");
+  assert.ok(u.privacy_accepted_at);
   assert.equal(u.is_active, false);
   assert.ok(u.anonymized_at);
   assert.equal(u.anonymized_by, adminId);

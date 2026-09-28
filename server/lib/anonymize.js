@@ -5,7 +5,15 @@ export const ANON_NAME = "Clienta dada de baja";
 export const ANON_GUEST_NAME = "Invitada dada de baja";
 export const anonEmail = (userId) => `baja+${String(userId).replace(/-/g, "")}@hive.invalid`;
 
-/** Columnas de `users` con el valor que las reemplaza. */
+/**
+ * Columnas de `users` con el valor que las reemplaza.
+ * El consentimiento de salud (health_consent_version/at) se borra junto con los
+ * datos de salud, igual que cuando la clienta lo retira: sin datos de salud no
+ * queda un consentimiento vigente que los ampare.
+ * privacy_notice_version y privacy_accepted_at NO se tocan a propósito: son la
+ * evidencia de qué aviso de privacidad aceptó y cuándo. Si deben conservarse
+ * tras la baja (o por cuánto tiempo) lo decide el abogado del estudio.
+ */
 export function userAnonymizationValues(userId, actorId) {
   return {
     display_name: ANON_NAME,
@@ -17,6 +25,8 @@ export function userAnonymizationValues(userId, actorId) {
     emergency_contact_name: null,
     emergency_contact_phone: null,
     health_notes: null,
+    health_consent_version: null,
+    health_consent_at: null,
     has_injury: null,
     injury_details: null,
     practiced_barre_before: null,

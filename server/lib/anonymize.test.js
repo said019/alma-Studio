@@ -18,6 +18,16 @@ test("users: borra datos personales y de salud y cierra el acceso", () => {
   assert.equal(v.anonymized_by, "actor");
 });
 
+test("users: la baja borra también el consentimiento de salud (como el retiro) y conserva la evidencia del aviso", () => {
+  const v = userAnonymizationValues(ID, "actor");
+  assert.ok(Object.hasOwn(v, "health_consent_version"));
+  assert.ok(Object.hasOwn(v, "health_consent_at"));
+  assert.equal(v.health_consent_version, null);
+  assert.equal(v.health_consent_at, null);
+  assert.equal(Object.hasOwn(v, "privacy_notice_version"), false, "qué aviso aceptó se conserva");
+  assert.equal(Object.hasOwn(v, "privacy_accepted_at"), false, "cuándo lo aceptó se conserva");
+});
+
 test("sólo toca columnas que existen, en orden, con NOW() para las de fecha", () => {
   const existing = new Set(["id", "display_name", "email", "phone", "health_notes", "anonymized_at", "is_active"]);
   const u = buildAnonymizeUpdate({ table: "users", values: userAnonymizationValues(ID, null), nowColumns: ["anonymized_at", "updated_at"], existing, id: ID });
