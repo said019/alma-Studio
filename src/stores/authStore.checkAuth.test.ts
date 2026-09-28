@@ -94,3 +94,21 @@ describe("checkAuth — no cierra sesión por un límite de velocidad (auditorí
     expect(useAuthStore.getState().sessionCheck).toBe("unavailable");
   });
 });
+
+// Ronda de ajustes 1, hallazgo menor: logout() dejaba sessionCheck como
+// estuviera (p. ej. "unavailable" de un intento previo), y ese resto podía
+// hacer que la guardia mostrara la pantalla de reintento en vez del login
+// justo después de cerrar sesión.
+describe("logout — limpia también sessionCheck", () => {
+  it("vuelve a 'idle', no deja un 'unavailable' pegado", () => {
+    useAuthStore.setState({ user: { id: "u", role: "admin" } as any, token: "tok", isAuthenticated: true, sessionCheck: "unavailable" });
+
+    useAuthStore.getState().logout();
+
+    const state = useAuthStore.getState();
+    expect(state.sessionCheck).toBe("idle");
+    expect(state.isAuthenticated).toBe(false);
+    expect(state.user).toBeNull();
+    expect(localStorage.getItem("auth_token")).toBeNull();
+  });
+});
