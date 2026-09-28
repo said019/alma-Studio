@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { HealthBadges } from "./HealthBadges";
 
 describe("HealthBadges", () => {
@@ -8,20 +8,28 @@ describe("HealthBadges", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it("hasInjury con detalle: botón Lesión y al tocarlo aparece el detalle", () => {
+  it("hasInjury con detalle: botón Lesión y al tocarlo aparece el detalle", async () => {
     render(<HealthBadges hasInjury injuryDetails="Rodilla derecha" />);
     const boton = screen.getByRole("button", { name: /Lesión/ });
     expect(boton).toBeInTheDocument();
     expect(screen.queryByText("Rodilla derecha")).not.toBeInTheDocument();
     fireEvent.click(boton);
-    expect(screen.getByText("Rodilla derecha")).toBeInTheDocument();
+    expect(await screen.findByText("Rodilla derecha")).toBeInTheDocument();
   });
 
-  it("sólo healthNotes también muestra Lesión y el detalle son las notas", () => {
+  it("sólo healthNotes también muestra Lesión y el detalle son las notas", async () => {
     render(<HealthBadges healthNotes="Hipertensión controlada" />);
     const boton = screen.getByRole("button", { name: /Lesión/ });
     fireEvent.click(boton);
-    expect(screen.getByText("Hipertensión controlada")).toBeInTheDocument();
+    expect(await screen.findByText("Hipertensión controlada")).toBeInTheDocument();
+  });
+
+  it("Escape cierra el detalle", async () => {
+    render(<HealthBadges hasInjury injuryDetails="Rodilla derecha" />);
+    fireEvent.click(screen.getByRole("button", { name: /Lesión/ }));
+    await screen.findByText("Rodilla derecha");
+    fireEvent.keyDown(screen.getByText("Rodilla derecha"), { key: "Escape" });
+    await waitFor(() => expect(screen.queryByText("Rodilla derecha")).not.toBeInTheDocument());
   });
 
   it("firstVisit muestra la etiqueta Primera vez", () => {
