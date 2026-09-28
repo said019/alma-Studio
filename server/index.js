@@ -9790,7 +9790,16 @@ app.get("/api/admin/today-roster", adminMiddleware, async (_req, res) => {
               b.guest_profile_id,
               u.id AS user_id, u.display_name, u.phone,
               gp.display_name AS guest_name,
-              host.display_name AS host_name
+              host.display_name AS host_name,
+              COALESCE(gp.has_injury, u.has_injury, false) AS has_injury,
+              COALESCE(gp.injury_details, u.injury_details) AS injury_details,
+              u.health_notes,
+              NOT EXISTS (
+                SELECT 1 FROM bookings pb
+                 WHERE pb.checked_in_at IS NOT NULL AND pb.id <> b.id
+                   AND ((b.user_id IS NOT NULL AND pb.user_id = b.user_id)
+                     OR (b.guest_profile_id IS NOT NULL AND pb.guest_profile_id = b.guest_profile_id))
+              ) AS first_visit
          FROM bookings b
          LEFT JOIN users u ON b.user_id = u.id
          LEFT JOIN guest_profiles gp ON b.guest_profile_id = gp.id
@@ -14163,7 +14172,9 @@ app.get("/api/classes/:id/roster", adminMiddleware, async (req, res) => {
     const r = await pool.query(
       `SELECT b.id AS booking_id, b.status, b.checked_in_at,
               u.id AS user_id, u.display_name, u.email, u.phone,
-              m.plan_id, p.name AS plan_name, m.classes_remaining
+              m.plan_id, p.name AS plan_name, m.classes_remaining,
+              COALESCE(u.has_injury, false) AS has_injury, u.injury_details, u.health_notes,
+              NOT EXISTS (SELECT 1 FROM bookings pb WHERE pb.user_id = b.user_id AND pb.checked_in_at IS NOT NULL AND pb.id <> b.id) AS first_visit
        FROM bookings b
        JOIN users u ON b.user_id = u.id
        LEFT JOIN memberships m ON b.membership_id = m.id

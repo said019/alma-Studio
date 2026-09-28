@@ -14,6 +14,7 @@ import WeekNav from "@/components/admin/WeekNav";
 import DayStrip from "@/components/admin/DayStrip";
 import StatusDot from "@/components/admin/StatusDot";
 import { Avatar } from "@/components/admin/PersonCell";
+import { HealthBadges } from "@/components/admin/HealthBadges";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,6 +46,10 @@ interface RosterEntry {
   phone: string | null;
   planName: string | null;
   classesRemaining: number | null;
+  hasInjury?: boolean;
+  injuryDetails?: string | null;
+  healthNotes?: string | null;
+  firstVisit?: boolean;
 }
 
 interface ClientOption {
@@ -483,6 +488,7 @@ const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: string; onBa
                   )}
                   <span className="min-w-0 leading-snug">
                     <span className="block truncate text-sm font-extrabold">{entry.displayName}</span>
+                    <HealthBadges hasInjury={entry.hasInjury} injuryDetails={entry.injuryDetails} healthNotes={entry.healthNotes} firstVisit={entry.firstVisit} />
                     <span className="block truncate text-xs text-ink-muted">{[plan, entry.phone].filter(Boolean).join(" · ")}</span>
                   </span>
                   <span className="col-start-2 lg:col-start-auto"><RosterStatus status={entry.status} /></span>

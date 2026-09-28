@@ -11,6 +11,10 @@ export type TodayRosterEntry = {
   phone?: string | null;
   guest_name?: string | null;
   host_name?: string | null;
+  has_injury?: boolean;
+  injury_details?: string | null;
+  health_notes?: string | null;
+  first_visit?: boolean;
 };
 
 export type TodayClass = {

@@ -18,6 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { Camera, Check, ChevronDown, RotateCcw, UserX } from "lucide-react";
 import CheckinScanner from "@/components/admin/CheckinScanner";
+import { HealthBadges } from "@/components/admin/HealthBadges";
 import { hhmm, minutesUntil, splitDay, summarize, type TodayClass, type TodayRosterEntry } from "@/lib/today-roster";
 
 type ClassCardProps = {
@@ -89,6 +90,7 @@ function ClassCard({ cls, clock, open, onToggle, current = false, past = false, 
                     {labelOf(r)}
                     {isGuest(r) && r.host_name ? <span className="font-normal text-ink-muted"> (invitada de {r.host_name})</span> : null}
                   </span>
+                  <HealthBadges hasInjury={r.has_injury} injuryDetails={r.injury_details} healthNotes={r.health_notes} firstVisit={r.first_visit} />
                   <span className="block truncate text-xs text-ink-muted">
                     {r.phone ?? "—"}
                     {r.status === "no_show" && <span className="text-danger"> · No asistió</span>}
