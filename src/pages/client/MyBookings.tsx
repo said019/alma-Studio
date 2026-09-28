@@ -45,7 +45,7 @@ import { cancellationRules, cancellationsLeftText, useBookingPolicy } from "@/li
 type TabId = "upcoming" | "past";
 
 /** Reserva de "Mis clases" con lo que agrega el servidor (bloque 3). */
-type Reserva = BookingClient & { waitlist_position?: number | null; membership_id?: string | null };
+type Reserva = BookingClient & { waitlist_position?: number | null };
 type MembresiaCuota = { id: string; cancellationsUsed?: number; cancellationLimit?: number; cancellationsLeft?: number | null };
 
 const STATUS_TINT: Record<string, Tone> = {
@@ -221,8 +221,12 @@ const MyBookings = () => {
 
   // Diálogo de cancelar: las mismas reglas que /legal/cancelacion y la cuota de
   // la membresía de ESA reserva (P0-4). Salir de la fila no usa cancelación.
+  // /memberships/mine/all sólo trae vigentes: si el paquete de esta reserva ya
+  // venció o se canceló, no está ahí. Sin fallback a otra membresía activa:
+  // eso mostraría la cuota de un paquete distinto y podría bloquear "Sí,
+  // cancelar" sin motivo. El servidor decide en el DELETE (ronda 1, T5).
   const saliendo = cancelTarget?.status === "waitlist";
-  const memDeReserva = memberships.find((m) => m.id === cancelTarget?.membership_id) ?? memberships[0] ?? null;
+  const memDeReserva = memberships.find((m) => m.id === cancelTarget?.membership_id) ?? null;
   const limite = Number(memDeReserva?.cancellationLimit ?? policy.cancellationLimit);
   const quedan = !saliendo && memDeReserva ? cancellationsLeftText(memDeReserva.cancellationsLeft ?? null, limite) : null;
   const agotada = !saliendo && limite > 0 && memDeReserva?.cancellationsLeft === 0;

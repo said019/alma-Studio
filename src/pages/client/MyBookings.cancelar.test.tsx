@@ -77,4 +77,26 @@ describe("Mis clases · cancelar y lista de espera (P0-4 · P1-1)", () => {
     await waitFor(() => expect(api.delete).toHaveBeenCalledWith("/bookings/b4"));
     await waitFor(() => expect(toastSpy).toHaveBeenCalledWith(expect.objectContaining({ title: "Saliste de la lista de espera" })));
   });
+
+  it("con el paquete de la reserva vencido (no viene en mine/all) no hereda la cuota de otro paquete activo (ronda 1)", async () => {
+    vi.mocked(api.get).mockImplementation(respuestas({
+      "/bookings/my-bookings": { data: [
+        { id: "b5", class_id: "c5", membership_id: "m-vencida", class_type_name: "Mat", instructor_name: "Ana", start_time: "2026-09-26T10:00:00", status: "confirmed" },
+      ] },
+      // /memberships/mine/all sólo trae vigentes: "m-vencida" no está aquí.
+      // La única activa tiene la cuota agotada, pero es OTRO paquete.
+      "/memberships/mine/all": { data: [mem(0)] },
+      "/public/booking-policy": { data: POLITICA },
+      "/public/review-tags": { data: [] },
+      "/me/notifications/unread-count": { data: { unread_count: 0 } },
+    }) as never);
+    renderPage(<MyBookings />, "/app/bookings");
+    fireEvent.click(await screen.findByRole("button", { name: "Cancelar reserva" }));
+    const dlg = await screen.findByRole("alertdialog", { name: "¿Cancelar tu reserva?" });
+    await within(dlg).findByRole("list", { name: "Reglas de cancelación" });
+    expect(within(dlg).queryByText(/Ya usaste/)).toBeNull();
+    expect(within(dlg).queryByText(/cancelaciones de este paquete/)).toBeNull();
+    expect(within(dlg).queryByText("Si necesitas cancelar, habla con recepción.")).toBeNull();
+    expect(within(dlg).getByRole("button", { name: "Sí, cancelar" })).toBeInTheDocument();
+  });
 });
