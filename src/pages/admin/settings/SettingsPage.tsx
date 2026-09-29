@@ -1046,9 +1046,9 @@ const SettingsPage = () => {
             actions={FEATURES.whatsappTemplates ? <SectionTabs tabs={[{ label: "Ajustes", to: "/admin/settings" }, { label: "Templates WA", to: "/admin/whatsapp-templates" }]} /> : undefined}
           />
           <Tabs value={tab} onValueChange={(v) => setTab(v === "general" ? null : v)} orientation="vertical" className="grid items-start gap-7 lg:grid-cols-[220px_minmax(0,1fr)]">
-            <TabsList className="flex h-auto flex-wrap justify-start gap-1 bg-transparent p-0 lg:flex-col lg:items-stretch">
+            <TabsList className="flex h-auto flex-wrap justify-start gap-1 overflow-visible rounded-none bg-transparent p-0 shadow-none lg:flex-col lg:items-stretch">
               {visibleTabs.map(({ value, label, icon: Icon }) => (
-                <TabsTrigger key={value} value={value} className="justify-start gap-3 rounded-xl px-3.5 data-[state=active]:border data-[state=active]:border-line data-[state=active]:bg-surface data-[state=active]:text-ink">
+                <TabsTrigger key={value} value={value} className="justify-start gap-3 rounded-xl border border-transparent px-3.5 data-[state=active]:border-line data-[state=active]:bg-surface data-[state=active]:text-ink">
                   <Icon size={18} aria-hidden="true" />
                   {label}
                 </TabsTrigger>
