@@ -9,7 +9,7 @@ export function ClassesCoaches({ classTypes, coaches, loading, error, onRetry }:
   return (
     <section id="clases" aria-labelledby="clases-titulo" className="scroll-mt-20 border-t border-line">
       <div className="mx-auto max-w-[1120px] px-5 py-14 sm:px-8 lg:py-20">
-        <SectionTitle id="clases-titulo" eyebrow="Clases y coaches" title="Reformer," accent="a tu ritmo y al nuestro." />
+        <SectionTitle id="clases-titulo" eyebrow={coaches.length ? "Clases y coaches" : "Clases"} title="Reformer," accent="a tu ritmo y al nuestro." />
 
         {loading ? (
           <div className="grid gap-3 sm:grid-cols-2" aria-hidden="true">

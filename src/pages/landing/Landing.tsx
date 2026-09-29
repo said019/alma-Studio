@@ -11,7 +11,7 @@ import { Contact } from "@/components/landing/Contact";
 import { LandingFooter } from "@/components/landing/LandingFooter";
 import {
   normalizeClasses, splitPlans, weekDays, weekStartFor,
-  type ApiClass, type ClassTypeRow, type CoachRow, type PlanRow,
+  type ApiClass, type ClassTypeRow, type PlanRow,
 } from "@/components/landing/landingData";
 
 const lista = <T,>(data: unknown): T[] => (Array.isArray(data) ? data : ((data as { data?: T[] })?.data ?? []));
@@ -58,10 +58,7 @@ export default function Landing() {
     queryKey: ["class-types-public"],
     queryFn: async () => lista<ClassTypeRow>((await api.get("/class-types")).data),
   });
-  const coachesQ = useQuery({
-    queryKey: ["public-instructors"],
-    queryFn: async () => lista<CoachRow>((await api.get("/public/instructors")).data),
-  });
+
 
   const classes = useMemo(() => normalizeClasses(classesQ.data ?? [], now), [classesQ.data, now]);
   const { trial, rest } = useMemo(() => splitPlans(plansQ.data ?? []), [plansQ.data]);
@@ -85,10 +82,10 @@ export default function Landing() {
         <Reveal>
           <ClassesCoaches
             classTypes={typesQ.data ?? []}
-            coaches={coachesQ.data ?? []}
-            loading={cargando(typesQ) || cargando(coachesQ)}
-            error={typesQ.isError || coachesQ.isError}
-            onRetry={() => { typesQ.refetch(); coachesQ.refetch(); }}
+            coaches={[]}
+            loading={cargando(typesQ)}
+            error={typesQ.isError}
+            onRetry={() => { typesQ.refetch(); }}
           />
         </Reveal>
         <Reveal>

@@ -16,7 +16,7 @@ const PLANES = [
 afterEach(() => vi.clearAllMocks());
 
 describe("landing de HIVE", () => {
-  it("pide horario, paquetes, clases y coaches, y pinta todas las secciones", async () => {
+  it("pide horario, paquetes y clases sin cargar fotos ni coaches", async () => {
     vi.mocked(api.get).mockImplementation(respuestas({
       "/plans": { data: PLANES },
       "/class-types": { data: [{ id: "r", name: "Reformer", durationMin: 50 }] },
@@ -29,7 +29,7 @@ describe("landing de HIVE", () => {
     for (const id of ["clases", "horario", "paquetes", "contacto"]) expect(document.getElementById(id)).not.toBeNull();
     expect(screen.getAllByRole("link", { name: "Paquetes" }).length).toBeGreaterThan(0);
     expect(vi.mocked(api.get).mock.calls.map(([u]) => String(u).split("?")[0]).sort())
-      .toEqual(["/class-types", "/classes", "/plans", "/public/instructors"]);
+      .toEqual(["/class-types", "/classes", "/plans"]);
   });
   it("sin paquetes activos: no hay sección ni liga de Paquetes", async () => {
     vi.mocked(api.get).mockImplementation(respuestas({ "/plans": { data: [] } }) as never);
@@ -58,18 +58,20 @@ describe("landing de HIVE", () => {
     fireEvent.click(within(document.getElementById("paquetes")!).getByRole("button", { name: "Reintentar" }));
     await waitFor(() => expect(pedidos()).toBe(2));
   });
-  it("si falla sólo /public/instructors: aviso en Clases y coaches, y los tipos de clase siguen", async () => {
+  it("no consulta coaches ni muestra sus fotos aunque su servicio falle", async () => {
     vi.mocked(api.get).mockImplementation(respuestas({
       "/class-types": { data: [{ id: "r", name: "Reformer", durationMin: 50 }] },
       "/public/instructors": new Error("500"),
     }) as never);
     renderPage(<Landing />, "/");
-    await screen.findByText("No pudimos cargar las clases.");
-    expect(screen.getByText("Reformer", { selector: "h3" })).toBeInTheDocument();
+    expect(await screen.findByText("Reformer", { selector: "h3" })).toBeInTheDocument();
+    expect(screen.queryByText("No pudimos cargar las clases.")).toBeNull();
+    expect(screen.queryByRole("list", { name: "Coaches" })).toBeNull();
+    expect(document.querySelector("#clases img")).toBeNull();
   });
   it("tras Reintentar, horario, clases y paquetes muestran esqueleto mientras piden de nuevo", async () => {
     vi.mocked(api.get).mockImplementation(respuestas({
-      "/classes": new Error("500"), "/plans": new Error("500"), "/public/instructors": new Error("500"),
+      "/classes": new Error("500"), "/plans": new Error("500"), "/class-types": new Error("500"),
     }) as never);
     renderPage(<Landing />, "/");
     const avisos = {

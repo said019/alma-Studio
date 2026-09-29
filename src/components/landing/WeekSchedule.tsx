@@ -97,7 +97,7 @@ export function WeekSchedule({ days, classes, todayIso, loading, error, onRetry 
                     </div>
                     <div className={"min-w-0 " + dim}>
                       <p className="truncate text-[0.9rem] font-bold text-ink">{c.name}</p>
-                      <p className="truncate text-[0.8rem] text-ink-muted">{c.coach}{c.durationMin ? ` · ${c.durationMin} min` : ""}</p>
+                      <p className="truncate text-[0.8rem] text-ink-muted">{c.durationMin ? `${c.durationMin} min` : ""}</p>
                       <p className={"text-[0.75rem] font-bold " + (a.full ? "text-ink-muted" : "text-accent")}>{a.label}</p>
                     </div>
                     {a.full ? (
