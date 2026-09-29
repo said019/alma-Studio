@@ -193,7 +193,7 @@ describe("Ficha de clienta", () => {
     expect(await within(mem).findByText("Cancelaciones: 1 usada · sin límite")).toBeInTheDocument();
   });
 
-  it("guardar otro ajuste sin tocar Cancelaciones usadas no reescribe el contador (A5)", async () => {
+  it("guardar otro ajuste sin tocar Cancelaciones usadas no reescribe el contador", async () => {
     const mockPut = (api as unknown as { put: Mock }).put;
     mockPut.mockReset().mockResolvedValue({ data: {} });
     loginAs("admin");
@@ -211,7 +211,7 @@ describe("Ficha de clienta", () => {
     expect(body).not.toHaveProperty("cancellationsUsed");
   });
 
-  it("el campo Cancelaciones usadas acepta hasta 1000 (A5)", async () => {
+  it("el campo Cancelaciones usadas acepta hasta 1000", async () => {
     loginAs("admin");
     routeApi(mockApi, tabla({ "/memberships?userId=u1": { data: [{ ...MEM, cancellationsUsed: 2, cancellationLimit: 2 }] } }));
     renderAdmin(<ClientDetail />, { route: "/admin/clients/u1", path: "/admin/clients/:id" });
@@ -221,7 +221,7 @@ describe("Ficha de clienta", () => {
     expect(within(dlg).getByLabelText("Cancelaciones usadas")).toHaveAttribute("max", "1000");
   });
 
-  it("en Pagos, un reembolso con terminal dice 'Terminal' y no 'Tarjeta', igual que el diálogo de reembolso (A5)", async () => {
+  it("en Pagos, un reembolso con terminal dice 'Terminal' y no 'Tarjeta', igual que el diálogo de reembolso", async () => {
     loginAs("admin");
     routeApi(mockApi, tabla({
       "/payments?userId=u1": { data: [

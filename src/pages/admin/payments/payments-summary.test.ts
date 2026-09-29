@@ -20,7 +20,7 @@ describe("summarizePayments", () => {
     const s = summarizePayments([{ method: "cash" }, { createdAt: "x", total_amount: "abc" }], now);
     expect(s.month).toEqual({ amount: 0, count: 0 });
   });
-  it("los reembolsos (filas negativas) restan del mes, se cuentan aparte y restan de su propio método (A9)", () => {
+  it("los reembolsos (filas negativas) restan del mes, se cuentan aparte y restan de su propio método", () => {
     const s = summarizePayments([
       p("2026-09-24T10:00:00", "cash", 1700),
       p("2026-09-25T09:00:00", "transfer", -500),
@@ -32,7 +32,7 @@ describe("summarizePayments", () => {
     expect(s.week).toEqual({ amount: 1200, count: 1 });
   });
 
-  it("Por método suma lo mismo que el neto del mes: un reembolso con el mismo método baja de esa columna (A9)", () => {
+  it("Por método suma lo mismo que el neto del mes: un reembolso con el mismo método baja de esa columna", () => {
     const s = summarizePayments([
       p("2026-09-05T10:00:00", "cash", 9400),
       p("2026-09-20T09:00:00", "cash", -425),
@@ -43,7 +43,7 @@ describe("summarizePayments", () => {
     expect(totalPorMetodo).toBe(s.month.amount);
   });
 
-  it("un reembolso con otro método resta del método del reembolso, no del original (A9)", () => {
+  it("un reembolso con otro método resta del método del reembolso, no del original", () => {
     const s = summarizePayments([
       p("2026-09-05T10:00:00", "cash", 1700),
       p("2026-09-20T09:00:00", "transfer", -500),

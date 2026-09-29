@@ -1,8 +1,8 @@
-// Tarea 10 · auditoría 2026-09-27, bloque 3. Punta a punta entre tareas que en
-// su ola sólo vieron el gancho vacío:
-//   - la cancelación de la clienta (T3), el reembolso total (T7) y la
-//     cancelación por webhook de Wellhub (T6) suben la lista de espera (T4);
-//   - la subida no gasta la cuota de nadie (T3).
+// Tarea 10 · auditoría 2026-09-27, bloque 3. Punta a punta entre flujos que en
+// su propia prueba sólo vieron el gancho onSeatReleased vacío:
+//   - cancelar una reserva, un reembolso total y la cancelación por webhook de
+//     Wellhub deben, cada uno por su cuenta, subir a la lista de espera;
+//   - esa subida no gasta la cuota de cancelaciones de quien sube.
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import http from "node:http";

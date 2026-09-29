@@ -95,7 +95,7 @@ const PAYMENT_METHOD: Record<string, string> = {
 };
 
 // En una fila de reembolso, "card" es la terminal, no la tarjeta con la que se
-// pagó: mismo criterio que PaymentsHistory.tsx y el diálogo de reembolso (T7).
+// pagó: mismo criterio que PaymentsHistory.tsx y el diálogo de reembolso.
 const metodoDePago = (p: { method?: string; source?: string }): string => {
   const m = p.method ?? "";
   if (p.source === "refund" && m in REFUND_METHOD_LABEL) return REFUND_METHOD_LABEL[m as keyof typeof REFUND_METHOD_LABEL];
@@ -436,7 +436,7 @@ const ClientDetail = () => {
       if (editEndDate) body.endDate = editEndDate;
       // Sólo manda cancellationsUsed si de verdad cambió: si no, un guardado
       // por otro ajuste (fechas, créditos...) reescribiría el contador con
-      // un valor que ya quedó viejo desde que se abrió el diálogo (T3).
+      // un valor que ya quedó viejo desde que se abrió el diálogo.
       if (editCancellations.trim() !== "" && editCancellations !== String(editMem.cancellationsUsed ?? 0)) {
         body.cancellationsUsed = Number(editCancellations);
       }

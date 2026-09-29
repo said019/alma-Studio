@@ -81,7 +81,7 @@ describe("Lista de espera", () => {
     expect(await screen.findByText("Nadie en lista de espera esta semana.")).toBeInTheDocument();
   });
 
-  it("con fila pero un lugar libre (se saltó a alguien), no dice 'llena' porque no lo está (A6)", async () => {
+  it("con fila pero un lugar libre (se saltó a alguien), no dice 'llena' porque no lo está", async () => {
     routeApi(mockApi, {
       "/admin/stats": { pendingAlerts: 0 },
       "/classes?start=": { data: [{ id: "c11", date: "2026-09-25", start_time: "2026-09-25T11:00:00", class_type_name: "Reformer Intermedio", instructor_name: "Fer", max_capacity: 8, current_bookings: 7, waitlist_count: 1 }] },
@@ -101,7 +101,7 @@ describe("Lista de espera", () => {
     expect(within(detalle).queryByText(/^Llena/)).toBeNull();
   });
 
-  it("de verdad llena, sí lo dice (A6)", async () => {
+  it("de verdad llena, sí lo dice", async () => {
     routeApi(mockApi, {
       "/admin/stats": { pendingAlerts: 0 },
       "/classes?start=": { data: [clase("c11", "11:00", "Reformer Intermedio", 1)] },

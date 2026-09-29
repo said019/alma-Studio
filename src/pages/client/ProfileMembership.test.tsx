@@ -28,7 +28,7 @@ function montar(membresia: Record<string, unknown> = MEMBRESIA, politica: Record
 
 beforeEach(() => { vi.mocked(api.get).mockReset(); });
 
-describe("Mi membresía · Cancelaciones con la política real (A3)", () => {
+describe("Mi membresía · Cancelaciones con la política real", () => {
   it("lista las reglas de la política configurada, no el texto fijo de 12 horas", async () => {
     montar();
     const section = (await screen.findByText(cancellationRules(POLITICA)[0])).closest("ol");

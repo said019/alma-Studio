@@ -76,7 +76,7 @@ const ProfileMembership = () => {
   const isLow = lowClasses || lowDays;
 
   // "Te quedan N cancelaciones de este paquete.", con la cuota real de
-  // /memberships/my (A3): misma fuente que MyBookings y BookClassConfirm.
+  // /memberships/my: misma fuente que MyBookings y BookClassConfirm.
   const membresiaQuedanText = membership
     ? cancellationsLeftText(membership.cancellationsLeft ?? null, Number(membership.cancellationLimit ?? policy.cancellationLimit))
     : null;

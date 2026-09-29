@@ -5,7 +5,7 @@ import KpiStrip, { type Kpi } from "./KpiStrip";
 const kpis = (n: number): Kpi[] =>
   Array.from({ length: n }, (_, i) => ({ label: `KPI ${i + 1}`, value: String(i + 1) }));
 
-describe("KpiStrip · hasta 5 columnas (A7)", () => {
+describe("KpiStrip · hasta 5 columnas", () => {
   it("con 2 a 4 cifras, la fila de escritorio sigue igual que antes", () => {
     for (const n of [2, 3, 4]) {
       const { container, unmount } = render(<KpiStrip items={kpis(n)} />);

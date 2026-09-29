@@ -25,7 +25,7 @@ const BASE: RefundablePayment = {
 
 beforeEach(() => { toastSpy.mockReset(); });
 
-describe("RefundDialog · el resumen no miente (A8)", () => {
+describe("RefundDialog · el resumen no miente", () => {
   it("total sobre una membresía activa: dice que la cancela y cuenta las clases que quita", async () => {
     montar(BASE);
     const dlg = await screen.findByRole("dialog");

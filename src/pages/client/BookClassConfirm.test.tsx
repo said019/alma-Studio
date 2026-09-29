@@ -85,7 +85,7 @@ describe("Detalle de clase · política y fila (P0-4 · P1-1)", () => {
     expect(screen.queryByText(/cancelaciones de este paquete/)).toBeNull();
   });
 
-  it("al quedar en lista de espera, el aviso dice cuándo sube sola en vez del genérico anterior (A2)", async () => {
+  it("al quedar en lista de espera, el aviso dice cuándo sube sola en vez del genérico anterior", async () => {
     montar({ ...CLASE, current_bookings: 2, waitlist_count: 1 });
     vi.mocked(api.post).mockResolvedValue({ data: { booking: { status: "waitlist" } } } as never);
     fireEvent.click(await screen.findByRole("button", { name: "Unirme a la lista de espera" }));
