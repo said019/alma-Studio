@@ -188,6 +188,17 @@ test("/api/payments rechaza un userId que no es UUID y fechas que no son AAAA-MM
   assert.equal((await api("GET", `/api/payments?startDate=${day(-30)}&endDate=${day(1)}`, { token: A })).status, 200);
 });
 
+test("endDate es inclusivo: un pago del mismo día que endDate aparece", async () => {
+  // created_at de la orden es NOW() al vender, no medianoche: con
+  // "created_at <= endDate" (medianoche del día) casi siempre quedaba fuera.
+  const { c, orderId } = await venta("enddateincl");
+  const hoy = day(0);
+  const pagos = await api("GET", `/api/payments?userId=${c.id}&startDate=${hoy}&endDate=${hoy}`, { token: A });
+  assert.equal(pagos.status, 200);
+  const fila = pagos.body.data.find((p) => p.source === "order" && p.orderId === orderId);
+  assert.ok(fila, `la orden de hoy debe aparecer con endDate=${hoy}: ${JSON.stringify(pagos.body.data).slice(0, 300)}`);
+});
+
 test("total sobre una membresía ya cancelada: igual cancela sus reservas futuras y no pisa la cancelación", async () => {
   const { c, membershipId, orderId } = await venta("yacancelada");
   const classId = await makeClass(A, f, { date: day(11) });

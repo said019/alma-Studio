@@ -15694,7 +15694,11 @@ app.get("/api/payments", ownerMiddleware, async (req, res) => {
     const filtros = (col, userCol) => {
       let w = "";
       if (startDate) { params.push(startDate); w += ` AND ${col} >= $${params.length}`; }
-      if (endDate) { params.push(endDate); w += ` AND ${col} <= $${params.length}`; }
+      // endDate inclusivo: hasta el final de ese día en la zona del estudio (la
+      // conexión ya ancla TimeZone=STUDIO_TIMEZONE), no a la medianoche que lo
+      // abre. "< día siguiente" en vez de "<= endDate" para no dejar fuera lo
+      // que se cobró ese mismo día.
+      if (endDate) { params.push(endDate); w += ` AND ${col} < ($${params.length}::date + INTERVAL '1 day')`; }
       if (userId) { params.push(userId); w += ` AND ${userCol} = $${params.length}`; }
       return w;
     };
