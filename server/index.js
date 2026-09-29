@@ -56,7 +56,7 @@ import {
   sendPasswordResetEmail,
   FROM_EMAIL,
 } from "./emailService.js";
-import { ALMA_CLASS_TYPES, ALMA_SCHEDULE_SLOTS, ALMA_SCHEDULE_DAYS, ALMA_PLANS } from "./lib/almaCatalog.js";
+import { CATALOG_CLASS_TYPES, CATALOG_SCHEDULE_SLOTS, CATALOG_SCHEDULE_DAYS, CATALOG_PLANS } from "./lib/catalog.js";
 import { seedClassTypesIfEmpty, seedPlansIfEmpty } from "./lib/catalogSeed.js";
 import { DEFAULT_NOTIFICATION_TEMPLATES } from "./lib/notificationTemplates.js";
 import { PASS_DEFAULT_TEXTS, LOYALTY_MILESTONES_SEED } from "./lib/passDefaults.js";
@@ -742,7 +742,7 @@ async function ensureSchema() {
         UNIQUE (time_slot, day_of_week)
       );
     `);
-    // ── packages (paquetes de precios barre Alma) ────────────────────────────
+    // ── packages (tabla legacy de paquetes de precios) ──────────────────────
     await pool.query(`
       CREATE TABLE IF NOT EXISTS packages (
         id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -770,15 +770,15 @@ async function ensureSchema() {
     await pool.query(`ALTER TABLE class_types ADD CONSTRAINT class_types_category_check CHECK (category IN ('studio','reformer_tower'))`).catch(() => { });
     // Con filas existentes (lo que el estudio captura en el panel) no se
     // desactiva ni se reescribe nada. Ver server/lib/catalogSeed.js.
-    await seedClassTypesIfEmpty(pool, ALMA_CLASS_TYPES);
+    await seedClassTypesIfEmpty(pool, CATALOG_CLASS_TYPES);
     // ── Seed schedule_slots si la tabla está vacía ─────────────────────────
     const existingSlots = await pool.query(`SELECT COUNT(*)::int AS n FROM schedule_slots`);
     if (existingSlots.rows[0].n === 0) {
       const values = [];
       const params = [];
       let i = 1;
-      for (const day of ALMA_SCHEDULE_DAYS) {
-        for (const slot of ALMA_SCHEDULE_SLOTS) {
+      for (const day of CATALOG_SCHEDULE_DAYS) {
+        for (const slot of CATALOG_SCHEDULE_SLOTS) {
           values.push(`($${i++}, $${i++}, NULL)`);
           params.push(slot, day);
         }
@@ -871,8 +871,8 @@ async function ensureSchema() {
     // Usuario "lite" con role='guest' vinculado a su guest_profile (1:1).
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS guest_profile_id UUID REFERENCES guest_profiles(id)`).catch(() => { });
     await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_guest_profile_unique ON users(guest_profile_id) WHERE guest_profile_id IS NOT NULL`).catch(() => { });
-    // ── Migrate class_types: 'Barre' es disciplina Studio en Alma Movement ──
-    // (En una base nueva la categoría la fija la siembra inicial de ALMA_CLASS_TYPES; 'barre' ya no es
+    // ── Migrate class_types: 'Barre' es disciplina Studio ──
+    // (En una base nueva la categoría la fija la siembra inicial de CATALOG_CLASS_TYPES; 'barre' ya no es
     //  una categoría válida según el CHECK class_types_category_check.)
     await pool.query(`
       UPDATE class_types SET category = 'studio' WHERE name = 'Barre';
@@ -882,10 +882,10 @@ async function ensureSchema() {
     // ── Seed plans: el lineup inicial sólo se siembra si la tabla está vacía ──
     // Con filas existentes (los paquetes que el estudio captura en el panel) no
     // se desactiva ni se reescribe nada. Ver server/lib/catalogSeed.js.
-    await seedPlansIfEmpty(pool, ALMA_PLANS);
-    // Planes de muestra/visita heredados eliminados: el catálogo Alma define
-    // "Alma Studio Intro" como única clase muestra y las clases únicas Studio /
-    // Reformer-Tower como sesiones sueltas. Ver server/lib/almaCatalog.js.
+    await seedPlansIfEmpty(pool, CATALOG_PLANS);
+    // Planes de muestra/visita heredados eliminados: el catálogo inicial define
+    // "Studio Intro" como única clase muestra y las clases únicas Studio /
+    // Reformer-Tower como sesiones sueltas. Ver server/lib/catalog.js.
     // (Si la dueña requiere un pack de visitas/invitadas lo crea desde el admin
     //  con is_visit_pack=true.)
     // ── Products table ─────────────────────────────────────────────────────

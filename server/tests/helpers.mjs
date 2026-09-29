@@ -117,7 +117,7 @@ export async function studioFixtures(prefix, adminToken) {
         AND COALESCE(morning_only,false) = false
         AND COALESCE(is_visit_pack,false) = false
       ORDER BY class_limit LIMIT 1`, [ct.category]);
-  // El arranque ya no reimpone el catálogo de Alma (sólo siembra una tabla
+  // El arranque ya no reimpone el catálogo inicial (sólo siembra una tabla
   // vacía): en una base creada con schema_complete.sql quedan los paquetes
   // heredados, todos de categoría 'all'. Si no hay un paquete general de la
   // categoría, la suite siembra el suyo (una sola vez; las siguientes suites

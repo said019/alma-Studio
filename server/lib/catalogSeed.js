@@ -2,8 +2,8 @@
 //
 // Sólo se siembra si la tabla está VACÍA (instalación nueva). Con filas
 // existentes —lo que el estudio captura en el panel— el arranque no desactiva,
-// no actualiza ni inserta nada: antes cada despliegue reimponía el catálogo de
-// Alma y desactivaba lo capturado (revisión final de la landing de HIVE, C1).
+// no actualiza ni inserta nada: antes cada despliegue reimponía el catálogo
+// heredado y desactivaba lo capturado (revisión final de la landing de HIVE, C1).
 
 async function isEmpty(pool, table) {
   const { rows } = await pool.query(`SELECT COUNT(*)::int AS n FROM ${table}`);
