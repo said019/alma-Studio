@@ -1,3 +1,4 @@
+import { BirthDateInput } from "@/components/ui/birth-date-input";
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -11,7 +12,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
-import { DatePicker } from "@/components/ui/date-picker";
 import { ErrorState } from "@/components/app/AppShell";
 
 export const editSchema = z.object({
@@ -99,7 +99,7 @@ export default function ClientEditSheet({ clientId, open, onOpenChange }: Client
                 </div>
                 <div className="flex flex-col gap-1.5">
                   <Label>Fecha de nacimiento</Label>
-                  <DatePicker value={watch("dateOfBirth") ?? ""} onChange={(v: string) => setValue("dateOfBirth", v, { shouldDirty: true })} />
+                  <BirthDateInput value={watch("dateOfBirth") ?? ""} onChange={(v: string) => setValue("dateOfBirth", v, { shouldDirty: true })} />
                 </div>
               </div>
             </fieldset>

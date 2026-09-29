@@ -1,3 +1,4 @@
+import { BirthDateInput } from "@/components/ui/birth-date-input";
 import { useState, type ComponentType, type ReactNode } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -382,7 +383,7 @@ const ClientsList = () => {
                   </div>
                   <div className="space-y-1">
                     <Label className="text-ink/70 text-xs">Fecha de nacimiento</Label>
-                    <DatePicker value={manualForm.watch("dateOfBirth")} onChange={(v) => manualForm.setValue("dateOfBirth", v)} />
+                    <BirthDateInput value={manualForm.watch("dateOfBirth")} onChange={(v) => manualForm.setValue("dateOfBirth", v)} />
                   </div>
                 </div>
               </div>
