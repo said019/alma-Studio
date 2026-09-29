@@ -397,8 +397,8 @@ const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: string; onBa
     .map((p: any) => ({
       id: p.id,
       name: p.name,
-      price: Number(p.price ?? 0),
-      classLimit: p.class_limit ?? p.classLimit ?? 1,
+      price: Number(p.effectivePrice ?? p.effective_price ?? p.price ?? 0),
+      classLimit: p.class_limit !== undefined ? p.class_limit : p.classLimit ?? null,
       isVisitPack: p.is_visit_pack === true || p.isVisitPack === true,
     }))
     // Ordenar primero los visit-pack (clase suelta, paquetes de visita)
@@ -824,7 +824,7 @@ const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: string; onBa
                           <option value="">— Seleccionar plan —</option>
                           {guestSalePlans.map((p) => (
                             <option key={p.id} value={p.id}>
-                              {p.name} — {p.classLimit ?? "?"} clase{p.classLimit === 1 ? "" : "s"} · {formatMXN(p.price)}
+                              {p.name} — {p.classLimit == null ? "Ilimitadas" : `${p.classLimit} ${p.classLimit === 1 ? "clase" : "clases"}`} · {formatMXN(p.price)}
                             </option>
                           ))}
                         </select>
