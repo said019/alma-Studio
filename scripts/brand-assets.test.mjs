@@ -4,6 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import sharp from "sharp";
+import { fileURLToPath } from "node:url";
 import { generate, TARGETS, HERO } from "./brand-assets.mjs";
 import { DARK } from "../src/design/tokens.ts";
 const rgbOf = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
@@ -56,4 +57,20 @@ test("og-image.png es 1200×630, carbón con el hexágono terracota al centro", 
   assert.deepEqual(px(8, 8), rgbOf(DARK.canvas));
   // Mismo punto relativo del hexágono que la prueba del ícono (a la derecha del rayo y sobre la corona).
   assert.ok(near(px(632, 201), rgbOf(DARK.accent)), `el hexágono no es terracota: ${px(632, 201)}`);
+});
+
+test("el isotipo del pase se llama hive-mark-light.png y ningún archivo lleva el nombre de la marca anterior", async () => {
+  const nombres = [...TARGETS.map((t) => t.file), HERO.file];
+  assert.ok(nombres.includes("hive-mark-light.png"));
+  assert.deepEqual(nombres.filter((f) => /alma/i.test(f)), []);
+  // El servidor lo pide por ese nombre (logo de Google Wallet y strip de Apple).
+  const server = fs.readFileSync(new URL("../server/index.js", import.meta.url), "utf8");
+  assert.match(server, /\$\{SITE_URL\}\/hive-mark-light\.png/);
+  assert.match(server, /findAssetFile\(\["hive-mark-light\.png"\]\)/);
+  assert.doesNotMatch(server, /alma-mark-light/);
+  // El archivo publicado existe y es el isotipo generado (512 px, fondo transparente).
+  const meta = await sharp(fileURLToPath(new URL("../public/hive-mark-light.png", import.meta.url))).metadata();
+  assert.equal(meta.width, 512);
+  assert.equal(meta.hasAlpha, true);
+  assert.ok(!fs.existsSync(new URL("../public/alma-mark-light.png", import.meta.url)));
 });

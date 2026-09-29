@@ -5908,7 +5908,7 @@ async function ensureGoogleWalletClass() {
       issuerName: GW_ISSUER_NAME,
       programName: GW_PROGRAM_NAME,
       programLogo: {
-        sourceUri: { uri: `${SITE_URL}/alma-mark-light.png` },
+        sourceUri: { uri: `${SITE_URL}/hive-mark-light.png` },
         contentDescription: { defaultValue: { language: "es", value: PASS_DEFAULT_TEXTS.logoDescription } },
       },
       heroImage: {
@@ -7536,9 +7536,9 @@ function getMarkLightDataUri() {
   if (MARK_LIGHT_CACHE.dataUri !== undefined) return MARK_LIGHT_CACHE.dataUri;
   let uri = null;
   try {
-    const p = findAssetFile(["alma-mark-light.png", "alma/alma-mark-light.png"]);
+    const p = findAssetFile(["hive-mark-light.png"]);
     if (p) uri = `data:image/png;base64,${fs.readFileSync(p).toString("base64")}`;
-  } catch (e) { console.warn("[wallet] alma-mark-light no disponible:", e.message); }
+  } catch (e) { console.warn("[wallet] hive-mark-light no disponible:", e.message); }
   MARK_LIGHT_CACHE.dataUri = uri;
   return uri;
 }

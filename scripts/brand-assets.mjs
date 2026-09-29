@@ -20,7 +20,8 @@ export const TARGETS = [
   { file: "icon-maskable-512.png", size: 512, fg: DARK.accent, bg: DARK.canvas, pad: 0.28 },
   // Círculo terracota opaco: se ve en correo claro y oscuro (el correo lo recorta en círculo).
   { file: "email-logo.png", size: 240, fg: DARK.onAccent, bg: DARK.accent, pad: 0.18 },
-  { file: "alma-mark-light.png", size: 512, fg: DARK.accent, bg: null, pad: 0.06 }, // "light" = para fondos oscuros
+  // Isotipo del pase: logo de Google Wallet y emblema del strip de Apple Wallet.
+  { file: "hive-mark-light.png", size: 512, fg: DARK.accent, bg: null, pad: 0.06 }, // "light" = para fondos oscuros
   // Isotipo de los correos: terracota sobre transparente, sin margen, a 3× de
   // los 40×46 con que lo pinta server/emailService.js en la banda carbón.
   { file: "email/hive-mark.png", width: 120, height: 138, fg: DARK.accent, bg: null, pad: 0 },
@@ -54,13 +55,10 @@ async function render({ size, width = size, height = size, fg, bg, pad }) {
 }
 
 // ─── Hero del pase de Google Wallet ─────────────────────────────────────────
-// Reemplaza wallet-hero-alma.png (una foto con el wordmark "ALMA MOVEMENT —
-// MOVE WITH INTENTION" quemado en la imagen) por una composición propia:
-// el isotipo HIVE + el wordmark "HIVE" / "PILATES STUDIO", sobre el carbón de
-// la app. Mismos tokens y mismas proporciones que BrandLogo variant="lockup"
-// (src/components/brand/BrandLogo.tsx) — sin fotos ni arte nuevo, sólo el
-// símbolo y la paleta que ya existen. wallet-hero-alma.png NO se borra ni se
-// renombra: un pase ya emitido podría seguir pidiéndola por URL.
+// Composición propia: el isotipo HIVE + el wordmark "HIVE" / "PILATES STUDIO",
+// sobre el carbón de la app. Mismos tokens y mismas proporciones que BrandLogo
+// variant="lockup" (src/components/brand/BrandLogo.tsx) — sin fotos ni arte
+// nuevo, sólo el símbolo y la paleta que ya existen.
 const HERO_SIZE = { width: 1032, height: 336 }; // tamaño de hero de Google Wallet
 // El hero no pasa por render() (lleva texto, no sólo el símbolo), por eso va
 // aparte de TARGETS; generate() lo escribe siempre después de ellos.
