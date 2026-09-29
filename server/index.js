@@ -65,7 +65,7 @@ import { syntheticGuestEmail } from "./lib/syntheticEmail.js";
 import { resolveEffectivePrice } from "./lib/pricing.js";
 import { saleAmountPlan, planMembershipAdjust, cleanPaymentReference, saleStartProblem, saleStartDay, saleAuditAfter, PAYMENT_METHODS, normalizePaymentMethod, PAYMENT_METHOD_INVALID, calcMembershipEndDate } from "./lib/membershipAdmin.js";
 import { cancellationLimitProblem, cancellationQuota, clientCancelDecision, normalizeCancellationSettings, publicBookingPolicy } from "./lib/cancellationPolicy.js";
-import { isMembershipCategoryCompatible as ruleCategoryCompatible, normalizeClassCategory as ruleNormalizeCategory, isWithinMorningWindow, categoryLabel, canMixtoBook } from "./lib/bookingRules.js";
+import { isMembershipCategoryCompatible as ruleCategoryCompatible, normalizeClassCategory as ruleNormalizeCategory, isWithinMorningWindow, membershipAllowsSession, purchaseCredits, categoryLabel, canMixtoBook } from "./lib/bookingRules.js";
 import { rateKey } from "./lib/rateKey.js";
 import { isWithinCancelWindow, penaltyDueAt, faltaReversal } from "./lib/faltas.js";
 import { scheduleAt } from "./lib/schedule.js";
@@ -842,6 +842,7 @@ async function ensureSchema() {
     await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS is_visit_pack BOOLEAN DEFAULT false`).catch(() => { });
     await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS opening_price DECIMAL(10,2)`).catch(() => { });
     await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS morning_only BOOLEAN DEFAULT false`).catch(() => { });
+    await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS afternoon_only BOOLEAN NOT NULL DEFAULT false, ADD COLUMN IF NOT EXISTS personal_only BOOLEAN NOT NULL DEFAULT false`);
     // Paquetes MIXTOS: créditos dedicados a cada área (NULL = el plan no es mixto).
     await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS studio_credits INTEGER`).catch(() => { });
     await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS rt_credits INTEGER`).catch(() => { });
@@ -2347,7 +2348,7 @@ function isMembershipCategoryCompatible(membershipCategory, classCategory) {
   return ruleCategoryCompatible(membershipCategory, classCategory);
 }
 
-async function selectMembershipForClass({ userId, classCategory, client = null }) {
+async function selectMembershipForClass({ userId, classCategory, startsAt, capacity, client = null }) {
   if (!userId) return null;
   const q = client ?? pool;
   const clsCat = normalizeClassCategory(classCategory, "all");
@@ -2360,7 +2361,9 @@ async function selectMembershipForClass({ userId, classCategory, client = null }
             m.end_date,
             m.created_at,
             COALESCE(p.class_category, 'all') AS class_category,
-            COALESCE(p.morning_only, false) AS morning_only
+            COALESCE(p.morning_only, false) AS morning_only,
+            COALESCE(p.afternoon_only, false) AS afternoon_only,
+            COALESCE(p.personal_only, false) AS personal_only
        FROM memberships m
        LEFT JOIN plans p ON p.id = m.plan_id
       WHERE m.user_id = $1
@@ -2390,11 +2393,10 @@ async function selectMembershipForClass({ userId, classCategory, client = null }
         CASE WHEN m.end_date IS NULL THEN 1 ELSE 0 END ASC,
         m.end_date ASC,
         CASE WHEN m.classes_remaining IS NULL OR m.classes_remaining >= 9999 THEN 1 ELSE 0 END ASC,
-        m.created_at ASC
-      LIMIT 1`,
+        m.created_at ASC`,
     [userId, clsCat]
   );
-  return r.rows[0] ?? null;
+  return r.rows.find(m => membershipAllowsSession(m, startsAt, capacity)) ?? null;
 }
 
 // ─── Créditos de membresía con soporte de paquetes MIXTOS ──────────────────
@@ -3893,7 +3895,7 @@ async function promoteOneFromWaitlist(classId) {
       // Dada de baja (bloque 2): no sube aunque le quede una fila previa.
       if (w.anonymized) reason = "baja";
       else {
-        mem = w.user_id ? await selectMembershipForClass({ userId: w.user_id, classCategory: category, client }) : null;
+        mem = w.user_id ? await selectMembershipForClass({ userId: w.user_id, classCategory: category, startsAt: cls.starts_at, capacity: cls.max_capacity, client }) : null;
         if (!mem) reason = "sin_clases";
         else if (mem.morning_only && !isWithinMorningWindow(cls.starts_at)) reason = "solo_manana";
         else if (!(await checkWeeklyClassLimit(client, w.user_id, mem.id, cls.date)).ok) reason = "tope_semanal";
@@ -4156,6 +4158,7 @@ app.post("/api/bookings", authMiddleware, async (req, res) => {
     const membership = await selectMembershipForClass({
       userId: req.userId,
       classCategory: clsCategory,
+      startsAt: cls.starts_at, capacity: cls.max_capacity,
       client,
     });
     if (!membership) {
@@ -4685,12 +4688,12 @@ async function finalizeStripeOrder(client, orderId) {
   if (!planRes.rows.length) return;
   const plan = planRes.rows[0];
 
-  // Carry-over: cancel active memberships and transfer remaining credits
+  // Renovar el mismo plan conserva créditos finitos sin transferir restricciones entre planes.
   let carryOver = 0;
   const activeMemberships = await client.query(
     `SELECT id, classes_remaining FROM memberships
-      WHERE user_id = $1 AND status = 'active' AND classes_remaining > 0`,
-    [order.user_id]
+      WHERE user_id = $1 AND plan_id = $2 AND status = 'active' AND classes_remaining > 0 AND classes_remaining < 9999`,
+    [order.user_id, plan.id]
   );
   if (activeMemberships.rows.length > 0) {
     for (const m of activeMemberships.rows) {
@@ -4708,7 +4711,7 @@ async function finalizeStripeOrder(client, orderId) {
     );
   }
 
-  const newCredits = (plan.class_limit ?? 0) + carryOver;
+  const newCredits = purchaseCredits(plan.class_limit, carryOver);
   const end = new Date();
   end.setDate(end.getDate() + (plan.duration_days || 30));
 
@@ -14189,7 +14192,7 @@ app.put("/api/plans/:id", adminMiddleware, async (req, res) => {
     const {
       name, description, price, currency, durationDays, classLimit, classCategory,
       features, isActive, sortOrder, isNonTransferable, isNonRepeatable, repeatKey,
-      opening_price, morning_only,
+      opening_price, morning_only, afternoon_only, personal_only,
     } = req.body;
     const validCats = ["studio", "reformer_tower", "mixto", "all"];
     const cat = validCats.includes(classCategory) ? classCategory : null;
@@ -14235,6 +14238,7 @@ app.put("/api/plans/:id", adminMiddleware, async (req, res) => {
        repeat_key=CASE WHEN $12::boolean IS NULL THEN repeat_key ELSE $13 END,
        is_visit_pack=COALESCE($14, is_visit_pack),
        opening_price=COALESCE($15, opening_price), morning_only=COALESCE($16, morning_only),
+       afternoon_only=COALESCE($20, afternoon_only), personal_only=COALESCE($21, personal_only),
        updated_at=NOW()
        WHERE id=$17 RETURNING *`,
       [
@@ -14258,6 +14262,7 @@ app.put("/api/plans/:id", adminMiddleware, async (req, res) => {
         Object.prototype.hasOwnProperty.call(req.body, "description"),
         Object.prototype.hasOwnProperty.call(req.body, "classLimit")
           || Object.prototype.hasOwnProperty.call(req.body, "class_limit"),
+        flagOrNull("afternoon_only"), flagOrNull("personal_only"),
       ]
     );
     if (!r.rows.length) return res.status(404).json({ message: "Plan no encontrado" });
@@ -14348,7 +14353,7 @@ app.post("/api/plans", adminMiddleware, async (req, res) => {
       name, description, price, currency = "MXN", durationDays = 30, classLimit,
       classCategory, features, isActive = true, sortOrder = 0,
       isNonTransferable, isNonRepeatable, repeatKey,
-      opening_price, morning_only,
+      opening_price, morning_only, afternoon_only, personal_only,
     } = req.body;
     if (!name) return res.status(400).json({ message: "Nombre requerido" });
     const validCats = ["studio", "reformer_tower", "mixto", "all"];
@@ -14368,9 +14373,9 @@ app.post("/api/plans", adminMiddleware, async (req, res) => {
     const isVisitPack = parseBooleanFlag(req.body.isVisitPack ?? req.body.is_visit_pack);
     const r = await pool.query(
       `INSERT INTO plans
-        (name, description, price, currency, duration_days, class_limit, class_category, features, is_active, sort_order, is_non_transferable, is_non_repeatable, repeat_key, is_visit_pack, opening_price, morning_only)
+        (name, description, price, currency, duration_days, class_limit, class_category, features, is_active, sort_order, is_non_transferable, is_non_repeatable, repeat_key, is_visit_pack, opening_price, morning_only, afternoon_only, personal_only)
        VALUES
-        ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING *`,
+        ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING *`,
       [
         name,
         description || null,
@@ -14388,6 +14393,7 @@ app.post("/api/plans", adminMiddleware, async (req, res) => {
         isVisitPack,
         openingPrice,
         morningOnly,
+        parseBooleanFlag(afternoon_only), parseBooleanFlag(personal_only),
       ]
     );
     return res.status(201).json({ data: camelRow(r.rows[0]) });
@@ -14492,6 +14498,7 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
     const membership = await selectMembershipForClass({
       userId,
       classCategory: clsCategory,
+      startsAt: cls.starts_at, capacity: cls.max_capacity,
       client,
     });
     if (!membership) {
@@ -14633,6 +14640,15 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
           return res.status(404).json({ message: "Plan para la acompañante no encontrado" });
         }
         const plan = planRes.rows[0];
+        if (!membershipAllowsSession(plan, cls.starts_at, cls.max_capacity)) {
+          await client.query("ROLLBACK");
+          return res.status(403).json({ message: "El plan de la acompañante no permite el horario o tipo de esta sesión." });
+        }
+        const trialConflict = await findNonRepeatablePlanConflict({ userId: guestUser.id, plan, client });
+        if (trialConflict) {
+          await client.query("ROLLBACK");
+          return res.status(409).json({ message: trialConflict.message });
+        }
         const _gen = await getSettingValueWithDefaults("general_settings");
         const _eff = resolveEffectivePrice(plan, _gen?.opening_pricing_active !== false);
         const pm = normalizePaymentMethod(guestSale.paymentMethod);
@@ -14642,8 +14658,8 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
         }
         const startStr = todayInStudio();
         const endStr = calcMembershipEndDate(startStr, plan);
-        // Si no especifica class_limit, asumimos clase suelta (1).
-        const credits = plan.class_limit ?? 1;
+        // NULL representa clases ilimitadas, también en una venta a acompañante.
+        const credits = plan.class_limit ?? null;
         // Primero la orden y luego la membresía ligada a ella (order_id): así
         // /api/payments la cuenta una sola vez (por la orden) y un reembolso
         // encuentra la membresía. Las ventas viejas sin order_id no se tocan.
@@ -14663,7 +14679,7 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
         );
         const memRow = memIns.rows[0];
         guestMembershipId = memRow.id;
-        guestMembershipCreditsAfter = (memRow.classes_remaining ?? 1) - 1;
+        guestMembershipCreditsAfter = memRow.classes_remaining == null ? null : memRow.classes_remaining - 1;
         if (memRow.classes_remaining !== null) {
           await client.query(
             "UPDATE memberships SET classes_remaining = GREATEST(classes_remaining - 1, 0), updated_at = NOW() WHERE id = $1",
@@ -15441,13 +15457,13 @@ app.put("/api/admin/orders/:id/verify", adminMiddleware, async (req, res) => {
 
       // Activate membership if this order is for a plan
       if (order.plan_id && plan && order.user_id) {
-        // Carry-over: suma créditos de membresías activas a la nueva membresía.
+        // Renovación del mismo plan: conserva créditos sin mezclar franjas ni sesiones individuales.
         let carryOver = 0;
         const activeMemberships = await client.query(
           `SELECT m.id, m.classes_remaining
              FROM memberships m LEFT JOIN plans p ON p.id = m.plan_id
-            WHERE m.user_id = $1 AND m.status = 'active' AND m.classes_remaining > 0`,
-          [order.user_id]
+            WHERE m.user_id = $1 AND m.plan_id = $2 AND m.status = 'active' AND m.classes_remaining > 0 AND m.classes_remaining < 9999`,
+          [order.user_id, plan.id]
         );
         if (activeMemberships.rows.length > 0) {
           for (const m of activeMemberships.rows) {
@@ -15461,7 +15477,7 @@ app.put("/api/admin/orders/:id/verify", adminMiddleware, async (req, res) => {
           );
         }
 
-        const newCredits = (plan.class_limit ?? 0) + carryOver;
+        const newCredits = purchaseCredits(plan.class_limit, carryOver);
         const end = new Date();
         end.setDate(end.getDate() + (plan.duration_days || 30));
 

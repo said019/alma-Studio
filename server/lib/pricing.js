@@ -1,5 +1,5 @@
 // Resuelve el precio que se muestra/cobra según el modo apertura.
-// opening_price solo está poblado en los paquetes ilimitados.
+// El precio de apertura puede ser menor, igual o mayor al normal.
 export function resolveEffectivePrice(plan, openingActive) {
   const base = Number(plan?.price);
   const openingRaw = plan?.opening_price ?? plan?.openingPrice;

@@ -109,7 +109,7 @@ export type LandingPlan = {
 export function toLandingPlan(p: PlanRow): LandingPlan {
   const price = Number(p.price) || 0;
   const eff = Number(p.effectivePrice ?? p.effective_price ?? price) || price;
-  const opening = Boolean(p.openingActive ?? p.opening_active) && eff > 0 && eff < price;
+  const opening = Boolean(p.openingActive ?? p.opening_active) && eff > 0 && eff !== price;
   const finalPrice = opening ? eff : price;
   const classLimit = p.classLimit ?? p.class_limit ?? null;
   // Como en Checkout: 900 clases o más es ilimitado, y ahí no hay precio por clase.

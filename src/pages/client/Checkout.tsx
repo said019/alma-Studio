@@ -94,7 +94,7 @@ const PlanRow = ({
   const category = detectCategory(plan);
   const durationDays = Number(plan.durationDays ?? plan.duration_days ?? 0);
   const classLimit = plan.classLimit ?? plan.class_limit ?? null;
-  const isUnlimited = Number(classLimit) >= 900;
+  const isUnlimited = classLimit == null || Number(classLimit) >= 900;
   const nonTransferable = flag(plan.isNonTransferable ?? plan.is_non_transferable);
   const nonRepeatable = flag(plan.isNonRepeatable ?? plan.is_non_repeatable);
   // Precio efectivo (anticipado/apertura) — el mismo que muestra el index y
@@ -102,7 +102,7 @@ const PlanRow = ({
   const regularPrice = Number(plan.price ?? 0);
   const effectivePrice = Number(plan.effectivePrice ?? plan.effective_price ?? regularPrice);
   const hasOpening =
-    Boolean(plan.openingActive ?? plan.opening_active) && effectivePrice > 0 && effectivePrice < regularPrice;
+    Boolean(plan.openingActive ?? plan.opening_active) && effectivePrice > 0;
   const perClass =
     !isUnlimited && effectivePrice > 0 && Number(classLimit) > 1
       ? Math.round(effectivePrice / Number(classLimit))
@@ -138,6 +138,7 @@ const PlanRow = ({
           <h3 className="font-display leading-tight text-ink" style={{ fontSize: "clamp(1.1rem, 1.6vw, 1.35rem)" }}>
             {plan.name}
           </h3>
+          {plan.description && <p className="mt-1 text-[0.8rem] text-ink-muted">{plan.description}</p>}
           {durationDays > 0 && (
             <p className="text-[0.75rem] mt-0.5 text-ink-muted">
               {durationDays} días de vigencia
@@ -148,7 +149,7 @@ const PlanRow = ({
         </div>
         <div className="text-right">
           {hasOpening && (
-            <div className="nums text-[0.75rem] line-through text-ink-muted">
+            <div className={`nums text-[0.75rem] text-ink-muted ${effectivePrice < regularPrice ? "line-through" : ""}`}>
               ${formatMoneyMX(regularPrice)}
             </div>
           )}

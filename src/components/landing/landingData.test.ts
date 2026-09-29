@@ -64,11 +64,13 @@ describe("clases de la semana", () => {
 });
 
 describe("paquetes", () => {
-  it("precios como texto; apertura sólo si es menor", () => {
+  it("precios como texto; apertura respeta también precios superiores", () => {
     expect(toLandingPlan({ id: "1", name: "4 clases", price: "1140.00", effectivePrice: "1080.00", openingActive: true, classLimit: 4 }))
       .toMatchObject({ price: 1140, finalPrice: 1080, opening: true, perClass: 270 });
     expect(toLandingPlan({ id: "2", name: "1 clase", price: "300.00", classLimit: 1 }))
       .toMatchObject({ price: 300, finalPrice: 300, opening: false, perClass: null });
+    expect(toLandingPlan({ id: "trial", name: "Clase muestra", price: 200, effectivePrice: 500, openingActive: true, classLimit: 1 }))
+      .toMatchObject({ finalPrice: 500, opening: true });
     expect(toLandingPlan({ id: "3", name: "Mes", price: 4200, effective_price: 4200, opening_active: true, class_limit: null }))
       .toMatchObject({ finalPrice: 4200, opening: false, perClass: null });
   });

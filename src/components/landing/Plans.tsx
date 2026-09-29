@@ -8,7 +8,7 @@ const money = (n: number) => `$${formatMoneyMX(n)}`;
 function Price({ p, big }: { p: LandingPlan; big?: boolean }) {
   return (
     <div className="text-right">
-      {p.opening && <s className="block text-[0.75rem] text-ink-muted">{money(p.price)}</s>}
+      {p.opening && (p.finalPrice < p.price ? <s className="block text-[0.75rem] text-ink-muted">{money(p.price)}</s> : <span className="block text-[0.75rem] text-ink-muted">Normal {money(p.price)}</span>)}
       <span className={"font-display font-extrabold text-ink " + (big ? "text-[1.4rem]" : "text-[1.1rem]")}>{money(p.finalPrice)}</span>
     </div>
   );

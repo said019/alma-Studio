@@ -16,24 +16,29 @@ export const CATALOG_SCHEDULE_SLOTS = [
 ];
 export const CATALOG_SCHEDULE_DAYS = [1, 2, 3, 4, 5, 6]; // lun..sáb
 
-// price = regular; opening_price = apertura (solo ilimitados). class_limit null = ilimitado.
+// Catálogo HIVE aprobado: MXN, 30 días; apertura se controla en ajustes.
 export const CATALOG_PLANS = [
-  { name: "Studio Intro", description: "1 clase muestra Studio, solo para nuevas alumnas.", price: 150, opening_price: null, class_limit: 1, duration_days: 7, class_category: "studio", morning_only: false, is_non_repeatable: true, repeat_key: "studio_intro", sort_order: 1 },
-  { name: "Clase Única Studio", description: "1 sesión Studio (Mat, Barre o Sculpt).", price: 240, opening_price: null, class_limit: 1, duration_days: 30, class_category: "studio", morning_only: false, is_non_repeatable: false, repeat_key: null, sort_order: 2 },
-  { name: "4 Sesiones Studio", description: "4 sesiones Studio.", price: 900, opening_price: null, class_limit: 4, duration_days: 30, class_category: "studio", morning_only: false, is_non_repeatable: false, repeat_key: null, sort_order: 3 },
-  { name: "8 Sesiones Studio", description: "8 sesiones Studio.", price: 1700, opening_price: null, class_limit: 8, duration_days: 30, class_category: "studio", morning_only: false, is_non_repeatable: false, repeat_key: null, sort_order: 4 },
-  { name: "12 Sesiones Studio", description: "12 sesiones Studio.", price: 2150, opening_price: null, class_limit: 12, duration_days: 45, class_category: "studio", morning_only: false, is_non_repeatable: false, repeat_key: null, sort_order: 5 },
-  { name: "Studio Ilimitado", description: "Sesiones ilimitadas Studio (Mat + Barre + Sculpt).", price: 2700, opening_price: 2300, class_limit: null, duration_days: 30, class_category: "studio", morning_only: false, is_non_repeatable: false, repeat_key: null, sort_order: 6 },
-  { name: "Clase Única Reformer/Tower", description: "1 sesión en Reformer o Tower.", price: 270, opening_price: null, class_limit: 1, duration_days: 30, class_category: "reformer_tower", morning_only: false, is_non_repeatable: false, repeat_key: null, sort_order: 7 },
-  { name: "4 Sesiones Reformer/Tower", description: "4 sesiones Reformer/Tower.", price: 920, opening_price: null, class_limit: 4, duration_days: 30, class_category: "reformer_tower", morning_only: false, is_non_repeatable: false, repeat_key: null, sort_order: 8 },
-  { name: "8 Sesiones Reformer/Tower", description: "8 sesiones Reformer/Tower.", price: 1760, opening_price: null, class_limit: 8, duration_days: 30, class_category: "reformer_tower", morning_only: false, is_non_repeatable: false, repeat_key: null, sort_order: 9 },
-  { name: "12 Sesiones Reformer/Tower", description: "12 sesiones Reformer/Tower.", price: 2280, opening_price: null, class_limit: 12, duration_days: 45, class_category: "reformer_tower", morning_only: false, is_non_repeatable: false, repeat_key: null, sort_order: 10 },
-  { name: "Reformer/Tower Ilimitado", description: "Sesiones ilimitadas en Reformer y Tower.", price: 2900, opening_price: 2500, class_limit: null, duration_days: 30, class_category: "reformer_tower", morning_only: false, is_non_repeatable: false, repeat_key: null, sort_order: 11 },
-  { name: "Balance", description: "8 sesiones: 4 Studio + 4 Reformer/Tower.", price: 1500, opening_price: null, class_limit: 8, duration_days: 30, class_category: "mixto", studio_credits: 4, rt_credits: 4, morning_only: false, is_non_repeatable: false, repeat_key: null, sort_order: 12 },
-  { name: "Fusion", description: "12 sesiones: 6 Studio + 6 Reformer/Tower.", price: 2200, opening_price: null, class_limit: 12, duration_days: 30, class_category: "mixto", studio_credits: 6, rt_credits: 6, morning_only: false, is_non_repeatable: false, repeat_key: null, sort_order: 13 },
-  { name: "Experience", description: "16 sesiones: 8 Studio + 8 Reformer/Tower.", price: 2800, opening_price: null, class_limit: 16, duration_days: 45, class_category: "mixto", studio_credits: 8, rt_credits: 8, morning_only: false, is_non_repeatable: false, repeat_key: null, sort_order: 14 },
-  { name: "AM Club", description: "8 sesiones Studio, solo horario matutino (7–10am).", price: 1300, opening_price: null, class_limit: 8, duration_days: 30, class_category: "studio", morning_only: true, is_non_repeatable: false, repeat_key: null, sort_order: 15 },
-  { name: "AM Club Reformer & Tower", description: "8 sesiones Reformer/Tower, solo matutino (7–10am).", price: 1600, opening_price: null, class_limit: 8, duration_days: 30, class_category: "reformer_tower", morning_only: true, is_non_repeatable: false, repeat_key: null, sort_order: 16 },
-  { name: "Unlimited", description: "Acceso ilimitado a las 5 disciplinas: Reformer, Tower, Mat, Barre y Sculpt.", price: 3900, opening_price: 3500, class_limit: null, duration_days: 30, class_category: "all", morning_only: false, is_non_repeatable: false, repeat_key: null, sort_order: 17 },
-];
-
+  ["1 Clase", 300, 280, 1],
+  ["4 Clases", 1140, 1080, 4],
+  ["10 Clases", 2600, 2450, 10],
+  ["20 Clases", 4500, 4200, 20],
+  ["Mes", 4200, 3750, null],
+  ["Suscripción", 4000, 3900, null],
+  ["Clases de 12 a 4", 250, 200, 1],
+  ["Mes de 12 a 4", 3799, 3600, null],
+  ["Personalizado", 500, 500, 1],
+  ["Clase muestra", 200, 500, 1],
+].map(([name, price, opening_price, class_limit], i) => ({
+  name, price, opening_price, class_limit, duration_days: 30,
+  class_category: "all", morning_only: false,
+  afternoon_only: name.includes("12 a 4"),
+  personal_only: name === "Personalizado",
+  is_non_repeatable: name === "Clase muestra",
+  repeat_key: name === "Clase muestra" ? "hive_trial" : null,
+  sort_order: i + 1,
+  description: name === "Suscripción"
+    ? "Clases ilimitadas por 30 días. Renovación manual, sin cobros automáticos."
+    : name === "Personalizado"
+      ? "Una sesión individual, con cupo de una persona. Coordina tu horario con el estudio. Vigencia: 30 días."
+      : `${class_limit == null ? "Clases ilimitadas" : `${class_limit} clase${class_limit === 1 ? "" : "s"}`}${name.includes("12 a 4") ? ", con inicio entre las 12:00 y las 16:00 (hora de Ciudad de México)" : ""}. Vigencia: 30 días.${name === "Clase muestra" ? " Una sola compra por persona." : ""}`,
+}));

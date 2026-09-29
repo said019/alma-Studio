@@ -62,3 +62,25 @@ export function canMixtoBook(buckets, classCategory) {
   if (field === "rt_remaining") return Number(buckets?.rtRemaining) > 0;
   return true;
 }
+
+// Franja inclusiva por hora de INICIO: 12:00–16:00 en Ciudad de México.
+export function isWithinAfternoonWindow(startsAt, timeZone = "America/Mexico_City") {
+  if (!startsAt) return false;
+  const d = new Date(startsAt);
+  if (Number.isNaN(d.getTime())) return false;
+  const parts = new Intl.DateTimeFormat("en-GB", { timeZone, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(d);
+  const minutes = Number(parts.find(p => p.type === "hour").value) * 60 + Number(parts.find(p => p.type === "minute").value);
+  return minutes >= 720 && minutes <= 960;
+}
+
+export function membershipAllowsSession(membership, startsAt, capacity) {
+  if (membership.morning_only && !isWithinMorningWindow(startsAt)) return false;
+  if (membership.afternoon_only && !isWithinAfternoonWindow(startsAt)) return false;
+  // Sesiones individuales reservadas para el paquete Personalizado.
+  if (membership.personal_only) return Number(capacity) === 1;
+  return Number(capacity) !== 1;
+}
+
+export function purchaseCredits(classLimit, carryOver = 0) {
+  return classLimit == null ? null : Number(classLimit) + Number(carryOver);
+}

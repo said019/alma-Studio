@@ -48,6 +48,8 @@ const planSchema = z.object({
   classCategory: z.enum(["studio", "reformer_tower", "mixto", "all"]).default("studio"),
   openingPrice: z.preprocess((v) => (v === "" || v == null ? null : Number(v)), z.number().nullable()),
   morningOnly: z.boolean().default(false),
+  afternoonOnly: z.boolean().default(false),
+  personalOnly: z.boolean().default(false),
   features: z.string().optional(),
   isActive: z.boolean().default(true),
   isNonTransferable: z.boolean().default(false),
@@ -81,6 +83,8 @@ function normalizePlanRow(row: any): Plan {
     classCategory: ((row?.classCategory ?? row?.class_category ?? "studio") as CategoryValue),
     openingPrice: (() => { const r = (row as any)?.openingPrice ?? (row as any)?.opening_price; return r == null || r === "" ? null : Number(r); })(),
     morningOnly: Boolean((row as any)?.morningOnly ?? (row as any)?.morning_only ?? false),
+    afternoonOnly: Boolean((row as any)?.afternoonOnly ?? (row as any)?.afternoon_only ?? false),
+    personalOnly: Boolean((row as any)?.personalOnly ?? (row as any)?.personal_only ?? false),
     features: Array.isArray(row?.features)
       ? row.features.join(", ")
       : String(row?.features ?? ""),
@@ -97,7 +101,7 @@ function normalizePlanRow(row: any): Plan {
 const EMPTY: PlanFormData = {
   name: "", description: "", price: 0, currency: "MXN",
   durationDays: 30, classLimit: null, classCategory: "studio",
-  openingPrice: null, morningOnly: false,
+  openingPrice: null, morningOnly: false, afternoonOnly: false, personalOnly: false,
   features: "", isActive: true, isNonTransferable: false, isNonRepeatable: false, repeatKey: "",
   sortOrder: 0,
   isVisitPack: false,
@@ -109,6 +113,8 @@ function serializePlan(d: PlanFormData) {
     repeatKey: d.isNonRepeatable ? (d.repeatKey?.trim() || null) : null,
     opening_price: d.openingPrice,
     morning_only: !!d.morningOnly,
+    afternoon_only: !!d.afternoonOnly,
+    personal_only: !!d.personalOnly,
     features: d.features
       ? d.features.split(",").map((s) => s.trim()).filter(Boolean)
       : [],
@@ -123,6 +129,8 @@ function normalizePlan(p: Plan): PlanFormData {
     classCategory: ((p as any).classCategory ?? (p as any).class_category ?? "studio") as CategoryValue,
     openingPrice: (() => { const r = (p as any).openingPrice ?? (p as any).opening_price; return r == null || r === "" ? null : Number(r); })(),
     morningOnly: Boolean((p as any).morningOnly ?? (p as any).morning_only ?? false),
+    afternoonOnly: Boolean((p as any)?.afternoonOnly ?? (p as any)?.afternoon_only ?? false),
+    personalOnly: Boolean((p as any)?.personalOnly ?? (p as any)?.personal_only ?? false),
     features: Array.isArray(p.features)
       ? (p.features as unknown as string[]).join(", ")
       : (p.features as unknown as string) ?? "",
@@ -174,6 +182,8 @@ function PlanCard({ p, onEdit, onToggleActive, onDelete }: {
     p.isNonTransferable && "No transferible",
     p.isNonRepeatable && "No repetible",
     p.morningOnly && "Sólo mañanas",
+    p.afternoonOnly && "De 12:00 a 16:00",
+    p.personalOnly && "Sesión individual",
     p.isVisitPack && "Paquete de visitas",
   ].filter(Boolean) as string[];
   return (
@@ -435,10 +445,22 @@ const PlansList = () => {
                   onCheckedChange={(v) => form.setValue("isNonRepeatable", v)}
                 />
                 <SwitchRow
+                  label="Solo de 12 a 4"
+                  help="Inicio de clase entre las 12:00 y las 16:00, hora de Ciudad de México."
+                  checked={form.watch("afternoonOnly")}
+                  onCheckedChange={(v) => { form.setValue("afternoonOnly", v); if (v) form.setValue("morningOnly", false); }}
+                />
+                <SwitchRow
+                  label="Sesión personalizada"
+                  help="Solo permite reservar sesiones con cupo de una persona."
+                  checked={form.watch("personalOnly")}
+                  onCheckedChange={(v) => form.setValue("personalOnly", v)}
+                />
+                <SwitchRow
                   label="Solo horario matutino (AM Club)"
                   help="Solo permite reservar clases que empiezan a las 10:00 am o antes."
                   checked={form.watch("morningOnly")}
-                  onCheckedChange={(v) => form.setValue("morningOnly", v)}
+                  onCheckedChange={(v) => { form.setValue("morningOnly", v); if (v) form.setValue("afternoonOnly", false); }}
                 />
               </FormSection>
 
