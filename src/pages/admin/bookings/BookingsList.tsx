@@ -1,3 +1,5 @@
+import { ClassOperations } from "@/components/admin/ClassOperations";
+import { useCanSeeFinance } from "@/lib/roles";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useState } from "react";
 import { addDays, format, getISOWeek, parseISO, startOfWeek } from "date-fns";
@@ -245,6 +247,7 @@ const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: string; onBa
     }
   };
 
+  const canManageFinance = useCanSeeFinance();
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["roster", classId],
     queryFn: async () => (await api.get(`/classes/${classId}/roster`)).data,
@@ -516,6 +519,7 @@ const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: string; onBa
                   </span>
                   <span className="col-start-2 2xl:col-start-auto"><RosterStatus status={entry.status} /></span>
                   <span className="col-span-2 flex flex-wrap justify-end gap-1.5 2xl:col-span-1">
+                    {canManageFinance && entry.status === "checked_in" && <ClassOperations bookingId={entry.bookingId} />}
                     {canCheckin && (
                       <Button variant="outline" aria-label={`Check-in de ${entry.displayName}`} onClick={() => checkinMutation.mutate(entry.bookingId)} disabled={checkinMutation.isPending}>
                         <Check size={16} aria-hidden="true" />

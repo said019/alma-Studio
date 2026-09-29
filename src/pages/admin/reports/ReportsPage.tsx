@@ -1,3 +1,4 @@
+import { OccupancyBySlot } from "@/components/admin/OccupancyBySlot";
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
@@ -751,7 +752,7 @@ const ReportsContent = () => {
             </CardContent>
           </Card>
         </Tabs>
-      </AdminPage>
+      <OccupancyBySlot /></AdminPage>
     </AdminLayout>
   );
 };

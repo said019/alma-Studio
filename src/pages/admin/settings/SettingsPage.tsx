@@ -1,3 +1,4 @@
+import { StripeStatus } from "@/components/admin/StripeStatus";
 import { useState, useEffect, useRef } from "react";
 import { FEATURES } from "@/config/features";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -1081,6 +1082,7 @@ const SettingsPage = () => {
               </TabsContent>
 
               <TabsContent value="payments">
+                <StripeStatus />
                 <BankInfoSettings />
               </TabsContent>
 

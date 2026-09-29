@@ -1,3 +1,4 @@
+import { RescheduleBooking } from "@/components/app/RescheduleBooking";
 import { useState, useMemo, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
@@ -215,6 +216,7 @@ const MyBookings = () => {
         </div>
         {hasActions && (
           <div className="mt-3 flex flex-wrap items-center gap-2">
+            {isCancellable && b.status === "confirmed" && <RescheduleBooking bookingId={b.id} />}
             {isCancellable && (
               <GhostButton tone="danger" onClick={() => setCancelTarget(b)}>
                 {b.status === "waitlist" ? "Salir de la lista de espera" : "Cancelar reserva"}

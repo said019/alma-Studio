@@ -1,3 +1,4 @@
+import { homePathForRole } from "@/lib/roleRoutes";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -49,10 +50,10 @@ const Login = () => {
   useEffect(() => {
     if (!isAuthenticated || !role) return;
     // Staff con sesión vencida en /admin/... vuelve ahí; nada fuera de /app o /admin.
-    const returnUrl = safeReturnUrl(params.get("returnUrl"), ["/app", "/admin"]);
+    const returnUrl = safeReturnUrl(params.get("returnUrl"), ["/app", "/admin", "/staff"]);
     let target: string;
     if (returnUrl) target = returnUrl;
-    else if (["admin", "super_admin", "instructor", "reception"].includes(role)) target = "/admin/dashboard";
+    else if (["admin", "super_admin", "instructor", "reception"].includes(role)) target = homePathForRole(role);
     // Con el cuestionario apagado (paridad con Velan) se entra directo a la app.
     else if (FEATURES.onboarding && onboardingDone === false) target = "/auth/onboarding";
     else target = "/app";
@@ -66,10 +67,10 @@ const Login = () => {
     try {
       await login(data);
       const { user: authedUser } = useAuthStore.getState();
-      const returnUrl = safeReturnUrl(params.get("returnUrl"), ["/app", "/admin"]);
+      const returnUrl = safeReturnUrl(params.get("returnUrl"), ["/app", "/admin", "/staff"]);
       if (returnUrl) { navigate(returnUrl, { replace: true }); return; }
       if (["admin", "super_admin", "instructor", "reception"].includes(authedUser?.role ?? "")) {
-        navigate("/admin/dashboard", { replace: true });
+        navigate(homePathForRole(authedUser?.role), { replace: true });
       } else if (FEATURES.onboarding && authedUser?.onboardingCompleted === false) {
         navigate("/auth/onboarding", { replace: true });
       } else {

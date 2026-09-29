@@ -1,3 +1,4 @@
+import { ReorderPlans } from "@/components/admin/ReorderPlans";
 import { useState, type ReactNode } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -292,7 +293,7 @@ const PlansList = () => {
             kicker="Más"
             title="Planes"
             subtitle="Los paquetes que vendes. Los cambios aplican a ventas nuevas; lo ya vendido no se toca."
-            actions={<Button onClick={openCreate}><Plus size={16} aria-hidden="true" />Nuevo plan</Button>}
+            actions={<><ReorderPlans plans={plans} /><Button onClick={openCreate}><Plus size={16} aria-hidden="true" />Nuevo plan</Button></>}
           />
 
           {isError ? (

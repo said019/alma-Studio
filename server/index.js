@@ -1,3 +1,5 @@
+import { registerCommunications } from "./lib/communications.js";
+import { registerVelanParity } from "./lib/velanParity.js";
 import "dotenv/config";
 
 // ─── Zona horaria del estudio ────────────────────────────────────────────────
@@ -1080,6 +1082,14 @@ async function ensureSchema() {
       );
     `);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_referrals_code ON referrals(referral_code_id)`).catch(() => { });
+
+    await pool.query(`ALTER TABLE discount_codes ADD COLUMN IF NOT EXISTS once_per_user BOOLEAN NOT NULL DEFAULT false,
+      ADD COLUMN IF NOT EXISTS max_uses_per_user INTEGER,
+      ADD COLUMN IF NOT EXISTS orphaned_by_plan_deletion BOOLEAN NOT NULL DEFAULT false`);
+    await pool.query(`ALTER TABLE payments ADD COLUMN IF NOT EXISTS discount_code_id UUID REFERENCES discount_codes(id) ON DELETE SET NULL,
+      ADD COLUMN IF NOT EXISTS discount_amount NUMERIC(10,2) DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS list_price NUMERIC(10,2),
+      ADD COLUMN IF NOT EXISTS order_id UUID REFERENCES orders(id) ON DELETE SET NULL`);
     // ── orders: add missing columns if needed ─────────────────────────────
     await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount_amount DECIMAL(10,2) DEFAULT 0`).catch(() => { });
     await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount_code_id UUID REFERENCES discount_codes(id) ON DELETE SET NULL`).catch(() => { });
@@ -1102,6 +1112,20 @@ async function ensureSchema() {
     await pool.query(`DROP TABLE IF EXISTS video_purchases CASCADE`).catch(() => { });
     await pool.query(`DROP TABLE IF EXISTS videos CASCADE`).catch(() => { });
     await pool.query(`DROP TABLE IF EXISTS homepage_video_cards CASCADE`).catch(() => { });
+    await pool.query(`ALTER TABLE memberships ADD COLUMN IF NOT EXISTS total_paused_days INTEGER NOT NULL DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS last_resumed_at TIMESTAMPTZ`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS membership_credit_log (
+      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(), membership_id UUID NOT NULL REFERENCES memberships(id) ON DELETE CASCADE,
+      old_value INTEGER, new_value INTEGER, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
+    await pool.query(`CREATE OR REPLACE FUNCTION hive_log_membership_credits() RETURNS TRIGGER AS $$
+      BEGIN
+        IF OLD.classes_remaining IS DISTINCT FROM NEW.classes_remaining THEN
+          INSERT INTO membership_credit_log(membership_id,old_value,new_value) VALUES(NEW.id,OLD.classes_remaining,NEW.classes_remaining);
+        END IF;
+        RETURN NEW;
+      END; $$ LANGUAGE plpgsql`);
+    await pool.query("CREATE OR REPLACE TRIGGER hive_credit_history AFTER UPDATE OF classes_remaining ON memberships FOR EACH ROW EXECUTE FUNCTION hive_log_membership_credits()");
     // ── memberships: add order_id column ─────────────────────────────────
     await pool.query(`ALTER TABLE memberships ADD COLUMN IF NOT EXISTS order_id UUID`).catch(() => { });
     await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_memberships_order ON memberships(order_id) WHERE order_id IS NOT NULL`).catch(() => { });
@@ -2453,13 +2477,169 @@ async function resyncMixtoBuckets(client, membershipId) {
   );
 }
 
+const COUPON_CLASS_CATEGORIES = ["studio", "reformer_tower", "mixto", "all"];
+const COUPON_CATEGORY_MESSAGE = "Elige Studio, Reformer/Tower, Mixto o Todas.";
+const COUPON_EMPTY_UPDATE_MESSAGE = "Envía al menos un campo del cupón.";
+function couponValidationError(message) {
+  const err = new Error(message);
+  err.status = 400;
+  return err;
+}
+
+// Las fechas elegidas en el panel se entienden como "válido hasta el final de
+// ese día" en Ciudad de México. Sin esta normalización, 2026-07-31 expiraba al
+// iniciar el día porque PostgreSQL interpretaba el input date a medianoche.
+function normalizeDiscountExpiry(value) {
+  if (value === undefined || value === null || value === "") return null;
+  const raw = String(value).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    const [year, month, day] = raw.split("-").map(Number);
+    const candidate = new Date(Date.UTC(year, month - 1, day));
+    if (
+      candidate.getUTCFullYear() !== year
+      || candidate.getUTCMonth() !== month - 1
+      || candidate.getUTCDate() !== day
+    ) {
+      throw couponValidationError("Fecha de expiración inválida");
+    }
+    return `${raw}T23:59:59.999-06:00`;
+  }
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) throw couponValidationError("Fecha de expiración inválida");
+  return parsed.toISOString();
+}
+
+// Campos que el panel manda de un cupón. Sirve para dos cosas: saber si un PUT
+// trae algo que actualizar y, en un PUT, qué claves NO tocar.
+const DISCOUNT_CODE_FIELDS = [
+  "code", "discountType", "discountValue", "maxUses", "expiresAt", "oncePerUser", "maxUsesPerUser",
+  "minOrderAmount", "minPurchaseAmount", "planId", "classCategory", "channel", "isActive",
+];
+
+// Los valores guardados de un cupón, con los nombres que usa el panel. Son el
+// punto de partida de una edición parcial (PUT).
+function discountCodeDefaultsFromRow(row) {
+  return {
+    code: row.code,
+    discountType: row.discount_type,
+    discountValue: Number(row.discount_value),
+    maxUses: row.max_uses === null || row.max_uses === undefined ? null : Number(row.max_uses),
+    oncePerUser: row.once_per_user === true,
+    maxUsesPerUser: row.max_uses_per_user ?? (row.once_per_user ? 1 : null),
+    expiresAt: row.expires_at ? new Date(row.expires_at).toISOString() : null,
+    minOrderAmount: Number(row.min_order_amount || 0),
+    planId: row.plan_id ?? null,
+    classCategory: row.class_category ?? null,
+    channel: row.channel || "all",
+    isActive: row.is_active !== false,
+  };
+}
+
+// `existing` (la fila guardada) convierte esto en una edición PARCIAL: lo que
+// el cuerpo no trae conserva su valor. Antes el PUT era un reemplazo y un
+// cuerpo sin `channel` pasaba un cupón de 'pos' a 'all', es decir lo abría a la
+// web sin que nadie lo pidiera (RG65/RG68).
+function normalizeDiscountCodePayload(input, { existing = null } = {}) {
+  const body = input ?? {};
+  const has = (key) => Object.prototype.hasOwnProperty.call(body, key);
+  const partial = existing !== null;
+  const base = partial
+    ? discountCodeDefaultsFromRow(existing)
+    : { code: undefined, discountType: undefined, discountValue: undefined, maxUses: undefined,
+        expiresAt: undefined, minOrderAmount: 0, planId: null, classCategory: null,
+        channel: "all", isActive: true };
+  if (partial && !DISCOUNT_CODE_FIELDS.some(has)) {
+    throw couponValidationError(COUPON_EMPTY_UPDATE_MESSAGE);
+  }
+  const pick = (key, fallbackKey = null) => {
+    if (has(key)) return body[key];
+    if (fallbackKey && has(fallbackKey)) return body[fallbackKey];
+    return base[key];
+  };
+
+  const normalizedCode = String(pick("code") ?? "").trim().toUpperCase();
+  if (!/^[A-Z0-9_-]{3,50}$/.test(normalizedCode)) {
+    throw couponValidationError("El código debe tener entre 3 y 50 caracteres: letras, números, guiones o guion bajo.");
+  }
+
+  const discountType = normalizeDiscountType(pick("discountType"));
+  if (!discountType) throw couponValidationError("Tipo de descuento inválido");
+
+  const discountValue = Number(pick("discountValue"));
+  if (!Number.isFinite(discountValue) || discountValue <= 0) {
+    throw couponValidationError("El valor del descuento debe ser mayor a cero");
+  }
+  if (discountType === "percent" && discountValue > 100) {
+    throw couponValidationError("Un descuento porcentual no puede ser mayor a 100%");
+  }
+
+  const rawMaxUses = pick("maxUses");
+  const legacyOnce = pick("oncePerUser") ?? false;
+  if (typeof legacyOnce !== "boolean") throw couponValidationError("Un uso por usuario debe ser verdadero o falso");
+  const rawPersonal = has("maxUsesPerUser") ? body.maxUsesPerUser : has("oncePerUser") ? (legacyOnce ? 1 : null) : (pick("maxUsesPerUser") ?? (legacyOnce ? 1 : null));
+  const maxUsesPerUser = rawPersonal === null || rawPersonal === undefined || rawPersonal === "" ? null : Number(rawPersonal);
+  if (maxUsesPerUser !== null && (!Number.isSafeInteger(maxUsesPerUser) || maxUsesPerUser < 1 || maxUsesPerUser > 2147483647)) throw couponValidationError("Usos por persona debe ser un entero positivo válido");
+  const oncePerUser = maxUsesPerUser === 1;
+  const maxUses = rawMaxUses === undefined || rawMaxUses === null || rawMaxUses === ""
+    ? null
+    : Number(rawMaxUses);
+  if (maxUses !== null && (!Number.isInteger(maxUses) || maxUses < 1)) {
+    throw couponValidationError("El límite de usos debe ser un número entero mayor a cero");
+  }
+
+  const minOrderAmount = Number(pick("minOrderAmount", "minPurchaseAmount") ?? 0);
+  if (!Number.isFinite(minOrderAmount) || minOrderAmount < 0) {
+    throw couponValidationError("La compra mínima debe ser un monto válido");
+  }
+
+  const rawCategory = pick("classCategory");
+  const classCategory = rawCategory === undefined || rawCategory === null || rawCategory === ""
+    ? null
+    : normalizeClassCategory(rawCategory, "__invalid__");
+  if (classCategory === "__invalid__") throw couponValidationError(COUPON_CATEGORY_MESSAGE);
+  // Una categoría retirada sólo se acepta si es la que la fila ya tenía: los
+  // cupones viejos se conservan tal cual, pero ninguno nuevo puede nacer con
+  // una categoría que ningún plan usa.
+  if (classCategory !== null
+    && !COUPON_CLASS_CATEGORIES.includes(classCategory)
+    && classCategory !== (base.classCategory ?? null)) {
+    throw couponValidationError(COUPON_CATEGORY_MESSAGE);
+  }
+
+  const rawChannel = pick("channel");
+  const channel = rawChannel === undefined || rawChannel === null || rawChannel === ""
+    ? "all"
+    : normalizeDiscountChannel(rawChannel, "__invalid__");
+  if (channel === "__invalid__") throw couponValidationError("Canal inválido");
+
+  const rawPlanId = pick("planId");
+  const rawIsActive = pick("isActive");
+
+  return {
+    code: normalizedCode,
+    discountType,
+    discountValue,
+    maxUses,
+    oncePerUser,
+    maxUsesPerUser,
+    expiresAt: normalizeDiscountExpiry(pick("expiresAt")),
+    minOrderAmount,
+    planId: rawPlanId || null,
+    classCategory,
+    channel,
+    isActive: rawIsActive === undefined ? true : Boolean(rawIsActive),
+  };
+}
+
 async function findApplicableDiscountCode({
+  userId = null,
   code,
   subtotal,
   planId = null,
   classCategory = "all",
   channel = "all",
   client = null,
+  lock = false,
 }) {
   if (!code) return null;
   const q = client ?? pool;
@@ -2472,7 +2652,17 @@ async function findApplicableDiscountCode({
       WHERE code = $1
         AND is_active = true
         AND (expires_at IS NULL OR expires_at > NOW())
-        AND (max_uses IS NULL OR uses_count < max_uses)
+        -- Mientras una orden está pendiente, conserva un cupo. Así evitamos
+        -- vender el último cupón dos veces durante pagos simultáneos.
+        AND (
+          max_uses IS NULL
+          OR uses_count + (
+            SELECT COUNT(*)
+              FROM orders pending_orders
+             WHERE pending_orders.discount_code_id = discount_codes.id
+               AND pending_orders.status IN ('pending_payment', 'pending_verification')
+          ) < max_uses
+        )
         AND (channel = 'all' OR channel = $2)
         AND (plan_id IS NULL OR plan_id = $3)
         AND (
@@ -2484,11 +2674,31 @@ async function findApplicableDiscountCode({
       ORDER BY
         CASE WHEN plan_id IS NULL THEN 1 ELSE 0 END ASC,
         CASE WHEN class_category IS NULL OR class_category = 'all' THEN 1 ELSE 0 END ASC
-      LIMIT 1`,
+      LIMIT 1${lock ? " FOR UPDATE" : ""}`,
     [normalizedCode, normalizedChannel, planId, normalizedCategory]
   );
   if (!r.rows.length) return null;
   const dc = r.rows[0];
+  // A fresh statement after the row lock sees orders committed while waiting.
+  if (dc.max_uses !== null) {
+    const pending = await q.query("SELECT COUNT(*)::int AS n FROM orders WHERE discount_code_id=$1 AND status IN ('pending_payment','pending_verification')", [dc.id]);
+    if (Number(dc.uses_count) + Number(pending.rows[0].n) >= Number(dc.max_uses)) return null;
+  }
+  const personalLimit = dc.max_uses_per_user ?? (dc.once_per_user === true ? 1 : null);
+  if (personalLimit !== null) {
+    if (!userId && lock) throw couponValidationError( "Este cupón requiere una persona registrada para aplicar el límite por persona.");
+    if (userId) {
+      // Separate query AFTER the coupon row lock: concurrent sales see the
+      // first committed order/payment, including pending checkout reservations.
+      const used = await q.query(`SELECT COUNT(*)::int AS uses FROM (
+        SELECT id FROM orders WHERE discount_code_id=$1 AND user_id=$2
+          AND status IN ('approved','pending_payment','pending_verification')
+        UNION
+        SELECT COALESCE(order_id, id) FROM payments WHERE discount_code_id=$1 AND user_id=$2 AND status='completed'
+      ) AS redemptions`, [dc.id, userId]);
+      if (Number(used.rows[0].uses) >= personalLimit) throw couponValidationError( `Este cupón permite ${personalLimit} uso(s) por persona. Ya alcanzaste el límite con tus compras confirmadas o pendientes.`);
+    }
+  }
   const safeSubtotal = Number(subtotal || 0);
   const minOrderAmount = Number(dc.min_order_amount || 0);
   if (safeSubtotal < minOrderAmount) {
@@ -2660,6 +2870,7 @@ async function processPosSale({ userId, items, paymentMethod = "efectivo", disco
     if (discountCode) {
       const discount = await findApplicableDiscountCode({
         code: discountCode,
+        userId, lock: true,
         subtotal,
         channel: "pos",
         classCategory: "all",
@@ -4910,6 +5121,7 @@ app.post("/api/orders", authMiddleware, async (req, res) => {
     if (discountCode) {
       const discountResult = await findApplicableDiscountCode({
         code: discountCode,
+        userId: req.userId, lock: true,
         subtotal,
         planId,
         classCategory: normalizeClassCategory(plan.class_category, "all"),
@@ -5005,7 +5217,7 @@ app.post("/api/orders", authMiddleware, async (req, res) => {
   } catch (err) {
     try { await client.query("ROLLBACK"); } catch (_) { }
     console.error("POST orders error:", err);
-    return res.status(500).json({ message: err?.message || "Error interno" });
+    return res.status(err.status || 500).json({ message: err.status ? err.message : "Error interno" });
   } finally {
     client.release();
   }
@@ -5091,14 +5303,16 @@ app.post("/api/discount-codes/validate", authMiddleware, async (req, res) => {
   const { code, planId, classCategory, channel } = req.body;
   if (!code) return res.status(400).json({ message: "Código requerido" });
   try {
-    const planRes = await pool.query("SELECT price, class_category FROM plans WHERE id = $1", [planId || null]);
-    const originalPrice = planRes.rows.length > 0 ? parseFloat(planRes.rows[0].price) : 0;
+    const planRes = await pool.query("SELECT * FROM plans WHERE id = $1", [planId || null]);
+    const priceSettings = await getSettingValueWithDefaults("general_settings");
+    const originalPrice = planRes.rows.length > 0 ? Number(resolveEffectivePrice(planRes.rows[0], priceSettings?.opening_pricing_active !== false)) : 0;
     const effectiveCategory = normalizeClassCategory(
       classCategory ?? planRes.rows[0]?.class_category ?? "all",
       "all"
     );
     const discountResult = await findApplicableDiscountCode({
       code,
+      userId: req.userId,
       subtotal: originalPrice,
       planId: planId || null,
       classCategory: effectiveCategory,
@@ -5122,9 +5336,23 @@ app.post("/api/discount-codes/validate", authMiddleware, async (req, res) => {
       }
     });
   } catch (err) {
-    console.error("Discount validate error:", err);
-    return res.status(500).json({ message: "Error interno" });
+    console.error("Discount validate error:", err.message);
+    return res.status(err.status || 500).json({ message: err.status ? err.message : "Error interno" });
   }
+});
+
+app.post("/api/admin/discount-codes/preview", ownerMiddleware, async(req,res)=>{
+  try {
+    const {code,planId,userId}=req.body??{};
+    if(!isUuid(planId)||!isUuid(userId))return res.status(400).json({message:"Selecciona un usuario y un plan"});
+    const plan=(await pool.query("SELECT * FROM plans WHERE id=$1 AND is_active=true",[planId])).rows[0];
+    if(!plan)return res.status(404).json({message:"Plan no encontrado"});
+    const settings=await getSettingValueWithDefaults("general_settings");
+    const subtotal=Number(resolveEffectivePrice(plan,settings?.opening_pricing_active!==false));
+    const result=await findApplicableDiscountCode({code,userId,planId,subtotal,classCategory:plan.class_category,channel:"membership"});
+    if(!result||result.rejectedByMinOrder)return res.status(400).json({message:"El cupón no aplica a esta compra"});
+    res.json({data:{code:result.code.code,discountAmount:result.discountAmount,finalAmount:subtotal-result.discountAmount}});
+  }catch(err){res.status(err.status||500).json({message:err.status?err.message:"No se pudo validar el cupón"});}
 });
 
 // ─── Routes: /api/wallet ────────────────────────────────────────────────────
@@ -9673,7 +9901,7 @@ async function applyCancellationRollback(client, booking, opts = {}) {
  * la clase no existe o ya estaba cancelada. Los avisos van DESPUÉS del COMMIT
  * con notifyClassCancelled().
  */
-async function cancelClassInTx(client, classId, { actorId, reason, source = "manual" }) {
+async function cancelClassInTx(client, classId, { actorId, reason, source = "manual", includeNoShows = false }) {
   const actor = isUuid(actorId) ? actorId : null;
   const why = cleanReason(reason);
   const cls = await client.query(
@@ -9692,15 +9920,15 @@ async function cancelClassInTx(client, classId, { actorId, reason, source = "man
   // Reservas activas ANTES de cancelarlas (incluye checked_in: la admin puede
   // cancelar una clase a posteriori).
   const bookingsRes = await client.query(
-    `SELECT b.id, b.user_id, b.class_id, b.membership_id, b.status, b.checked_in_at,
+    `SELECT b.id, b.user_id, b.class_id, b.membership_id, b.status, b.checked_in_at, b.falta_recorded_at, b.guest_profile_id,
             c.date AS class_date,
             u.display_name, u.phone, ct.name AS class_name
        FROM bookings b
        LEFT JOIN users u ON u.id = b.user_id
        LEFT JOIN classes c ON c.id = b.class_id
        LEFT JOIN class_types ct ON ct.id = c.class_type_id
-      WHERE b.class_id = $1 AND b.status NOT IN ('cancelled', 'no_show')`,
-    [classId],
+      WHERE b.class_id = $1 AND b.status <> 'cancelled' AND ($2::boolean OR b.status <> 'no_show') FOR UPDATE OF b`,
+    [classId, includeNoShows],
   );
   const activeBookings = bookingsRes.rows;
   let creditsRestored = 0;
@@ -9712,6 +9940,17 @@ async function cancelClassInTx(client, classId, { actorId, reason, source = "man
         WHERE id=$1`,
       [b.id, actor, why],
     );
+    if (b.status === "no_show" && includeNoShows) {
+      if (b.membership_id) { await restoreMembershipCredit(client,b.membership_id,b.class_id); creditsRestored++; }
+      if (b.falta_recorded_at && b.user_id && !b.guest_profile_id) {
+        const cfg=await getLoyaltyConfig(client);
+        const count=(await client.query("SELECT COALESCE(faltas_count,0)::int AS n FROM users WHERE id=$1 FOR UPDATE",[b.user_id])).rows[0]?.n??0;
+        const reversal=faltaReversal({faltasCount:count,threshold:cfg.faltas_threshold,penaltyPoints:cfg.faltas_penalty_points});
+        await client.query("UPDATE users SET faltas_count=$2 WHERE id=$1",[b.user_id,reversal.newCount]);
+        if(reversal.refundPoints>0)await client.query("INSERT INTO loyalty_transactions(user_id,type,points,description) VALUES($1,'adjust',$2,'Reverso: clase no realizada')",[b.user_id,reversal.refundPoints]);
+      }
+      await client.query("UPDATE bookings SET falta_recorded_at=NULL WHERE id=$1",[b.id]);
+    }
     // Al cancelar la clase completa se devuelve crédito también a quienes ya
     // tenían check-in (la clase no ocurrió).
     const rollback = await applyCancellationRollback(client, b, { refundCheckedIn: true });
@@ -12404,7 +12643,7 @@ async function getBookingPolicy(db = pool) {
       .catch(() => null),
     getLoyaltyConfig(db),
   ]);
-  return publicBookingPolicy({ settings: raw, loyalty, bookingLeadHours: BOOKING_LEAD_HOURS });
+  return publicBookingPolicy({ settings: raw, loyalty, bookingLeadHours: BOOKING_LEAD_HOURS, cancelClassInTx, notifyClassCancelled, applyCancellationRollback });
 }
 
 app.get("/api/public/booking-policy", async (_req, res) => {
@@ -13826,7 +14065,7 @@ app.post("/api/memberships", adminMiddleware, async (req, res) => {
     const plan = planRes.rows[0];
     const _gen = await getSettingValueWithDefaults("general_settings");
     const _eff = resolveEffectivePrice(plan, _gen?.opening_pricing_active !== false);
-    const sale = saleAmountPlan({ listPrice: _eff ?? 0, amount: req.body.amount, reason: req.body.reason });
+    let sale = saleAmountPlan({ listPrice: _eff ?? 0, amount: req.body.amount, reason: req.body.discountCode ? `Cupón ${req.body.discountCode}` : req.body.reason });
     if (!sale.ok) return res.status(400).json({ ...(sale.code ? { code: sale.code } : {}), message: sale.message });
     const nonRepeatableConflict = await findNonRepeatablePlanConflict({ userId, plan });
     if (nonRepeatableConflict) {
@@ -13841,6 +14080,15 @@ app.post("/api/memberships", adminMiddleware, async (req, res) => {
     let r;
     try {
       await saleClient.query("BEGIN");
+      let coupon = null;
+      if (req.body.discountCode) {
+        const result = await findApplicableDiscountCode({ code: req.body.discountCode, userId, planId, subtotal: Number(_eff), classCategory: plan.class_category, channel: "membership", client: saleClient, lock: true });
+        if (!result || result.rejectedByMinOrder) throw couponValidationError("El cupón no aplica a esta venta");
+        coupon = result.code;
+        sale = saleAmountPlan({ listPrice: _eff, amount: Number(_eff)-result.discountAmount, reason: `Cupón ${coupon.code}` });
+        if (req.body.amount != null && Math.abs(Number(req.body.amount)-sale.amount)>0.01) throw couponValidationError("El importe cambió. Aplica de nuevo el cupón antes de cobrar.");
+        await incrementDiscountUsage(coupon.id, saleClient);
+      }
       r = await saleClient.query(
         `INSERT INTO memberships (user_id, plan_id, status, payment_method, start_date, end_date, classes_remaining, activated_by, activated_at)
          VALUES ($1,$2,'active',$3,$4,$5,$6,$7,NOW())
@@ -13855,6 +14103,7 @@ app.post("/api/memberships", adminMiddleware, async (req, res) => {
         [userId, planId, paymentMethod, sale.subtotal, sale.amount, sale.discount, req.userId || null]
       );
       const order = orderRes.rows[0];
+      if (coupon) await saleClient.query("UPDATE orders SET discount_code_id=$2 WHERE id=$1", [order.id,coupon.id]);
       const paymentReference = ref.value || order.order_number || order.id;
       await saleClient.query(`UPDATE memberships SET order_id = $2, payment_reference = $3 WHERE id = $1`,
         [r.rows[0].id, order.id, paymentReference]);
@@ -13862,7 +14111,7 @@ app.post("/api/memberships", adminMiddleware, async (req, res) => {
       r.rows[0].payment_reference = paymentReference;
       await recordAudit(saleClient, {
         actorId: req.userId, action: "membership.sale", entityType: "membership", entityId: r.rows[0].id,
-        subjectUserId: userId, reason: sale.courtesy || sale.priceDiffers ? req.body.reason : null,
+        subjectUserId: userId, reason: coupon ? `Cupón ${coupon.code}` : sale.courtesy || sale.priceDiffers ? req.body.reason : null,
         after: saleAuditAfter({
           plan, listPrice: sale.listPrice, amount: sale.amount, paymentMethod, paymentReference,
           orderId: order.id, startDate: r.rows[0].start_ymd, endDate: r.rows[0].end_ymd,
@@ -13933,7 +14182,7 @@ app.post("/api/memberships", adminMiddleware, async (req, res) => {
     return res.status(201).json({ data: r.rows[0] });
   } catch (err) {
     console.error("POST /memberships error:", err);
-    return res.status(500).json({ message: "Error interno" });
+    return res.status(err.status || 500).json({ message: err.status ? err.message : "Error interno" });
   }
 });
 
@@ -14401,6 +14650,220 @@ app.post("/api/plans", adminMiddleware, async (req, res) => {
     console.error("[POST /plans]", err.message);
     return res.status(500).json({ message: "Error interno" });
   }
+});
+
+function instructorMiddleware(req,res,next) { return roleGuard(["instructor"])(req,res,next); }
+function receptionMiddleware(req,res,next) { return roleGuard(["reception"])(req,res,next); }
+function staffOperationsMiddleware(req,res,next) { return roleGuard(["instructor","reception"])(req,res,next); }
+function isCivilDateKey(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(value || ""))) return false;
+  const parsed = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+}
+
+function addCivilDays(dateKey, days) {
+  const parsed = new Date(`${dateKey}T00:00:00Z`);
+  parsed.setUTCDate(parsed.getUTCDate() + days);
+  return parsed.toISOString().slice(0, 10);
+}
+
+function civilDayDistance(from, to) {
+  return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000);
+}
+
+function mapStaffClass(row) {
+  return {
+    id: row.id,
+    date: row.date,
+    startTime: String(row.start_time || "").slice(0, 5),
+    endTime: String(row.end_time || "").slice(0, 5),
+    status: row.status,
+    classTypeName: row.class_type_name,
+    instructorName: row.instructor_name || null,
+    maxCapacity: Number(row.max_capacity || 0),
+    currentBookings: Number(row.current_bookings || 0),
+    confirmedCount: Number(row.confirmed_count || 0),
+    checkedInCount: Number(row.checked_in_count || 0),
+    waitlistCount: Number(row.waitlist_count || 0),
+  };
+}
+
+async function selectStaffClasses({ userId, role, from, to }) {
+  const roleFilter = role === "instructor"
+    ? "AND i.user_id = $1"
+    : "";
+  const params = role === "instructor" ? [userId, from, to] : [from, to];
+  const fromIndex = role === "instructor" ? 2 : 1;
+  const toIndex = fromIndex + 1;
+  const result = await pool.query(
+    `SELECT c.id, c.date::text AS date, c.start_time, c.end_time, c.status,
+            c.max_capacity, c.current_bookings,
+            ct.name AS class_type_name, i.display_name AS instructor_name,
+            COUNT(b.id) FILTER (WHERE b.status = 'confirmed') AS confirmed_count,
+            COUNT(b.id) FILTER (WHERE b.status = 'checked_in') AS checked_in_count,
+            COUNT(b.id) FILTER (WHERE b.status = 'waitlist') AS waitlist_count
+       FROM classes c
+       JOIN class_types ct ON ct.id = c.class_type_id
+       JOIN instructors i ON i.id = c.instructor_id
+       LEFT JOIN bookings b ON b.class_id = c.id AND b.status != 'cancelled'
+      WHERE c.date BETWEEN $${fromIndex} AND $${toIndex}
+        ${roleFilter}
+      GROUP BY c.id, ct.name, i.display_name
+      ORDER BY c.date, c.start_time`,
+    params,
+  );
+  return result.rows.map(mapStaffClass);
+}
+
+async function selectScopedStaffClass({ classId, userId, role }) {
+  const params = [classId];
+  let scopeSql = "";
+  if (role === "instructor") {
+    params.push(userId);
+    scopeSql = `AND i.user_id = $2`;
+  } else if (role === "reception") {
+    params.push(todayInStudio());
+    scopeSql = `AND c.date = $2::date`;
+  } else {
+    return null;
+  }
+  const result = await pool.query(
+    `SELECT c.id, c.date::text AS date, c.start_time, c.end_time, c.status,
+            c.max_capacity, c.current_bookings,
+            ct.name AS class_type_name, i.display_name AS instructor_name
+       FROM classes c
+       JOIN class_types ct ON ct.id = c.class_type_id
+       JOIN instructors i ON i.id = c.instructor_id
+      WHERE c.id = $1 ${scopeSql}
+      LIMIT 1`,
+    params,
+  );
+  return result.rows[0] || null;
+}
+
+async function selectMinimalStaffRoster(classId, { includeAttentionNote = false } = {}) {
+  const result = await pool.query(
+    `SELECT b.id AS booking_id, b.status, b.checked_in_at, NULL AS checkin_method,
+            COALESCE(u.display_name, 'Asistente') AS display_name,
+            NULL AS guest_name,
+            COALESCE(u.alert_flag, false) AS attention_required,
+            u.alert_message AS attention_message
+       FROM bookings b
+       LEFT JOIN users u ON u.id = b.user_id
+      WHERE b.class_id = $1 AND b.status != 'cancelled'
+      ORDER BY CASE b.status
+        WHEN 'confirmed' THEN 1
+        WHEN 'checked_in' THEN 2
+        WHEN 'waitlist' THEN 3
+        WHEN 'no_show' THEN 4
+        ELSE 5 END,
+        COALESCE(u.display_name, 'Asistente')`,
+    [classId],
+  );
+  return result.rows.map((row) => {
+    const entry = {
+      bookingId: row.booking_id,
+      displayName: row.display_name,
+      status: row.status,
+      checkedInAt: row.checked_in_at,
+      checkinMethod: row.checkin_method,
+      guestName: row.guest_name || null,
+      attentionRequired: row.attention_required === true,
+    };
+    if (includeAttentionNote) {
+      entry.attentionNote = row.attention_required
+        ? (row.attention_message || "Requiere atención")
+        : null;
+    }
+    return entry;
+  });
+}
+
+
+app.get("/api/staff/instructor/classes", instructorMiddleware, async (req, res) => {
+  const from = String(req.query.from || todayInStudio());
+  // `from` se valida ANTES de calcular el `to` por defecto: addCivilDays con
+  // una fecha inválida lanza RangeError fuera del try y una instructora podía
+  // tumbar el proceso con `?from=abc` (QA 2026-09-16, F01).
+  if (!isCivilDateKey(from)) {
+    return res.status(400).json({ message: "Rango de fechas no válido" });
+  }
+  const to = String(req.query.to || addCivilDays(from, 14));
+  if (!isCivilDateKey(to)) {
+    return res.status(400).json({ message: "Rango de fechas no válido" });
+  }
+  const distance = civilDayDistance(from, to);
+  if (distance < 0 || distance > 31) {
+    return res.status(400).json({ message: "El rango debe ser de 0 a 31 días" });
+  }
+  try {
+    const classes = await selectStaffClasses({ userId: req.userId, role: "instructor", from, to });
+    return res.json({ data: classes });
+  } catch (error) {
+    console.error("[GET /staff/instructor/classes]", error.message);
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+app.get("/api/staff/reception/classes", receptionMiddleware, async (_req, res) => {
+  try {
+    const today = todayInStudio();
+    const classes = await selectStaffClasses({ role: "reception", from: today, to: today });
+    return res.json({ data: classes });
+  } catch (error) {
+    console.error("[GET /staff/reception/classes]", error.message);
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+async function handleStaffRoster(req, res) {
+  try {
+    const classRow = await selectScopedStaffClass({
+      classId: req.params.id,
+      userId: req.userId,
+      role: req.userRole,
+    });
+    if (!classRow) return res.status(404).json({ message: "Clase no encontrada" });
+    // La instructora asignada recibe solo la categoría corta necesaria para
+    // adaptar la clase. Recepción recibe el booleano operativo, nunca la
+    // categoría ni las notas clínicas libres.
+    const roster = await selectMinimalStaffRoster(classRow.id, {
+      includeAttentionNote: req.userRole === "instructor",
+    });
+    return res.json({ data: { class: mapStaffClass(classRow), roster } });
+  } catch (error) {
+    console.error("[GET /staff/classes/:id/roster]", error.message);
+    return res.status(500).json({ message: "Error interno" });
+  }
+}
+
+app.get("/api/staff/instructor/classes/:id/roster", instructorMiddleware, handleStaffRoster);
+app.get("/api/staff/reception/classes/:id/roster", receptionMiddleware, handleStaffRoster);
+
+app.put("/api/staff/bookings/:id/check-in", staffOperationsMiddleware, async (req, res) => {
+  const client=await pool.connect();let booking;
+  try {
+    await client.query("BEGIN");
+    const current=(await client.query(
+      `SELECT b.*,c.status AS class_status,c.date::text AS class_date,c.start_time
+       FROM bookings b JOIN classes c ON c.id=b.class_id JOIN instructors i ON i.id=c.instructor_id
+       WHERE b.id=$1 AND c.status<>'cancelled' AND c.date=$4::date
+       AND ($3='reception' OR ($3='instructor' AND i.user_id=$2)) FOR UPDATE OF b,c`,
+      [req.params.id,req.userId,req.userRole,todayInStudio()])).rows[0];
+    if(!current){await client.query("ROLLBACK");return res.status(404).json({message:"Reserva no encontrada"});}
+    const rule=checkinRule({bookingStatus:current.status,classStatus:current.class_status,classDate:current.class_date,startTime:String(current.start_time),...(await studioNow(client))});
+    if(!rule.ok){await client.query("ROLLBACK");return res.status(409).json({message:rule.message});}
+    if(current.status==='checked_in'){await client.query("COMMIT");return res.json({data:{bookingId:current.id,status:current.status,already:true}});}
+    if(current.status!=='confirmed'){await client.query("ROLLBACK");return res.status(409).json({message:"La reserva no está confirmada"});}
+    booking=(await client.query("UPDATE bookings SET status='checked_in',checked_in_at=NOW(),checked_in_by=$2,updated_at=NOW() WHERE id=$1 RETURNING *",[current.id,req.userId])).rows[0];
+    if(booking.user_id&&!booking.guest_profile_id)await insertCheckinPoints(client,booking.user_id,await getLoyaltyConfig(client));
+    await recordAudit(client,{actorId:req.userId,action:"booking.checkin",entityType:"booking",entityId:booking.id,subjectUserId:booking.user_id,after:{status:"checked_in"},meta:{source:"staff"}});
+    await client.query("COMMIT");
+  }catch(error){await client.query("ROLLBACK").catch(()=>{});console.error("[staff checkin]",error.message);return res.status(error.code==='40P01'?409:500).json({message:"No se pudo registrar la asistencia. Intenta de nuevo."});}
+  finally{client.release();}
+  reflectWellhubVisit(booking);
+  triggerWalletPassSync(booking.user_id,"booking_checked_in");
+  res.json({data:{bookingId:booking.id,status:booking.status,already:false}});
 });
 
 // ─── Bookings admin ──────────────────────────────────────────────────────────
@@ -14959,7 +15422,7 @@ app.put("/api/bookings/:id/check-in", adminMiddleware, async (req, res) => {
 // POST /api/admin/checkin/scan — check-in por QR del pase (wallet).
 // El QR del pase codifica base64(userId). Ubica la reserva confirmada de la
 // clienta para la clase de HOY más cercana a la hora actual y la marca asistida.
-app.post("/api/admin/checkin/scan", adminMiddleware, async (req, res) => {
+app.post(["/api/admin/checkin/scan", "/api/staff/reception/checkin/scan"], (req,res,next) => req.path.startsWith("/api/staff/") ? receptionMiddleware(req,res,next) : adminMiddleware(req,res,next), async (req, res) => {
   try {
     const raw = String(req.body?.code ?? "").trim();
     if (!raw) return res.status(400).json({ status: "error", message: "Código vacío" });
@@ -15289,25 +15752,21 @@ app.post("/api/admin/clients/manual", adminMiddleware, async (req, res) => {
       }
       let priceNote = "";
       let orderDiscount = 0;
+      let appliedManualCoupon = null;
       if (discountCode) {
-        const dc = await findApplicableDiscountCode({
-          code: discountCode,
-          planId: plan.id,
-          classCategory: plan.class_category,
-          channel: "membership",
-          client,
+        const result = await findApplicableDiscountCode({
+          code: discountCode, userId: user.id, lock: true,
+          subtotal: Number(_eff) || 0, planId: plan.id,
+          classCategory: plan.class_category, channel: "membership", client,
         });
-        if (!dc) {
+        if (!result || result.rejectedByMinOrder) {
           await client.query("ROLLBACK");
-          return res.status(400).json({ message: "El cupón no es válido para este plan" });
+          return res.status(400).json({ message: "El cupón no aplica o no se alcanza su compra mínima" });
         }
-        const subtotal = Number(_eff) || 0;
-        const discount = calculateDiscountAmount(dc.discount_type, Number(dc.discount_value), subtotal);
-        const finalPrice = Math.max(0, subtotal - discount);
-        priceNote = ` · Cupón ${dc.code}: $${subtotal} → $${finalPrice}`;
-        orderDiscount = discount;
-        // Incrementa el uso del cupón.
-        await client.query("UPDATE discount_codes SET uses_count = uses_count + 1 WHERE id = $1", [dc.id]).catch(() => {});
+        appliedManualCoupon = result.code;
+        orderDiscount = result.discountAmount;
+        priceNote = ` · Cupón ${result.code.code}: descuento $${orderDiscount}`;
+        await incrementDiscountUsage(result.code.id, client);
       }
 
       // Cortesía en el alta manual (sale en $0): exige motivo, en `reason` o en
@@ -15346,6 +15805,7 @@ app.post("/api/admin/clients/manual", adminMiddleware, async (req, res) => {
         [user.id, plan.id, paymentMethod, Number(_eff) || 0,
          chargedPrice, orderDiscount, req.userId || null]
       );
+      if (appliedManualCoupon) await client.query("UPDATE orders SET discount_code_id=$2 WHERE id=$1", [ordRes.rows[0].id, appliedManualCoupon.id]);
       const paymentReference = ordRes.rows[0].order_number || ordRes.rows[0].id;
       await client.query(`UPDATE memberships SET order_id = $2, payment_reference = $3 WHERE id = $1`,
         [memRes.rows[0].id, ordRes.rows[0].id, paymentReference]);
@@ -15959,13 +16419,23 @@ app.post("/api/admin/orders/:id/refunds", ownerMiddleware, async (req, res) => {
   }
 });
 
+registerCommunications(app, { pool, ownerMiddleware, queueWhatsAppSend, normalisePhone, whatsappChannelState, appPublicUrl: APP_PUBLIC_URL, recordAudit });
+registerVelanParity(app, { pool, ownerMiddleware, authMiddleware, restoreMembershipCredit,
+  recordAudit, triggerWalletPassSync, onSeatReleased, camelRow, isDay, reasonProblem, getBookingPolicy, bookingLeadHours: BOOKING_LEAD_HOURS, cancelClassInTx, notifyClassCancelled, applyCancellationRollback });
+
 // ─── Discount codes admin CRUD ───────────────────────────────────────────────
 
 // GET /api/discount-codes
-app.get("/api/discount-codes", adminMiddleware, async (req, res) => {
+app.get("/api/discount-codes", ownerMiddleware, async (req, res) => {
   try {
     const r = await pool.query(
-      `SELECT dc.*, p.name AS plan_name
+      `SELECT dc.*, p.name AS plan_name,
+              COALESCE((
+                SELECT COUNT(*)
+                  FROM orders pending_orders
+                 WHERE pending_orders.discount_code_id = dc.id
+                   AND pending_orders.status IN ('pending_payment', 'pending_verification')
+              ), 0)::int AS pending_reservations
        FROM discount_codes dc
        LEFT JOIN plans p ON p.id = dc.plan_id
        ORDER BY dc.created_at DESC`
@@ -15977,60 +16447,32 @@ app.get("/api/discount-codes", adminMiddleware, async (req, res) => {
 });
 
 // POST /api/discount-codes
-app.post("/api/discount-codes", adminMiddleware, async (req, res) => {
+app.post("/api/discount-codes", ownerMiddleware, async (req, res) => {
   try {
-    const {
-      code,
-      discountType = "percent",
-      discountValue,
-      maxUses,
-      expiresAt,
-      minOrderAmount,
-      minPurchaseAmount,
-      planId,
-      classCategory,
-      channel,
-      isActive = true,
-    } = req.body;
-    if (!code || !discountValue) return res.status(400).json({ message: "Código y valor requeridos" });
-    const normalizedType = normalizeDiscountType(discountType);
-    if (!normalizedType) return res.status(400).json({ message: "Tipo de descuento inválido" });
-    const normalizedMinOrder = Number(minOrderAmount ?? minPurchaseAmount ?? 0) || 0;
-    const normalizedCategory =
-      classCategory === undefined || classCategory === null || classCategory === ""
-        ? null
-        : normalizeClassCategory(classCategory, "__invalid__");
-    if (normalizedCategory === "__invalid__") {
-      return res.status(400).json({ message: "Categoría inválida. Usa: all, studio, reformer_tower o mixto." });
-    }
-    const normalizedChannel =
-      channel === undefined || channel === null || channel === ""
-        ? "all"
-        : normalizeDiscountChannel(channel, "__invalid__");
-    if (normalizedChannel === "__invalid__") {
-      return res.status(400).json({ message: "Canal inválido. Usa: all, membership, pos o event." });
-    }
-    if (planId) {
-      const planExists = await pool.query("SELECT id FROM plans WHERE id = $1", [planId]);
+    const coupon = normalizeDiscountCodePayload(req.body);
+    if (coupon.planId) {
+      const planExists = await pool.query("SELECT id FROM plans WHERE id = $1", [coupon.planId]);
       if (!planExists.rows.length) return res.status(404).json({ message: "Plan no encontrado" });
     }
     const r = await pool.query(
       `INSERT INTO discount_codes (
          code, discount_type, discount_value, max_uses, expires_at,
-         min_order_amount, plan_id, class_category, channel, is_active
+         min_order_amount, plan_id, class_category, channel, is_active, once_per_user, max_uses_per_user
        )
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
       [
-        code.toUpperCase(),
-        normalizedType,
-        discountValue,
-        maxUses || null,
-        expiresAt || null,
-        normalizedMinOrder,
-        planId || null,
-        normalizedCategory,
-        normalizedChannel,
-        isActive,
+        coupon.code,
+        coupon.discountType,
+        coupon.discountValue,
+        coupon.maxUses,
+        coupon.expiresAt,
+        coupon.minOrderAmount,
+        coupon.planId,
+        coupon.classCategory,
+        coupon.channel,
+        coupon.isActive,
+        coupon.oncePerUser,
+        coupon.maxUsesPerUser,
       ]
     );
     const enriched = await pool.query(
@@ -16043,63 +16485,90 @@ app.post("/api/discount-codes", adminMiddleware, async (req, res) => {
     return res.status(201).json({ data: camelRow(enriched.rows[0]) });
   } catch (err) {
     if (err.code === "23505") return res.status(409).json({ message: "Código ya existe" });
-    return res.status(500).json({ message: "Error interno" });
+    return res.status(err.status || 500).json({ message: err.status ? err.message : "Error interno" });
   }
 });
 
 // PUT /api/discount-codes/:id
-app.put("/api/discount-codes/:id", adminMiddleware, async (req, res) => {
+// COUPON_USED_EDIT_MESSAGE nombra el mismo control que COUPON_USED_DELETE_MESSAGE
+// («Cupón activo» en «Editar cupón») y añade qué hacer después: crear otro.
+const COUPON_USED_EDIT_MESSAGE = "Este cupón ya se usó; desactívalo y crea otro.";
+// QA 2026-09-18 (ronda 8, P2 de revCodigo): un cupón que quedó SIN plan porque
+// el suyo se borró en cascada (orphaned_by_plan_deletion) no se reactiva por
+// esta vía. Antes «activar» lo dejaba is_active=true con plan_id=NULL, y eso
+// ES un cupón general válido en cualquier plan — nadie lo decidió a propósito.
+// Opción conservadora: bloquear del todo y pedir uno nuevo (RG94: la misma
+// regla, no una versión más débil por otra ruta).
+const COUPON_ORPHANED_REACTIVATE_MESSAGE =
+  "Este cupón perdió su plan porque ese plan se borró; no se puede reactivar (quedaría válido para cualquier plan sin que nadie lo haya decidido). Crea un cupón nuevo.";
+app.put("/api/discount-codes/:id", ownerMiddleware, async (req, res) => {
   try {
-    const {
-      code,
-      discountType,
-      discountValue,
-      maxUses,
-      expiresAt,
-      minOrderAmount,
-      minPurchaseAmount,
-      planId,
-      classCategory,
-      channel,
-      isActive,
-    } = req.body;
-    const normalizedType = normalizeDiscountType(discountType);
-    if (!normalizedType) return res.status(400).json({ message: "Tipo de descuento inválido" });
-    const normalizedMinOrder = Number(minOrderAmount ?? minPurchaseAmount ?? 0) || 0;
-    const normalizedCategory =
-      classCategory === undefined || classCategory === null || classCategory === ""
-        ? null
-        : normalizeClassCategory(classCategory, "__invalid__");
-    if (normalizedCategory === "__invalid__") {
-      return res.status(400).json({ message: "Categoría inválida. Usa: all, studio, reformer_tower o mixto." });
+    // Ronda 7 (RG65/RG68): la fila guardada se lee ANTES de normalizar, porque
+    // ahora la edición es parcial: lo que el cuerpo no trae conserva su valor.
+    // Antes esto era un reemplazo y un PUT sin `channel` pasaba un cupón de
+    // 'pos' a 'all', es decir lo abría a la web.
+    const existing = await pool.query(
+      `SELECT dc.*, dc.discount_type::text AS discount_type,
+              COALESCE((
+                SELECT COUNT(*)
+                  FROM orders pending_orders
+                 WHERE pending_orders.discount_code_id = dc.id
+                   AND pending_orders.status IN ('pending_payment', 'pending_verification')
+              ), 0)::int AS pending_reservations,
+              (EXISTS (SELECT 1 FROM orders WHERE discount_code_id = dc.id)
+               OR EXISTS (SELECT 1 FROM payments WHERE discount_code_id = dc.id)) AS cited
+         FROM discount_codes dc
+        WHERE dc.id = $1`,
+      [req.params.id]
+    );
+    if (!existing.rows.length) return res.status(404).json({ message: "Código no encontrado" });
+    const coupon = normalizeDiscountCodePayload(req.body, { existing: existing.rows[0] });
+    if (existing.rows[0].orphaned_by_plan_deletion === true && coupon.isActive === true) {
+      return res.status(409).json({ message: COUPON_ORPHANED_REACTIVATE_MESSAGE });
     }
-    const normalizedChannel =
-      channel === undefined || channel === null || channel === ""
-        ? "all"
-        : normalizeDiscountChannel(channel, "__invalid__");
-    if (normalizedChannel === "__invalid__") {
-      return res.status(400).json({ message: "Canal inválido. Usa: all, membership, pos o event." });
-    }
-    if (planId) {
-      const planExists = await pool.query("SELECT id FROM plans WHERE id = $1", [planId]);
+    if (coupon.planId) {
+      const planExists = await pool.query("SELECT id FROM plans WHERE id = $1", [coupon.planId]);
       if (!planExists.rows.length) return res.status(404).json({ message: "Plan no encontrado" });
+    }
+    const reservedUses = Number(existing.rows[0].uses_count || 0) + Number(existing.rows[0].pending_reservations || 0);
+    if (coupon.maxUses !== null && coupon.maxUses < reservedUses) {
+      return res.status(400).json({ message: "El límite no puede ser menor a los usos confirmados y apartados" });
+    }
+    // Ronda 6 (grupo «ventas», RG87): Historial, Detalle y Perfil muestran
+    // COALESCE(dc.code, discount_code_text), así que renombrar un cupón YA
+    // USADO reescribía la evidencia de ventas pasadas: la venta hecha con
+    // RBPOS10 aparecía como RBVIP50 mientras la orden guardaba RBPOS10.
+    // Decisión conservadora: se rechaza el cambio de código, tipo y valor (lo
+    // que define qué se cobró) en vez de pintar «RBPOS10 (hoy RBVIP50)»; así el
+    // panel nunca ofrece un código vivo que no corresponde a ninguna venta. Lo
+    // que no es evidencia —activo, vencimiento, límite, compra mínima, plan,
+    // categoría, canal— sigue editable, y el mensaje manda justo a eso (RG88:
+    // «desactívalo» es el control «Cupón activo» de este mismo diálogo).
+    const usedBefore = Number(existing.rows[0].uses_count || 0) > 0 || existing.rows[0].cited === true;
+    const rewritesEvidence = coupon.code !== existing.rows[0].code
+      || coupon.discountType !== existing.rows[0].discount_type
+      || Math.abs(Number(coupon.discountValue) - Number(existing.rows[0].discount_value)) >= 0.005;
+    if (usedBefore && rewritesEvidence) {
+      return res.status(409).json({ message: COUPON_USED_EDIT_MESSAGE });
     }
     const r = await pool.query(
       `UPDATE discount_codes SET code=$1, discount_type=$2, discount_value=$3, max_uses=$4,
-       expires_at=$5, min_order_amount=$6, plan_id=$7, class_category=$8, channel=$9, is_active=$10, updated_at=NOW()
+       expires_at=$5, min_order_amount=$6, plan_id=$7, class_category=$8, channel=$9, is_active=$10, once_per_user=$12, max_uses_per_user=$13, updated_at=NOW()
        WHERE id=$11 RETURNING *`,
       [
-        code?.toUpperCase(),
-        normalizedType,
-        discountValue,
-        maxUses || null,
-        expiresAt || null,
-        normalizedMinOrder,
-        planId || null,
-        normalizedCategory,
-        normalizedChannel,
-        isActive !== false,
+        coupon.code,
+        coupon.discountType,
+        coupon.discountValue,
+        coupon.maxUses,
+        coupon.expiresAt,
+        coupon.minOrderAmount,
+        coupon.planId,
+        coupon.classCategory,
+        coupon.channel,
+        coupon.isActive,
         req.params.id,
+        coupon.oncePerUser,
+        coupon.maxUsesPerUser,
       ]
     );
     if (!r.rows.length) return res.status(404).json({ message: "Código no encontrado" });
@@ -16112,16 +16581,127 @@ app.put("/api/discount-codes/:id", adminMiddleware, async (req, res) => {
     );
     return res.json({ data: camelRow(enriched.rows[0]) });
   } catch (err) {
-    return res.status(500).json({ message: "Error interno" });
+    if (err.code === "23505") return res.status(409).json({ message: "Código ya existe" });
+    return res.status(err.status || 500).json({ message: err.status ? err.message : "Error interno" });
   }
 });
 
 // DELETE /api/discount-codes/:id
-app.delete("/api/discount-codes/:id", adminMiddleware, async (req, res) => {
+// Ronda 4 (grupo «reportes»): un cupón que ya se usó (uses_count, una orden o
+// una venta del panel que lo cita) no se borra: las FK son ON DELETE SET NULL
+// y el historial quedaba con «Lista $1,000 · −$100» sin decir por qué. Se
+// responde 409 y la dueña lo desactiva («Editar cupón» › «Cupón activo»). El
+// candado del cupón espera a una venta en curso que lo esté usando.
+// Un :id mal formado ya lo rechaza app.param con 400 antes de llegar aquí.
+const COUPON_USED_DELETE_MESSAGE = "Este cupón ya se usó; desactívalo para que no se aplique más.";
+app.delete("/api/discount-codes/:id", ownerMiddleware, async (req, res) => {
+  const id = String(req.params.id);
+  const client = await pool.connect();
+  if (!client) return;
   try {
-    await pool.query("DELETE FROM discount_codes WHERE id = $1", [req.params.id]);
+    await client.query("BEGIN");
+    const found = await client.query(
+      "SELECT id, COALESCE(uses_count, 0) AS uses_count FROM discount_codes WHERE id = $1 FOR UPDATE",
+      [id]
+    );
+    if (!found.rows.length) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ message: "Código no encontrado" });
+    }
+    const used = await client.query(
+      `SELECT EXISTS (SELECT 1 FROM orders WHERE discount_code_id = $1)
+           OR EXISTS (SELECT 1 FROM payments WHERE discount_code_id = $1) AS used`,
+      [id]
+    );
+    if (Number(found.rows[0].uses_count) > 0 || used.rows[0]?.used) {
+      await client.query("ROLLBACK");
+      return res.status(409).json({ message: COUPON_USED_DELETE_MESSAGE });
+    }
+    await client.query("DELETE FROM discount_codes WHERE id = $1", [id]);
+    await client.query("COMMIT");
     return res.json({ message: "Código eliminado" });
   } catch (err) {
+    await client.query("ROLLBACK").catch(() => {});
+    console.error("[DELETE /discount-codes/:id]", err.message);
+    return res.status(500).json({ message: "Error interno" });
+  } finally {
+    client.release();
+  }
+});
+
+// GET /api/discount-codes/:id/redemptions — Cupones › «Usos».
+// Ronda 4 (grupo «reportes»): órdenes con o sin cuenta (walk-in, POS: nombre
+// de la invitada) y ventas del panel (payments.discount_code_id sin orden).
+// Antes sólo salían órdenes de usuarios con cuenta: un cupón usado en Pagos y
+// en un walk-in decía «2 usos» y no listaba ninguno.
+app.get("/api/discount-codes/:id/redemptions", ownerMiddleware, async (req, res) => {
+  const id = String(req.params.id);
+  try {
+    const r = await pool.query(
+      `SELECT * FROM (
+         SELECT o.id,
+                CASE WHEN o.user_id IS NULL OR o.channel = 'walkin' THEN 'walkin' ELSE 'order' END AS source,
+                o.id           AS order_id,
+                o.order_number,
+                o.status::text AS status,
+                o.subtotal,
+                COALESCE(o.discount_amount, 0) AS discount_amount,
+                o.total_amount,
+                o.payment_method::text AS payment_method,
+                o.created_at,
+                o.user_id,
+                u.display_name AS user_name,
+                u.email        AS user_email,
+                p.name AS plan_name,
+                NULL::text     AS membership_status
+           FROM orders o
+           LEFT JOIN users u ON u.id = o.user_id
+           LEFT JOIN plans p ON p.id = o.plan_id
+          WHERE o.discount_code_id = $1
+         UNION ALL
+         SELECT pay.id,
+                'membership'   AS source,
+                NULL::uuid     AS order_id,
+                NULL::text     AS order_number,
+                'approved'     AS status,
+                COALESCE(pay.list_price, pay.amount) AS subtotal,
+                COALESCE(pay.discount_amount, 0) AS discount_amount,
+                pay.amount     AS total_amount,
+                pay.payment_method::text AS payment_method,
+                pay.created_at,
+                pay.user_id,
+                u.display_name AS user_name,
+                u.email        AS user_email,
+                p.name         AS plan_name,
+                m.status::text AS membership_status
+           FROM payments pay
+           LEFT JOIN users u ON u.id = pay.user_id
+           LEFT JOIN memberships m ON m.id = pay.membership_id
+           LEFT JOIN plans p ON p.id = m.plan_id
+          WHERE pay.discount_code_id = $1 AND pay.order_id IS NULL
+       ) r
+       ORDER BY created_at DESC`,
+      [id]
+    );
+    return res.json({ data: r.rows.map((x) => ({
+      id: x.id,
+      source: x.source,
+      orderId: x.order_id,
+      orderNumber: x.order_number,
+      status: x.status,
+      subtotal: Number(x.subtotal),
+      discountAmount: Number(x.discount_amount),
+      totalAmount: Number(x.total_amount),
+      paymentMethod: x.payment_method,
+      createdAt: x.created_at,
+      userId: x.user_id,
+      userName: x.user_name,
+      userEmail: x.user_email,
+      planName: x.plan_name,
+      membershipStatus: x.membership_status,
+    })) });
+  } catch (err) {
+    console.error("GET /discount-codes/:id/redemptions error:", err.message);
     return res.status(500).json({ message: "Error interno" });
   }
 });

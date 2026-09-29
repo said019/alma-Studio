@@ -1,3 +1,5 @@
+import { ClassOperations } from "@/components/admin/ClassOperations";
+import { DuplicateWeek } from "@/components/admin/DuplicateWeek";
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -410,7 +412,7 @@ function CalendarView({
       title: "¿Cancelar esta clase?",
       description:
         occupied > 0
-          ? `Hay ${occupied} ${occupied === 1 ? "reserva activa" : "reservas activas"}. La clase quedará cancelada y habrá que avisar a los usuarios inscritas.`
+          ? `Hay ${occupied} ${occupied === 1 ? "reserva activa" : "reservas activas"}. La clase quedará cancelada y habrá que avisar a los usuarios inscritos.`
           : "La clase quedará cancelada y dejará de aceptar reservas.",
       confirmLabel: "Cancelar clase",
       destructive: true,
@@ -438,7 +440,7 @@ function CalendarView({
           description="No pudimos cargar las clases de la semana. Revisa tu conexión y vuelve a intentarlo."
           onRetry={() => classesQuery.refetch()}
         />
-        {dialog}
+        {dialog}{isOwner && <div className="mb-4 flex flex-wrap gap-2"><DuplicateWeek sourceStart={start} /><ClassOperations /></div>}
       </>
     );
   }
@@ -851,6 +853,7 @@ function CalendarView({
                 </div>
               )}
               <div className="flex flex-col gap-2 pt-4">
+                {isOwner && !selectedClass.isCancelled && new Date(selectedClass.startTime).getTime() < Date.now() && <ClassOperations classId={selectedClass.id} />}
                 {!selectedClass.isCancelled && !selectedClass.isClosed && (
                   <Button variant="outline" className="border-line-strong/70 text-ink" onClick={() => openEdit(selectedClass)}>
                     Editar clase

@@ -17,7 +17,8 @@
     "test:server": "node --test --test-concurrency=1 \"server/*.test.mjs\" \"server/lib/*.test.js\" \"server/lib/wellhub/*.test.js\"",
     "test:regression": "node --test --test-concurrency=1 \"server/tests/*.test.mjs\"",
     "test:scripts": "node --test \"scripts/*.test.mjs\"",
-    "brand:assets": "node scripts/brand-assets.mjs"
+    "brand:assets": "node scripts/brand-assets.mjs",
+    "test:parity": "node scripts/verify-velan-parity.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

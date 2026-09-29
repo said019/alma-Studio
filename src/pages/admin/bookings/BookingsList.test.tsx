@@ -80,14 +80,14 @@ describe("Reservas · Semana", () => {
     await waitFor(() => expect(screen.getByTestId("location").textContent).toBe("/admin/bookings?clase=c13"));
   });
 
-  it("con visitas apagadas no se ofrece visitante ni acompañante", async () => {
+  it("con visitas habilitadas se ofrece visitante y acompañante", async () => {
     renderAdmin(<BookingsList />, { route: "/admin/bookings?clase=c11", path: "/admin/bookings" });
     const lista = await screen.findByRole("region", { name: "Lista de la clase" });
     await within(lista).findByText("Reformer Intermedio");
-    expect(screen.queryByRole("button", { name: "Asignar visitante" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Asignar visitante" })).toBeInTheDocument();
     fireEvent.click(within(lista).getByRole("button", { name: /Asignar socia/ }));
     expect(await screen.findByText("Asignar reserva a socia")).toBeInTheDocument();
-    expect(screen.queryByText("Llevará acompañante")).toBeNull();
+    expect(screen.getByText("Llevará acompañante")).toBeInTheDocument();
   });
 
   it("un enlace viejo muestra el error con salida", async () => {

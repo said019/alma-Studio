@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, useRef, type ReactNode } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format, addDays } from "date-fns";
 import { es } from "date-fns/locale";
@@ -85,6 +85,16 @@ function CashAssignment() {
   const [amountStr, setAmountStr] = useState("");
   const [paymentReference, setPaymentReference] = useState("");
   const [reason, setReason] = useState("");
+  const [couponCode,setCouponCode] = useState("");
+  const [appliedCoupon,setAppliedCoupon] = useState("");
+  useEffect(()=>{setCouponCode("");setAppliedCoupon("");},[selectedUser?.id,selectedPlan?.id]);
+  const couponSelection=useRef("");
+  couponSelection.current=`${selectedUser?.id}:${selectedPlan?.id}:${couponCode}`;
+  const couponMutation=useMutation({
+    mutationFn:async()=>{const selection=couponSelection.current;const response=await api.post("/admin/discount-codes/preview",{code:couponCode,planId:selectedPlan?.id,userId:selectedUser?.id});return {...response,selection};},
+    onSuccess:({data,selection})=>{if(selection!==couponSelection.current)return;setAmountStr(String(data.data.finalAmount));setAppliedCoupon(data.data.code);},
+    onError:(e:any)=>toast({title:e.response?.data?.message??"No se pudo aplicar el cupón",variant:"destructive"}),
+  });
 
   // "Renovar" desde la ficha: /admin/payments?clienta=<id>. Misma llave que la ficha.
   const preselectQ = useQuery<Record<string, any>>({
@@ -114,7 +124,7 @@ function CashAssignment() {
   const amountValid = Number.isFinite(amount) && amount >= 0;
   const courtesy = amountValid && amount === 0;
   const differs = amountValid && Math.abs(amount - listPrice) >= 0.01;
-  const needsReason = !!selectedPlan && (courtesy || differs);
+  const needsReason = !!selectedPlan && !appliedCoupon && (courtesy || differs);
   const reasonOk = reason.trim().length >= REASON_MIN_CHARS;
 
   const assignMutation = useMutation({
@@ -125,6 +135,7 @@ function CashAssignment() {
         paymentMethod,
         startDate: format(new Date(), "yyyy-MM-dd"),
         amount,
+        ...(appliedCoupon ? {discountCode:appliedCoupon} : {}),
         ...(paymentReference.trim() ? { paymentReference: paymentReference.trim() } : {}),
         ...(needsReason ? { reason: reason.trim() } : {}),
       }),
@@ -254,10 +265,14 @@ function CashAssignment() {
 
         <Panel aria-label="Cobro" className="flex flex-col gap-3.5 p-5 lg:p-6">
           <StepTitle n={4} done={false}>Cobro</StepTitle>
+          <div className="flex flex-wrap items-end gap-2">
+            <label className="flex-1">Cupón (opcional)<Input value={couponCode} disabled={!!appliedCoupon} onChange={e=>setCouponCode(e.target.value.toUpperCase())} placeholder="Código de descuento" /></label>
+            {appliedCoupon ? <Button variant="outline" onClick={()=>{setAppliedCoupon("");setCouponCode("");setAmountStr(String(listPrice));}}>Quitar {appliedCoupon}</Button> : <Button variant="outline" disabled={!couponCode||!selectedPlan||!selectedUser||couponMutation.isPending} onClick={()=>couponMutation.mutate()}>Aplicar cupón</Button>}
+          </div>
           <div className="grid gap-3.5 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="cobro-monto">Precio cobrado</Label>
-              <Input id="cobro-monto" type="number" inputMode="decimal" min={0} step="1" className="nums" disabled={!selectedPlan}
+              <Input id="cobro-monto" type="number" inputMode="decimal" min={0} step="1" className="nums" disabled={!selectedPlan||!!appliedCoupon}
                 value={amountStr} onChange={(e) => setAmountStr(e.target.value)} />
               <p className="text-[0.75rem] text-ink-muted">
                 {selectedPlan ? `Precio del plan: ${formatMXN(listPrice)}.` : "Elige un plan primero."}

@@ -1,3 +1,4 @@
+import { MembershipPauseButton } from "@/components/admin/MembershipPauseButton";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
@@ -26,11 +27,12 @@ import { COLOR } from "@/design/tokens";
 import { expiresSoon } from "./membership-helpers";
 import { REASON_MIN_CHARS } from "@/lib/audit-log";
 
-const STATUS_OPTIONS = ["active", "pending_payment", "pending_activation", "expired", "cancelled"] as const;
+const STATUS_OPTIONS = ["active", "pending_payment", "pending_activation", "expired", "paused", "cancelled"] as const;
 type MembershipStatus = (typeof STATUS_OPTIONS)[number];
 
 const STATUS_LABELS: Record<MembershipStatus, string> = {
   active: "Activa",
+  paused: "Congelada",
   pending_payment: "Pendiente pago",
   pending_activation: "Pendiente activación",
   expired: "Expirada",
@@ -294,7 +296,7 @@ const MembershipTable = ({
                       )}
                     </TableCell>
                     <TableCell>
-                      <DropdownMenu>
+                      <MembershipPauseButton membership={m} /><DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" size="icon" aria-label={`Acciones de la membresía de ${m.userName ?? "el usuario"}`}><MoreHorizontal size={14} /></Button>
                         </DropdownMenuTrigger>
@@ -347,7 +349,7 @@ const MembershipsList = () => {
           <Tabs value={tab} onValueChange={(v) => setTab(v === "all" ? null : v)}>
             <TabsList>
               <TabsTrigger value="all">Todas</TabsTrigger>
-              <TabsTrigger value="active">Activas</TabsTrigger>
+              <TabsTrigger value="active">Activas</TabsTrigger><TabsTrigger value="paused">Congeladas</TabsTrigger>
               <TabsTrigger value="expiring">Por vencer<Count n={expiring} /></TabsTrigger>
               <TabsTrigger value="pending">Pendientes<Count n={pending} /></TabsTrigger>
             </TabsList>
@@ -357,6 +359,7 @@ const MembershipsList = () => {
                 emptyDescription="Cuando un usuario compre un plan, su membresía aparece aquí para activarla y darle seguimiento."
               />
             </TabsContent>
+            <TabsContent value="paused"><MembershipTable status="paused" emptyTitle="Sin membresías congeladas" emptyDescription="Las membresías congeladas aparecerán aquí." /></TabsContent>
             <TabsContent value="active">
               <MembershipTable
                 status="active"

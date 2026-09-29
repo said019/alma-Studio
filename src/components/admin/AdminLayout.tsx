@@ -29,19 +29,21 @@ const NAV_GROUPS = [
       { path: "/admin/bookings", label: "Reservas", icon: BookOpen, aliases: ["/admin/pasar-lista"] },
       { path: "/admin/classes", label: "Clases", icon: CalendarDays, aliases: ["/admin/class-types", "/admin/class-generator"] },
       { path: "/admin/payments", label: "Cobros", icon: DollarSign, ownerOnly: true, aliases: ["/admin/orders"] },
-      { path: "/admin/clients", label: "Personas", icon: Users, aliases: ["/admin/staff", "/admin/visitas"] },
+      { path: "/admin/clients", label: "Personas", icon: Users, aliases: ["/admin/staff"] },
     ],
   },
   {
     label: "Más",
     collapsible: false,
     items: [
+      { path: "/admin/visitas", label: "Visitas", icon: Users, feature: "visits" },
       { path: "/admin/notifications", label: "Bandeja", icon: Bell, feature: "adminInbox" },
       { path: "/admin/memberships", label: "Membresías", icon: CreditCard },
       { path: "/admin/plans", label: "Planes", icon: Package },
       { path: "/admin/pos", label: "Tienda", icon: ShoppingCart, feature: "pos" },
       { path: "/admin/reports", label: "Reportes", icon: BarChart2, ownerOnly: true },
       { path: "/admin/loyalty", label: "Lealtad", icon: Award, feature: "loyalty" },
+      { path: "/admin/campaigns", label: "Campañas", icon: MessageCircle, ownerOnly: true },
       { path: "/admin/discount-codes", label: "Cupones", icon: Percent },
     ],
   },
@@ -62,7 +64,7 @@ const MOBILE_QUICK_NAV = [
   { path: "/admin/dashboard", label: "Inicio", icon: LayoutDashboard },
   { path: "/admin/bookings", label: "Reservas", icon: BookOpen, aliases: ["/admin/pasar-lista"] },
   { path: "/admin/classes", label: "Clases", icon: CalendarDays, aliases: ["/admin/class-types", "/admin/class-generator"] },
-  { path: "/admin/clients", label: "Personas", icon: Users, aliases: ["/admin/staff", "/admin/visitas"] },
+  { path: "/admin/clients", label: "Personas", icon: Users, aliases: ["/admin/staff"] },
   { path: "/admin/payments", label: "Cobros", icon: DollarSign, ownerOnly: true, aliases: ["/admin/orders"] },
 ];
 
@@ -121,7 +123,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
   useEffect(() => {
     setMobileOpen(false);
     setSearchOpen(false);
-  }, [location.pathname]);
+  }, [location.pathname, location.search]);
 
   const handleLogout = () => {
     logout();
@@ -143,7 +145,11 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
   const onOwnOrAlias = (base: string, aliases: string[] | undefined, path: string) =>
     path === base || path.startsWith(base + "/") || (aliases ?? []).some((a) => path === a || path.startsWith(a + "/"));
   const matchPath = (itemPath: string, aliases?: string[]) => {
-    const basePath = itemPath.split("?")[0];
+    const [basePath, query] = itemPath.split("?");
+    if (query) {
+      const current = new URLSearchParams(location.search);
+      if ([...new URLSearchParams(query)].some(([key, value]) => current.get(key) !== value)) return false;
+    }
     return onOwnOrAlias(basePath, aliases, location.pathname);
   };
   const currentItem = allItems.find((i) => matchPath(i.path, (i as { aliases?: string[] }).aliases));
@@ -202,8 +208,9 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
               {!isCompact && group.label && (
                 <p className="px-6 pb-1.5 pt-4 text-[0.75rem] font-bold uppercase tracking-[0.12em] text-ink-muted">{group.label}</p>
               )}
-              {group.items.map(({ path, label, icon: Icon, aliases }) => {
-                const active = matchPath(path, aliases);
+              {group.items.map((item) => {
+                const { path, label, icon: Icon } = item;
+                const active = matchPath(path, "aliases" in item ? item.aliases : undefined);
                 const badge = badgeFor(path);
                 const srLabel = srLabelFor(path);
                 return (

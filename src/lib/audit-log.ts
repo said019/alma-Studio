@@ -38,8 +38,15 @@ export const AUDIT_ENTITY_OPTIONS: { value: string; label: string }[] = [
 ];
 
 const ACTION_LABEL: Record<string, string> = {
+  "user.password_reset": "Enlace de acceso solicitado",
+  "booking.checkin_undone": "Asistencia deshecha",
+  "membership.pause": "Membresía congelada",
+  "membership.resume": "Membresía reactivada",
+  "plan.reorder": "Planes reordenados",
+  "class.duplicate_week": "Semana copiada",
   "membership.sale": "Venta en mostrador",
   "membership.adjust": "Ajuste de membresía",
+  "booking.reschedule": "Cambio de horario de reserva",
   "booking.checkin": "Check-in",
   "booking.no_show": "Falta marcada",
   "booking.no_show_corrected": "Falta corregida a asistencia",

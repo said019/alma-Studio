@@ -20,6 +20,7 @@ interface ScanResult {
 }
 
 interface Props {
+  endpoint?: string;
   open: boolean;
   onOpenChange: (v: boolean) => void;
 }
@@ -62,7 +63,7 @@ const platformPermissionHint = (p: Platform): string => {
  * play() después de animar el modal — si no, el <video> queda negro aunque
  * la cámara esté activa.
  */
-export const CheckinScanner = ({ open, onOpenChange }: Props) => {
+export const CheckinScanner = ({ open, onOpenChange, endpoint = "/admin/checkin/scan" }: Props) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const controlsRef = useRef<IScannerControls | null>(null);
@@ -98,7 +99,7 @@ export const CheckinScanner = ({ open, onOpenChange }: Props) => {
     lastCodeRef.current = { code: value, at: now };
     busyRef.current = true;
     try {
-      const res = await api.post("/admin/checkin/scan", { code: value });
+      const res = await api.post(endpoint, { code: value });
       setResults((r) => [res.data as ScanResult, ...r].slice(0, 10));
       if (!opts?.silent && navigator.vibrate) navigator.vibrate(80);
     } catch (e: any) {

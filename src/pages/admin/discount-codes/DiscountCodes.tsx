@@ -1,460 +1,834 @@
-import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
+import { useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
 import api from "@/lib/api";
 import { AuthGuard } from "@/components/admin/AuthGuard";
 import AdminLayout from "@/components/admin/AdminLayout";
-import { AdminPage, AdminPageHeader } from "@/components/admin/AdminPage";
-import { Panel } from "@/components/admin/Panel";
-import StatusDot from "@/components/admin/StatusDot";
-import { useConfirm } from "@/components/admin/ConfirmDialog";
-import { EmptyState, ErrorState } from "@/components/app/AppShell";
-import { formatDate, formatMXN } from "@/lib/format";
+import { AdminPageHeader as HivePageHeader } from "@/components/admin/AdminPage";
+const AdminPageHeader = ({ eyebrow, description, ...props }: any) => <HivePageHeader kicker={eyebrow} subtitle={description} {...props} />;
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
-import { Copy, MoreHorizontal, Plus, TicketPercent } from "lucide-react";
-import { couponStatus, usageInfo } from "./discount-helpers";
+import { avisoDeDestino, refrescarCupones } from "@/lib/refrescoCatalogo";
+import {
+  CircleAlert, Copy, Edit3, Eye, Loader2, Percent,
+  Plus, Search, Tag, Trash2, Users, X,
+} from "lucide-react";
 
-const nullableInt = z.preprocess(
-  (v) => (v === "" || v === undefined || v === null ? null : Number(v)),
-  z.number().int().positive().nullable(),
+type DiscountType = "percent" | "fixed";
+type CouponFilter = "all" | "active" | "attention";
+
+const CouponUsageBadge = ({ coupon, onEdit }: { coupon: DiscountCode; onEdit: () => void }) => (
+  <button type="button" onClick={onEdit}
+    aria-label={`Editar límite por usuario de ${coupon.code}`}
+    className={`mt-2 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink-muted ${coupon.oncePerUser ? "border-ink-muted/30 bg-ink-muted/10 text-ink-muted hover:bg-ink-muted/20" : "border-ink-muted/15 text-ink-muted hover:bg-ink-muted/10"}`}>
+    <Users size={13} aria-hidden="true" />
+    {(coupon.maxUsesPerUser ?? (coupon.oncePerUser ? 1 : null)) ? `${coupon.maxUsesPerUser ?? 1} uso(s) por persona` : "Sin límite por persona"}
+    <Edit3 size={12} aria-hidden="true" />
+  </button>
 );
 
-// Taxonomía única (la misma que valida el server: all/studio/reformer_tower/mixto).
-const CODE_CATEGORIES = ["all", "studio", "reformer_tower", "mixto"] as const;
-type CodeCategory = (typeof CODE_CATEGORIES)[number];
+interface DiscountCode {
+  oncePerUser?: boolean;
+  maxUsesPerUser?: number | null;
+  id: string;
+  code: string;
+  discountType: DiscountType;
+  discountValue: number;
+  maxUses: number | null;
+  usesCount: number;
+  pendingReservations?: number;
+  expiresAt: string | null;
+  minOrderAmount: number;
+  planId: string | null;
+  planName: string | null;
+  classCategory: string | null;
+  channel: string | null;
+  isActive: boolean;
+  createdAt: string;
+}
 
-const CATEGORY_LABELS: Record<CodeCategory, string> = {
-  all: "General (all)",
+interface PlanOption {
+  id: string;
+  name: string;
+  price: number;
+}
+
+// Ronda 4 (reportes): órdenes con o sin cuenta (walk-in, POS) y ventas del
+// panel (source 'membership', sin orden).
+interface Redemption {
+  id: string;
+  source?: "order" | "walkin" | "membership" | string;
+  orderId: string | null;
+  orderNumber: string | null;
+  status: string;
+  subtotal: number;
+  discountAmount: number;
+  totalAmount: number;
+  paymentMethod: string;
+  createdAt: string;
+  userId: string | null;
+  userName: string | null;
+  userEmail: string | null;
+  planName: string | null;
+  membershipStatus?: string | null;
+}
+
+const REDEMPTION_SOURCE_LABEL: Record<string, string> = {
+  order: "App",
+  walkin: "Walk-in",
+  membership: "Venta de mostrador",
+};
+
+/** Un cupón con usos confirmados o apartados no se borra: se desactiva. */
+const COUPON_USED_MESSAGE = "Este cupón ya se usó; desactívalo para que no se aplique más.";
+const couponHasUses = (coupon: DiscountCode | null) =>
+  Boolean(coupon && (Number(coupon.usesCount || 0) > 0 || Number(coupon.pendingReservations || 0) > 0));
+
+interface FormState {
+  maxUsesPerUser: string;
+  code: string;
+  discountType: DiscountType;
+  discountValue: string;
+  maxUses: string;
+  expiresAt: string;
+  minOrderAmount: string;
+  planId: string;
+  classCategory: string;
+  channel: string;
+  isActive: boolean;
+}
+
+interface CouponPayload {
+  maxUsesPerUser: number | null;
+  code: string;
+  discountType: DiscountType;
+  discountValue: number;
+  maxUses: number | null;
+  expiresAt: string | null;
+  minOrderAmount: number;
+  planId: string | null;
+  classCategory: string | null;
+  channel: string;
+  isActive: boolean;
+}
+
+const emptyForm: FormState = {
+  maxUsesPerUser: "",
+  code: "",
+  discountType: "percent",
+  discountValue: "10",
+  maxUses: "",
+  expiresAt: "",
+  minOrderAmount: "",
+  planId: "all",
+  classCategory: "all",
+  channel: "all",
+  isActive: true,
+};
+
+const CHANNEL_LABEL: Record<string, string> = {
+  all: "Todos los canales",
+  membership: "Membresías web",
+  pos: "Punto de venta",
+  event: "Eventos",
+};
+
+// La etiqueta de TODAS las categorías que alguna vez se pudieron guardar: un
+// cupón viejo tiene que seguir viéndose con su nombre, no con el valor crudo.
+const CATEGORY_LABEL: Record<string, string> = {
+  all: "Todas las categorías",
   studio: "Studio",
   reformer_tower: "Reformer/Tower",
+  bienestar: "Bienestar",
+  funcional: "Funcional",
+  barre: "Barre",
+  especial: "Especial",
   mixto: "Mixto",
 };
 
-const codeSchema = z.object({
-  code: z.string().trim().min(1, "Código requerido"),
-  discountType: z.enum(["percent", "fixed"]),
-  discountValue: z.coerce.number().min(0.01, "Valor inválido"),
-  minOrderAmount: z.coerce.number().min(0).default(0),
-  maxUses: nullableInt,
-  planId: z.string().optional(),
-  classCategory: z.enum(CODE_CATEGORIES).optional(),
-  channel: z.enum(["all", "membership", "pos", "event"]).default("all"),
-  expiresAt: z.string().optional(),
-  isActive: z.boolean().default(true),
-}).refine((d) => d.discountType !== "percent" || d.discountValue <= 100, {
-  message: "El porcentaje no puede superar 100.", path: ["discountValue"],
-});
+// QA 2026-09-17 (ronda 7): lo que el selector puede OFRECER. Planes y tipos de
+// clase sólo manejan pilates, bienestar y «todas», así que un cupón limitado a
+// funcional, barre, especial o mixto no aplicaba nunca y la usuaria leía «no
+// válido para este plan» (RG68). Decisión de la dueña (opción A): se retiran
+// del selector y de la validación del servidor. Los cupones viejos NO se
+// reescriben: se siguen listando con su etiqueta, marcados «No aplica», y al
+// editarlos su categoría sigue siendo la opción elegida para que guardar otro
+// cambio no se la mueva sin que nadie lo pida.
+const CATEGORY_OPTIONS = ["all", "studio", "reformer_tower", "mixto"] as const;
+const isRetiredCategory = (value?: string | null) =>
+  Boolean(value) && !CATEGORY_OPTIONS.includes(String(value) as (typeof CATEGORY_OPTIONS)[number]);
+const categoryLabel = (value?: string | null) =>
+  (value ? CATEGORY_LABEL[value] || value : CATEGORY_LABEL.all);
 
-type CodeFormData = z.infer<typeof codeSchema>;
-interface DiscountCode extends CodeFormData {
-  id: string;
-  usesCount: number;
-  planName?: string | null;
-}
-
-function normalizeType(type: unknown): "percent" | "fixed" {
-  const value = String(type ?? "").toLowerCase();
-  return value === "fixed" ? "fixed" : "percent";
-}
-
-function normalizeCategory(raw: unknown): CodeCategory | undefined {
-  const value = String(raw ?? "").toLowerCase();
-  return (CODE_CATEGORIES as readonly string[]).includes(value) ? (value as CodeCategory) : undefined;
-}
-
-function normalizeCode(row: any): DiscountCode {
-  return {
-    id: row.id,
-    code: String(row.code ?? ""),
-    discountType: normalizeType(row.discountType ?? row.discount_type),
-    discountValue: Number(row.discountValue ?? row.discount_value ?? 0),
-    minOrderAmount: Number(row.minOrderAmount ?? row.min_order_amount ?? 0),
-    maxUses: row.maxUses ?? row.max_uses ?? null,
-    planId: row.planId ?? row.plan_id ?? undefined,
-    classCategory: normalizeCategory(row.classCategory ?? row.class_category),
-    channel: (row.channel ?? "all") as "all" | "membership" | "pos" | "event",
-    planName: row.planName ?? row.plan_name ?? null,
-    expiresAt: row.expiresAt ?? row.expires_at ?? "",
-    isActive: Boolean(row.isActive ?? row.is_active ?? true),
-    usesCount: Number(row.usesCount ?? row.uses_count ?? 0),
-  };
-}
-
-const CHANNEL_LABELS: Record<string, string> = {
-  membership: "Membresías",
-  pos: "POS",
-  event: "Eventos",
-  all: "Todos",
+const STATUS_LABEL: Record<string, { label: string; tone: string }> = {
+  approved: { label: "Aprobada", tone: "border-line bg-sunken text-ink" },
+  pending_payment: { label: "Esperando pago", tone: "border-line bg-sunken text-ink" },
+  pending_verification: { label: "Por verificar", tone: "border-line bg-sunken text-ink" },
+  rejected: { label: "Rechazada", tone: "border-line bg-sunken text-destructive" },
+  cancelled: { label: "Cancelada", tone: "border-line bg-sunken text-ink-muted" },
+  expired: { label: "Expirada", tone: "border-line bg-sunken text-ink-muted" },
 };
 
-const DiscountCodes = () => {
-  const { toast } = useToast();
-  const qc = useQueryClient();
-  const { confirm, dialog } = useConfirm();
-  const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [editing, setEditing] = useState<DiscountCode | null>(null);
+const PAYMENT_LABEL: Record<string, string> = {
+  card: "Tarjeta",
+  transfer: "Transferencia",
+  cash: "Efectivo",
+};
 
-  const { data, isLoading, isError, refetch } = useQuery<{ data: any[] }>({
-    queryKey: ["discount-codes"],
+const money = (value: number | string) =>
+  Number(value || 0).toLocaleString("es-MX", { style: "currency", currency: "MXN", maximumFractionDigits: 2 });
+
+const couponStatus = (coupon: DiscountCode) => {
+  const pendingReservations = Number(coupon.pendingReservations || 0);
+  const isExpired = Boolean(coupon.expiresAt && new Date(coupon.expiresAt).getTime() <= Date.now());
+  const remaining = coupon.maxUses === null
+    ? null
+    : Math.max(0, Number(coupon.maxUses) - Number(coupon.usesCount || 0) - pendingReservations);
+  const exhausted = remaining === 0;
+
+  if (isExpired) return { key: "expired", label: "Vencido", tone: "border-line bg-sunken text-ink-muted", remaining, pendingReservations };
+  if (exhausted) return { key: "exhausted", label: "Sin cupo", tone: "border-line bg-sunken text-destructive", remaining, pendingReservations };
+  if (!coupon.isActive) return { key: "inactive", label: "Pausado", tone: "border-line bg-sunken text-ink-muted", remaining, pendingReservations };
+  return { key: "active", label: "Activo", tone: "border-line bg-sunken text-ink", remaining, pendingReservations };
+};
+
+const discountLabel = (coupon: Pick<DiscountCode, "discountType" | "discountValue">) =>
+  coupon.discountType === "percent" ? `${Number(coupon.discountValue)}%` : money(coupon.discountValue);
+
+const formatExpiry = (value: string | null) =>
+  value ? format(new Date(value), "d MMM yyyy", { locale: es }) : "Sin fecha límite";
+
+const errorMessage = (error: unknown, fallback: string) => {
+  const candidate = error as { response?: { data?: { message?: string } } };
+  return candidate?.response?.data?.message || fallback;
+};
+
+export default function DiscountCodesPage() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [editing, setEditing] = useState<DiscountCode | null>(null);
+  const [form, setForm] = useState<FormState>(emptyForm);
+  const [redemptionsFor, setRedemptionsFor] = useState<DiscountCode | null>(null);
+  const [couponToDelete, setCouponToDelete] = useState<DiscountCode | null>(null);
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState<CouponFilter>("all");
+
+  const codesQuery = useQuery({
+    queryKey: ["admin-discount-codes"],
     queryFn: async () => (await api.get("/discount-codes")).data,
   });
-  const codes = Array.isArray(data?.data) ? data.data.map(normalizeCode) : [];
-  const visibleCodes = codes.filter((c) =>
-    c.code.toLowerCase().includes(search.trim().toLowerCase()) &&
-    (statusFilter === "all" || couponStatus(c) === statusFilter));
-  const activeCount = codes.filter((c) => couponStatus(c) === "Activo").length;
+  const codes = useMemo<DiscountCode[]>(
+    () => (Array.isArray(codesQuery.data?.data) ? codesQuery.data.data : []),
+    [codesQuery.data],
+  );
 
-  const { data: plansData } = useQuery<{ data: { id: string; name: string }[] }>({
-    queryKey: ["plans"],
+  const plansQuery = useQuery({
+    queryKey: ["coupon-plans"],
     queryFn: async () => (await api.get("/plans")).data,
+    staleTime: 60_000,
   });
-  const plans = Array.isArray(plansData?.data) ? plansData.data : [];
+  const plans: PlanOption[] = Array.isArray(plansQuery.data?.data) ? plansQuery.data.data : [];
 
-  const form = useForm<CodeFormData>({
-    resolver: zodResolver(codeSchema),
-    defaultValues: {
-      discountType: "percent",
-      isActive: true,
-      maxUses: null,
-      minOrderAmount: 0,
-      planId: undefined,
-      classCategory: undefined,
-      channel: "all",
-    },
+  const redemptionsQuery = useQuery({
+    queryKey: ["admin-discount-redemptions", redemptionsFor?.id],
+    queryFn: async () => (await api.get(`/discount-codes/${redemptionsFor?.id}/redemptions`)).data,
+    enabled: Boolean(redemptionsFor),
+    staleTime: 0,
   });
+  const redemptions: Redemption[] = Array.isArray(redemptionsQuery.data?.data) ? redemptionsQuery.data.data : [];
 
-  const serialize = (d: CodeFormData) => ({
-    ...d,
-    code: d.code.toUpperCase().trim(),
-    planId: d.planId || null,
-    classCategory: d.classCategory || null,
-    channel: d.channel || "all",
-    expiresAt: d.expiresAt || null,
-    maxUses: d.maxUses ?? null,
-  });
+  const refreshCodes = () => refrescarCupones(queryClient);
+
+  /* QA 2026-09-18: el filtro se aplica en pantalla, así que pausar un cupón
+     (o ponerle una fecha vencida, o bajarle el límite de usos hasta agotarlo)
+     desde la vista «Activos» lo hacía desaparecer sin decir nada; sólo al
+     recargar reaparecía, porque el panel vuelve a «Todos». La vista no se mueve
+     sola: el aviso nombra la vista de esta misma pantalla donde quedó (RG88). */
+  const VISTA_LABEL: Record<CouponFilter, string> = { all: "Todos", active: "Activos", attention: "Por revisar" };
+  const cabeEnLaVista = (estado: string) =>
+    filter === "all" || (filter === "active" ? estado === "active" : estado !== "active");
+  const avisoDeGuardado = (res: unknown, payload: CouponPayload) => {
+    const fila = (res as { data?: { data?: DiscountCode } })?.data?.data;
+    const guardado = (fila && typeof fila === "object" && fila.code ? fila : { ...editing, ...payload }) as DiscountCode;
+    const estado = couponStatus(guardado);
+    if (cabeEnLaVista(estado.key)) return undefined;
+    return avisoDeDestino(guardado.code, estado.label, VISTA_LABEL[estado.key === "active" ? "active" : "attention"]);
+  };
 
   const createMutation = useMutation({
-    mutationFn: (d: CodeFormData) => api.post("/discount-codes", serialize(d)),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["discount-codes"] });
-      toast({ title: "Código creado" });
-      setOpen(false);
-      setEditing(null);
+    mutationFn: (payload: CouponPayload) => api.post("/discount-codes", payload),
+    onSuccess: (res: unknown, payload) => {
+      refreshCodes();
+      toast({
+        title: "Cupón creado",
+        description: avisoDeGuardado(res, payload) ?? "Ya está listo para usarse según sus reglas.",
+      });
+      setIsFormOpen(false);
+      setForm(emptyForm);
     },
-    onError: (e: any) => toast({ title: e?.response?.data?.message ?? "Error al crear código", variant: "destructive" }),
+    onError: (error: unknown) => toast({ title: errorMessage(error, "No se pudo crear el cupón"), variant: "destructive" }),
   });
 
   const updateMutation = useMutation({
-    mutationFn: (d: DiscountCode) => api.put(`/discount-codes/${d.id}`, serialize({
-      code: d.code,
-      discountType: d.discountType,
-      discountValue: d.discountValue,
-      minOrderAmount: d.minOrderAmount ?? 0,
-      maxUses: d.maxUses ?? null,
-      planId: d.planId ?? undefined,
-      classCategory: d.classCategory ?? undefined,
-      channel: d.channel ?? "all",
-      expiresAt: d.expiresAt ?? "",
-      isActive: d.isActive,
-    })),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["discount-codes"] });
-      toast({ title: "Código actualizado" });
-      setOpen(false);
+    mutationFn: ({ id, ...payload }: CouponPayload & { id: string }) => api.put(`/discount-codes/${id}`, payload),
+    onSuccess: (res: unknown, { id: _id, ...payload }) => {
+      refreshCodes();
+      toast({ title: "Cupón actualizado", description: avisoDeGuardado(res, payload) });
+      setIsFormOpen(false);
       setEditing(null);
+      setForm(emptyForm);
     },
-    onError: (e: any) => toast({ title: e?.response?.data?.message ?? "Error al actualizar código", variant: "destructive" }),
+    onError: (error: unknown) => toast({ title: errorMessage(error, "No se pudo actualizar el cupón"), variant: "destructive" }),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/discount-codes/${id}`),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["discount-codes"] }); toast({ title: "Código eliminado" }); },
-    onError: (e: any) => toast({ title: e?.response?.data?.message ?? "Error al eliminar código", variant: "destructive" }),
+    onSuccess: () => {
+      refreshCodes();
+      toast({ title: "Cupón eliminado" });
+      setCouponToDelete(null);
+    },
+    onError: (error: unknown) => toast({ title: errorMessage(error, "No se pudo eliminar el cupón"), variant: "destructive" }),
   });
 
-  const requestDelete = async (c: DiscountCode) => {
-    const ok = await confirm({
-      title: `¿Eliminar el código ${c.code}?`,
-      description: "Deja de funcionar de inmediato para compras nuevas. Las compras donde ya se aplicó no cambian.",
-      confirmLabel: "Eliminar",
-      destructive: true,
-    });
-    if (ok) deleteMutation.mutate(c.id);
-  };
+  const summary = useMemo(() => {
+    const active = codes.filter((coupon) => couponStatus(coupon).key === "active").length;
+    const attention = codes.filter((coupon) => ["expired", "exhausted", "inactive"].includes(couponStatus(coupon).key)).length;
+    const redemptions = codes.reduce((sum, coupon) => sum + Number(coupon.usesCount || 0), 0);
+    return { active, attention, redemptions };
+  }, [codes]);
 
-  const openEdit = (c: DiscountCode) => {
-    form.reset({
-      code: c.code,
-      discountType: c.discountType,
-      discountValue: c.discountValue,
-      minOrderAmount: c.minOrderAmount ?? 0,
-      maxUses: c.maxUses ?? null,
-      planId: c.planId ?? undefined,
-      classCategory: c.classCategory ?? undefined,
-      channel: c.channel ?? "all",
-      expiresAt: c.expiresAt ?? "",
-      isActive: c.isActive,
+  const visibleCodes = useMemo(() => {
+    const normalizedSearch = search.trim().toLowerCase();
+    return codes.filter((coupon) => {
+      const status = couponStatus(coupon).key;
+      const matchesFilter = filter === "all" || (filter === "active" ? status === "active" : status !== "active");
+      const matchesSearch = !normalizedSearch || [coupon.code, coupon.planName, coupon.channel, coupon.classCategory]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(normalizedSearch));
+      return matchesFilter && matchesSearch;
     });
-    setEditing(c);
-    setOpen(true);
-  };
+  }, [codes, filter, search]);
 
   const openCreate = () => {
-    form.reset({
-      code: "",
-      discountType: "percent",
-      discountValue: 0,
-      minOrderAmount: 0,
-      isActive: true,
-      maxUses: null,
-      expiresAt: "",
-      planId: undefined,
-      classCategory: undefined,
-      channel: "all",
-    });
     setEditing(null);
-    setOpen(true);
+    setForm(emptyForm);
+    setIsFormOpen(true);
   };
 
+  const openEdit = (coupon: DiscountCode) => {
+    setEditing(coupon);
+    setForm({
+      code: coupon.code,
+      maxUsesPerUser: String(coupon.maxUsesPerUser ?? (coupon.oncePerUser ? 1 : "")),
+      discountType: coupon.discountType,
+      discountValue: String(coupon.discountValue),
+      maxUses: coupon.maxUses === null ? "" : String(coupon.maxUses),
+      expiresAt: coupon.expiresAt ? coupon.expiresAt.slice(0, 10) : "",
+      minOrderAmount: Number(coupon.minOrderAmount) > 0 ? String(coupon.minOrderAmount) : "",
+      planId: coupon.planId || "all",
+      classCategory: coupon.classCategory || "all",
+      channel: coupon.channel || "all",
+      isActive: coupon.isActive,
+    });
+    setIsFormOpen(true);
+  };
+
+  const submitForm = () => {
+    const discountValue = Number(form.discountValue);
+    const maxUses = form.maxUses === "" ? null : Number(form.maxUses);
+    const maxUsesPerUser = form.maxUsesPerUser === "" ? null : Number(form.maxUsesPerUser);
+    if (maxUsesPerUser !== null && (!Number.isSafeInteger(maxUsesPerUser) || maxUsesPerUser < 1 || maxUsesPerUser > 2147483647)) {
+      toast({ title: "Usos por persona debe ser un entero positivo válido", variant: "destructive" });
+      return;
+    }
+    const minOrderAmount = form.minOrderAmount === "" ? 0 : Number(form.minOrderAmount);
+
+    if (!/^[A-Z0-9_-]{3,50}$/.test(form.code.trim().toUpperCase())) {
+      toast({ title: "Usa 3 a 50 letras, números, guiones o guion bajo para el código", variant: "destructive" });
+      return;
+    }
+    if (!Number.isFinite(discountValue) || discountValue <= 0 || (form.discountType === "percent" && discountValue > 100)) {
+      toast({ title: "Ingresa un descuento válido", variant: "destructive" });
+      return;
+    }
+    if (maxUses !== null && (!Number.isInteger(maxUses) || maxUses < 1)) {
+      toast({ title: "El límite de usos debe ser un entero mayor a cero", variant: "destructive" });
+      return;
+    }
+    if (!Number.isFinite(minOrderAmount) || minOrderAmount < 0) {
+      toast({ title: "La compra mínima no es válida", variant: "destructive" });
+      return;
+    }
+
+    const payload: CouponPayload = {
+      code: form.code.trim().toUpperCase(),
+      discountType: form.discountType,
+      discountValue,
+      maxUses,
+      maxUsesPerUser,
+      expiresAt: form.expiresAt || null,
+      minOrderAmount,
+      planId: form.planId === "all" ? null : form.planId,
+      classCategory: form.classCategory === "all" ? null : form.classCategory,
+      channel: form.channel,
+      isActive: form.isActive,
+    };
+
+    if (editing) updateMutation.mutate({ id: editing.id, ...payload });
+    else createMutation.mutate(payload);
+  };
+
+  const copyCode = async (code: string) => {
+    try {
+      await navigator.clipboard.writeText(code);
+      toast({ title: `Código ${code} copiado` });
+    } catch {
+      toast({ title: "No se pudo copiar el código", variant: "destructive" });
+    }
+  };
+
+  const formHasUnavailablePlan = Boolean(form.planId !== "all" && !plans.some((plan) => plan.id === form.planId));
+  const formHasRetiredCategory = isRetiredCategory(form.classCategory);
   const isSaving = createMutation.isPending || updateMutation.isPending;
 
   return (
-    <AuthGuard>
+    <AuthGuard requiredRoles={["admin", "super_admin"]}>
       <AdminLayout>
-        {dialog}
-        <AdminPage>
+        {/* Ronda 5 (ui-pagos): AdminLayout ya pone el landmark «main»; aquí había un
+            segundo landmark anidado. */}
+        <div className="admin-page max-w-6xl space-y-6">
           <AdminPageHeader
-            kicker="Más"
+            className="mb-0"
+            eyebrow="Promociones"
             title="Cupones"
-            subtitle="Cupones que los usuarios escriben al pagar: porcentaje o monto fijo, con límites por plan, canal, usos o fecha."
-            actions={<Button onClick={openCreate}><Plus size={16} aria-hidden="true" />Nuevo cupón</Button>}
+            description="Administra descuentos con reglas claras y consulta el cupo disponible antes de compartirlos."
+            actions={(
+              <Button onClick={openCreate} className="h-10 bg-ink-muted px-4 text-white hover:bg-ink">
+                <Plus size={16} className="mr-2" /> Nuevo cupón
+              </Button>
+            )}
           />
 
-          {!isError && !isLoading && codes.length > 0 && (
-            <div className="space-y-4">
-              <div className="grid gap-3 sm:grid-cols-3">
-                {[["Activos", activeCount], ["Por revisar", codes.length - activeCount], ["Usos confirmados", codes.reduce((total, c) => total + c.usesCount, 0)]].map(([label, value]) => (
-                  <Panel key={label} className="p-4"><p className="text-sm text-muted-foreground">{label}</p><p className="nums text-2xl font-bold">{value}</p></Panel>
+          <section className="grid gap-px overflow-hidden rounded-2xl border border-ink-muted/12 bg-ink-muted/12 sm:grid-cols-[1.2fr_1fr_1fr]">
+            {[
+              { label: "Activos", value: summary.active, hint: "disponibles ahora" },
+              { label: "Por revisar", value: summary.attention, hint: "pausados, vencidos o sin cupo" },
+              { label: "Usos confirmados", value: summary.redemptions, hint: "ventas registradas" },
+            ].map((item) => (
+              <div key={item.label} className="bg-surface px-4 py-3.5">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-muted">{item.label}</p>
+                <p className="mt-1 text-2xl font-bold tabular-nums text-ink">{item.value}</p>
+                <p className="mt-0.5 text-[11px] text-ink-muted/55">{item.hint}</p>
+              </div>
+            ))}
+          </section>
+
+          <section className="space-y-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="relative w-full sm:max-w-sm">
+                <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted" />
+                <Input
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  className="h-10 border-ink-muted/15 bg-white pl-9"
+                  placeholder="Buscar por código, plan o canal"
+                />
+              </div>
+              <div className="inline-flex w-full rounded-xl border border-ink-muted/12 bg-surface p-1 sm:w-auto">
+                {([
+                  ["all", "Todos"],
+                  ["active", "Activos"],
+                  ["attention", "Por revisar"],
+                ] as [CouponFilter, string][]).map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setFilter(value)}
+                    className={`flex-1 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors sm:flex-none ${
+                      filter === value ? "bg-ink-muted text-white" : "text-ink-muted/65 hover:bg-ink-muted/5"
+                    }`}
+                  >
+                    {label}
+                  </button>
                 ))}
               </div>
-              <div className="flex flex-col gap-3 sm:flex-row">
-                <Input aria-label="Buscar cupón" placeholder="Buscar por código…" value={search} onChange={(e) => setSearch(e.target.value)} />
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="sm:w-48" aria-label="Estado del cupón"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos los estados</SelectItem>
-                    {["Activo", "Inactivo", "Vencido", "Agotado"].map((state) => <SelectItem key={state} value={state}>{state}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
             </div>
-          )}
-          {isError ? (
-            <ErrorState
-              description="No pudimos cargar los códigos de descuento. Revisa tu conexión y vuelve a intentarlo."
-              onRetry={() => refetch()}
-            />
-          ) : !isLoading && codes.length === 0 ? (
-            <div className="rounded-xl border border-line bg-sunken px-6">
-              <EmptyState
-                icon={<TicketPercent size={20} strokeWidth={1.8} />}
-                title="Aún no hay códigos de descuento"
-                description="Son cupones que los usuarios escriben al pagar: aplican un porcentaje o un monto fijo. Puedes limitarlos por plan, categoría, canal, número de usos o fecha."
-                ctaLabel="Crear el primer código"
-                onCta={openCreate}
-              />
-            </div>
-          ) : (
-            <Panel className="overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Código</TableHead>
-                    <TableHead>Descuento</TableHead>
-                    <TableHead>Canal</TableHead>
-                    <TableHead>Aplica a</TableHead>
-                    <TableHead>Usos</TableHead>
-                    <TableHead>Vence</TableHead>
-                    <TableHead>Estado</TableHead>
-                    <TableHead />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {isLoading
-                    ? Array(4).fill(0).map((_, i) => (
-                      <TableRow key={i}>{Array(8).fill(0).map((_, j) => <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>)}</TableRow>
-                    ))
-                    : visibleCodes.map((c) => (
-                      <TableRow key={c.id}>
-                        <TableCell>
-                          <span className="inline-flex items-center gap-1.5">
-                            <span className="rounded-lg border border-dashed border-line-strong bg-canvas px-2.5 py-1 font-mono text-sm font-extrabold tracking-[0.04em]">{c.code}</span>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              aria-label={`Copiar ${c.code}`}
-                              onClick={async () => {
-                                try { await navigator.clipboard.writeText(c.code); toast({ title: "Código copiado" }); }
-                                catch { toast({ title: "No se pudo copiar", variant: "destructive" }); }
-                              }}
-                            >
-                              <Copy size={16} />
-                            </Button>
-                          </span>
-                        </TableCell>
-                        <TableCell className="nums text-ink">
-                          {c.discountType === "percent" ? `${c.discountValue}%` : formatMXN(c.discountValue)}
-                        </TableCell>
-                        <TableCell className="text-sm text-ink/70">{CHANNEL_LABELS[c.channel] ?? "Todos"}</TableCell>
-                        <TableCell className="text-sm text-ink/70">
-                          {c.planName
-                            ? c.planName
-                            : c.classCategory
-                              ? `Categoría ${CATEGORY_LABELS[c.classCategory]}`
-                              : "Todos los planes"}
-                        </TableCell>
-                        <TableCell>
-                          {(() => {
-                            const u = usageInfo(c.usesCount, c.maxUses);
-                            return (
-                              <span className="flex w-[120px] flex-col gap-1">
-                                <span className="nums text-[13px] font-extrabold">{u.label}</span>
-                                {u.pct != null && (
-                                  <span aria-hidden="true" className="block h-1.5 overflow-hidden rounded-full bg-line">
-                                    <span className={u.exhausted ? "block h-full bg-accent" : "block h-full bg-ink"} style={{ width: `${u.pct}%` }} />
-                                  </span>
-                                )}
-                              </span>
-                            );
-                          })()}
-                        </TableCell>
-                        <TableCell className="nums text-sm text-ink/70">{c.expiresAt ? formatDate(c.expiresAt) : "—"}</TableCell>
-                        <TableCell><StatusDot tone={couponStatus(c) === "Activo" ? "success" : "muted"}>{couponStatus(c)}</StatusDot></TableCell>
-                        <TableCell>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" aria-label={`Acciones de ${c.code}`}><MoreHorizontal size={14} /></Button></DropdownMenuTrigger>
-                            <DropdownMenuContent>
-                              <DropdownMenuItem onClick={() => openEdit(c)}>Editar</DropdownMenuItem>
-                              <DropdownMenuItem className="text-destructive" onClick={() => requestDelete(c)}>Eliminar</DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  {!isLoading && codes.length > 0 && visibleCodes.length === 0 && (
-                    <TableRow><TableCell colSpan={8} className="py-10 text-center">No hay cupones que coincidan con la búsqueda.</TableCell></TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </Panel>
-          )}
-        </AdminPage>
 
-        <Dialog
-          open={open}
-          onOpenChange={(next) => {
-            setOpen(next);
-            if (!next) setEditing(null);
-          }}
-        >
-          <DialogContent className="max-h-[90dvh] overflow-y-auto max-w-md border-line bg-canvas">
+            {codesQuery.isLoading ? (
+              <div className="space-y-2">
+                {[1, 2, 3].map((item) => <Skeleton key={item} className="h-20 w-full rounded-xl" />)}
+              </div>
+            ) : codesQuery.isError ? (
+              <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-ink-muted/20 bg-surface px-6 py-14 text-center">
+                <CircleAlert size={26} className="text-ink-muted" />
+                <p className="mt-3 text-sm font-semibold text-ink">No pudimos cargar los cupones</p>
+                <Button variant="outline" size="sm" onClick={() => codesQuery.refetch()} className="mt-4">Reintentar</Button>
+              </div>
+            ) : visibleCodes.length === 0 ? (
+              <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-ink-muted/20 bg-surface px-6 py-14 text-center">
+                <Tag size={30} className="text-ink-muted/55" />
+                <p className="mt-3 text-sm font-semibold text-ink">
+                  {codes.length === 0 ? "Todavía no hay cupones" : "No hay resultados con estos filtros"}
+                </p>
+                <p className="mt-1 text-xs text-ink-muted/60">
+                  {codes.length === 0 ? "Crea el primero cuando tengas una promoción lista." : "Prueba otro término o vuelve a ver todos."}
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="hidden overflow-hidden rounded-2xl border border-ink-muted/12 bg-white md:block">
+                  <Table>
+                    <TableHeader className="bg-surface">
+                      <TableRow className="hover:bg-surface">
+                        <TableHead>Código y descuento</TableHead>
+                        <TableHead>Alcance</TableHead>
+                        <TableHead>Disponibilidad</TableHead>
+                        <TableHead>Vigencia</TableHead>
+                        <TableHead className="w-[190px] text-right">Acciones</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {visibleCodes.map((coupon) => {
+                        const status = couponStatus(coupon);
+                        const scope = [coupon.planName || "Todos los planes", coupon.classCategory ? categoryLabel(coupon.classCategory) : null]
+                          .filter(Boolean)
+                          .join(" · ");
+                        // Un cupón guardado con una categoría que ya no usa
+                        // ningún plan no se aplica a nadie: se dice, no se
+                        // reescribe la fila (ronda 7).
+                        const categoriaMuerta = isRetiredCategory(coupon.classCategory);
+                        return (
+                          <TableRow key={coupon.id} className="border-ink-muted/8 hover:bg-surface">
+                            <TableCell>
+                              <div className="flex items-center gap-3">
+                                <button
+                                  type="button"
+                                  onClick={() => copyCode(coupon.code)}
+                                  className="group rounded-lg border border-ink-muted/10 bg-surface px-2.5 py-1.5 font-mono text-sm font-bold tracking-wide text-ink transition-colors hover:border-ink-muted/35"
+                                  title="Copiar código" aria-label={`Copiar ${coupon.code}`}
+                                >
+                                  {coupon.code}<Copy size={11} className="ml-1.5 inline opacity-45 group-hover:opacity-100" />
+                                </button>
+                                <div>
+                                  <p className="flex items-center gap-1 text-sm font-semibold text-ink">
+                                    <Percent size={13} className="text-ink-muted" /> {discountLabel(coupon)} de descuento
+                                  </p>
+                                  {Number(coupon.minOrderAmount) > 0 && <p className="mt-0.5 text-[11px] text-ink-muted/55">Mínimo {money(coupon.minOrderAmount)}</p>}
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <p className="max-w-[190px] truncate text-xs font-medium text-ink-muted">{scope}</p>
+                              <p className="mt-1 text-[11px] text-ink-muted/55">{CHANNEL_LABEL[coupon.channel || "all"] || coupon.channel}</p>
+                              {categoriaMuerta && (
+                                <p className="mt-1 text-[11px] font-semibold text-destructive">
+                                  No aplica: ningún plan es de {categoryLabel(coupon.classCategory)}
+                                </p>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className={status.tone}>{status.label}</Badge>
+                              <div><CouponUsageBadge coupon={coupon} onEdit={() => openEdit(coupon)} /></div>
+                              <p className="mt-1.5 text-xs text-ink-muted/65">
+                                {coupon.maxUses === null
+                                  ? `${Number(coupon.usesCount || 0)} uso${Number(coupon.usesCount || 0) === 1 ? "" : "s"} confirmado${Number(coupon.usesCount || 0) === 1 ? "" : "s"}`
+                                  : `${status.remaining} disponible${status.remaining === 1 ? "" : "s"} de ${coupon.maxUses}`}
+                              </p>
+                              {status.pendingReservations > 0 && <p className="text-[10px] text-warn-700">{status.pendingReservations} apartado{status.pendingReservations === 1 ? "" : "s"} por pago pendiente</p>}
+                            </TableCell>
+                            <TableCell>
+                              <p className="text-xs font-medium text-ink-muted">{formatExpiry(coupon.expiresAt)}</p>
+                              <p className="mt-1 text-[11px] text-ink-muted/55">Creado {coupon.createdAt ? format(new Date(coupon.createdAt), "d MMM yyyy", { locale: es }) : "—"}</p>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex justify-end gap-1">
+                                <Button size="sm" variant="outline" onClick={() => setRedemptionsFor(coupon)} className="h-8 px-2 text-xs" title="Ver usos">
+                                  <Eye size={13} className="mr-1" /> Usos
+                                </Button>
+                                <Button size="icon" variant="ghost" onClick={() => openEdit(coupon)} className="h-8 w-8" title="Editar cupón">
+                                  <Edit3 size={14} />
+                                </Button>
+                                <Button size="icon" variant="ghost" onClick={() => setCouponToDelete(coupon)} className="h-8 w-8 text-destructive hover:bg-sunken hover:text-destructive" title="Eliminar cupón">
+                                  <Trash2 size={14} />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+
+                <div className="space-y-2 md:hidden">
+                  {visibleCodes.map((coupon) => {
+                    const status = couponStatus(coupon);
+                    return (
+                      <article key={coupon.id} className="rounded-2xl border border-ink-muted/12 bg-white p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <button type="button" onClick={() => copyCode(coupon.code)} className="font-mono text-base font-bold tracking-wide text-ink">
+                              {coupon.code}<Copy size={11} className="ml-1.5 inline" />
+                            </button>
+                            <p className="mt-1 text-sm font-semibold text-ink-muted">{discountLabel(coupon)} de descuento</p>
+                          </div>
+                          <Badge variant="outline" className={status.tone}>{status.label}</Badge>
+                        </div>
+                        <p className="mt-3 text-xs text-ink-muted/70">{coupon.planName || "Todos los planes"} · {CHANNEL_LABEL[coupon.channel || "all"]}</p>
+                        <CouponUsageBadge coupon={coupon} onEdit={() => openEdit(coupon)} />
+                        {isRetiredCategory(coupon.classCategory) && (
+                          <p className="mt-1 text-[11px] font-semibold text-destructive">
+                            No aplica: ningún plan es de {categoryLabel(coupon.classCategory)}
+                          </p>
+                        )}
+                        <div className="mt-3 flex items-center justify-between border-t border-ink-muted/8 pt-3">
+                          <span className="text-[11px] text-ink-muted/60">{coupon.maxUses === null ? "Sin límite total" : `${status.remaining} de ${coupon.maxUses} disponibles en total`}</span>
+                          <div className="flex gap-1">
+                            <Button size="sm" variant="outline" onClick={() => setRedemptionsFor(coupon)} className="h-8 text-xs"><Users size={13} className="mr-1" /> Usos</Button>
+                            <Button size="icon" variant="ghost" onClick={() => openEdit(coupon)} className="h-8 w-8" aria-label="Editar cupón"><Edit3 size={14} /></Button>
+                            {/* Ronda 5 (ui-pagos): la tarjeta móvil no tenía «Eliminar».
+                                Abre el mismo diálogo que escritorio: si el cupón ya se
+                                usó dice que se desactive, y un 409 se ve en el aviso. */}
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => setCouponToDelete(coupon)}
+                              className="h-8 w-8 text-destructive hover:bg-sunken hover:text-destructive"
+                              aria-label="Eliminar cupón"
+                            >
+                              <Trash2 size={14} />
+                            </Button>
+                          </div>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </section>
+        </div>
+
+        <Dialog open={isFormOpen} onOpenChange={(open) => {
+          setIsFormOpen(open);
+          if (!open) { setEditing(null); setForm(emptyForm); }
+        }}>
+          <DialogContent className="max-h-[92vh] max-w-xl overflow-y-auto border-ink-muted/15 bg-surface">
             <DialogHeader>
-              <DialogTitle className="font-display text-ink">{editing ? "Editar cupón" : "Nuevo cupón"}</DialogTitle>
+              <DialogTitle className="font-display text-2xl tracking-wide text-ink">{editing ? "Editar cupón" : "Crear cupón"}</DialogTitle>
+              <p className="text-sm text-ink-muted/65">Define exactamente dónde aplica y cuánto tiempo estará disponible.</p>
             </DialogHeader>
-            <form
-              noValidate
-              onSubmit={form.handleSubmit((d) => editing
-                ? updateMutation.mutate({ ...editing, ...d })
-                : createMutation.mutate(d))}
-              className="space-y-4"
-            >
-              <div className="space-y-1"><Label>Código</Label><Input {...form.register("code")} className="uppercase font-mono" /></div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label>Tipo</Label>
-                  <Select value={form.watch("discountType")} onValueChange={(v) => form.setValue("discountType", v as "percent" | "fixed")}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="percent">Porcentaje</SelectItem>
-                      <SelectItem value="fixed">Monto fijo</SelectItem>
-                    </SelectContent>
-                  </Select>
+
+            <div className="space-y-5 py-1">
+              <div className="grid gap-3 sm:grid-cols-[1.25fr,0.75fr]">
+                <div>
+                  <Label htmlFor="coupon-code">Código</Label>
+                  <Input id="coupon-code" value={form.code} onChange={(event) => setForm({ ...form, code: event.target.value.toUpperCase() })} className="mt-1.5 font-mono font-semibold uppercase" placeholder="BIENVENIDA10" />
+                  <p className="mt-1 text-[11px] text-ink-muted/55">Letras, números, guion y guion bajo.</p>
                 </div>
-                <div className="space-y-1"><Label>Valor</Label><Input type="number" className="nums" {...form.register("discountValue")} /></div>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1"><Label>Compra mínima</Label><Input type="number" className="nums" {...form.register("minOrderAmount")} /></div>
-                <div className="space-y-1"><Label>Máx. usos (vacío = ∞)</Label><Input type="number" className="nums" {...form.register("maxUses")} /></div>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label>Canal</Label>
-                  <Select value={form.watch("channel")} onValueChange={(v) => form.setValue("channel", v as CodeFormData["channel"])}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                <div>
+                  <Label htmlFor="coupon-value">Valor</Label>
+                  <Input id="coupon-value" type="number" min="0.01" max={form.discountType === "percent" ? 100 : undefined} step="0.01" value={form.discountValue} onChange={(event) => setForm({ ...form, discountValue: event.target.value })} className="mt-1.5" />
+                  <Select value={form.discountType} onValueChange={(value) => setForm({ ...form, discountType: value as DiscountType })}>
+                    <SelectTrigger className="mt-2 h-8 text-xs"><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">Todos</SelectItem>
-                      <SelectItem value="membership">Membresías</SelectItem>
-                      <SelectItem value="pos">POS</SelectItem>
-                      <SelectItem value="event">Eventos</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1">
-                  <Label>Categoría de clase</Label>
-                  <Select value={form.watch("classCategory") ?? "none"} onValueChange={(v) => form.setValue("classCategory", v === "none" ? undefined : (v as CodeCategory))}>
-                    <SelectTrigger><SelectValue placeholder="Todas" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Todas</SelectItem>
-                      <SelectItem value="studio">Studio</SelectItem>
-                      <SelectItem value="reformer_tower">Reformer/Tower</SelectItem>
-                      <SelectItem value="mixto">Mixto</SelectItem>
-                      <SelectItem value="all">General (all)</SelectItem>
+                      <SelectItem value="percent">Porcentaje (%)</SelectItem>
+                      <SelectItem value="fixed">Monto fijo (MXN)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
-              <div className="space-y-1">
-                <Label>Plan específico (opcional)</Label>
-                <Select value={form.watch("planId") ?? "all"} onValueChange={(v) => form.setValue("planId", v === "all" ? undefined : v)}>
-                  <SelectTrigger><SelectValue placeholder="Todos los planes" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos los planes</SelectItem>
-                    {plans.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1"><Label>Fecha de expiración</Label><Input type="datetime-local" className="nums" {...form.register("expiresAt")} /></div>
-              <div className="flex items-center gap-3"><Switch checked={form.watch("isActive")} onCheckedChange={(v) => form.setValue("isActive", v)} /><Label>Activo</Label></div>
-              {Object.values(form.formState.errors).length > 0 && (
-                <div role="alert" className="text-sm text-destructive">
-                  {Object.entries(form.formState.errors).map(([field, error]) => <p key={field}>{error.message}</p>)}
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <Label htmlFor="coupon-uses">Límite total de usos</Label>
+                  <Input id="coupon-uses" type="number" min="1" step="1" value={form.maxUses} onChange={(event) => setForm({ ...form, maxUses: event.target.value })} className="mt-1.5" placeholder="Sin límite" />
+                  <p className="mt-1 text-[11px] text-ink-muted/55">Entre todos los usuarios. Vacío = sin límite total.</p>
                 </div>
-              )}
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-                <Button type="submit" disabled={isSaving}>{isSaving ? "Guardando..." : editing ? "Actualizar" : "Crear"}</Button>
-              </DialogFooter>
-            </form>
+                <div>
+                  <Label htmlFor="coupon-expiry">Vigencia hasta</Label>
+                  <Input id="coupon-expiry" type="date" value={form.expiresAt} onChange={(event) => setForm({ ...form, expiresAt: event.target.value })} className="mt-1.5" />
+                  <p className="mt-1 text-[11px] text-ink-muted/55">Incluye todo el día seleccionado.</p>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-ink-muted/10 bg-white p-4">
+                <div className="mb-4">
+                  <Label htmlFor="coupon-personal-uses">Usos por persona</Label>
+                  <Input id="coupon-personal-uses" type="number" min="1" step="1" value={form.maxUsesPerUser} onChange={(event) => setForm({ ...form, maxUsesPerUser: event.target.value })} className="mt-1.5" placeholder="Sin límite por persona" />
+                  <p className="mt-1 text-xs text-ink-muted">Escribe 1 para permitir una sola compra por cuenta, o el número que necesites. Vacío = sin límite por persona. Las compras pendientes también cuentan.</p>
+                </div>
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-ink-muted">Dónde aplica</p>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <Label>Plan</Label>
+                    <Select value={form.planId} onValueChange={(value) => setForm({ ...form, planId: value })}>
+                      <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos los planes</SelectItem>
+                        {formHasUnavailablePlan && <SelectItem value={form.planId}>Plan no disponible</SelectItem>}
+                        {plans.map((plan) => <SelectItem key={plan.id} value={plan.id}>{plan.name} · {money(plan.price)}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Categoría</Label>
+                    <Select value={form.classCategory} onValueChange={(value) => setForm({ ...form, classCategory: value })}>
+                      <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {CATEGORY_OPTIONS.map((value) => <SelectItem key={value} value={value}>{CATEGORY_LABEL[value]}</SelectItem>)}
+                        {formHasRetiredCategory && (
+                          <SelectItem value={form.classCategory}>{categoryLabel(form.classCategory)} (no aplica)</SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
+                    {formHasRetiredCategory && (
+                      <p className="mt-1.5 text-[11px] text-ink-muted">
+                        Ningún plan usa la categoría «{categoryLabel(form.classCategory)}», así que este cupón no se
+                        aplica a nadie. Cámbiala a Pilates, Bienestar o Todas, o desactívalo.
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <Label>Canal</Label>
+                    <Select value={form.channel} onValueChange={(value) => setForm({ ...form, channel: value })}>
+                      <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(CHANNEL_LABEL).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="coupon-minimum">Compra mínima</Label>
+                    <Input id="coupon-minimum" type="number" min="0" step="0.01" value={form.minOrderAmount} onChange={(event) => setForm({ ...form, minOrderAmount: event.target.value })} className="mt-1.5" placeholder="Sin mínimo" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between rounded-xl border border-ink-muted/12 bg-white px-4 py-3">
+                <div>
+                  <Label htmlFor="coupon-active" className="text-sm font-semibold">Cupón activo</Label>
+                  <p className="mt-0.5 text-[11px] text-ink-muted/55">Puedes pausarlo sin perder su historial.</p>
+                </div>
+                <Switch id="coupon-active" checked={form.isActive} onCheckedChange={(checked) => setForm({ ...form, isActive: checked })} />
+              </div>
+            </div>
+
+            <DialogFooter className="border-t border-ink-muted/10 pt-4">
+              <Button variant="outline" onClick={() => setIsFormOpen(false)}>Cancelar</Button>
+              <Button onClick={submitForm} disabled={isSaving} className="bg-ink-muted text-white hover:bg-ink">
+                {isSaving && <Loader2 size={14} className="mr-2 animate-spin" />}{editing ? "Guardar cambios" : "Crear cupón"}
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        <Dialog open={Boolean(redemptionsFor)} onOpenChange={(open) => { if (!open) setRedemptionsFor(null); }}>
+          <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto border-ink-muted/15 bg-surface">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-ink">
+                <Users size={17} /> Usos de <span className="rounded bg-ink-muted/10 px-1.5 py-0.5 font-mono text-sm">{redemptionsFor?.code}</span>
+              </DialogTitle>
+              <p className="text-sm text-ink-muted/65">Incluye compras en la app, walk-ins, ventas de mostrador y órdenes que siguen en proceso.</p>
+            </DialogHeader>
+            <div className="divide-y divide-ink-muted/10 rounded-xl border border-ink-muted/12 bg-white">
+              {redemptionsQuery.isLoading ? (
+                <div className="flex items-center justify-center py-12 text-sm text-ink-muted/60"><Loader2 size={16} className="mr-2 animate-spin" /> Cargando usos…</div>
+              ) : redemptions.length === 0 ? (
+                <div className="px-5 py-12 text-center text-sm text-ink-muted/60">Aún no hay ventas asociadas a este cupón.</div>
+              ) : redemptions.map((redemption) => {
+                const status = STATUS_LABEL[redemption.status] || { label: redemption.status, tone: "border-line bg-sunken text-ink-muted" };
+                const sourceLabel = redemption.source ? REDEMPTION_SOURCE_LABEL[redemption.source] : null;
+                return (
+                  <div key={`${redemption.source ?? "order"}-${redemption.id ?? redemption.orderId}`} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-ink">{redemption.userName || redemption.userEmail || "Sin cuenta"}</p>
+                      <p className="mt-0.5 truncate text-xs text-ink-muted/60">
+                        {[
+                          sourceLabel,
+                          redemption.planName || "Compra",
+                          PAYMENT_LABEL[redemption.paymentMethod] || redemption.paymentMethod,
+                          format(new Date(redemption.createdAt), "d MMM yyyy, HH:mm", { locale: es }),
+                        ].filter(Boolean).join(" · ")}
+                      </p>
+                      {redemption.membershipStatus === "cancelled" && (
+                        <p className="mt-0.5 text-[11px] text-warn-700">Membresía cancelada</p>
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between gap-3 sm:justify-end">
+                      <div className="text-right text-xs"><p className="font-semibold text-ink">−{money(redemption.discountAmount)}</p><p className="text-ink-muted/55">Total {money(redemption.totalAmount)}</p></div>
+                      <Badge variant="outline" className={status.tone}>{status.label}</Badge>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Ronda 4 (reportes): un cupón usado no se borra (el historial perdería
+            qué explicó el descuento). El diálogo lo dice y lleva a «Editar
+            cupón», donde está «Cupón activo»; el servidor responde lo mismo
+            (409) si el uso llegó mientras tanto. */}
+        <AlertDialog open={Boolean(couponToDelete)} onOpenChange={(open) => { if (!open) setCouponToDelete(null); }}>
+          <AlertDialogContent className="border-ink-muted/15 bg-surface">
+            {couponHasUses(couponToDelete) ? (
+              <>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>No se puede eliminar {couponToDelete?.code}</AlertDialogTitle>
+                  <AlertDialogDescription>{COUPON_USED_MESSAGE}</AlertDialogDescription>
+                  <p className="text-sm text-ink-muted/70">En «Editar cupón» apaga «Cupón activo»: conserva su historial y ya no se aplica.</p>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cerrar</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => {
+                      const coupon = couponToDelete;
+                      setCouponToDelete(null);
+                      if (coupon) openEdit(coupon);
+                    }}
+                    className="bg-ink-muted text-white hover:bg-ink"
+                  >
+                    <Edit3 size={14} className="mr-2" />Editar cupón
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </>
+            ) : (
+              <>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>¿Eliminar {couponToDelete?.code}?</AlertDialogTitle>
+                  <AlertDialogDescription>Todavía no se ha usado. Si prefieres conservarlo sin que se aplique, apaga «Cupón activo» en «Editar cupón».</AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Conservar cupón</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => couponToDelete && deleteMutation.mutate(couponToDelete.id)} className="bg-err-700 text-white hover:bg-err-800">
+                    {deleteMutation.isPending ? <Loader2 size={14} className="mr-2 animate-spin" /> : <X size={14} className="mr-2" />} Eliminar
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </>
+            )}
+          </AlertDialogContent>
+        </AlertDialog>
       </AdminLayout>
     </AuthGuard>
   );
-};
-
-export default DiscountCodes;
+}

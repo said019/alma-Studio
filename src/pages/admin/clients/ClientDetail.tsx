@@ -1,3 +1,6 @@
+import { UserCommunications } from "@/components/admin/UserCommunications";
+import { CreditHistory } from "@/components/admin/CreditHistory";
+import { MembershipPauseButton } from "@/components/admin/MembershipPauseButton";
 import { useState, useRef, type ComponentType, type ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -216,7 +219,7 @@ function MembershipCard({ mem, clientId, showFinance, onEdit, isLoading, isError
         <p className="text-[0.75rem] font-bold uppercase tracking-[0.12em] text-ink-muted">Membresía</p>
         <StatusDot tone="success">Activa</StatusDot>
       </div>
-      <p className="text-base font-extrabold">{mem.planName}</p>
+      <p className="text-base font-extrabold">{mem.planName}</p><MembershipPauseButton membership={mem} />
       {unlimited ? (
         <p className="font-display text-xl font-semibold">Clases ilimitadas</p>
       ) : (
@@ -547,7 +550,7 @@ const ClientDetail = () => {
                       </>
                     )}
                     {showFinance && (
-                      <Button onClick={() => setEditOpen(true)}><Pencil size={16} aria-hidden="true" />Editar datos</Button>
+                      <><UserCommunications userId={id!} /><Button onClick={() => setEditOpen(true)}><Pencil size={16} aria-hidden="true" />Editar datos</Button></>
                     )}
                   </div>
                 </div>
@@ -665,7 +668,7 @@ const ClientDetail = () => {
                                   onClick={() => openEditMem(m)}
                                 >
                                   <Pencil size={12} className="mr-1" /> Editar
-                                </Button>
+                                </Button><MembershipPauseButton membership={m} />
                               </TableCell>
                             </TableRow>
                           ))}
@@ -1060,6 +1063,7 @@ const ClientDetail = () => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        {showFinance && id && <CreditHistory userId={id} />}
       </AdminLayout>
     </AuthGuard>
   );

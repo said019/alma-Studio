@@ -108,11 +108,11 @@ describe("Configuración", () => {
     await waitFor(() => expect(screen.getByTestId("location").textContent).toBe("/admin/settings?tab=payments"));
   });
 
-  it("Notificaciones ya no enlaza a plantillas apagadas", async () => {
+  it("Notificaciones enlaza a las plantillas habilitadas", async () => {
     renderAdmin(<SettingsPage />, { route: "/admin/settings?tab=notifications", path: "/admin/settings" });
     await screen.findByRole("tab", { name: /Notificaciones/ });
     const links = screen.queryAllByRole("link").map((a) => a.getAttribute("href") ?? "");
-    expect(links.filter((h) => h.includes("whatsapp-templates"))).toEqual([]);
+    expect(links).toContain("/admin/whatsapp-templates");
   });
 
   it("historial del pase: un recordatorio omitido por canal caído se ve como Omitido, no como Error", async () => {

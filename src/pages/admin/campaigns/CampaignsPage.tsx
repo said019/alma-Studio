@@ -1,3 +1,4 @@
+import { BroadcastDialog } from "@/components/admin/BroadcastDialog";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
@@ -70,6 +71,7 @@ const LOG_PILL: Record<CampaignLog["status"], { label: string; className: string
 };
 
 const CampaignsPage = () => {
+  const [broadcastOpen,setBroadcastOpen]=useState(false);
   const { toast } = useToast();
   const qc = useQueryClient();
   const { confirm, dialog } = useConfirm();
@@ -168,7 +170,7 @@ const CampaignsPage = () => {
 
   return (
     <AuthGuard>
-      <AdminLayout>
+      <AdminLayout><div className="mb-4"><Button onClick={()=>setBroadcastOpen(true)}>Nuevo comunicado por correo o WhatsApp</Button></div><BroadcastDialog open={broadcastOpen} onOpenChange={setBroadcastOpen} />
         <div className="admin-page max-w-5xl space-y-6">
           {/* ── Header ── */}
           <div>

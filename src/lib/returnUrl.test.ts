@@ -25,10 +25,10 @@ describe("returnUrl seguro", () => {
   });
   it("/admin sólo se acepta con los prefijos del login", () => {
     expect(safeReturnUrl("/admin/bookings")).toBeNull();
-    expect(safeReturnUrl("/admin/bookings", ["/app", "/admin"])).toBe("/admin/bookings");
-    expect(safeReturnUrl("/app/classes/1", ["/app", "/admin"])).toBe("/app/classes/1");
+    expect(safeReturnUrl("/admin/bookings", ["/app", "/admin", "/staff"])).toBe("/admin/bookings");
+    expect(safeReturnUrl("/app/classes/1", ["/app", "/admin", "/staff"])).toBe("/app/classes/1");
     for (const bad of ["/administrador", "/admin//evil.com", "https://evil.com/admin", "//evil.com/admin", "/auth/login"]) {
-      expect(safeReturnUrl(bad, ["/app", "/admin"])).toBeNull();
+      expect(safeReturnUrl(bad, ["/app", "/admin", "/staff"])).toBeNull();
     }
   });
   it("agrega el regreso a una ruta", () => {
@@ -53,9 +53,9 @@ describe("registro, bienvenida y login respetan returnUrl", () => {
   it("Login conserva returnUrl en la liga de crear cuenta", () => {
     expect(read("src/pages/auth/Login.tsx")).toMatch(/withReturnUrl\("\/auth\/register", safeReturnUrl\(params\.get\("returnUrl"\)\)\)/);
   });
-  it("Login, tras entrar, sólo regresa a /app o /admin (staff con sesión vencida vuelve al panel)", () => {
+  it("Login, tras entrar, sólo regresa a /app, /admin o /staff (staff con sesión vencida vuelve al panel)", () => {
     const src = read("src/pages/auth/Login.tsx");
-    const seguro = 'safeReturnUrl(params.get("returnUrl"), ["/app", "/admin"])';
+    const seguro = 'safeReturnUrl(params.get("returnUrl"), ["/app", "/admin", "/staff"])';
     expect(src.split(seguro).length - 1).toBe(2);
     expect(src).not.toMatch(/=\s*params\.get\("returnUrl"\)/);
   });

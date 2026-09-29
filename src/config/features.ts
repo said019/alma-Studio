@@ -1,3 +1,4 @@
+// 2026-09-29: vistas habilitadas a petición del usuario al traer las funciones de Velan.
 /**
  * Funciones ocultas — paridad con Velan (24 sep 2026)
  * ===================================================
@@ -33,11 +34,11 @@ export const FEATURES = {
   /** Punto de venta de mostrador. `/admin/pos` */
   pos: false,
   /** Visitas sueltas y acompañantes. `/admin/visitas` */
-  visits: false,
+  visits: true,
   /** Plantillas de WhatsApp y campañas. `/admin/whatsapp-templates` */
-  whatsappTemplates: false,
+  whatsappTemplates: true,
   /** Bandeja de avisos del panel. `/admin/notifications` */
-  adminInbox: false,
+  adminInbox: true,
   /** Plantillas de horario semanal. `/admin/schedules` */
   scheduleTemplates: false,
   /** Wellhub: configuración y check-ins, sólo para la dueña. `/admin/settings/platforms`, `/admin/bookings/partners-checkins` */
@@ -50,13 +51,13 @@ export const FEATURES = {
   walletExtras: false,
   /** Tarjeta del pase en `/app/wallet` (titular, créditos, vencimiento, próxima
    *  clase). Apagada, la pantalla deja sólo el QR y los botones de Wallet. */
-  walletPassCard: false,
+  walletPassCard: true,
   /** Detalle de un pedido. `/app/orders/:orderId` */
-  orderDetail: false,
+  orderDetail: true,
   /** Detalle de la membresía. `/app/profile/membership` */
   membershipDetail: false,
   /** Cambio de contraseña desde el perfil. `/app/profile/security` */
-  profileSecurity: false,
+  profileSecurity: true,
 
   // ── Alta ─────────────────────────────────────────────────────────────────
   /** Cuestionario posterior al registro. `/auth/onboarding` */

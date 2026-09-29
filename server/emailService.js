@@ -691,3 +691,24 @@ export {
   sendOrderRejected,
   sendAdminWelcome,
 };
+
+// Owner-composed communications. Unlike optional transactional notices, callers
+// need provider failures to be reported rather than counted as successful sends.
+export async function sendCustomBroadcast({to,name,subject,body,headline,ctaUrl,ctaText}) {
+  if (!resend) throw new Error("Correo no configurado");
+  const first=firstNameOf(name);
+  const replace=(value)=>String(value||"").replace(/\{name\}/gi,first);
+  let safeUrl;
+  if (ctaUrl) {
+    const url=new URL(ctaUrl);
+    if (!["https:","http:"].includes(url.protocol)) throw new Error("Enlace inválido");
+    safeUrl=url.href;
+  }
+  const html=baseLayout({preheader:replace(subject),eyebrow:"HIVE Pilates Studio",
+    title:esc(replace(headline||"Hola, {name}")),
+    content:replace(body).split(/\n\n/).map(line=>p(esc(line).replace(/\n/g,"<br>"))).join(""),
+    ctaUrl:safeUrl,ctaText:ctaText?replace(ctaText):undefined});
+  const result=await resend.emails.send({from:FROM_EMAIL,to:[to],subject:replace(subject),html});
+  if (result.error) throw new Error(result.error.message||"El proveedor rechazó el correo");
+  return result.data;
+}

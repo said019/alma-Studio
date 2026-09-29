@@ -1,3 +1,4 @@
+import { OrderActions } from "@/components/app/OrderActions";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
@@ -107,6 +108,7 @@ const OrderDetail = () => {
               actions={status ? <StatusPill label={status.label} tone={status.tone} variant={status.variant ?? "soft"} /> : null}
             />
 
+            {order.status === "pending_payment" && <OrderActions orderId={order.id} />}
             <Section>
               <div className="rounded-3xl p-5 sm:p-7 border border-line bg-sunken">
                 <div className="flex flex-wrap items-baseline justify-between gap-3 pb-3 border-b border-line">
@@ -122,7 +124,7 @@ const OrderDetail = () => {
                     label="Fecha"
                     value={order.created_at ? format(safeParse(order.created_at), "d MMM yyyy", { locale: es }) : "—"}
                   />
-                  <DataRow label="Método" value={order.payment_method === "cash" ? "Efectivo" : "Transferencia"} />
+                  <DataRow label="Método" value={order.payment_method === "cash" ? "Efectivo" : order.payment_method === "card" ? "Tarjeta" : "Transferencia"} />
                   {(order as any).orderNumber && (
                     <DataRow label="Folio" value={(order as any).orderNumber} mono />
                   )}

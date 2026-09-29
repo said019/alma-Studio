@@ -6,8 +6,10 @@ export const REASON_MIN = 5;
 export const REASON_MAX = 500;
 
 export const AUDIT_ACTIONS = Object.freeze([
+  "user.password_reset", "booking.checkin_undone", "membership.pause", "membership.resume", "plan.reorder", "class.duplicate_week",
   "membership.sale",
   "membership.adjust",
+  "booking.reschedule",
   "booking.checkin",
   "booking.no_show",
   "booking.no_show_corrected",

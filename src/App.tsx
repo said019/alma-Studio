@@ -36,6 +36,9 @@ import ProfileSecurity from "./pages/client/ProfileSecurity";
 import Responsiva from "./pages/client/Responsiva";
 import Notifications from "./pages/client/Notifications";
 
+import StaffOperations from "./pages/staff/Operations";
+import StaffScanner from "./pages/staff/Scanner";
+import CampaignsPage from "./pages/admin/campaigns/CampaignsPage";
 // Admin pages
 import AdminDashboard from "./pages/admin/Dashboard";
 import PlansList from "./pages/admin/plans/PlansList";
@@ -141,6 +144,13 @@ const App = () => (
           <Route path="/app/profile/responsiva" element={<Responsiva />} />
           <Route path="/app/notifications" element={<Notifications />} />
 
+          <Route path="/staff" element={<Navigate to="/auth/login" replace />} />
+          <Route path="/staff/instructor" element={<StaffOperations role="instructor" />} />
+          <Route path="/staff/reception" element={<StaffOperations role="reception" />} />
+          <Route path="/staff/reception/checkin" element={<StaffScanner />} />
+          <Route path="/app/pass" element={<Navigate to="/app/wallet" replace />} />
+          <Route path="/admin/checkin" element={<Navigate to="/admin/pasar-lista" replace />} />
+          <Route path="/admin/audit" element={<Navigate to="/admin/bitacora" replace />} />
           {/* Admin panel */}
           <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
           <Route path="/admin/dashboard" element={<AdminDashboard />} />
@@ -172,6 +182,7 @@ const App = () => (
             <Route path="/admin/visitas" element={<VisitsList />} />
           )}
           <Route path="/admin/pasar-lista" element={<TodayAttendance />} />
+          <Route path="/admin/campaigns" element={<CampaignsPage />} />
           <Route path="/admin/discount-codes" element={<DiscountCodes />} />
           {FEATURES.loyalty && (
             <Route path="/admin/loyalty" element={<LoyaltyPage />} />

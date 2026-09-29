@@ -25,20 +25,22 @@ const APAGADAS: Record<string, keyof typeof FEATURES> = {
   "/admin/loyalty": "loyalty",
   "/admin/reviews": "reviews",
   "/admin/pos": "pos",
-  "/admin/visitas": "visits",
-  "/admin/whatsapp-templates": "whatsappTemplates",
-  "/admin/notifications": "adminInbox",
   "/admin/schedules": "scheduleTemplates",
   "/app/wallet/history": "walletExtras",
   "/app/wallet/rewards": "walletExtras",
-  "/app/orders/:orderId": "orderDetail",
   "/app/profile/membership": "membershipDetail",
-  "/app/profile/security": "profileSecurity",
   "/auth/onboarding": "onboarding",
 };
 
 /** Vistas que se quedan aunque Velan no las tenga, con su motivo. */
 const EXCEPCIONES: Record<string, string> = {
+  "/admin/visitas": "gestión de visitas e invitados solicitada con la paridad ampliada",
+  "/admin/whatsapp-templates": "campañas equivalentes a la difusión de Velan",
+  "/admin/notifications": "avisos operativos",
+  "/app/orders/:orderId": "consultar y continuar compras desde el historial",
+  "/app/profile/security": "gestión de contraseña",
+  "/staff/instructor": "portal exclusivo del coach",
+  "/staff/reception": "portal de recepción",
   "/app/profile/responsiva": "el backend bloquea la primera reserva sin responsiva firmada",
   "/admin/pasar-lista": "es el equivalente de /admin/checkin de Velan",
   "/admin/class-generator": "destino real de /admin/classes/generate, que Velan sí tiene",
