@@ -60,6 +60,7 @@ import { ALMA_CLASS_TYPES, ALMA_SCHEDULE_SLOTS, ALMA_SCHEDULE_DAYS, ALMA_PLANS }
 import { seedClassTypesIfEmpty, seedPlansIfEmpty } from "./lib/catalogSeed.js";
 import { DEFAULT_NOTIFICATION_TEMPLATES } from "./lib/notificationTemplates.js";
 import { PASS_DEFAULT_TEXTS, LOYALTY_MILESTONES_SEED } from "./lib/passDefaults.js";
+import { passLocationFields } from "./lib/passGeofence.js";
 import { resolveEffectivePrice } from "./lib/pricing.js";
 import { saleAmountPlan, planMembershipAdjust, cleanPaymentReference, saleStartProblem, saleStartDay, saleAuditAfter, PAYMENT_METHODS, normalizePaymentMethod, PAYMENT_METHOD_INVALID, calcMembershipEndDate } from "./lib/membershipAdmin.js";
 import { cancellationLimitProblem, cancellationQuota, clientCancelDecision, normalizeCancellationSettings, publicBookingPolicy } from "./lib/cancellationPolicy.js";
@@ -7685,8 +7686,8 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
   // HIVE lockscreen relevance:
   // - Para membership pass: 30 min antes de la próxima clase (si existe).
   //   Apple muestra el pase en la lockscreen automáticamente alrededor de esta hora.
-  // - Geofence: usar `locations` (configurada abajo) para que también aparezca
-  //   cuando la alumna esté cerca del estudio.
+  // - Geocerca: `locations` (abajo) para que también aparezca cuando la alumna
+  //   esté cerca del estudio, sólo si BUSINESS_LATITUDE/BUSINESS_LONGITUDE existen.
   const almaRelevantDate = (() => {
     if (hasEventPass) return null;
     if (!nextBooking?.date) return null;
@@ -8187,22 +8188,15 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
     webServiceURL: `${SITE_URL}/api/wallet`,
     authenticationToken: APPLE_AUTH_TOKEN,
     relevantDate: almaRelevantDate || eventRelevantDate,
-    // Geofence: pase aparece en lockscreen cuando la alumna está cerca del estudio.
-    // El fallback de abajo son las coords viejas de Plaza Arce, Juriquilla,
-    // Querétaro (sede anterior a HIVE) — quedan solo por si no hay env vars.
-    // En producción define BUSINESS_LATITUDE/BUSINESS_LONGITUDE con las coords
-    // reales de Cuauhtémoc #68, Del Carmen, Coyoacán, CDMX (src/lib/studio.ts).
-    // Apple alerta cuando entras al radio.
-    locations: [
-      {
-        latitude: Number(process.env.BUSINESS_LATITUDE || 22.1536775),
-        longitude: Number(process.env.BUSINESS_LONGITUDE || -100.9970307),
-        relevantText: hasEventPass
-          ? "Estás cerca del estudio. Saca tu pase del evento."
-          : PASS_DEFAULT_TEXTS.geofenceRelevantText,
-      },
-    ],
-    maxDistance: Number(process.env.BUSINESS_PASS_RADIUS_M || 150),
+    // Geocerca: el pase aparece en la pantalla de bloqueo cerca del estudio.
+    // Para activarla define BUSINESS_LATITUDE y BUSINESS_LONGITUDE (y, opcional,
+    // BUSINESS_PASS_RADIUS_M) con las coordenadas de Cuauhtémoc #68, Del Carmen,
+    // Coyoacán, CDMX (src/lib/studio.ts). Sin ellas no hay coordenadas de
+    // respaldo: el pase sale sin `locations` ni aviso de cercanía.
+    // Ver server/lib/passGeofence.js.
+    ...passLocationFields(hasEventPass
+      ? "Estás cerca del estudio. Saca tu pase del evento."
+      : PASS_DEFAULT_TEXTS.geofenceRelevantText),
   };
   if (eventExpirationDate) {
     passJson.expirationDate = eventExpirationDate;
