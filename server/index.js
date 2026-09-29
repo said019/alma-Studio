@@ -4302,15 +4302,14 @@ app.post("/api/bookings", authMiddleware, async (req, res) => {
     }
 
     const msg = isWaitlist ? "Añadido a lista de espera" : "Reserva confirmada";
+    // El WhatsApp de "reserva confirmada" ya salió arriba, vía
+    // sendBookingNoticeWhatsApp (respeta whatsapp_reminders, el template
+    // habilitado y usa el firstName real); aquí sólo queda refrescar el pase
+    // (antes se mandaba dos veces: ésta y notifyBookingConfirmed).
     if (isWaitlist) {
       triggerWalletPassSync(req.userId, "booking_waitlist_created");
     } else if (isConfirmed) {
-      const booking = result.rows[0];
-      const className = booking?.class_type_name;
-      const startStr = booking?.start_time
-        ? new Date(booking.start_time).toLocaleString("es-MX", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
-        : null;
-      notifyBookingConfirmed(req.userId, { className, when: startStr }).catch(() => {});
+      triggerWalletPassSync(req.userId, "booking_confirmed");
     }
     return res.status(201).json({ message: msg, booking: result.rows[0] });
   } catch (err) {
