@@ -9,6 +9,7 @@ import { resolveWellhubPrice } from "./pricing.js";
 import {
   confirmWellhubBooking, rejectWellhubBooking, validateWellhubVisit,
 } from "./api.js";
+import { recordAuditBestEffort } from "../audit.js";
 
 const CHANNEL = "wellhub";
 
@@ -149,7 +150,18 @@ export async function handleCheckin(pool, creds, payload, now) {
       [checkinId, JSON.stringify(res.data || {})],
     );
     if (booking) {
-      await pool.query("UPDATE bookings SET status='checked_in' WHERE id=$1", [booking.id]);
+      // Con checked_in_at: sin la fecha no contaba en "Primera vez" ni en los
+      // reportes que miran la asistencia (auditoría 2026-09-27, P1-9).
+      await pool.query(
+        "UPDATE bookings SET status='checked_in', checked_in_at = COALESCE(checked_in_at, NOW()) WHERE id=$1",
+        [booking.id],
+      );
+      await recordAuditBestEffort(pool, {
+        systemActor: "wellhub", action: "booking.checkin", entityType: "booking",
+        entityId: booking.id, subjectUserId: user.id,
+        before: { status: booking.status }, after: { status: "checked_in" },
+        meta: { method: "wellhub", checkin_id: checkinId, class_id: booking.class_id },
+      });
       await createWellhubOrder(pool, { userId: user.id, price: resolveWellhubPrice(creds.extra_config) });
     }
     return { status: "confirmed" };
@@ -162,16 +174,26 @@ export async function handleCheckin(pool, creds, payload, now) {
 }
 
 // ── cancelaciones ──
+// Devuelve las clases cuyo lugar se liberó: el webhook sube su lista de espera
+// (auditoría 2026-09-27, P1-1).
 export async function handleCancel(pool, creds, payload, { late = false } = {}) {
   const bookingNumber = extractBookingNumber(payload);
   if (!bookingNumber) return { status: "ignored" };
   const r = await pool.query(
-    `UPDATE bookings SET status='cancelled', cancelled_at=NOW(),
-       partner_metadata = COALESCE(partner_metadata,'{}'::jsonb) || $2::jsonb
-     WHERE channel='wellhub' AND external_ref=$1 AND status <> 'cancelled' RETURNING id`,
+    `WITH prev AS (
+       SELECT id, status::text AS status FROM bookings
+        WHERE channel='wellhub' AND external_ref=$1 AND status <> 'cancelled'
+        FOR UPDATE
+     )
+     UPDATE bookings b SET status='cancelled', cancelled_at=NOW(),
+            partner_metadata = COALESCE(b.partner_metadata,'{}'::jsonb) || $2::jsonb
+       FROM prev
+      WHERE b.id = prev.id
+      RETURNING b.id, b.class_id, prev.status AS prev_status`,
     [String(bookingNumber), JSON.stringify({ late_cancel: late })],
   );
-  return { status: r.rows.length ? "cancelled" : "not_found", late };
+  const classIds = r.rows.filter((x) => ["confirmed", "checked_in"].includes(x.prev_status)).map((x) => x.class_id);
+  return { status: r.rows.length ? "cancelled" : "not_found", late, classIds };
 }
 
 // ── cambio / baja de plan del usuario ──
@@ -182,14 +204,17 @@ export async function handlePlanChange(pool, creds, payload) {
   const plan = u.plan || u.plan_name || u.status || null;
   await pool.query("UPDATE users SET platform_plan=$2 WHERE wellhub_id=$1", [String(wid), plan]);
   const inactive = !plan || ["0", "cancelled", "canceled", "paused"].includes(String(plan).toLowerCase());
+  let classIds = [];
   if (inactive) {
-    await pool.query(
+    const r = await pool.query(
       `UPDATE bookings b SET status='cancelled', cancelled_at=NOW()
          FROM classes c WHERE b.class_id=c.id AND b.channel='wellhub'
            AND b.user_id=(SELECT id FROM users WHERE wellhub_id=$1)
-           AND c.date >= NOW()::date AND b.status NOT IN ('cancelled','no_show')`,
+           AND c.date >= NOW()::date AND b.status NOT IN ('cancelled','no_show')
+       RETURNING b.class_id`,
       [String(wid)],
     );
+    classIds = r.rows.map((x) => x.class_id);
   }
-  return { status: "updated", plan, inactive };
+  return { status: "updated", plan, inactive, classIds };
 }

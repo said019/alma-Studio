@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from "vitest";
-import { fireEvent, screen, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 
 vi.mock("@/lib/api", () => ({ default: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() } }));
 import api from "@/lib/api";
@@ -143,5 +143,97 @@ describe("Ficha de clienta", () => {
     renderAdmin(<ClientDetail />, { route: "/admin/clients/u1", path: "/admin/clients/:id" });
     const resp = await screen.findByRole("region", { name: "Responsiva" });
     expect(within(resp).queryByText("Pendiente")).toBeNull();
+  });
+
+  it("editar la membresía pide motivo, avisa si queda por encima del plan y lo manda", async () => {
+    const mockPut = (api as unknown as { put: Mock }).put;
+    mockPut.mockReset().mockResolvedValue({ data: {} });
+    loginAs("admin");
+    routeApi(mockApi, tabla());
+    renderAdmin(<ClientDetail />, { route: "/admin/clients/u1", path: "/admin/clients/:id" });
+    const mem = await screen.findByRole("region", { name: "Membresía" });
+    fireEvent.click(await within(mem).findByRole("button", { name: /Editar/ }));
+    const dlg = await screen.findByRole("dialog", { name: "Editar membresía" });
+    fireEvent.change(within(dlg).getByLabelText("Clases restantes"), { target: { value: "10" } });
+    expect(within(dlg).getByText("Queda por encima del plan (8 clases).")).toBeInTheDocument();
+    const guardar = within(dlg).getByRole("button", { name: "Guardar" });
+    expect(guardar).toBeDisabled();
+    fireEvent.change(within(dlg).getByLabelText("Motivo del ajuste"), { target: { value: "Compensación por clase cancelada" } });
+    expect(guardar).toBeEnabled();
+    fireEvent.click(guardar);
+    await waitFor(() => expect(mockPut).toHaveBeenCalledWith("/memberships/m1", expect.objectContaining({ classesRemaining: 10, reason: "Compensación por clase cancelada" })));
+  });
+
+  it("la tarjeta dice cuántas cancelaciones lleva y Editar las ajusta con el motivo del ajuste", async () => {
+    const mockPut = (api as unknown as { put: Mock }).put;
+    mockPut.mockReset().mockResolvedValue({ data: {} });
+    loginAs("reception");
+    routeApi(mockApi, tabla({ "/memberships?userId=u1": { data: [{ ...MEM, cancellationsUsed: 2, cancellationLimit: 2 }] } }));
+    renderAdmin(<ClientDetail />, { route: "/admin/clients/u1", path: "/admin/clients/:id" });
+    const mem = await screen.findByRole("region", { name: "Membresía" });
+    expect(await within(mem).findByText("Cancelaciones: 2 de 2")).toBeInTheDocument();
+    fireEvent.click(within(mem).getByRole("button", { name: /Editar/ }));
+    const dlg = await screen.findByRole("dialog", { name: "Editar membresía" });
+    const campo = within(dlg).getByLabelText("Cancelaciones usadas");
+    expect(campo).toHaveValue(2);
+    expect(within(dlg).getByText(/De 2 permitidas por paquete/)).toBeInTheDocument();
+    fireEvent.change(campo, { target: { value: "0" } });
+    fireEvent.change(within(dlg).getByLabelText("Motivo del ajuste"), { target: { value: "Canceló por enfermedad, trajo receta" } });
+    fireEvent.click(within(dlg).getByRole("button", { name: "Guardar" }));
+    await waitFor(() => expect(mockPut).toHaveBeenCalledWith("/memberships/m1", expect.objectContaining({
+      cancellationsUsed: 0, reason: "Canceló por enfermedad, trajo receta",
+    })));
+  });
+
+  it("sin límite de cancelaciones la tarjeta lo dice", async () => {
+    loginAs("admin");
+    routeApi(mockApi, tabla({ "/memberships?userId=u1": { data: [{ ...MEM, cancellationsUsed: 1, cancellationLimit: 0 }] } }));
+    renderAdmin(<ClientDetail />, { route: "/admin/clients/u1", path: "/admin/clients/:id" });
+    const mem = await screen.findByRole("region", { name: "Membresía" });
+    expect(await within(mem).findByText("Cancelaciones: 1 usada · sin límite")).toBeInTheDocument();
+  });
+
+  it("guardar otro ajuste sin tocar Cancelaciones usadas no reescribe el contador", async () => {
+    const mockPut = (api as unknown as { put: Mock }).put;
+    mockPut.mockReset().mockResolvedValue({ data: {} });
+    loginAs("admin");
+    routeApi(mockApi, tabla({ "/memberships?userId=u1": { data: [{ ...MEM, cancellationsUsed: 2, cancellationLimit: 2 }] } }));
+    renderAdmin(<ClientDetail />, { route: "/admin/clients/u1", path: "/admin/clients/:id" });
+    const mem = await screen.findByRole("region", { name: "Membresía" });
+    fireEvent.click(await within(mem).findByRole("button", { name: /Editar/ }));
+    const dlg = await screen.findByRole("dialog", { name: "Editar membresía" });
+    // No toca "Cancelaciones usadas": sólo cambia las clases restantes.
+    fireEvent.change(within(dlg).getByLabelText("Clases restantes"), { target: { value: "1" } });
+    fireEvent.change(within(dlg).getByLabelText("Motivo del ajuste"), { target: { value: "Ajuste por clase de cortesía" } });
+    fireEvent.click(within(dlg).getByRole("button", { name: "Guardar" }));
+    await waitFor(() => expect(mockPut).toHaveBeenCalledWith("/memberships/m1", expect.objectContaining({ classesRemaining: 1 })));
+    const [, body] = mockPut.mock.calls[0];
+    expect(body).not.toHaveProperty("cancellationsUsed");
+  });
+
+  it("el campo Cancelaciones usadas acepta hasta 1000", async () => {
+    loginAs("admin");
+    routeApi(mockApi, tabla({ "/memberships?userId=u1": { data: [{ ...MEM, cancellationsUsed: 2, cancellationLimit: 2 }] } }));
+    renderAdmin(<ClientDetail />, { route: "/admin/clients/u1", path: "/admin/clients/:id" });
+    const mem = await screen.findByRole("region", { name: "Membresía" });
+    fireEvent.click(await within(mem).findByRole("button", { name: /Editar/ }));
+    const dlg = await screen.findByRole("dialog", { name: "Editar membresía" });
+    expect(within(dlg).getByLabelText("Cancelaciones usadas")).toHaveAttribute("max", "1000");
+  });
+
+  it("en Pagos, un reembolso con terminal dice 'Terminal' y no 'Tarjeta', igual que el diálogo de reembolso", async () => {
+    loginAs("admin");
+    routeApi(mockApi, tabla({
+      "/payments?userId=u1": { data: [
+        { id: "p1", source: "order", method: "card", total_amount: 800, planName: "Paquete 8 clases", createdAt: "2026-09-10T10:00:00" },
+        { id: "p2", source: "refund", method: "card", total_amount: 800, planName: "Paquete 8 clases", createdAt: "2026-09-20T10:00:00" },
+      ] },
+    }));
+    renderAdmin(<ClientDetail />, { route: "/admin/clients/u1", path: "/admin/clients/:id" });
+    fireEvent.mouseDown(await screen.findByRole("tab", { name: /Pagos/ }));
+    const filas = await screen.findAllByRole("row");
+    const textos = filas.map((f) => f.textContent ?? "");
+    expect(textos.some((t) => t.includes("Tarjeta"))).toBe(true);
+    expect(textos.some((t) => t.includes("Terminal"))).toBe(true);
   });
 });

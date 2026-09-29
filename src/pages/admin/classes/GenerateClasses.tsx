@@ -84,7 +84,7 @@ const GenerateClasses = () => {
       const created = res.data?.data?.classesCreated ?? 0;
       const skipped = res.data?.data?.classesSkipped ?? 0;
       toast({
-        title: "Horario Alma aplicado",
+        title: "Horario HIVE aplicado",
         description: created > 0
           ? `${created} clases creadas${skipped ? ` · ${skipped} ya existían` : ""}.`
           : (res.data?.message || "Plantilla guardada"),
@@ -141,7 +141,7 @@ const GenerateClasses = () => {
   const handlePresetGenerate = async () => {
     const totalSlots = presetWeeks * 23;
     const ok = await confirm({
-      title: "¿Aplicar el horario Alma?",
+      title: "¿Aplicar el horario HIVE?",
       description: `Se crearán hasta ${totalSlots} clases (${presetWeeks} ${presetWeeks === 1 ? "semana" : "semanas"} por 23 horarios) con la instructora seleccionada. Las clases que ya existan se omiten.`,
       confirmLabel: "Aplicar y generar",
     });

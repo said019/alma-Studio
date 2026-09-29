@@ -1,12 +1,14 @@
 import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
-import { fireEvent, screen, within } from "@testing-library/react";
+import { fireEvent, screen, within, waitFor } from "@testing-library/react";
+import fs from "fs";
+import path from "path";
 
 vi.mock("@/lib/api", () => ({ default: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() } }));
 import api from "@/lib/api";
 import PlansList from "./PlansList";
 import { loginAs, renderAdmin, routeApi } from "@/test/admin-harness";
 
-const mockApi = api as unknown as { get: Mock };
+const mockApi = api as unknown as { get: Mock; delete: Mock };
 
 beforeEach(() => {
   mockApi.get.mockReset();
@@ -57,5 +59,35 @@ describe("Planes", () => {
     fireEvent.keyDown(within(legado).getByRole("button", { name: "Acciones de Plan legado" }), { key: "Enter" });
     expect(await screen.findByRole("menuitem", { name: "Editar" })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: "Eliminar" })).toBeInTheDocument();
+  });
+
+  it("eliminar explica que un plan con historial se archiva y ya no manda cascade", async () => {
+    mockApi.delete.mockReset().mockResolvedValue({ data: { message: "Plan archivado: tiene membresías, órdenes o códigos de descuento, así que se ocultó de la venta y su historial se conserva.", data: { archived: true } } });
+    renderAdmin(<PlansList />, { route: "/admin/plans" });
+    const paquete = (await screen.findByRole("heading", { name: "Paquete 8 clases" })).closest("article")!;
+    fireEvent.keyDown(within(paquete).getByRole("button", { name: "Acciones de Paquete 8 clases" }), { key: "Enter" });
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Eliminar" }));
+    const dlg = await screen.findByRole("alertdialog");
+    expect(within(dlg).getByText(/se archiva: deja de venderse y su historial se conserva/)).toBeInTheDocument();
+    fireEvent.click(within(dlg).getByRole("button", { name: "Eliminar" }));
+    await waitFor(() => expect(mockApi.delete).toHaveBeenCalledWith("/plans/p8"));
+  });
+
+  it("un plan archivado dice Archivado", async () => {
+    routeApi(mockApi, {
+      "/admin/stats": { pendingAlerts: 0 },
+      "/plans": { data: [
+        { id: "pa", name: "Plan viejo", price: 900, duration_days: 30, class_limit: 4, class_category: "studio", is_active: false, archived_at: "2026-09-28T10:00:00Z" },
+      ] },
+    });
+    renderAdmin(<PlansList />, { route: "/admin/plans" });
+    const viejo = (await screen.findByRole("heading", { name: "Plan viejo" })).closest("article")!;
+    expect(within(viejo).getByText("Archivado")).toBeInTheDocument();
+  });
+
+  it("ya no hay borrado en cascada por nombre de plan, ni texto de menos de 12 px", () => {
+    const src = fs.readFileSync(path.resolve(__dirname, "PlansList.tsx"), "utf8");
+    expect(src).not.toMatch(/cascade|CASCADE_DELETE_PLAN_NAME/);
+    expect(src).not.toMatch(/text-\[0\.(?:[0-6]\d*|7[0-4]?)rem\]/);
   });
 });

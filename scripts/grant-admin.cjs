@@ -2,7 +2,7 @@
 /* eslint-disable no-console */
 /**
  * Promueve (o crea) un usuario a `admin` y le envía un correo de bienvenida
- * con su contraseña temporal (Resend, plantilla de marca Alma).
+ * con su contraseña temporal (Resend, plantilla de marca HIVE).
  *
  *   node scripts/grant-admin.cjs <email> ["Nombre Completo"]
  *

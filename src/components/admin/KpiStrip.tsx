@@ -4,14 +4,19 @@ import { Panel } from "./Panel";
 
 export type Kpi = { label: string; value: ReactNode; hint?: ReactNode };
 
-const COLS: Record<number, string> = { 1: "lg:grid-cols-1", 2: "lg:grid-cols-2", 3: "lg:grid-cols-3", 4: "lg:grid-cols-4" };
+const COLS: Record<number, string> = {
+  1: "lg:grid-cols-1", 2: "lg:grid-cols-2", 3: "lg:grid-cols-3", 4: "lg:grid-cols-4", 5: "lg:grid-cols-5",
+};
 
 /* Fila de cifras en una sola tarjeta con divisores (spec §4.5). En celular
-   van de dos en dos. */
+   el grid es siempre de 2 columnas, así que a partir de la tercera cifra
+   ya baja de fila ahí. En escritorio el número de columnas crece con la
+   cantidad de cifras hasta un tope de 5 en una sola fila; con más de 5,
+   las que sobran también bajan de fila en escritorio (el tope no crece). */
 export default function KpiStrip({ items }: { items: Kpi[] }) {
   return (
     <Panel>
-      <dl className={cn("grid grid-cols-2", COLS[Math.min(Math.max(items.length, 1), 4)])}>
+      <dl className={cn("grid grid-cols-2", COLS[Math.min(Math.max(items.length, 1), 5)])}>
         {items.map((k, i) => (
           <div
             key={k.label}

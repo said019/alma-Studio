@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from "vitest";
-import { fireEvent, screen, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 
 vi.mock("@/lib/api", () => ({ default: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() } }));
 import api from "@/lib/api";
@@ -25,12 +25,13 @@ beforeEach(() => {
       { status: "confirmed", displayName: "Camila Torres" },
       { status: "waitlist", displayName: "Regina López" },
     ] } },
+    "/partners/wellhub/class-status/c11": { data: { published: false, maxSpots: 0, bookedSpots: 0, externalSlotId: null } },
   });
 });
 afterEach(() => vi.useRealTimers());
 
 describe("Clases · Calendario", () => {
-  it("al tocar una clase abre su panel con el resumen, iniciales de inscritas, sin Wellhub y con enlace directo a Reservas", async () => {
+  it("al tocar una clase abre su panel con el resumen, iniciales de inscritas, el control de Wellhub para la dueña y enlace directo a Reservas", async () => {
     renderAdmin(<ClassesCalendar />, { route: "/admin/classes" });
     expect(await screen.findByRole("heading", { level: 1, name: "Clases" })).toBeInTheDocument();
     fireEvent.click(await screen.findByRole("button", { name: /Reformer Intermedio.*8 de 8, llena/ }));
@@ -38,8 +39,16 @@ describe("Clases · Calendario", () => {
     expect(await screen.findByText("1 en espera")).toBeInTheDocument();
     // Iniciales de la clienta confirmada (Camila Torres → "CT"), no de la instructora.
     expect(await screen.findByText("CT")).toBeInTheDocument();
-    expect(screen.queryByText("Wellhub")).toBeNull();
+    expect(await screen.findByPlaceholderText("Cupo para Wellhub")).toBeInTheDocument();
     expect(screen.getByText("Gestionar en Reservas").closest("a")).toHaveAttribute("href", "/admin/bookings?clase=c11");
+  });
+
+  it("recepción no ve el control de Wellhub de la clase (sólo la dueña publica a Wellhub)", async () => {
+    loginAs("reception");
+    renderAdmin(<ClassesCalendar />, { route: "/admin/classes" });
+    fireEvent.click(await screen.findByRole("button", { name: /Reformer Intermedio.*8 de 8, llena/ }));
+    expect(await screen.findByText("Llena · 8/8")).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("Cupo para Wellhub")).toBeNull();
   });
 
   it("una sola reserva va en singular", async () => {
@@ -77,5 +86,46 @@ describe("Clases · Calendario", () => {
     const banner = await screen.findByTestId("empty-week-banner");
     expect(within(banner).getByText("Semana sin clases")).toBeInTheDocument();
     expect(within(banner).getByRole("link", { name: "Generar semana" })).toHaveAttribute("href", "/admin/class-generator");
+  });
+
+  it("Limpiar semana: con reservas pide motivo, cancela esas clases y avisa a quién no le llegó", async () => {
+    const mockDelete = (api as unknown as { delete: Mock }).delete;
+    mockDelete.mockReset()
+      .mockRejectedValueOnce({ response: { status: 409, data: { code: "ACTIVE_BOOKINGS", activeBookings: 8, classesToCancel: 1, classesToDelete: 0, classesKept: 0 } } })
+      .mockResolvedValueOnce({ data: { deleted: 0, cancelled: 1, kept: 0, bookingsCancelled: 8, wa_failed: 1, wa_unreached: [{ user_id: "u1", display_name: "Camila Torres", phone: "5512345678" }], wa_channel_state: "disconnected" } });
+    renderAdmin(<ClassesCalendar />, { route: "/admin/classes" });
+    const limpiar = await screen.findByRole("button", { name: "Limpiar semana" });
+    await waitFor(() => expect(limpiar).toBeEnabled());
+    fireEvent.click(limpiar);
+    const confirmar = await screen.findByRole("alertdialog");
+    expect(within(confirmar).getByText(/Las que ya pasaron no se tocan/)).toBeInTheDocument();
+    fireEvent.click(within(confirmar).getByRole("button", { name: "Limpiar semana" }));
+    const prompt = await screen.findByRole("alertdialog", { name: "Hay reservas activas" });
+    const seguir = within(prompt).getByRole("button", { name: "Cancelar esas clases y limpiar" });
+    expect(seguir).toBeDisabled();
+    fireEvent.change(within(prompt).getByRole("textbox"), { target: { value: "Cierre por vacaciones" } });
+    fireEvent.click(seguir);
+    await waitFor(() => expect(mockDelete).toHaveBeenLastCalledWith("/classes/week", { data: { startDate: "2026-09-21", endDate: "2026-09-27", force: true, reason: "Cierre por vacaciones" } }));
+    expect(mockDelete).toHaveBeenNthCalledWith(1, "/classes/week", { data: { startDate: "2026-09-21", endDate: "2026-09-27", force: false, reason: undefined } });
+    expect(await screen.findByText("Avisa a mano a estas alumnas")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "5512345678" })).toHaveAttribute("href", "tel:5512345678");
+  });
+
+  it("cancelar una clase suelta desde el calendario también abre 'Avisa a mano' si el WhatsApp no le llegó a todas", async () => {
+    const mockPut = (api as unknown as { put: Mock }).put;
+    mockPut.mockReset().mockResolvedValue({ data: { data: {
+      bookings_cancelled: 2, credits_restored: 2, points_reverted: 0,
+      wa_queued: 0, wa_failed: 1,
+      wa_unreached: [{ user_id: "u1", display_name: "Camila Torres", phone: "5512345678" }],
+      wa_channel_state: "disconnected",
+    } } });
+    renderAdmin(<ClassesCalendar />, { route: "/admin/classes" });
+    fireEvent.click(await screen.findByRole("button", { name: /Reformer Intermedio.*8 de 8, llena/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "Cancelar clase" }));
+    const confirmar = await screen.findByRole("alertdialog");
+    fireEvent.click(within(confirmar).getByRole("button", { name: "Cancelar clase" }));
+    await waitFor(() => expect(mockPut).toHaveBeenCalledWith("/classes/c11/cancel"));
+    expect(await screen.findByText("Avisa a mano a estas alumnas")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "5512345678" })).toHaveAttribute("href", "tel:5512345678");
   });
 });

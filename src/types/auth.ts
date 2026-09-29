@@ -30,6 +30,9 @@ export interface User {
   practicedBarreBefore?: boolean | null;
   injuryDetails?: string | null;
   onboardingCompleted?: boolean;
+  privacyNoticeVersion?: string | null;
+  healthConsentVersion?: string | null;
+  healthConsentAt?: string | null;
   createdAt: string;
   created_at?: string;
   updatedAt?: string;
@@ -59,6 +62,7 @@ export interface RegisterData {
   dateOfBirth?: string;
   acceptsTerms: boolean;
   acceptsCommunications: boolean;
+  healthConsent?: boolean;
 }
 
 export interface UpdateProfileData {
@@ -71,4 +75,5 @@ export interface UpdateProfileData {
   receiveReminders?: boolean;
   receivePromotions?: boolean;
   receiveWeeklySummary?: boolean;
+  healthConsent?: boolean;
 }

@@ -69,12 +69,12 @@ describe("Pasar lista", () => {
     await waitFor(() => expect(mockApi.put).toHaveBeenCalledWith("/bookings/d/no-show"));
   });
 
-  it("el diálogo de falta dice que ya no podrá marcarse como asistencia", async () => {
+  it("el diálogo de falta dice que se puede corregir hoy mismo", async () => {
     montar();
     const actual = await screen.findByRole("region", { name: "Reformer Intermedio 11:00" });
     fireEvent.click(within(actual).getByRole("button", { name: "Marcar falta de Camila Torres" }));
-    expect(await screen.findByText("Su reserva quedará registrada como falta y ya no podrá marcarse como asistencia.")).toBeInTheDocument();
-    expect(screen.queryByText(/todavía pueden hacerle check-in/)).toBeNull();
+    expect(await screen.findByText("Su reserva quedará registrada como falta. Si fue un error, podrás corregirla a asistencia hoy mismo, con un motivo.")).toBeInTheDocument();
+    expect(screen.queryByText(/ya no podrá marcarse como asistencia/)).toBeNull();
   });
 
   it("una fila con falta no ofrece Check-in y muestra la etiqueta Falta", async () => {
@@ -87,6 +87,21 @@ describe("Pasar lista", () => {
     expect(within(actual).queryByRole("button", { name: "Marcar falta de Lucía Díaz" })).toBeNull();
     const fila = within(actual).getByText("Lucía Díaz").closest("li")!;
     expect(within(fila as HTMLElement).getByText("Falta")).toHaveClass("text-[13px]", "text-ink-muted");
+  });
+
+  it("una falta de hoy ofrece Corregir a asistencia y pide motivo", async () => {
+    montar([clase("c11", "11:00", "11:50", "Reformer Intermedio", 8, [e("n", "no_show", "Lucía Díaz")])]);
+    const actual = await screen.findByRole("region", { name: "Reformer Intermedio 11:00" });
+    fireEvent.click(within(actual).getByRole("button", { name: "Corregir a asistencia de Lucía Díaz" }));
+    const dlg = await screen.findByRole("alertdialog");
+    expect(within(dlg).getByText(/Pasa a asistencia y se le quita esta falta/)).toBeInTheDocument();
+    expect(within(dlg).queryByText(/puntos/i)).toBeNull();
+    const corregir = within(dlg).getByRole("button", { name: "Corregir a asistencia" });
+    expect(corregir).toBeDisabled();
+    fireEvent.change(within(dlg).getByRole("textbox"), { target: { value: "Sí vino, error al marcar" } });
+    expect(corregir).toBeEnabled();
+    fireEvent.click(corregir);
+    await waitFor(() => expect(mockApi.put).toHaveBeenCalledWith("/bookings/n/correct-no-show", { reason: "Sí vino, error al marcar" }));
   });
 
   it("la cámara se abre desde aquí", async () => {

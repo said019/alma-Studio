@@ -18,6 +18,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -27,6 +28,8 @@ import { cn } from "@/lib/utils";
 import { useCanSeeFinance } from "@/lib/roles";
 import { FEATURES } from "@/config/features";
 import { waLink } from "@/lib/phone";
+import { REASON_MIN_CHARS } from "@/lib/audit-log";
+import { REFUND_METHOD_LABEL } from "@/pages/admin/payments/refund-math";
 import {
   ArrowLeft, ArrowRight, CalendarDays, Camera, ChevronLeft, ChevronRight, CreditCard,
   MessageCircle, Pencil, Phone, Receipt, RefreshCw, type LucideProps,
@@ -89,6 +92,14 @@ const PAYMENT_METHOD: Record<string, string> = {
   transfer: "Transferencia",
   stripe: "Stripe",
   mercado_pago: "Mercado Pago",
+};
+
+// En una fila de reembolso, "card" es la terminal, no la tarjeta con la que se
+// pagó: mismo criterio que PaymentsHistory.tsx y el diálogo de reembolso.
+const metodoDePago = (p: { method?: string; source?: string }): string => {
+  const m = p.method ?? "";
+  if (p.source === "refund" && m in REFUND_METHOD_LABEL) return REFUND_METHOD_LABEL[m as keyof typeof REFUND_METHOD_LABEL];
+  return PAYMENT_METHOD[m] ?? p.method ?? "—";
 };
 
 // ── Clases compartidas (tema claro nativo) ─────────────────────────────────────
@@ -231,6 +242,15 @@ function MembershipCard({ mem, clientId, showFinance, onEdit, isLoading, isError
             : ""}
         </p>
       )}
+      {mem.cancellationLimit !== undefined && (() => {
+        const usadas = Number(mem.cancellationsUsed ?? 0);
+        const tope = Number(mem.cancellationLimit ?? 0);
+        return (
+          <p className="nums text-[13px] text-ink-muted">
+            {tope > 0 ? `Cancelaciones: ${usadas} de ${tope}` : `Cancelaciones: ${usadas} ${usadas === 1 ? "usada" : "usadas"} · sin límite`}
+          </p>
+        );
+      })()}
       <div className="grid grid-cols-2 gap-2">
         <Button variant="outline" onClick={onEdit}><Pencil size={16} aria-hidden="true" />Editar</Button>
         {showFinance && (
@@ -305,6 +325,8 @@ const ClientDetail = () => {
   const [editStatus, setEditStatus] = useState("");
   const [editStartDate, setEditStartDate] = useState("");
   const [editEndDate, setEditEndDate] = useState("");
+  const [editReason, setEditReason] = useState("");
+  const [editCancellations, setEditCancellations] = useState("");
 
   // Paginación por pestaña
   const [memPage, setMemPage] = useState(0);
@@ -392,6 +414,8 @@ const ClientDetail = () => {
     setEditStatus(m.status ?? "active");
     setEditStartDate(m.startDate ? String(m.startDate).slice(0, 10) : "");
     setEditEndDate(m.endDate ? String(m.endDate).slice(0, 10) : "");
+    setEditReason("");
+    setEditCancellations(String(m.cancellationsUsed ?? 0));
   };
 
   const handleEditStartDateChange = (val: string) => {
@@ -410,6 +434,13 @@ const ClientDetail = () => {
       body.classesRemaining = editUnlimited ? 9999 : Math.max(0, Number(editCredits || 0));
       if (editStartDate) body.startDate = editStartDate;
       if (editEndDate) body.endDate = editEndDate;
+      // Sólo manda cancellationsUsed si de verdad cambió: si no, un guardado
+      // por otro ajuste (fechas, créditos...) reescribiría el contador con
+      // un valor que ya quedó viejo desde que se abrió el diálogo.
+      if (editCancellations.trim() !== "" && editCancellations !== String(editMem.cancellationsUsed ?? 0)) {
+        body.cancellationsUsed = Number(editCancellations);
+      }
+      body.reason = editReason.trim();
       return api.put(`/memberships/${editMem.id}`, body);
     },
     onSuccess: () => {
@@ -422,6 +453,10 @@ const ClientDetail = () => {
   });
 
   const u = user?.data ?? user;
+
+  const creditsNum = Number(editCredits);
+  const editAbovePlan = !editUnlimited && editMem?.classLimit != null && editCredits.trim() !== ""
+    && Number.isFinite(creditsNum) && creditsNum > Number(editMem.classLimit);
 
   const membershipRows: any[] = Array.isArray(memberships?.data) ? memberships.data : [];
   const bookingRows: any[] = Array.isArray(bookings?.data) ? bookings.data : [];
@@ -715,7 +750,7 @@ const ClientDetail = () => {
                                   {formatMXN(Number(p.total_amount ?? p.amount ?? 0))}
                                 </TableCell>
                                 <TableCell className="text-ink/70">{p.planName ?? p.plan_name ?? "—"}</TableCell>
-                                <TableCell className="text-ink/70">{PAYMENT_METHOD[p.method] ?? p.method ?? "—"}</TableCell>
+                                <TableCell className="text-ink/70">{metodoDePago(p)}</TableCell>
                                 <TableCell className="text-ink/70 nums">{createdAt ? formatDate(createdAt) : "—"}</TableCell>
                               </TableRow>
                             );
@@ -924,8 +959,9 @@ const ClientDetail = () => {
                 </div>
 
                 <div className="space-y-1">
-                  <Label className="text-xs text-ink/70">Clases restantes</Label>
+                  <Label htmlFor="mem-credits" className="text-xs text-ink/70">Clases restantes</Label>
                   <Input
+                    id="mem-credits"
                     type="number"
                     min="0"
                     inputMode="numeric"
@@ -937,6 +973,30 @@ const ClientDetail = () => {
                   />
                   <p className="text-xs text-ink/50">
                     Ajusta los créditos de la clienta (sirve para paquetes por semana o por mes).
+                  </p>
+                  {editAbovePlan && (
+                    <p className="text-[0.75rem] font-bold text-danger">Queda por encima del plan ({editMem.classLimit} clases).</p>
+                  )}
+                </div>
+
+                <div className="space-y-1">
+                  <Label htmlFor="mem-cancellations" className="text-xs text-ink/70">Cancelaciones usadas</Label>
+                  <Input
+                    id="mem-cancellations"
+                    type="number"
+                    min="0"
+                    max={1000}
+                    step="1"
+                    inputMode="numeric"
+                    className={cn(fieldCls, "nums")}
+                    value={editCancellations}
+                    onChange={(e) => setEditCancellations(e.target.value)}
+                  />
+                  <p className="text-xs text-ink/50">
+                    {Number(editMem.cancellationLimit) > 0
+                      ? `De ${editMem.cancellationLimit} permitidas por paquete.`
+                      : "Este paquete no tiene límite de cancelaciones."}{" "}
+                    Bajarlas le deja cancelar otra vez; queda en la bitácora con el motivo del ajuste.
                   </p>
                 </div>
 
@@ -978,6 +1038,12 @@ const ClientDetail = () => {
                     Puedes ajustarlo manualmente.
                   </p>
                 )}
+                <div className="space-y-1">
+                  <Label htmlFor="mem-reason" className="text-xs text-ink/70">Motivo del ajuste</Label>
+                  <Textarea id="mem-reason" rows={2} maxLength={500} className={fieldCls} value={editReason} onChange={(e) => setEditReason(e.target.value)}
+                    placeholder="Obligatorio: p. ej. compensación por clase cancelada" />
+                  <p className="text-xs text-ink/50">Queda en la bitácora con tu nombre. Mínimo {REASON_MIN_CHARS} caracteres.</p>
+                </div>
               </div>
             )}
             <DialogFooter>
@@ -986,7 +1052,7 @@ const ClientDetail = () => {
               </Button>
               <Button
                 className={primaryBtnCls}
-                disabled={editMemMutation.isPending || (!editUnlimited && editCredits.trim() === "")}
+                disabled={editMemMutation.isPending || (!editUnlimited && editCredits.trim() === "") || editReason.trim().length < REASON_MIN_CHARS}
                 onClick={() => editMemMutation.mutate()}
               >
                 {editMemMutation.isPending ? "Guardando…" : "Guardar"}

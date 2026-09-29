@@ -20,6 +20,7 @@ import { Camera, Check, ChevronDown, RotateCcw, UserX } from "lucide-react";
 import CheckinScanner from "@/components/admin/CheckinScanner";
 import { HealthBadges } from "@/components/admin/HealthBadges";
 import { hhmm, minutesUntil, splitDay, summarize, type TodayClass, type TodayRosterEntry } from "@/lib/today-roster";
+import { REASON_MIN_CHARS } from "@/lib/audit-log";
 
 type ClassCardProps = {
   cls: TodayClass;
@@ -33,9 +34,10 @@ type ClassCardProps = {
   isGuest: (r: TodayRosterEntry) => boolean;
   onCheckin: (bookingId: string) => void;
   onNoShow: (r: TodayRosterEntry) => void;
+  onCorrect: (r: TodayRosterEntry) => void;
 };
 
-function ClassCard({ cls, clock, open, onToggle, current = false, past = false, mutating, labelOf, isGuest, onCheckin, onNoShow }: ClassCardProps) {
+function ClassCard({ cls, clock, open, onToggle, current = false, past = false, mutating, labelOf, isGuest, onCheckin, onNoShow, onCorrect }: ClassCardProps) {
   const s = summarize(cls);
   const mins = minutesUntil(hhmm(cls.start_time), clock);
   const name = cls.class_type_name;
@@ -103,9 +105,17 @@ function ClassCard({ cls, clock, open, onToggle, current = false, past = false, 
                 ) : r.status === "waitlist" ? (
                   <span className="text-[13px] text-ink-muted">Lista de espera</span>
                 ) : r.status === "no_show" ? (
-                  // La regla de check-in (server/lib/checkin.js) rechaza una
-                  // reserva marcada como falta: no se ofrece el botón.
-                  <span className="text-[13px] text-ink-muted">Falta</span>
+                  // Una falta se corrige a asistencia el mismo día con motivo
+                  // (PUT /bookings/:id/correct-no-show). Pasar lista sólo trae
+                  // clases de hoy; el servidor vuelve a revisar el día.
+                  <span className="flex items-center gap-2">
+                    <span className="text-[13px] text-ink-muted">Falta</span>
+                    <Button variant="outline" size="sm" aria-label={`Corregir a asistencia de ${labelOf(r)}`} onClick={() => onCorrect(r)} disabled={mutating}>
+                      <RotateCcw size={14} aria-hidden="true" />
+                      <span className="hidden sm:inline">Corregir a asistencia</span>
+                      <span className="sm:hidden">Corregir</span>
+                    </Button>
+                  </span>
                 ) : (
                   <span className="flex gap-1.5">
                     <Button variant="ghost" size="icon" aria-label={`Marcar falta de ${labelOf(r)}`} onClick={() => onNoShow(r)} disabled={mutating}>
@@ -128,7 +138,7 @@ function ClassCard({ cls, clock, open, onToggle, current = false, past = false, 
 const TodayAttendance = () => {
   const { toast } = useToast();
   const qc = useQueryClient();
-  const { confirm, dialog } = useConfirm();
+  const { confirm, promptText, dialog } = useConfirm();
 
   // Reloj de recepción: se actualiza cada 30 s, también marca la clase en curso.
   const [now, setNow] = useState(() => new Date());
@@ -180,6 +190,20 @@ const TodayAttendance = () => {
     }),
   });
 
+  const correctMutation = useMutation({
+    mutationFn: ({ bookingId, reason }: { bookingId: string; reason: string; name: string }) =>
+      api.put(`/bookings/${bookingId}/correct-no-show`, { reason }),
+    onSuccess: (_res, vars) => {
+      qc.invalidateQueries({ queryKey: ["today-roster"] });
+      toast({ title: "Falta corregida", description: `${vars.name} quedó con asistencia.` });
+    },
+    onError: (e: any) => toast({
+      title: "No se pudo corregir la falta",
+      description: e?.response?.data?.message ?? "Intenta de nuevo.",
+      variant: "destructive",
+    }),
+  });
+
   const labelOf = (r: TodayRosterEntry) =>
     r.guest_name ?? r.display_name ?? "—";
 
@@ -189,21 +213,34 @@ const TodayAttendance = () => {
     const name = labelOf(r);
     const ok = await confirm({
       title: `¿Marcar a ${name} como no asistió?`,
-      description: "Su reserva quedará registrada como falta y ya no podrá marcarse como asistencia.",
+      description: "Su reserva quedará registrada como falta. Si fue un error, podrás corregirla a asistencia hoy mismo, con un motivo.",
       destructive: true,
       confirmLabel: "Marcar falta",
     });
     if (ok) noShowMutation.mutate(r.booking_id);
   };
 
+  const handleCorrect = async (r: TodayRosterEntry) => {
+    const name = labelOf(r);
+    const reason = await promptText({
+      title: `¿Corregir la falta de ${name}?`,
+      description: "Pasa a asistencia y se le quita esta falta. Sólo se puede el mismo día de la clase, y queda en la bitácora con tu nombre.",
+      placeholder: "Motivo (obligatorio): p. ej. sí vino, se marcó por error",
+      confirmLabel: "Corregir a asistencia",
+      minLength: REASON_MIN_CHARS,
+    });
+    if (reason) correctMutation.mutate({ bookingId: r.booking_id, reason, name });
+  };
+
   const clock = format(now, "HH:mm");
   const { past, next, later } = splitDay(classes, clock);
 
-  const mutating = checkinMutation.isPending || noShowMutation.isPending;
+  const mutating = checkinMutation.isPending || noShowMutation.isPending || correctMutation.isPending;
   const cardProps = {
     clock, mutating, labelOf, isGuest,
     onCheckin: (id: string) => checkinMutation.mutate(id),
     onNoShow: handleNoShow,
+    onCorrect: handleCorrect,
   };
 
   return (

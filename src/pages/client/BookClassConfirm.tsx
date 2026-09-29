@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useParams, useNavigate } from "react-router-dom";
+import { Link, useParams, useNavigate } from "react-router-dom";
 import { differenceInMinutes, format } from "date-fns";
 import { es } from "date-fns/locale";
 import api from "@/lib/api";
@@ -15,14 +15,16 @@ import {
   SkeletonRow,
   ErrorState,
 } from "@/components/app/AppShell";
-import { BackLink, InfoBanner, StatusPill, StickyCta } from "@/components/app/widgets";
+import { BackLink, StatusPill, StickyCta } from "@/components/app/widgets";
 import { HexPedestal } from "@/components/brand/HexPedestal";
 import { useToast } from "@/hooks/use-toast";
 import { ResponsivaDialog } from "@/components/app/ResponsivaDialog";
+import { cancellationRules, cancellationsLeftText, horasTexto, useBookingPolicy, waitlistRule } from "@/lib/booking-policy";
 
-const KNOW_BEFORE = [
+// La regla de la fila sale de la política vigente (auditoría 2026-09-27, P1-1).
+const knowBefore = (fila: string) => [
   "Llega 10 minutos antes para acomodarte.",
-  "Cupos limitados. Si está llena entras a lista de espera.",
+  fila,
   "Trae ropa cómoda y algo para hidratarte.",
 ];
 
@@ -32,6 +34,7 @@ const BookClassConfirm = () => {
   const { toast } = useToast();
   const qc = useQueryClient();
   const { user } = useAuthStore();
+  const { policy } = useBookingPolicy();
 
   const [waiverOpen, setWaiverOpen] = useState(false);
 
@@ -60,7 +63,10 @@ const BookClassConfirm = () => {
       qc.invalidateQueries({ queryKey: ["my-membership"] });
       qc.invalidateQueries({ queryKey: ["public-classes"] });
       if (data?.booking?.status === "waitlist") {
-        toast({ title: "Quedaste en lista de espera", description: "Te avisamos si se libera un lugar." });
+        toast({
+          title: "Quedaste en lista de espera",
+          description: `Si se libera un lugar hasta ${horasTexto(policy.waitlistCutoffHours)} antes, quedas inscrita sola y se usa una clase de tu paquete.`,
+        });
       } else {
         toast({ title: "Reserva confirmada." });
       }
@@ -82,7 +88,10 @@ const BookClassConfirm = () => {
   const remaining = cls
     ? Math.max(0, Number(cls.max_capacity ?? 0) - Number(cls.current_bookings ?? 0))
     : 0;
-  const isFull = Boolean(cls) && remaining === 0;
+  // Con fila, la clase se ofrece como lista de espera aunque haya lugares:
+  // nadie se salta la fila (P1-1).
+  const waiting = Number(cls?.waitlist_count ?? 0);
+  const isFull = Boolean(cls) && (remaining === 0 || waiting > 0);
 
   const membership = membershipData?.data ?? membershipData ?? null;
   const hasActivePkg = membership?.status === "active";
@@ -90,6 +99,11 @@ const BookClassConfirm = () => {
   const pkgUnlimited = pkgRemaining === null || pkgRemaining === undefined || pkgRemaining === 9999;
   const planName = membership?.planName ?? membership?.plan_name ?? "tu paquete";
   const remainingAfter = Math.max(0, Number(pkgRemaining ?? 0) - 1);
+
+  // "Te quedan N cancelaciones de este paquete." (P0-4)
+  const quedanText = hasActivePkg
+    ? cancellationsLeftText(membership?.cancellationsLeft ?? null, Number(membership?.cancellationLimit ?? 0))
+    : null;
 
   const defaultName =
     user?.displayName ?? user?.display_name ?? user?.full_name ?? "";
@@ -232,7 +246,7 @@ const BookClassConfirm = () => {
 
             <Section title="Lo que tienes que saber">
               <ul className="list-none m-0 p-0">
-                {KNOW_BEFORE.map((text, i, arr) => (
+                {knowBefore(waitlistRule(policy)).map((text, i, arr) => (
                   <li
                     key={i}
                     className={"grid grid-cols-[auto_1fr] items-baseline gap-4 py-3.5 border-t border-line " + (i === arr.length - 1 ? "border-b" : "")}
@@ -248,11 +262,26 @@ const BookClassConfirm = () => {
               </ul>
             </Section>
 
-            <Section>
-              <InfoBanner
-                title="Cancela hasta 12 horas antes y no cuenta como falta."
-                description="Las cancelaciones tardías cuentan como falta; al juntar 5 se descuentan puntos."
-              />
+            <Section title="Si necesitas cancelar">
+              {/* Mismas reglas y mismas palabras que /legal/cancelacion y el
+                  diálogo de cancelar (src/lib/booking-policy.ts, P0-4). */}
+              <ul aria-label="Reglas de cancelación" className="list-none m-0 p-0">
+                {cancellationRules(policy).map((regla, i, arr) => (
+                  <li
+                    key={regla}
+                    className={"py-3 border-t border-line text-[0.92rem] leading-[1.55] text-ink-muted" + (i === arr.length - 1 ? " border-b" : "")}
+                  >
+                    {regla}
+                  </li>
+                ))}
+              </ul>
+              {quedanText && <p className="m-0 mt-3 text-[0.92rem] font-medium text-ink">{quedanText}</p>}
+              <Link
+                to="/legal/cancelacion"
+                className="mt-2 inline-flex min-h-[44px] items-center text-[0.84rem] font-medium text-accent-strong underline underline-offset-2"
+              >
+                Ver la política completa
+              </Link>
             </Section>
 
             <StickyCta>

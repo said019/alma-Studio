@@ -6,7 +6,7 @@ import api from "@/lib/api";
 import MembershipsList from "./MembershipsList";
 import { loginAs, renderAdmin, routeApi } from "@/test/admin-harness";
 
-const mockApi = api as unknown as { get: Mock };
+const mockApi = api as unknown as { get: Mock; put: Mock };
 const m = (id: string, userName: string, status: string, endDate: string | null, classesRemaining: number | null, classLimit: number | null) =>
   ({ id, userId: id, userName, planId: "p", planName: "Paquete 8 clases", classCategory: "studio", status, startDate: "2026-09-01", endDate, classesRemaining, classLimit });
 
@@ -14,6 +14,7 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date(2026, 8, 25, 10, 40));
   mockApi.get.mockReset();
+  mockApi.put.mockReset().mockResolvedValue({ data: {} });
   loginAs("admin");
   routeApi(mockApi, {
     "/admin/stats": { pendingAlerts: 0 },
@@ -42,5 +43,19 @@ describe("Membresías", () => {
     expect(await screen.findByRole("tab", { name: /Por vencer/ })).toHaveAttribute("aria-selected", "true");
     fireEvent.mouseDown(screen.getByRole("tab", { name: /Activas/ }));
     await waitFor(() => expect(screen.getByTestId("location").textContent).toBe("/admin/memberships?tab=active"));
+  });
+
+  it("editar vigencia pide motivo y lo manda", async () => {
+    renderAdmin(<MembershipsList />, { route: "/admin/memberships" });
+    await screen.findByText("Camila Torres");
+    fireEvent.keyDown(screen.getByRole("button", { name: "Acciones de la membresía de Camila Torres" }), { key: "Enter" });
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Editar vigencia" }));
+    const guardar = await screen.findByRole("button", { name: "Guardar vigencia" });
+    fireEvent.change(screen.getByLabelText("Fecha de inicio"), { target: { value: "2026-10-01" } });
+    expect(guardar).toBeDisabled();
+    fireEvent.change(screen.getByLabelText("Motivo del ajuste"), { target: { value: "Preventa acordada con la clienta" } });
+    expect(guardar).toBeEnabled();
+    fireEvent.click(guardar);
+    await waitFor(() => expect(mockApi.put).toHaveBeenCalledWith("/memberships/m1", { startDate: "2026-10-01", reason: "Preventa acordada con la clienta" }));
   });
 });

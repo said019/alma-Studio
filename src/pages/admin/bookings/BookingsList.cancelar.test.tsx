@@ -11,7 +11,7 @@ import api from "@/lib/api";
 import BookingsList from "./BookingsList";
 import { loginAs, renderAdmin, routeApi } from "@/test/admin-harness";
 
-const mockApi = api as unknown as { get: Mock; put: Mock };
+const mockApi = api as unknown as { get: Mock; put: Mock; delete: Mock };
 
 const semana = {
   data: [
@@ -33,6 +33,7 @@ beforeEach(() => {
   vi.setSystemTime(new Date(2026, 8, 25, 10, 40));
   mockApi.get.mockReset();
   mockApi.put.mockReset();
+  mockApi.delete.mockReset().mockResolvedValue({ data: { data: { id: "b1", credit_restored: true } } });
   toastSpy.mockReset();
   loginAs("admin");
   routeApi(mockApi, {
@@ -111,5 +112,24 @@ describe("Cancelar clase · WhatsApp desconectado (P0-1)", () => {
     const descripcion = String(toastSpy.mock.calls.at(-1)?.[0]?.description ?? "");
     expect(descripcion).toMatch(/los avisos de WhatsApp están apagados/i);
     expect(descripcion).not.toMatch(/desconectado/);
+  });
+});
+
+describe("Reservas · cancelar una reserva", () => {
+  it("exige motivo y lo manda con la devolución de crédito", async () => {
+    renderAdmin(<BookingsList />, { route: "/admin/bookings?clase=c11", path: "/admin/bookings" });
+    const lista = await screen.findByRole("region", { name: "Lista de la clase" });
+    await within(lista).findByText("Ana");
+    fireEvent.keyDown(within(lista).getByRole("button", { name: "Más acciones para Ana" }), { key: "Enter" });
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Cancelar reserva (devuelve crédito)" }));
+    const dlg = await screen.findByRole("dialog", { name: "Cancelar reserva de Ana" });
+    const boton = within(dlg).getByRole("button", { name: "Cancelar reserva" });
+    expect(boton).toBeDisabled();
+    expect(within(dlg).getByText(/Queda en la bitácora y se incluye en el WhatsApp/)).toBeInTheDocument();
+    expect(within(dlg).getByLabelText("Motivo (obligatorio)")).toHaveAttribute("maxLength", "500");
+    fireEvent.change(within(dlg).getByLabelText("Motivo (obligatorio)"), { target: { value: "Nos pidió moverla" } });
+    expect(boton).toBeEnabled();
+    fireEvent.click(boton);
+    await waitFor(() => expect(mockApi.delete).toHaveBeenCalledWith("/admin/bookings/b1", { data: { reason: "Nos pidió moverla", refundCredit: true } }));
   });
 });

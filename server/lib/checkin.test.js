@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { checkinRule } from "./checkin.js";
+import { checkinRule, noShowCorrectionRule } from "./checkin.js";
 
 const base = { bookingStatus: "confirmed", classStatus: "scheduled", classDate: "2026-09-27", startTime: "08:00:00", nowDate: "2026-09-27", nowMinutes: 7 * 60 + 45 };
 
@@ -32,4 +32,16 @@ test("demasiado temprano: abre 90 min antes", () => {
   assert.equal(r.code, "TOO_EARLY");
   assert.match(r.message, /06:30/);
   assert.deepEqual(checkinRule({ ...base, nowMinutes: 6 * 60 + 30 }), { ok: true });
+});
+
+test("corregir falta: sólo no_show, clase no cancelada, mismo día", () => {
+  const ok = { bookingStatus: "no_show", classStatus: "scheduled", classDate: "2026-09-28", nowDate: "2026-09-28" };
+  assert.deepEqual(noShowCorrectionRule(ok), { ok: true });
+  for (const s of ["confirmed", "checked_in", "cancelled", "waitlist"]) {
+    assert.equal(noShowCorrectionRule({ ...ok, bookingStatus: s }).code, "NOT_NO_SHOW");
+  }
+  assert.equal(noShowCorrectionRule({ ...ok, classStatus: "cancelled" }).code, "CLASS_CANCELLED");
+  const otro = noShowCorrectionRule({ ...ok, classDate: "2026-09-27" });
+  assert.equal(otro.code, "NOT_SAME_DAY");
+  assert.match(otro.message, /mismo día/);
 });

@@ -23,3 +23,19 @@ export function checkinRule({ bookingStatus, classStatus, classDate, startTime, 
   }
   return { ok: true };
 }
+
+/** Corregir una falta a asistencia (pedido del dueño, bloque 2): sólo una
+ *  reserva marcada como falta, de una clase no cancelada y el mismo día de la
+ *  clase en la zona del estudio. */
+export function noShowCorrectionRule({ bookingStatus, classStatus, classDate, nowDate }) {
+  if (bookingStatus !== "no_show") {
+    return { ok: false, code: "NOT_NO_SHOW", message: "La reserva no está marcada como falta." };
+  }
+  if (classStatus === "cancelled") {
+    return { ok: false, code: "CLASS_CANCELLED", message: "La clase fue cancelada." };
+  }
+  if (classDate !== nowDate) {
+    return { ok: false, code: "NOT_SAME_DAY", message: `Sólo se puede corregir el mismo día de la clase (${classDate}).` };
+  }
+  return { ok: true };
+}

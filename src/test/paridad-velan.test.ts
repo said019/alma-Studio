@@ -29,8 +29,6 @@ const APAGADAS: Record<string, keyof typeof FEATURES> = {
   "/admin/whatsapp-templates": "whatsappTemplates",
   "/admin/notifications": "adminInbox",
   "/admin/schedules": "scheduleTemplates",
-  "/admin/settings/platforms": "partnerPlatforms",
-  "/admin/bookings/partners-checkins": "partnerPlatforms",
   "/app/wallet/history": "walletExtras",
   "/app/wallet/rewards": "walletExtras",
   "/app/orders/:orderId": "orderDetail",
@@ -46,6 +44,9 @@ const EXCEPCIONES: Record<string, string> = {
   "/admin/class-generator": "destino real de /admin/classes/generate, que Velan sí tiene",
   "/admin/class-types": "destino real de /admin/classes/types, que Velan sí tiene",
   "/app/wallet": "equivale a /app/pass de Velan",
+  "/admin/bitacora": "bitácora de la dueña pedida por la auditoría de producción (2026-09-27, P0-3)",
+  "/admin/settings/platforms": "Wellhub está activo en producción: la dueña configura la integración (auditoría 2026-09-27, P1-9)",
+  "/admin/bookings/partners-checkins": "la dueña concilia las visitas de Wellhub (auditoría 2026-09-27, P1-9)",
 };
 
 describe("paridad de vistas con Velan", () => {

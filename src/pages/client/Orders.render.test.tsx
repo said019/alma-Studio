@@ -12,7 +12,7 @@ vi.mock("@/components/layout/ClientAuthGuard", () => ({
 
 afterEach(() => vi.clearAllMocks());
 
-describe("Órdenes: estados traducidos (S2)", () => {
+describe("Órdenes: estados traducidos", () => {
   it('una orden "expired" se lee "Vencido", en pill neutra (muted)', async () => {
     vi.mocked(api.get).mockImplementation(respuestas({
       "/orders": { data: [{ id: "o1", status: "expired", plan_name: "Plan 8 clases", created_at: "2026-09-01T10:00:00", total_amount: 1200, currency: "MXN" }] },

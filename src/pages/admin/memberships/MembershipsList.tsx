@@ -19,10 +19,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { CreditCard, MoreHorizontal } from "lucide-react";
 import { COLOR } from "@/design/tokens";
 import { expiresSoon } from "./membership-helpers";
+import { REASON_MIN_CHARS } from "@/lib/audit-log";
 
 const STATUS_OPTIONS = ["active", "pending_payment", "pending_activation", "expired", "cancelled"] as const;
 type MembershipStatus = (typeof STATUS_OPTIONS)[number];
@@ -104,16 +106,18 @@ const MembershipTable = ({
   const [startVal, setStartVal] = useState("");
   const [endVal, setEndVal] = useState("");
   const [autoEnd, setAutoEnd] = useState(true);
+  const [reasonVal, setReasonVal] = useState("");
 
   const openEdit = (m: Membership) => {
     setEditing(m);
     setStartVal((m.startDate ?? "").slice(0, 10));
     setEndVal((m.endDate ?? "").slice(0, 10));
     setAutoEnd(true);
+    setReasonVal("");
   };
 
   const editMutation = useMutation({
-    mutationFn: (body: { startDate?: string; endDate?: string }) =>
+    mutationFn: (body: { startDate?: string; endDate?: string; reason: string }) =>
       api.put(`/memberships/${editing!.id}`, body),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["memberships"] });
@@ -125,7 +129,7 @@ const MembershipTable = ({
 
   const submitEdit = () => {
     if (!startVal) { toast({ title: "Elige la fecha de inicio", variant: "destructive" }); return; }
-    const body: { startDate?: string; endDate?: string } = { startDate: startVal };
+    const body: { startDate?: string; endDate?: string; reason: string } = { startDate: startVal, reason: reasonVal.trim() };
     if (!autoEnd && endVal) body.endDate = endVal;
     editMutation.mutate(body);
   };
@@ -207,6 +211,12 @@ const MembershipTable = ({
                 <Input id="m-end" type="date" value={endVal} onChange={(e) => setEndVal(e.target.value)} />
               </div>
             )}
+            <div className="space-y-1.5">
+              <Label htmlFor="m-reason">Motivo del ajuste</Label>
+              <Textarea id="m-reason" rows={2} maxLength={500} value={reasonVal} onChange={(e) => setReasonVal(e.target.value)}
+                placeholder="Obligatorio: p. ej. preventa acordada con la clienta" />
+              <p className="text-xs text-ink/50">Queda en la bitácora con tu nombre. Mínimo {REASON_MIN_CHARS} caracteres.</p>
+            </div>
             <p className="text-xs text-ink/50">
               Para preventa: fija el inicio en la fecha en que la membresía debe empezar a valer.
               Con el recálculo activado, el vencimiento se ajusta solo según la duración del plan;
@@ -215,7 +225,7 @@ const MembershipTable = ({
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setEditing(null)}>Cancelar</Button>
-            <Button onClick={submitEdit} disabled={editMutation.isPending}>
+            <Button onClick={submitEdit} disabled={editMutation.isPending || reasonVal.trim().length < REASON_MIN_CHARS}>
               {editMutation.isPending ? "Guardando…" : "Guardar vigencia"}
             </Button>
           </DialogFooter>

@@ -40,8 +40,13 @@ import { useToast } from "@/hooks/use-toast";
 import { Star, CalendarDays, ChevronDown } from "lucide-react";
 import type { BookingClient } from "@/types/booking";
 import { type Tone } from "@/design/tokens";
+import { cancellationRules, cancellationsLeftText, useBookingPolicy } from "@/lib/booking-policy";
 
 type TabId = "upcoming" | "past";
+
+/** Reserva de "Mis clases" con lo que agrega el servidor (bloque 3). */
+type Reserva = BookingClient & { waitlist_position?: number | null };
+type MembresiaCuota = { id: string; cancellationsUsed?: number; cancellationLimit?: number; cancellationsLeft?: number | null };
 
 const STATUS_TINT: Record<string, Tone> = {
   confirmed: "success",
@@ -63,7 +68,7 @@ const MyBookings = () => {
   const qc = useQueryClient();
   const [tab, setTab] = useState<TabId>("upcoming");
   const [showCancelled, setShowCancelled] = useState(false);
-  const [cancelId, setCancelId] = useState<string | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<Reserva | null>(null);
   const [reviewBooking, setReviewBooking] = useState<BookingClient | null>(null);
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState("");
@@ -81,6 +86,13 @@ const MyBookings = () => {
     queryFn: async () => (await api.get("/bookings/my-bookings")).data,
   });
 
+  const { policy } = useBookingPolicy();
+  const { data: membershipsData } = useQuery({
+    queryKey: ["my-memberships-all"],
+    queryFn: async () => (await api.get("/memberships/mine/all")).data,
+  });
+  const memberships: MembresiaCuota[] = Array.isArray(membershipsData?.data) ? membershipsData.data : [];
+
   const {
     data: tagsData,
     isError: tagsError,
@@ -92,7 +104,7 @@ const MyBookings = () => {
   });
   const reviewTags: { id: string; name: string; color: string }[] = Array.isArray(tagsData?.data) ? tagsData.data : [];
 
-  const bookings: BookingClient[] = Array.isArray(bookingsData?.data) ? bookingsData.data : Array.isArray(bookingsData) ? bookingsData : [];
+  const bookings: Reserva[] = Array.isArray(bookingsData?.data) ? bookingsData.data : Array.isArray(bookingsData) ? bookingsData : [];
 
   const { upcoming, past, cancelled } = useMemo(() => {
     const now = new Date(nowTick);
@@ -107,24 +119,40 @@ const MyBookings = () => {
   }, [bookings, nowTick]);
 
   const cancelMutation = useMutation({
-    mutationFn: (id: string) => api.delete(`/bookings/${id}`),
+    mutationFn: ({ id, isWaitlist }: { id: string; isWaitlist: boolean }) =>
+      isWaitlist
+        ? api.delete(`/bookings/${id}`, { params: { expect: "waitlist" } })
+        : api.delete(`/bookings/${id}`),
     onSuccess: (res) => {
       qc.invalidateQueries({ queryKey: ["my-bookings"] });
       qc.invalidateQueries({ queryKey: ["my-membership"] });
+      qc.invalidateQueries({ queryKey: ["my-memberships-all"] });
       qc.invalidateQueries({ queryKey: ["public-classes"] });
-      const creditRestored = res?.data?.creditRestored;
+      const d = res?.data ?? {};
       toast({
-        title: "Reserva cancelada",
-        description: creditRestored
-          ? "Cancelaste a tiempo, tu clase regresó a tu paquete."
-          : "Tu lugar quedó libre. Esta vez contó como falta.",
+        title: d.leftWaitlist ? "Saliste de la lista de espera" : "Reserva cancelada",
+        description: d.message ?? (d.creditRestored ? "Cancelaste a tiempo, tu clase regresó a tu paquete." : "Tu lugar quedó libre."),
       });
-      setCancelId(null);
+      setCancelTarget(null);
     },
     onError: (err: any) => {
+      // Pantalla desfasada: ya subió de la fila antes de que la clienta confirme
+      // salir. El servidor no cambia nada; sólo refrescamos para que se vea
+      // "Confirmada" en vez de reintentar sobre una fila que ya no existe.
+      if (err?.response?.status === 409 && err?.response?.data?.code === "ALREADY_PROMOTED") {
+        const msg = err.response.data.message || "Ya subiste de la lista de espera: tu lugar está confirmado.";
+        toast({ title: "Tu lugar ya está confirmado", description: msg });
+        setCancelTarget(null);
+        // La subida ya descontó una clase del paquete: refresca también las
+        // membresías, no sólo la reserva, para que el cupo se vea al momento.
+        qc.invalidateQueries({ queryKey: ["my-bookings"] });
+        qc.invalidateQueries({ queryKey: ["my-membership"] });
+        qc.invalidateQueries({ queryKey: ["my-memberships-all"] });
+        return;
+      }
       const msg = err?.response?.data?.message || "No se pudo cancelar.";
       toast({ title: "No pudimos cancelar", description: msg, variant: "destructive" });
-      setCancelId(null);
+      setCancelTarget(null);
     },
   });
 
@@ -157,10 +185,10 @@ const MyBookings = () => {
   const list = tab === "upcoming" ? upcoming : past;
   const nowDate = new Date(nowTick);
 
-  const renderBookingRow = (b: BookingClient) => {
+  const renderBookingRow = (b: Reserva) => {
     const isPast = new Date(b.start_time) < nowDate;
     const hasReview = Boolean(b.has_review);
-    const isCancellable = b.status === "confirmed" && !isPast;
+    const isCancellable = (b.status === "confirmed" || b.status === "waitlist") && !isPast;
     const canReview = isPast && b.status === "checked_in" && !hasReview;
     const hasActions = isCancellable || canReview || hasReview;
     // Pasadas atenuadas (spec §6.4): sólo la información de la fila; la pill,
@@ -177,6 +205,9 @@ const MyBookings = () => {
               {b.start_time ? format(safeParse(b.start_time), "EEE d MMM · HH:mm", { locale: es }) : "Por confirmar"}
               {b.instructor_name ? ` · ${b.instructor_name}` : ""}
             </div>
+            {b.status === "waitlist" && b.waitlist_position ? (
+              <div className="nums text-[0.8rem] mt-1 text-ink-muted">Lugar {b.waitlist_position} en la fila</div>
+            ) : null}
           </div>
           <div className="shrink-0 pt-0.5">
             <StatusPill label={STATUS_LABEL[b.status] ?? b.status} tone={STATUS_TINT[b.status] ?? "accent"} />
@@ -185,8 +216,8 @@ const MyBookings = () => {
         {hasActions && (
           <div className="mt-3 flex flex-wrap items-center gap-2">
             {isCancellable && (
-              <GhostButton tone="danger" onClick={() => setCancelId(b.id)}>
-                Cancelar reserva
+              <GhostButton tone="danger" onClick={() => setCancelTarget(b)}>
+                {b.status === "waitlist" ? "Salir de la lista de espera" : "Cancelar reserva"}
               </GhostButton>
             )}
             {canReview && (
@@ -204,6 +235,18 @@ const MyBookings = () => {
       </div>
     );
   };
+
+  // Diálogo de cancelar: las mismas reglas que /legal/cancelacion y la cuota de
+  // la membresía de ESA reserva (P0-4). Salir de la fila no usa cancelación.
+  // /memberships/mine/all sólo trae vigentes: si el paquete de esta reserva ya
+  // venció o se canceló, no está ahí. Sin fallback a otra membresía activa:
+  // eso mostraría la cuota de un paquete distinto y podría bloquear "Sí,
+  // cancelar" sin motivo. El servidor decide en el DELETE con sus propios datos.
+  const saliendo = cancelTarget?.status === "waitlist";
+  const memDeReserva = memberships.find((m) => m.id === cancelTarget?.membership_id) ?? null;
+  const limite = Number(memDeReserva?.cancellationLimit ?? policy.cancellationLimit);
+  const quedan = !saliendo && memDeReserva ? cancellationsLeftText(memDeReserva.cancellationsLeft ?? null, limite) : null;
+  const agotada = !saliendo && limite > 0 && memDeReserva?.cancellationsLeft === 0;
 
   return (
     <ClientAuthGuard requiredRoles={["client"]}>
@@ -288,27 +331,41 @@ const MyBookings = () => {
           )}
         </Section>
 
-        {/* Cancel confirm */}
-        <AlertDialog open={!!cancelId} onOpenChange={(o) => !o && setCancelId(null)}>
+        {/* Cancelar o salir de la fila */}
+        <AlertDialog open={!!cancelTarget} onOpenChange={(o) => !o && setCancelTarget(null)}>
           <AlertDialogContent className="w-[calc(100%-2rem)] rounded-3xl bg-canvas border-line">
             <AlertDialogHeader>
               <AlertDialogTitle className="font-display text-[1.35rem] font-normal leading-snug text-ink">
-                ¿Cancelar tu reserva?
+                {saliendo ? "¿Salir de la lista de espera?" : "¿Cancelar tu reserva?"}
               </AlertDialogTitle>
-              <AlertDialogDescription className="text-[0.92rem] leading-[1.6] text-ink-muted">
-                Si faltan más de 12 horas, tu clase regresa a tu paquete. Con menos tiempo, cuenta como falta.
+              <AlertDialogDescription asChild>
+                <div className="text-[0.92rem] leading-[1.6] text-ink-muted">
+                  {saliendo ? (
+                    <p className="m-0">Dejas tu lugar en la fila. No usa una cancelación de tu paquete.</p>
+                  ) : (
+                    <>
+                      <ul aria-label="Reglas de cancelación" className="m-0 list-disc space-y-1 pl-5">
+                        {cancellationRules(policy).map((r) => <li key={r}>{r}</li>)}
+                      </ul>
+                      {quedan && <p className="m-0 mt-3 font-medium text-ink">{quedan}</p>}
+                      {agotada && <p className="m-0 mt-1">Si necesitas cancelar, habla con recepción.</p>}
+                    </>
+                  )}
+                </div>
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter className="gap-2">
               <AlertDialogCancel className="h-11 rounded-full px-5 text-[0.75rem] font-medium uppercase tracking-[0.18em]">
                 Volver
               </AlertDialogCancel>
-              <AlertDialogAction
-                className="h-11 rounded-full px-5 text-[0.75rem] font-medium uppercase tracking-[0.18em] bg-danger text-canvas hover:bg-danger/90"
-                onClick={() => cancelId && cancelMutation.mutate(cancelId)}
-              >
-                Sí, cancelar
-              </AlertDialogAction>
+              {!agotada && (
+                <AlertDialogAction
+                  className="h-11 rounded-full px-5 text-[0.75rem] font-medium uppercase tracking-[0.18em] bg-danger text-canvas hover:bg-danger/90"
+                  onClick={() => cancelTarget && cancelMutation.mutate({ id: cancelTarget.id, isWaitlist: saliendo })}
+                >
+                  {saliendo ? "Sí, salir" : "Sí, cancelar"}
+                </AlertDialogAction>
+              )}
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>

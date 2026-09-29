@@ -2,11 +2,10 @@
 // Nav simple sin blur (cream sólido + hairline), H1 serif en title-case,
 // cuerpo de lectura a 70ch y footer corto con enlaces cruzados.
 // Colores SIEMPRE desde los tokens de src/design/tokens.ts (nada de paletas locales).
-import { useEffect, useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 
 import { STUDIO, whatsappUrl } from "@/lib/studio";
-import api from "@/lib/api";
 import { COLOR } from "@/design/tokens";
 
 const LEGAL_PAGES = [
@@ -18,35 +17,6 @@ const LEGAL_PAGES = [
 export type LegalPath = (typeof LEGAL_PAGES)[number]["path"];
 
 export type PolicyField = "terms_of_service" | "privacy_policy" | "cancellation_policy";
-
-/** Texto editable desde el CMS. `loading` permite mostrar el skeleton
- *  antes de decidir entre el texto dinámico y el fallback estático,
- *  evitando el salto de contenido. */
-export const usePolicyText = (field: PolicyField) => {
-  const [text, setText] = useState("");
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let active = true;
-    api
-      .get("/public/settings/policies_settings")
-      .then(({ data }) => {
-        if (!active) return;
-        const value = data?.data;
-        const raw = value?.[field];
-        setText(typeof raw === "string" ? raw.trim() : "");
-      })
-      .catch(() => {})
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [field]);
-
-  return { text, loading };
-};
 
 /** Skeleton de párrafos mientras resolvemos el contenido del CMS. */
 export const LegalSkeleton = () => (
@@ -76,28 +46,19 @@ export const LegalUpdated = ({ children }: { children: ReactNode }) => (
   </p>
 );
 
-/** Cuerpo dinámico del CMS, respetando saltos de línea del texto. */
-export const LegalDynamicBody = ({ text }: { text: string }) => (
-  <div className="space-y-6">
-    <LegalUpdated>{new Date().toLocaleDateString("es-MX")}</LegalUpdated>
-    <div className="whitespace-pre-wrap leading-[1.85]">{text}</div>
-  </div>
-);
-
-/** Datos de contacto del estudio. STUDIO es la única fuente: si no hay
- *  teléfono confirmado, la fila no se muestra. */
+/** Datos de contacto del estudio. STUDIO es la única fuente: una fila sin dato
+ *  confirmado no se muestra. Mientras no haya correo de privacidad, las
+ *  solicitudes se presentan en recepción (auditoría 2026-09-27, P1-10). */
 export const LegalContact = () => (
   <ul className="list-none space-y-1 p-0 m-0">
-    <li>
-      <strong className="font-semibold" style={{ color: COLOR.ink }}>Email:</strong>{" "}
-      <a
-        href="mailto:info@almamovement.mx"
-        className="underline underline-offset-2"
-        style={{ color: COLOR.accentStrong }}
-      >
-        info@almamovement.mx
-      </a>
-    </li>
+    {STUDIO.privacyEmail && (
+      <li>
+        <strong className="font-semibold" style={{ color: COLOR.ink }}>Email:</strong>{" "}
+        <a href={`mailto:${STUDIO.privacyEmail}`} className="underline underline-offset-2" style={{ color: COLOR.accentStrong }}>
+          {STUDIO.privacyEmail}
+        </a>
+      </li>
+    )}
     {whatsappUrl() && (
       <li>
         <strong className="font-semibold" style={{ color: COLOR.ink }}>WhatsApp:</strong>{" "}
@@ -119,6 +80,9 @@ export const LegalContact = () => (
     )}
     <li>
       <strong className="font-semibold" style={{ color: COLOR.ink }}>Dirección:</strong> {STUDIO.address}
+    </li>
+    <li>
+      <strong className="font-semibold" style={{ color: COLOR.ink }}>Horario:</strong> {STUDIO.hours}
     </li>
   </ul>
 );
@@ -145,13 +109,13 @@ const LegalLayout = ({ current, title, children }: LegalLayoutProps) => {
           className="font-display text-[1.15rem] tracking-tight no-underline transition-opacity hover:opacity-75"
           style={{ color: COLOR.ink, fontWeight: 420 }}
         >
-          Alma Movement
+          {STUDIO.name}
         </Link>
       </nav>
 
       <main className="w-full max-w-3xl mx-auto flex-1 px-6 pt-14 pb-20">
         <p
-          className="flex items-center gap-[10px] text-[0.7rem] uppercase tracking-[0.28em] font-medium mb-4"
+          className="flex items-center gap-[10px] text-[0.75rem] uppercase tracking-[0.28em] font-medium mb-4"
           style={{ color: COLOR.accentStrong }}
         >
           <span className="inline-block h-px w-[30px]" style={{ backgroundColor: COLOR.line }} />
@@ -192,7 +156,7 @@ const LegalLayout = ({ current, title, children }: LegalLayoutProps) => {
             </Link>
           </nav>
           <p className="m-0" style={{ color: COLOR.accentStrong, opacity: 0.75 }}>
-            © 2026 Alma Movement
+            © 2026 {STUDIO.name}
           </p>
         </div>
       </footer>

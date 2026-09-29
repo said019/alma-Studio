@@ -40,7 +40,7 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe("Inicio: el próximo logro sólo existe con FEATURES.walletExtras (S1)", () => {
+describe("Inicio: el próximo logro sólo existe con FEATURES.walletExtras", () => {
   describe("con la bandera apagada", () => {
     it('no pinta "Tu próximo logro" aunque haya un logro', async () => {
       vi.mocked(api.get).mockImplementation(respuestas({ ...base, "/loyalty/milestones/me": { data: LOGRO } }) as never);

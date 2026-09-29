@@ -54,24 +54,38 @@ import {
   sendWeeklyReminder,
   sendRenewalReminder,
   sendPasswordResetEmail,
+  FROM_EMAIL,
 } from "./emailService.js";
 import { ALMA_CLASS_TYPES, ALMA_SCHEDULE_SLOTS, ALMA_SCHEDULE_DAYS, ALMA_PLANS } from "./lib/almaCatalog.js";
 import { seedClassTypesIfEmpty, seedPlansIfEmpty } from "./lib/catalogSeed.js";
+import { DEFAULT_NOTIFICATION_TEMPLATES } from "./lib/notificationTemplates.js";
+import { PASS_DEFAULT_TEXTS, LOYALTY_MILESTONES_SEED } from "./lib/passDefaults.js";
 import { resolveEffectivePrice } from "./lib/pricing.js";
-import { isMembershipCategoryCompatible as ruleCategoryCompatible, normalizeClassCategory as ruleNormalizeCategory, isWithinMorningWindow, categoryLabel } from "./lib/bookingRules.js";
+import { saleAmountPlan, planMembershipAdjust, cleanPaymentReference, saleStartProblem, saleStartDay, saleAuditAfter, PAYMENT_METHODS, normalizePaymentMethod, PAYMENT_METHOD_INVALID, calcMembershipEndDate } from "./lib/membershipAdmin.js";
+import { cancellationLimitProblem, cancellationQuota, clientCancelDecision, normalizeCancellationSettings, publicBookingPolicy } from "./lib/cancellationPolicy.js";
+import { isMembershipCategoryCompatible as ruleCategoryCompatible, normalizeClassCategory as ruleNormalizeCategory, isWithinMorningWindow, categoryLabel, canMixtoBook } from "./lib/bookingRules.js";
 import { rateKey } from "./lib/rateKey.js";
-import { isWithinCancelWindow, penaltyDueAt } from "./lib/faltas.js";
+import { isWithinCancelWindow, penaltyDueAt, faltaReversal } from "./lib/faltas.js";
 import { scheduleAt } from "./lib/schedule.js";
 import { verifyWellhubSignature, extractSignatureHeader } from "./lib/wellhub/signature.js";
 import { extractGymId, computeEventId } from "./lib/wellhub/payload.js";
+import { planWeekClear, weekRangeProblem } from "./lib/weekClear.js";
+import { promotionWindowOpen, freeSeats, queueBlocksNewBooking, firstEligible, sweepMinutes, MAX_SWEEP_MINUTES, singleFlight, bookingNotice, classEditReleasesSeats } from "./lib/waitlist.js";
 import { getWellhubCredentials } from "./lib/wellhub/credentials.js";
 import { publicPartnerSettings, mergeSecret } from "./lib/partnerSettings.js";
+import { createAccountGate } from "./lib/accountGate.js";
+import { userAnonymizationValues, buildAnonymizeUpdate, WAIVER_ANON_VALUES, GUEST_ANON_VALUES, eventRegistrationAnonValues } from "./lib/anonymize.js";
+import { refundPlan, round2 } from "./lib/refunds.js";
 import { validateWellhubVisit as wellhubValidateVisit } from "./lib/wellhub/api.js";
 import { handleBookingRequested, handleCheckin, handleCancel, handlePlanChange } from "./lib/wellhub/flows.js";
-import { isUuid, signatureProblem } from "./lib/validate.js";
-import { checkinRule } from "./lib/checkin.js";
+import { wellhubMonthRange, summarizeWellhubMonth } from "./lib/wellhub/reconcile.js";
+import { isUuid, isDay, signatureProblem } from "./lib/validate.js";
+import { checkinRule, noShowCorrectionRule } from "./lib/checkin.js";
+import { responsivaDocument, waiverVersionProblem } from "./lib/responsiva.js";
 import { pgReminderLog, sendClassReminders } from "./lib/classReminder.js";
 import { createChannelState } from "./lib/whatsappState.js";
+import { recordAudit, recordAuditBestEffort, reasonProblem, cleanReason, buildAuditQuery, auditRowOut } from "./lib/audit.js";
+import { PRIVACY_NOTICE_VERSION, healthDataChanges, hasCurrentHealthConsent, healthConsentProblem } from "./lib/privacy.js";
 import {
   validateStripeConfig,
   createOrGetStripeCustomer,
@@ -84,7 +98,7 @@ const app = express();
 const PORT = process.env.PORT || 8080;
 const JWT_SECRET = process.env.JWT_SECRET || "dev_alma_secret_change_me";
 
-const APP_PUBLIC_URL = String(process.env.APP_URL || process.env.SITE_URL || "https://alma-movement.com.mx").replace(/\/+$/, "");
+const APP_PUBLIC_URL = String(process.env.APP_URL || process.env.SITE_URL || "https://www.almamovement.com.mx").replace(/\/+$/, "");
 
 // ─── Evolution API (WhatsApp) config ────────────────────────────────────────
 const EVOLUTION_API_URL = process.env.EVOLUTION_API_URL || "";
@@ -97,11 +111,13 @@ const evolutionApi = axios.create({
 });
 
 const DEFAULT_GENERAL_SETTINGS = {
-  studio_name: "Alma Movement",
-  address: "Plaza Arce, Calle Acueducto de Querétaro 513, Jurica Acueducto, 76230 Juriquilla, Qro.",
-  phone: "7721119216",
-  instagram: "@movementalma",
-  facebook: "Alma Movement",
+  // Alineado con src/lib/studio.ts (única fuente de verdad de los datos
+  // públicos del estudio). Teléfono y WhatsApp: pendientes (null), igual que ahí.
+  studio_name: "HIVE Pilates Studio",
+  address: "Cuauhtémoc #68, Del Carmen, Coyoacán, C.P. 04100, CDMX",
+  phone: null,
+  instagram: "@hive.pilates",
+  facebook: "",
   timezone: "America/Mexico_City",
   currency: "MXN",
   maintenance_mode: false,
@@ -112,9 +128,6 @@ const DEFAULT_GENERAL_SETTINGS = {
   venue_media_updated_at: "",
   opening_pricing_active: true,
 };
-
-// Valores válidos del enum payment_method en la base.
-const PAYMENT_METHODS = ["cash", "transfer", "card", "online"];
 
 // Operación diaria: dueña, recepción e instructoras.
 const OPERATIONS_ROLES = ["admin", "super_admin", "instructor", "reception"];
@@ -211,10 +224,13 @@ async function getConfiguredBankInfo(dbClient = pool) {
   }
 }
 
+// Textos de respaldo de policies_settings. Desde el bloque 3 las páginas legales
+// ya no los muestran: los documentos viven versionados en src/pages/legal. Se
+// dejan en HIVE por si algo viejo los lee (auditoría 2026-09-27, punto 7).
 const DEFAULT_POLICIES_SETTINGS = {
-  cancellation_policy: "Si cancelas dentro de las 12 horas previas a tu clase y acumulas 5 clases reservadas sin asistir, se aplica una penalizacion con perdida de puntos.",
-  terms_of_service: "Al reservar o comprar en Alma Movement aceptas el reglamento interno, la vigencia mensual de paquetes, las politicas de cancelacion y el uso personal e intransferible de tus clases.",
-  privacy_policy: "Tus datos se usan para gestionar reservas, pagos, asistencias, recompensas y comunicacion operativa del studio. No compartimos tu informacion personal con terceros sin autorizacion.",
+  cancellation_policy: "La política de cancelación vigente de HIVE Pilates Studio está en /legal/cancelacion.",
+  terms_of_service: "Los términos y condiciones vigentes de HIVE Pilates Studio están en /legal/terminos.",
+  privacy_policy: "El aviso de privacidad vigente de HIVE Pilates Studio está en /legal/privacidad.",
 };
 
 const DEFAULT_NOTIFICATION_SETTINGS = {
@@ -227,177 +243,10 @@ const DEFAULT_NOTIFICATION_SETTINGS = {
   admin_phones: [],
 };
 
-// Templates en voz Alma (cercana, casual, con primer nombre).
+// Templates en voz HIVE (cercana, casual, con primer nombre).
 // Editables vía system_settings.notification_templates (admin UI).
-// Variables disponibles per-template documentadas en cada body.
-const DEFAULT_NOTIFICATION_TEMPLATES = {
-  // ── Onboarding y cuenta ─────────────────────────────────────────
-  welcome: {
-    subject: "Bienvenida a Alma",
-    body: "{firstName}, bienvenida a Alma Movement. Este es un paso más hacia tus objetivos. Cuando quieras, reserva tu clase muestra desde la app.",
-  },
-  password_reset: {
-    subject: "Recuperación de contraseña",
-    body: "{firstName}, usa este enlace para restablecer tu contraseña: {link}",
-  },
-
-  // ── Reservas ────────────────────────────────────────────────────
-  booking_confirmed: {
-    subject: "Reserva confirmada",
-    body: "{firstName}, te apartamos lugar de {class} el {date} a las {time}. Tu pase Alma ya lo trae cargado. Te esperamos.",
-  },
-  booking_cancelled: {
-    subject: "Reserva cancelada",
-    body: "{firstName}, cancelaste tu reserva de {class} del {date}. Crédito devuelto: {creditRestored}. Cuando quieras volver, reservas desde la app.",
-  },
-  class_reminder: {
-    subject: "Recordatorio de clase",
-    body: "{firstName}, te recordamos tu clase de {class} a las {time}. Llega 10 minutos antes para acomodarte.",
-  },
-  class_attended: {
-    subject: "Check-in registrado",
-    body: "Listo, {firstName}. Tenemos tu check-in de {class}. Buena clase. ✨",
-  },
-
-  // ── Membresía y pagos ───────────────────────────────────────────
-  membership_activated: {
-    subject: "Tu paquete está activo",
-    body: "{firstName}, tu paquete {plan} ya quedó activo. Vigencia: {startDate} al {endDate}. Tu pase Alma está al día. Cuando quieras, reservas tu primera clase desde la app.",
-  },
-  membership_expiring_today: {
-    subject: "Tu paquete vence hoy",
-    body: "{firstName}, hoy vence tu paquete Alma. Si quieres seguir, renueva desde la app y no perdemos el ritmo.",
-  },
-  membership_expiring_tomorrow: {
-    subject: "Tu paquete vence mañana",
-    body: "{firstName}, mañana vence tu paquete Alma. Renueva desde la app para no parar.",
-  },
-  membership_expiring_n_days: {
-    subject: "Tu paquete vence pronto",
-    body: "{firstName}, te quedan {days} días en tu paquete Alma. Renueva desde la app cuando quieras y seguimos sin pausa.",
-  },
-  membership_expired: {
-    subject: "Tu paquete terminó",
-    body: "{firstName}, tu paquete terminó. Aquí seguimos cuando quieras volver. Te recibimos como siempre, como una amiga en su casa.",
-  },
-  renewal_reminder: {
-    subject: "Recordatorio de renovación",
-    body: "{firstName}, tu plan {plan} está por vencer el {expiresAt}. Renueva desde la app para no parar.",
-  },
-  transfer_rejected: {
-    subject: "Comprobante rechazado",
-    body: "{firstName}, no pudimos aprobar tu comprobante. Motivo: {reason}. Mándanos uno nuevo desde la app o por WhatsApp.",
-  },
-
-  // ── Lealtad y eventos ──────────────────────────────────────────
-  points_earned: {
-    subject: "Sumaste puntos",
-    body: "{firstName}, sumaste {points} puntos Alma. Total: {totalPoints}. Canjéalos cuando se te antoje desde la app.",
-  },
-  reward_redeemed: {
-    subject: "Recompensa canjeada",
-    body: "{firstName}, canjeaste \"{rewardName}\" por {points} pts. Pasa por recepción a reclamarlo. Disfrútalo. ✨",
-  },
-  event_registered: {
-    subject: "Inscrita al evento",
-    body: "{firstName}, quedaste inscrita a \"{eventTitle}\". En tu Alma Wallet ya tienes el pase del evento con tu QR para entrar.",
-  },
-
-  // ── Motivación por asistencia (auto, max 1/día por user) ────────
-  motivation_first_class_week: {
-    subject: "Arrancando la semana",
-    body: "{firstName}, arrancas la semana 💪. {classesThisWeek} de {weekGoal} clases esta semana. Vas muy bien.",
-  },
-  motivation_almost_ringed: {
-    subject: "Te falta una",
-    body: "{firstName}, te falta 1 clase para cumplir tu meta de la semana. Reserva la siguiente desde la app.",
-  },
-  motivation_streak_2_weeks: {
-    subject: "Dos semanas seguidas",
-    body: "{firstName}, 2 semanas seguidas asistiendo a clase. Vas con todo. ✨",
-  },
-  motivation_streak_4_weeks: {
-    subject: "Un mes completo",
-    body: "{firstName}, 1 mes completo asistiendo cada semana. Eso es disciplina real.",
-  },
-  motivation_streak_8_weeks: {
-    subject: "Imparable",
-    body: "{firstName}, 2 meses sin saltarte una semana. Imparable. ✨",
-  },
-  motivation_milestone_10_classes: {
-    subject: "10 clases",
-    body: "{firstName}, ya van 10 clases en Alma. Esto ya es hábito.",
-  },
-  motivation_milestone_25_classes: {
-    subject: "25 clases",
-    body: "{firstName}, 25 clases. Tu cuerpo ya nota el cambio.",
-  },
-  motivation_milestone_50_classes: {
-    subject: "50 clases",
-    body: "{firstName}, 50 clases. Eres parte de la familia Alma.",
-  },
-  motivation_milestone_100_classes: {
-    subject: "100 clases",
-    body: "{firstName}, 100 clases. 🌟 Eres leyenda Alma.",
-  },
-  motivation_comeback: {
-    subject: "Qué bueno tenerte de regreso",
-    body: "{firstName}, qué bueno tenerte de regreso. {daysAway} días sin verte fueron muchos.",
-  },
-  // Recordatorio de mitad de semana para socias con pack activo que aún no
-  // agendan clase esta semana. Se manda como campaña desde Promociones.
-  midweek_reservation_reminder: {
-    subject: "Ya estás a la mitad de la semana",
-    body: "{firstName}, vamos a la mitad de la semana y aún no agendas tu clase Alma. Tu paquete está al día — entra a la app y aparta tu lugar antes de que se llenen las clases. ✨",
-  },
-
-  // ── Recompensas por asistencia (loyalty_milestones) ─────────────
-  // Disparan cuando el usuario alcanza N clases lifetime/mes/año.
-  // Acompañan al award (points/reward) auto-otorgado.
-  milestone_classes_5: {
-    subject: "Primera meta",
-    body: "{firstName}, llegaste a tu primera meta: {classes} clases. +{points} puntos en tu cuenta. Esto está prendiendo. ✨",
-  },
-  milestone_classes_10: {
-    subject: "10 clases",
-    body: "{firstName}, 10 clases. Esto ya es hábito. +{points} puntos a tu cuenta como reconocimiento.",
-  },
-  milestone_classes_25: {
-    subject: "25 clases",
-    body: "{firstName}, 25 clases en Alma. Tu cuerpo ya nota el cambio. +{points} puntos.",
-  },
-  milestone_classes_50: {
-    subject: "50 clases",
-    body: "{firstName}, 50 clases. Eres parte de la familia Alma. +{points} puntos.",
-  },
-  milestone_classes_100: {
-    subject: "100 clases",
-    body: "{firstName}, 100 clases. 🌟 Leyenda Alma. +{points} puntos para canjear como tú quieras.",
-  },
-
-  // ── Promociones (broadcast manual por segmento) ─────────────────
-  // Editables. {message} es el cuerpo que la dueña escribe en el admin.
-  promo_custom: {
-    subject: "Promo Alma",
-    body: "{firstName}, {message}",
-  },
-  promo_dormant_invite: {
-    subject: "Te extrañamos en el estudio",
-    body: "{firstName}, llevamos {days} días sin verte. Te queremos de regreso. {message}",
-  },
-  promo_expiring_offer: {
-    subject: "Renueva con beneficio",
-    body: "{firstName}, tu paquete vence pronto. {message}",
-  },
-  promo_birthday_month: {
-    subject: "Feliz mes",
-    body: "{firstName}, este mes cumples años y te tenemos algo. {message}",
-  },
-  admin_new_booking: {
-    subject: "Nueva reserva",
-    body: "Nueva reserva: {clientName} en {class} el {date} a las {time}.",
-  },
-};
+// Extraído a server/lib/notificationTemplates.js (ver ese archivo para el
+// detalle de cada template y sus variables).
 
 const DEFAULT_SETTINGS_BY_KEY = {
   general_settings: DEFAULT_GENERAL_SETTINGS,
@@ -1289,18 +1138,11 @@ async function ensureSchema() {
       );
     `).catch(() => { });
     await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_waivers_user ON waivers(user_id)`).catch(() => { });
-    // ── Reconcile cancellations_used with actual cancelled bookings ────────
-    await pool.query(`
-      UPDATE memberships m
-      SET cancellations_used = sub.cnt
-      FROM (
-        SELECT b.membership_id, COUNT(*) AS cnt
-        FROM bookings b
-        WHERE b.status = 'cancelled' AND b.membership_id IS NOT NULL
-        GROUP BY b.membership_id
-      ) sub
-      WHERE m.id = sub.membership_id AND m.cancellations_used != sub.cnt;
-    `).catch(() => { });
+    // (Bloque 3, auditoría 2026-09-27, P0-4: aquí corría en cada arranque una
+    // "reconciliación" que igualaba cancellations_used al total de reservas
+    // canceladas de la membresía. Contaba también las cancelaciones del estudio y
+    // las salidas de la lista de espera, y deshacía los ajustes de recepción. El
+    // contador lo mueven sólo la cancelación de la clienta y el ajuste con motivo.)
     // (homepage_video_cards retirada junto con la feature de videos — ver DROP arriba)
     // ── discount_codes: normalise discount_type values ────────────────────
     await pool.query(`ALTER TABLE discount_codes ADD COLUMN IF NOT EXISTS min_order_amount DECIMAL(10,2) DEFAULT 0`).catch(() => { });
@@ -1663,18 +1505,18 @@ async function ensureSchema() {
     `).catch(() => { });
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_campaign_logs_campaign ON campaign_logs(campaign_id, status)`).catch(() => { });
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_campaign_logs_user ON campaign_logs(user_id)`).catch(() => { });
-    // Seed default Alma milestones si la tabla está vacía
+    // Seed default HIVE milestones si la tabla está vacía (LOYALTY_MILESTONES_SEED
+    // en server/lib/passDefaults.js — ver server/lib/brandResidue.test.js).
     const lmCount = await pool.query("SELECT COUNT(*)::int AS n FROM loyalty_milestones");
     if (lmCount.rows[0].n === 0) {
-      await pool.query(`
-        INSERT INTO loyalty_milestones (name, description, classes_required, period, award_type, award_points, message_template_key, sort_order) VALUES
-          ('Primera meta',          'Primer logro: 5 clases asistidas',   5,   'lifetime', 'points', 50,  'milestone_classes_5',   10),
-          ('Hábito en marcha',      '10 clases. Esto ya es hábito.',       10,  'lifetime', 'points', 100, 'milestone_classes_10',  20),
-          ('Cuerpo en cambio',      '25 clases. El cuerpo lo nota.',       25,  'lifetime', 'points', 250, 'milestone_classes_25',  30),
-          ('Familia Alma',          '50 clases. Eres parte del estudio.',  50,  'lifetime', 'points', 500, 'milestone_classes_50',  40),
-          ('Leyenda Alma',          '100 clases. Imparable.',              100, 'lifetime', 'points', 1000,'milestone_classes_100', 50)
-        ON CONFLICT DO NOTHING;
-      `).catch(() => { });
+      for (const m of LOYALTY_MILESTONES_SEED) {
+        await pool.query(
+          `INSERT INTO loyalty_milestones (name, description, classes_required, period, award_type, award_points, message_template_key, sort_order)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+           ON CONFLICT DO NOTHING`,
+          [m.name, m.description, m.classesRequired, m.period, m.awardType, m.awardPoints, m.messageTemplateKey, m.sortOrder],
+        ).catch(() => { });
+      }
     }
     // ── Review tags table ──────────────────────────────────────────────────
     await pool.query(`
@@ -1866,6 +1708,80 @@ async function ensureSchema() {
     await pool.query(`CREATE TRIGGER trg_channel_inventory AFTER INSERT OR UPDATE OR DELETE ON bookings
       FOR EACH ROW EXECUTE FUNCTION fn_update_channel_inventory()`).catch((e) => console.warn("[schema] inv trg:", e.message));
 
+    // ── Bitácora de acciones del personal (auditoría 2026-09-27, bloque 2) ──
+    // Sin llaves foráneas a propósito: la bitácora sobrevive a la persona y a la
+    // fila que describe. Nada de esto cambia datos existentes.
+    await pool.query(`CREATE TABLE IF NOT EXISTS audit_log (
+      id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+      created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      actor_id        UUID,
+      actor_role      VARCHAR(30),
+      actor_name      TEXT,
+      action          VARCHAR(60) NOT NULL,
+      entity_type     VARCHAR(30) NOT NULL,
+      entity_id       UUID,
+      subject_user_id UUID,
+      reason          TEXT,
+      before          JSONB,
+      after           JSONB,
+      meta            JSONB NOT NULL DEFAULT '{}'::jsonb
+    )`).catch((e) => console.warn("[schema] audit_log:", e.message));
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_audit_log_created ON audit_log(created_at DESC)`).catch(() => { });
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_audit_log_entity ON audit_log(entity_type, entity_id)`).catch(() => { });
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_audit_log_actor ON audit_log(actor_id, created_at DESC)`).catch(() => { });
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_audit_log_subject ON audit_log(subject_user_id, created_at DESC)`).catch(() => { });
+    // Columnas que escribe el bloque 2. Algunas existen en schema_complete.sql,
+    // pero no hay garantía de que producción las tenga.
+    await pool.query(`ALTER TABLE memberships ADD COLUMN IF NOT EXISTS activated_by UUID`).catch(() => { });
+    await pool.query(`ALTER TABLE memberships ADD COLUMN IF NOT EXISTS activated_at TIMESTAMPTZ`).catch(() => { });
+    await pool.query(`ALTER TABLE memberships ADD COLUMN IF NOT EXISTS payment_reference VARCHAR(255)`).catch(() => { });
+    await pool.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS cancellation_reason TEXT`).catch(() => { });
+    await pool.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS cancelled_by UUID`).catch(() => { });
+    // La falta que registró ESTA reserva (para poder corregirla el mismo día).
+    await pool.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS falta_recorded_at TIMESTAMPTZ`).catch(() => { });
+    await pool.query(`ALTER TABLE classes ADD COLUMN IF NOT EXISTS cancellation_reason TEXT`).catch(() => { });
+    await pool.query(`ALTER TABLE classes ADD COLUMN IF NOT EXISTS cancelled_by UUID`).catch(() => { });
+    await pool.query(`ALTER TABLE classes ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMPTZ`).catch(() => { });
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS anonymized_at TIMESTAMPTZ`).catch(() => { });
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS anonymized_by UUID`).catch(() => { });
+
+    // ── Bloque 3 de la auditoría (2026-09-27): lista de espera, reembolsos,
+    // planes archivados y consentimiento de datos de salud. Sólo CREATE / ADD
+    // COLUMN / CREATE INDEX: nada de esto cambia datos existentes.
+    await pool.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS promoted_at TIMESTAMPTZ`).catch(() => { });
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_bookings_class_waitlist
+      ON bookings(class_id, created_at, id) WHERE status = 'waitlist'`).catch(() => { });
+    await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS refunded_amount NUMERIC(10,2) NOT NULL DEFAULT 0`).catch(() => { });
+    await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS refund_status VARCHAR(20)`).catch(() => { });
+    await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS refunded_at TIMESTAMPTZ`).catch(() => { });
+    // Reembolsos registrados por la dueña. Sin llaves foráneas, como audit_log:
+    // el registro sobrevive a la fila que describe.
+    await pool.query(`CREATE TABLE IF NOT EXISTS refunds (
+      id                   UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+      created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      order_id             UUID NOT NULL,
+      membership_id        UUID,
+      user_id              UUID,
+      amount               NUMERIC(10,2) NOT NULL CHECK (amount > 0),
+      kind                 VARCHAR(10) NOT NULL CHECK (kind IN ('total', 'partial')),
+      method               VARCHAR(20) NOT NULL,
+      reference            VARCHAR(100),
+      reason               TEXT NOT NULL,
+      classes_removed      INTEGER NOT NULL DEFAULT 0,
+      membership_cancelled BOOLEAN NOT NULL DEFAULT false,
+      bookings_cancelled   INTEGER NOT NULL DEFAULT 0,
+      created_by           UUID
+    )`).catch((e) => console.warn("[schema] refunds:", e.message));
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_refunds_order ON refunds(order_id)`).catch(() => { });
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_refunds_created ON refunds(created_at DESC)`).catch(() => { });
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_refunds_user ON refunds(user_id, created_at DESC)`).catch(() => { });
+    await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ`).catch(() => { });
+    await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS archived_by UUID`).catch(() => { });
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS privacy_notice_version VARCHAR(20)`).catch(() => { });
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS privacy_accepted_at TIMESTAMPTZ`).catch(() => { });
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS health_consent_version VARCHAR(20)`).catch(() => { });
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS health_consent_at TIMESTAMPTZ`).catch(() => { });
+
     console.log("✅ Schema ensured");
   } catch (err) {
     console.error("Schema migration warning:", err.message);
@@ -1998,7 +1914,7 @@ async function ensureSchema() {
       const adminHash = await bcrypt.hash(adminPassword, 12);
       await pool.query(
         `INSERT INTO users (display_name, email, phone, password_hash, role, accepts_terms, accepts_communications)
-         VALUES ('Admin Alma', $2, '0000000000', $1, 'admin', true, false)
+         VALUES ('Admin HIVE', $2, '0000000000', $1, 'admin', true, false)
          ON CONFLICT (email) DO NOTHING`,
         [adminHash, adminEmail]
       );
@@ -2193,7 +2109,19 @@ async function wellhubWebhookHandler(req, res, eventTypeOverride) {
       case "cancel": result = await handlePlanChange(pool, creds, payload); break;
       default: result = { status: "ignored", eventType };
     }
-    return res.status(200).json(result);
+    // Lo que liberó lugar sube la lista de espera (auditoría 2026-09-27, P1-1).
+    // Los ids de clase no van en la respuesta a Wellhub. Se responde ANTES de
+    // la subida: sus avisos pueden tardar varios segundos (sonda de WhatsApp) y
+    // Wellhub reintentaría el evento por timeout. El evento ya quedó en
+    // processed_events, así que un reintento no repite nada; la subida corre
+    // después y sus errores sólo van al log.
+    const { classIds, ...body } = result ?? {};
+    res.status(200).json(body);
+    if (Array.isArray(classIds) && classIds.length) {
+      onSeatReleased(classIds, { source: "wellhub" })
+        .catch((e) => console.error("[wellhub] subida de la lista de espera:", e?.message));
+    }
+    return;
   } catch (err) {
     console.error("[wellhub] handler error:", err.message);
     await pool.query("DELETE FROM processed_events WHERE event_id=$1", [eventId]).catch(() => {});
@@ -2243,7 +2171,8 @@ app.put("/api/partners/settings", ownerMiddleware, async (req, res) => {
   } catch (err) { console.error("[partners settings PUT]", err.message); return res.status(500).json({ message: "Error interno" }); }
 });
 
-app.post("/api/partners/wellhub/publish/:classId", adminMiddleware, async (req, res) => {
+// Publicar clases a Wellhub, sus check-ins y su resumen: sólo la dueña (auditoría 2026-09-27, P1-9).
+app.post("/api/partners/wellhub/publish/:classId", ownerMiddleware, async (req, res) => {
   try {
     const { classId } = req.params;
     const quota = Number(req.body?.quota ?? 0);
@@ -2263,7 +2192,7 @@ app.post("/api/partners/wellhub/publish/:classId", adminMiddleware, async (req, 
   } catch (err) { console.error("[partners publish]", err.message); return res.status(500).json({ message: "Error interno" }); }
 });
 
-app.post("/api/partners/wellhub/unpublish/:classId", adminMiddleware, async (req, res) => {
+app.post("/api/partners/wellhub/unpublish/:classId", ownerMiddleware, async (req, res) => {
   try {
     await pool.query("DELETE FROM channel_inventory WHERE class_id=$1 AND channel='wellhub'", [req.params.classId]);
     await pool.query("DELETE FROM partner_class_mappings WHERE class_id=$1 AND channel='wellhub'", [req.params.classId]);
@@ -2284,24 +2213,67 @@ app.get("/api/partners/wellhub/class-status/:classId", adminMiddleware, async (r
   } catch (err) { return res.status(500).json({ message: "Error interno" }); }
 });
 
-app.get("/api/partners/checkins", adminMiddleware, async (_req, res) => {
+// GET /api/partners/checkins?month=AAAA-MM — conciliación del mes (P1-9): los
+// check-ins de Wellhub con la asistencia en el estudio, el resumen y las
+// asistencias de Wellhub sin check-in confirmado. Sólo la dueña.
+app.get("/api/partners/checkins", ownerMiddleware, async (req, res) => {
+  const range = wellhubMonthRange(typeof req.query.month === "string" ? req.query.month : undefined, todayInStudio());
+  if (!range.ok) return res.status(400).json({ message: range.message });
   try {
-    const r = await pool.query(
-      `SELECT pc.id, pc.status, pc.method, pc.validated_at, pc.created_at, pc.channel,
-              u.display_name AS user_name, u.wellhub_id,
-              c.date AS class_date, ct.name AS class_name
-         FROM partner_checkins pc
-         LEFT JOIN users u ON u.id = pc.user_id
-         LEFT JOIN bookings b ON b.id = pc.booking_id
-         LEFT JOIN classes c ON c.id = b.class_id
-         LEFT JOIN class_types ct ON ct.id = c.class_type_id
-        ORDER BY pc.created_at DESC LIMIT 200`,
-    );
-    return res.json({ data: r.rows });
-  } catch (err) { console.error("[partners checkins]", err.message); return res.status(500).json({ message: "Error interno" }); }
+    const [rows, bookings, unmatched] = await Promise.all([
+      pool.query(
+        `SELECT pc.id, pc.status, pc.method, pc.validated_at, pc.created_at, pc.channel, pc.booking_id,
+                u.display_name AS user_name, u.wellhub_id,
+                to_char(c.date, 'YYYY-MM-DD') AS class_date, ct.name AS class_name,
+                b.status::text AS booking_status, b.checked_in_at
+           FROM partner_checkins pc
+           LEFT JOIN users u ON u.id = pc.user_id
+           LEFT JOIN bookings b ON b.id = pc.booking_id
+           LEFT JOIN classes c ON c.id = b.class_id
+           LEFT JOIN class_types ct ON ct.id = c.class_type_id
+          WHERE pc.channel = 'wellhub'
+            AND pc.created_at >= ($1::date::timestamp AT TIME ZONE '${STUDIO_TIMEZONE}')
+            AND pc.created_at <  ($2::date::timestamp AT TIME ZONE '${STUDIO_TIMEZONE}')
+          ORDER BY pc.created_at DESC
+          LIMIT 500`,
+        [range.from, range.to],
+      ),
+      pool.query(
+        `SELECT COUNT(*) FILTER (WHERE b.status <> 'cancelled')::int AS booked,
+                COUNT(*) FILTER (WHERE b.status = 'checked_in')::int AS attended,
+                COUNT(*) FILTER (WHERE b.status = 'no_show')::int AS no_show
+           FROM bookings b JOIN classes c ON c.id = b.class_id
+          WHERE b.channel = 'wellhub' AND c.date >= $1::date AND c.date < $2::date`,
+        [range.from, range.to],
+      ),
+      pool.query(
+        `SELECT b.id AS booking_id, u.display_name AS user_name, u.wellhub_id,
+                to_char(c.date, 'YYYY-MM-DD') AS class_date, ct.name AS class_name, b.checked_in_at
+           FROM bookings b
+           JOIN classes c ON c.id = b.class_id
+           LEFT JOIN class_types ct ON ct.id = c.class_type_id
+           LEFT JOIN users u ON u.id = b.user_id
+          WHERE b.channel = 'wellhub' AND b.status = 'checked_in'
+            AND c.date >= $1::date AND c.date < $2::date
+            AND NOT EXISTS (SELECT 1 FROM partner_checkins pc WHERE pc.booking_id = b.id AND pc.status = 'confirmed')
+          ORDER BY c.date DESC
+          LIMIT 200`,
+        [range.from, range.to],
+      ),
+    ]);
+    return res.json({
+      data: rows.rows,
+      summary: summarizeWellhubMonth(rows.rows, bookings.rows[0], unmatched.rows.length),
+      unmatched: unmatched.rows,
+      month: range.month,
+    });
+  } catch (err) {
+    console.error("[partners checkins]", err.message);
+    return res.status(500).json({ message: "Error interno" });
+  }
 });
 
-app.post("/api/partners/checkins/:id/confirm", adminMiddleware, async (req, res) => {
+app.post("/api/partners/checkins/:id/confirm", ownerMiddleware, async (req, res) => {
   try {
     const r = await pool.query(
       "UPDATE partner_checkins SET status='confirmed', validated_at=COALESCE(validated_at,NOW()), method='manual' WHERE id=$1 RETURNING *",
@@ -2312,7 +2284,7 @@ app.post("/api/partners/checkins/:id/confirm", adminMiddleware, async (req, res)
   } catch (err) { return res.status(500).json({ message: "Error interno" }); }
 });
 
-app.get("/api/partners/summary", adminMiddleware, async (_req, res) => {
+app.get("/api/partners/summary", ownerMiddleware, async (_req, res) => {
   try {
     const r = await pool.query(
       `SELECT channel, COUNT(*)::int AS checkins,
@@ -3009,16 +2981,41 @@ function isStrongPassword(password) {
   return candidate.length >= 8 && /[A-Z]/.test(candidate) && /[0-9]/.test(candidate);
 }
 
+// Cuentas dadas de baja (anonimizadas) o borradas: su token deja de servir
+// aunque no haya vencido. Ver server/lib/accountGate.js (auditoría 2026-09-27, P1-5).
+const accountGate = createAccountGate({
+  lookup: async (userId) => {
+    if (!isUuid(userId)) return false;
+    const r = await pool.query("SELECT anonymized_at FROM users WHERE id = $1", [userId]);
+    return r.rows.length === 0 || r.rows[0].anonymized_at != null;
+  },
+});
+
+// Venta o asignación a una clienta dada de baja: 409 antes de abrir cualquier
+// transacción, para no reactivarla por accidente.
+async function anonymizedSaleConflict(userId) {
+  if (!isUuid(userId)) return null;
+  const r = await pool.query("SELECT anonymized_at FROM users WHERE id = $1", [userId]);
+  if (r.rows.length && r.rows[0].anonymized_at) {
+    return { code: "ACCOUNT_ANONYMIZED", message: "Esta clienta fue dada de baja." };
+  }
+  return null;
+}
+
 async function authMiddleware(req, res, next) {
   const header = req.headers.authorization;
   if (!header?.startsWith("Bearer ")) return res.status(401).json({ message: "No autorizado" });
+  let payload;
   try {
-    const payload = jwt.verify(header.slice(7), JWT_SECRET);
-    req.userId = payload.sub;
-    next();
+    payload = jwt.verify(header.slice(7), JWT_SECRET);
   } catch {
     return res.status(401).json({ message: "Token inválido" });
   }
+  req.userId = payload.sub;
+  if (await accountGate.isDisabled(req.userId)) {
+    return res.status(401).json({ code: "ACCOUNT_DISABLED", message: "Esta cuenta fue dada de baja." });
+  }
+  next();
 }
 
 function roleGuard(allowed) {
@@ -3069,6 +3066,10 @@ function mapUser(u) {
     practicedBarreBefore: u.practiced_barre_before ?? null,
     injuryDetails: u.injury_details ?? null,
     onboardingCompleted: u.onboarding_completed ?? false,
+    // Aviso de privacidad y consentimiento de salud (auditoría 2026-09-27, P1-10).
+    privacyNoticeVersion: u.privacy_notice_version ?? null,
+    healthConsentVersion: u.health_consent_version ?? null,
+    healthConsentAt: u.health_consent_at ?? null,
     createdAt: u.created_at,
   };
 }
@@ -3077,7 +3078,7 @@ function mapUser(u) {
 
 // POST /api/auth/register
 app.post("/api/auth/register", async (req, res) => {
-  const { email, password, displayName, phone, gender, dateOfBirth, acceptsTerms, acceptsCommunications } = req.body;
+  const { email, password, displayName, phone, gender, dateOfBirth, acceptsTerms, acceptsCommunications, healthConsent } = req.body;
   if (!email || !password || !displayName) {
     return res.status(400).json({ message: "Nombre, email y contraseña son requeridos" });
   }
@@ -3100,16 +3101,25 @@ app.post("/api/auth/register", async (req, res) => {
       return res.status(409).json({ message: "Este email ya está registrado" });
     }
     const passwordHash = await bcrypt.hash(password, 12);
+    // Aceptar términos deja la versión y la fecha del aviso de privacidad; la
+    // casilla de salud (opcional al registrarse) deja su consentimiento expreso
+    // (auditoría 2026-09-27, P1-10).
+    const versionAviso = acceptsTerms === true ? PRIVACY_NOTICE_VERSION : null;
+    const versionSalud = healthConsent === true ? PRIVACY_NOTICE_VERSION : null;
     const result = await pool.query(
-      `INSERT INTO users (display_name, email, phone, gender, date_of_birth, password_hash, accepts_terms, accepts_communications, role)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'client')
+      `INSERT INTO users (display_name, email, phone, gender, date_of_birth, password_hash, accepts_terms, accepts_communications, role,
+                          privacy_notice_version, privacy_accepted_at, health_consent_version, health_consent_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'client',
+               $9::varchar, CASE WHEN $9::varchar IS NULL THEN NULL ELSE NOW() END,
+               $10::varchar, CASE WHEN $10::varchar IS NULL THEN NULL ELSE NOW() END)
        RETURNING *`,
-      [displayName.trim(), email.toLowerCase().trim(), phone || null, gender || null, normalizedDob, passwordHash, acceptsTerms ?? false, acceptsCommunications ?? false]
+      [displayName.trim(), email.toLowerCase().trim(), phone || null, gender || null, normalizedDob, passwordHash,
+       acceptsTerms ?? false, acceptsCommunications ?? false, versionAviso, versionSalud]
     );
     const user = result.rows[0];
     // Auto-create referral code (best-effort: nunca debe tirar el registro).
     try {
-      const code = "ALMA" + Math.random().toString(36).slice(2, 7).toUpperCase();
+      const code = "HIVE" + Math.random().toString(36).slice(2, 7).toUpperCase();
       await pool.query(
         "INSERT INTO referral_codes (user_id, code) VALUES ($1, $2) ON CONFLICT DO NOTHING",
         [user.id, code]
@@ -3198,21 +3208,28 @@ app.get("/api/me/waiver", authMiddleware, async (req, res) => {
 });
 
 // POST: firma la responsiva (nombre + firma dibujada + consentimiento de imagen).
+// Guarda la versión del texto que la clienta leyó (auditoría 2026-09-27, punto 7):
+// la app manda `waiver_version`; sin él, v1 — una app en caché de antes del
+// versionado mostró la v1, y sin este resguardo quedaría registrado que aceptó
+// un texto (v2) que nunca vio. Las ya firmadas no se tocan ni se piden de nuevo.
 app.post("/api/me/waiver", authMiddleware, async (req, res) => {
-  const { full_name, phone, email, image_consent, signature_data } = req.body || {};
+  const { full_name, phone, email, image_consent, signature_data, waiver_version } = req.body || {};
   if (!full_name?.trim() || !signature_data) {
     return res.status(400).json({ message: "Nombre y firma son requeridos." });
   }
   const firmaMala = signatureProblem(signature_data);
   if (firmaMala) return res.status(400).json({ message: firmaMala });
+  const versionMala = waiverVersionProblem(waiver_version);
+  if (versionMala) return res.status(400).json({ message: versionMala });
+  const version = waiver_version ?? "v1";
   try {
     const r = await pool.query(
       `INSERT INTO waivers (user_id, full_name, phone, email, image_consent, signature_data, waiver_version, signed_at)
-       VALUES ($1,$2,$3,$4,$5,$6,'v1',NOW())
+       VALUES ($1,$2,$3,$4,$5,$6,$7,NOW())
        ON CONFLICT (user_id) DO UPDATE SET
-         full_name=$2, phone=$3, email=$4, image_consent=$5, signature_data=$6, signed_at=NOW()
+         full_name=$2, phone=$3, email=$4, image_consent=$5, signature_data=$6, waiver_version=$7, signed_at=NOW()
        RETURNING *`,
-      [req.userId, full_name.trim(), phone || null, email || null, !!image_consent, signature_data]
+      [req.userId, full_name.trim(), phone || null, email || null, !!image_consent, signature_data, version]
     );
     return res.status(201).json({ data: r.rows[0] });
   } catch (err) {
@@ -3269,16 +3286,32 @@ app.post("/api/auth/onboarding", authMiddleware, async (req, res) => {
     return res.status(400).json({ message: "Describe la lesión o condición que debemos saber" });
   }
   try {
+    // Reportar una lesión es dato de salud: exige consentimiento expreso
+    // vigente o la casilla (auditoría 2026-09-27, P1-10).
+    const cur = await pool.query(
+      "SELECT has_injury, injury_details, health_consent_version, health_consent_at FROM users WHERE id = $1",
+      [req.userId],
+    );
+    if (!cur.rows.length) return res.status(404).json({ message: "Usuario no encontrado" });
+    const hasConsent = hasCurrentHealthConsent(cur.rows[0]);
+    const consentGiven = req.body?.healthConsent === true;
+    const problem = healthConsentProblem({
+      changes: healthDataChanges(cur.rows[0], { hasInjury, injuryDetails: details }), consentGiven, hasConsent,
+    });
+    if (problem) return res.status(400).json(problem);
+    const recordConsent = consentGiven && !hasConsent;
     const r = await pool.query(
       `UPDATE users SET
          has_injury             = $1,
          practiced_barre_before = $2,
          injury_details         = $3,
          onboarding_completed   = true,
+         health_consent_version = CASE WHEN $5 THEN $6 ELSE health_consent_version END,
+         health_consent_at      = CASE WHEN $5 THEN NOW() ELSE health_consent_at END,
          updated_at             = NOW()
        WHERE id = $4
        RETURNING *`,
-      [hasInjury, practicedBarreBefore, hasInjury ? details : null, req.userId]
+      [hasInjury, practicedBarreBefore, hasInjury ? details : null, req.userId, recordConsent, PRIVACY_NOTICE_VERSION]
     );
     if (!r.rows.length) return res.status(404).json({ message: "Usuario no encontrado" });
     return res.json({ user: mapUser(r.rows[0]) });
@@ -3478,6 +3511,12 @@ app.get("/api/memberships/my", authMiddleware, async (req, res) => {
     // Treat 9999 or very large numbers as unlimited (null)
     if (row.classesRemaining >= 9999) row.classesRemaining = null;
     if (row.classLimit >= 9999) row.classLimit = null;
+    // Cuota de cancelaciones del paquete (auditoría 2026-09-27, P0-4).
+    const policy = await getBookingPolicy();
+    const quota = cancellationQuota({ used: row.cancellationsUsed, limit: policy.cancellationLimit });
+    row.cancellationsUsed = quota.used;
+    row.cancellationLimit = policy.cancellationLimit;
+    row.cancellationsLeft = quota.left;
     return res.json({ data: row });
   } catch (err) {
     console.error("Memberships/my error:", err);
@@ -3512,10 +3551,12 @@ app.get("/api/memberships/mine/all", authMiddleware, async (req, res) => {
          m.created_at DESC`,
       [req.userId]
     );
+    const policy = await getBookingPolicy();
     const rows = camelRows(r.rows).map((row) => {
       if (row.classesRemaining >= 9999) row.classesRemaining = null;
       if (row.classLimit >= 9999) row.classLimit = null;
-      return row;
+      const quota = cancellationQuota({ used: row.cancellationsUsed, limit: policy.cancellationLimit });
+      return { ...row, cancellationsUsed: quota.used, cancellationLimit: policy.cancellationLimit, cancellationsLeft: quota.left };
     });
     return res.json({ data: rows });
   } catch (err) {
@@ -3614,6 +3655,7 @@ app.get("/api/classes/:id", async (req, res) => {
     // Usar el conteo real de lugares ocupados (no el contador guardado, que
     // puede estar desfasado y mostrar la clase como "llena" sin estarlo).
     row.current_bookings = await liveBookingCount(req.params.id);
+    row.waitlist_count = await waitingCount(req.params.id);
     return res.json({ data: row });
   } catch (err) {
     console.error("Class/:id error:", err);
@@ -3642,6 +3684,11 @@ app.get("/api/bookings/my-bookings", authMiddleware, async (req, res) => {
                 WHERE rv.booking_id = b.id
               ) AS has_review,
               f.name         AS facility_name
+              , CASE WHEN b.status = 'waitlist' THEN (
+                  SELECT COUNT(*)::int + 1 FROM bookings w
+                   WHERE w.class_id = b.class_id AND w.status = 'waitlist'
+                     AND (w.created_at, w.id) < (b.created_at, b.id)
+                ) END AS waitlist_position_live
        FROM bookings b
        JOIN classes c       ON b.class_id       = c.id
        JOIN class_types ct  ON c.class_type_id  = ct.id
@@ -3651,7 +3698,10 @@ app.get("/api/bookings/my-bookings", authMiddleware, async (req, res) => {
        ORDER BY c.date DESC, c.start_time DESC`,
       [req.userId]
     );
-    return res.json({ data: r.rows });
+    // waitlist_position en vivo por orden de llegada (antes salía siempre null).
+    return res.json({
+      data: r.rows.map(({ waitlist_position_live, ...row }) => ({ ...row, waitlist_position: waitlist_position_live ?? null })),
+    });
   } catch (err) {
     console.error("Bookings/my error:", err);
     return res.status(500).json({ message: "Error interno" });
@@ -3736,6 +3786,8 @@ app.get("/api/bookings/weekly-status", authMiddleware, async (req, res) => {
 // walk-ins de último momento desde el roster.
 const BOOKING_LEAD_HOURS = 2;
 const BOOKING_LEAD_MS = BOOKING_LEAD_HOURS * 60 * 60 * 1000;
+// Membresía vencida en el calendario del estudio (no en el del servidor).
+const MEMBERSHIP_EXPIRED_SQL = `(end_date IS NOT NULL AND end_date < (NOW() AT TIME ZONE '${STUDIO_TIMEZONE}')::date)`;
 
 // Conteo REAL de lugares ocupados (confirmadas + check-in). Fuente de verdad
 // del cupo, en lugar del contador denormalizado classes.current_bookings, que
@@ -3748,11 +3800,291 @@ async function liveBookingCount(classId, db = pool) {
   return r.rows[0]?.cnt ?? 0;
 }
 
+// ── Lista de espera: subida automática (auditoría 2026-09-27, P1-1) ─────────
+// Se liberó uno o más lugares. Lo llaman, DESPUÉS de su COMMIT y con await,
+// todas las vías que liberan cupo:
+//   - la clienta que cancela y el estudio que cancela una reserva;
+//   - subir el cupo, cancelar una membresía o reembolsarla;
+//   - la cancelación por webhook de Wellhub, reabrir una clase;
+//   - la reserva nueva que entra a la fila.
+// Quien llama debe haber soltado ya su cliente de la transacción: la subida
+// pide su propia conexión y el aviso puede tardar hasta 5 s (sonda de WhatsApp).
+// Sube, clase por clase, a la primera de la fila (orden de llegada) que pueda
+// usar el lugar:
+//   - membresía vigente con clases para esa categoría;
+//   - AM Club y tope semanal respetados;
+//   - cuenta no dada de baja.
+// La que no cumple se salta y sigue en la fila. Sólo en clases 'scheduled' y
+// hasta BOOKING_LEAD_HOURS antes del inicio; después el lugar queda libre.
+// Concurrencia: cada subida es su propia transacción y empieza con
+// SELECT … FOR UPDATE de la clase. Así dos liberaciones a la vez se forman, y
+// ninguna sube dos veces a la misma ni pasa el cupo. Una subida bloquea una
+// sola membresía y siempre en el orden clase → fila → membresía, así que no
+// forma un ciclo de candados con una reserva o una cancelación sola; si
+// Postgres aun así corta un interbloqueo (40P01), la vuelta se reintenta.
+// Contrato: nunca lanza y devuelve las subidas
+// [{ booking_id, user_id, display_name, phone, whatsapp, email }].
+// ctx: { source?: string, quietUserIds?: string[] }.
+async function onSeatReleased(classIds, ctx = {}) {
+  const out = [];
+  try {
+    const ids = [...new Set([].concat(classIds ?? []).map((x) => String(x ?? "")).filter((x) => isUuid(x)))];
+    const quietUserIds = Array.isArray(ctx?.quietUserIds) ? ctx.quietUserIds.map(String) : [];
+    for (const id of ids) {
+      try {
+        out.push(...(await promoteWaitlist(id, { quietUserIds })));
+      } catch (err) {
+        console.error(`[waitlist] no se pudo subir la fila de ${id} (${ctx?.source ?? "?"}):`, err?.message);
+      }
+    }
+  } catch (err) {
+    console.error(`[waitlist] onSeatReleased (${ctx?.source ?? "?"}):`, err?.message);
+  }
+  return out;
+}
+
+const waitingCount = async (classId, db = pool) =>
+  Number((await db.query(
+    "SELECT COUNT(*)::int AS n FROM bookings WHERE class_id = $1 AND status = 'waitlist'", [classId],
+  )).rows[0]?.n ?? 0);
+
+/** Una subida, en su propia transacción. null = nada que hacer; { retry } = revisar otra vez. */
+async function promoteOneFromWaitlist(classId) {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const c = await client.query(
+      `SELECT c.id, c.status::text AS status, c.max_capacity, c.date, c.start_time,
+              to_char(c.date, 'YYYY-MM-DD') AS day,
+              ((c.date + c.start_time) AT TIME ZONE '${STUDIO_TIMEZONE}') AS starts_at,
+              ct.category AS class_category, ct.name AS class_name, i.display_name AS instructor_name
+         FROM classes c
+         JOIN class_types ct ON ct.id = c.class_type_id
+         LEFT JOIN instructors i ON i.id = c.instructor_id
+        WHERE c.id = $1
+        FOR UPDATE OF c`,
+      [classId],
+    );
+    const cls = c.rows[0];
+    if (!cls || cls.status !== "scheduled" || !promotionWindowOpen(cls.starts_at, Date.now(), BOOKING_LEAD_HOURS)) {
+      await client.query("ROLLBACK");
+      return null;
+    }
+    if (freeSeats(cls.max_capacity, await liveBookingCount(classId, client)) <= 0) {
+      await client.query("ROLLBACK");
+      return null;
+    }
+    const queue = (await client.query(
+      `SELECT b.id, b.user_id, (u.anonymized_at IS NOT NULL) AS anonymized
+         FROM bookings b
+         LEFT JOIN users u ON u.id = b.user_id
+        WHERE b.class_id = $1 AND b.status = 'waitlist'
+        ORDER BY b.created_at ASC, b.id ASC
+        FOR UPDATE OF b`,
+      [classId],
+    )).rows;
+    const category = normalizeClassCategory(cls.class_category, "all");
+    const candidates = [];
+    for (const [i, w] of queue.entries()) {
+      let mem = null;
+      let reason = null;
+      // Dada de baja (bloque 2): no sube aunque le quede una fila previa.
+      if (w.anonymized) reason = "baja";
+      else {
+        mem = w.user_id ? await selectMembershipForClass({ userId: w.user_id, classCategory: category, client }) : null;
+        if (!mem) reason = "sin_clases";
+        else if (mem.morning_only && !isWithinMorningWindow(cls.starts_at)) reason = "solo_manana";
+        else if (!(await checkWeeklyClassLimit(client, w.user_id, mem.id, cls.date)).ok) reason = "tope_semanal";
+      }
+      candidates.push({ bookingId: w.id, userId: w.user_id, membershipId: mem?.id ?? null, position: i + 1, reason });
+      if (!reason) break; // la primera que cumple; las de atrás siguen esperando
+    }
+    const { promote, skipped } = firstEligible(candidates);
+    if (!promote) {
+      await client.query("ROLLBACK");
+      return null;
+    }
+    // Se revalida bajo candado: entre la elección y el candado la membresía pudo
+    // cancelarse, vencer, gastar su última clase (o la de su área, si es mixta)
+    // o llenar su tope semanal con una reserva de otra clase. Si ya no sirve no
+    // se usa; la siguiente vuelta la vuelve a evaluar (y la salta si no tiene otra).
+    const locked = (await client.query(
+      `SELECT id, classes_remaining, studio_remaining, rt_remaining, status::text AS status, end_date,
+              (SELECT p.class_category FROM plans p WHERE p.id = memberships.plan_id) AS plan_category,
+              (end_date IS NOT NULL AND end_date < (NOW() AT TIME ZONE '${STUDIO_TIMEZONE}')::date) AS expired
+         FROM memberships WHERE id = $1 FOR UPDATE`,
+      [promote.membershipId],
+    )).rows[0];
+    const stillUsable = locked
+      && locked.status === "active" && !locked.expired
+      && (isUnlimitedClasses(locked.classes_remaining) || Number(locked.classes_remaining) > 0)
+      && (normalizeClassCategory(locked.plan_category, "all") !== "mixto"
+        || canMixtoBook({ studioRemaining: locked.studio_remaining, rtRemaining: locked.rt_remaining }, category))
+      // El tope semanal se cuenta otra vez ya con la membresía bloqueada: una
+      // reserva nueva de la misma clienta la bloquea antes de contar e insertar.
+      && (await checkWeeklyClassLimit(client, promote.userId, promote.membershipId, cls.date)).ok;
+    if (!stillUsable) {
+      await client.query("ROLLBACK");
+      return { retry: true };
+    }
+    await client.query(
+      "UPDATE bookings SET status = 'confirmed', membership_id = $2, promoted_at = NOW() WHERE id = $1",
+      [promote.bookingId, promote.membershipId],
+    );
+    // Cupo: lo mantiene el trigger update_class_booking_count (auditoría 2026-09-08, P1-6).
+    if (!isUnlimitedClasses(locked.classes_remaining)) {
+      await consumeMembershipCredit(client, promote.membershipId, classId);
+    }
+    await recordAudit(client, {
+      systemActor: "system", action: "booking.waitlist_promoted", entityType: "booking",
+      entityId: promote.bookingId, subjectUserId: promote.userId,
+      before: { status: "waitlist" }, after: { status: "confirmed" },
+      meta: {
+        class_id: cls.id, class_name: cls.class_name, day: cls.day, start_time: String(cls.start_time).slice(0, 5),
+        position: promote.position, membership_id: promote.membershipId,
+        skipped: skipped.map((s) => ({ booking_id: s.bookingId, position: s.position, reason: s.reason })),
+      },
+    });
+    await client.query("COMMIT");
+    return { bookingId: promote.bookingId, userId: promote.userId, membershipId: promote.membershipId, cls };
+  } catch (err) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+// Interbloqueo o candado no disponible: la otra transacción ya confirmó o se
+// revirtió; la subida se vuelve a intentar en la siguiente vuelta.
+const RETRYABLE_PG_CODES = new Set(["40P01", "55P03", "40001"]);
+
+/** Sube mientras haya lugar y alguien que cumpla; luego avisa (salvo a quietUserIds). */
+async function promoteWaitlist(classId, { quietUserIds = [] } = {}) {
+  const promoted = [];
+  let retries = 0;
+  for (let vuelta = 0; vuelta < 50; vuelta++) {
+    let p;
+    try {
+      p = await promoteOneFromWaitlist(classId);
+    } catch (err) {
+      if (RETRYABLE_PG_CODES.has(err?.code) && ++retries <= 5) continue;
+      // Las que ya subieron (y confirmaron) se avisan igual.
+      console.error(`[waitlist] subida en ${classId}:`, err?.message);
+      break;
+    }
+    if (!p) break;
+    if (p.retry) {
+      if (++retries > 5) break; // nunca un ciclo sin fin si algo no converge
+      continue;
+    }
+    retries = 0;
+    promoted.push(p);
+  }
+  const out = [];
+  for (const p of promoted) {
+    const aviso = quietUserIds.includes(String(p.userId))
+      ? { whatsapp: "skipped", email: "skipped" }
+      : await notifyWaitlistPromoted(p);
+    const u = (await pool.query("SELECT display_name, phone FROM users WHERE id = $1", [p.userId]).catch(() => ({ rows: [] }))).rows[0] ?? {};
+    out.push({ booking_id: p.bookingId, user_id: p.userId, display_name: u.display_name ?? null, phone: u.phone ?? null, ...aviso });
+  }
+  return out;
+}
+
+// Aviso de la subida, con la regla honesta del bloque 1: con el canal de
+// WhatsApp caído o los avisos apagados no se intenta y se dice
+// ("unreached" | "disabled"), para que recepción avise a mano. Va también el
+// correo de "reserva confirmada" y se sincroniza el pase. La plantilla
+// "waitlist_promoted" no está en DEFAULT_NOTIFICATION_TEMPLATES
+// (server/lib/notificationTemplates.js): sale el texto de respaldo, salvo que
+// se guarde una plantilla con esa llave.
+async function notifyWaitlistPromoted(p) {
+  const out = { whatsapp: "skipped", email: "skipped" };
+  try {
+    triggerWalletPassSync(p.userId, "waitlist_promoted");
+    const cls = p.cls;
+    const dateStr = cls.date ? new Date(cls.date).toLocaleDateString("es-MX", { weekday: "short", day: "numeric", month: "short" }) : "";
+    const timeStr = cls.start_time ? String(cls.start_time).slice(0, 5) : "";
+    const className = cls.class_name || "tu clase";
+    const notif = await getSettingsValue("notification_settings", DEFAULT_NOTIFICATION_SETTINGS);
+    const waOn = notif?.whatsapp_reminders !== false;
+    const channel = waOn ? await whatsappChannelState() : { connected: false, state: "disabled" };
+    if (!channel.connected) {
+      out.whatsapp = channel.state === "disabled" ? "disabled" : "unreached";
+    } else {
+      const r = await notifyByTemplate(
+        p.userId,
+        "waitlist_promoted",
+        { class: className, date: dateStr, time: timeStr },
+        ({ firstName }) =>
+          `${firstName}, se liberó un lugar en ${className}${dateStr ? ` del ${dateStr}` : ""}${timeStr ? ` a las ${timeStr}` : ""} y ya quedó a tu nombre: se usó una clase de tu paquete. Si no puedes ir, cancela desde la app; aplican las reglas de cancelación.`,
+      );
+      out.whatsapp = r?.sent ? "queued" : "failed";
+    }
+    const u = (await pool.query("SELECT email, display_name FROM users WHERE id = $1", [p.userId])).rows[0];
+    if (u?.email && (await areEmailNotificationsEnabled())) {
+      const mem = p.membershipId
+        ? (await pool.query("SELECT classes_remaining FROM memberships WHERE id = $1", [p.membershipId])).rows[0]
+        : null;
+      const cfg = await getLoyaltyConfig();
+      sendBookingConfirmed({
+        to: u.email, name: u.display_name || "Alumna", className, date: cls.date, startTime: cls.start_time,
+        instructor: cls.instructor_name, classesLeft: mem?.classes_remaining ?? null, isWaitlist: false,
+        cancelHours: cfg.faltas_cancel_window_hours,
+      }).catch((e) => console.error("[Email] subida de lista de espera:", e.message));
+      out.email = "queued";
+    }
+  } catch (e) {
+    console.warn("[waitlist] aviso de subida:", e?.message);
+  }
+  return out;
+}
+
+// Red de seguridad: clases con lugar libre y fila, por si una subida no ocurrió
+// (un reinicio a media cancelación o una vía sin gancho). Lo corre
+// scheduleEmailCrons cada WAITLIST_SWEEP_MINUTES, que viene APAGADO por
+// defecto (ver sweepMinutes en server/lib/waitlist.js). singleFlight: si una
+// vuelta tarda más que el intervalo (avisos de hasta 5 s por subida), la
+// siguiente no arranca encima de ella.
+const runWaitlistSweep = singleFlight(async () => {
+  const r = await pool.query(
+    `SELECT c.id FROM classes c
+      WHERE c.status = 'scheduled'
+        AND ((c.date + c.start_time) AT TIME ZONE '${STUDIO_TIMEZONE}') >= NOW() + make_interval(hours => $1)
+        AND c.date <= (NOW() AT TIME ZONE '${STUDIO_TIMEZONE}')::date + 60
+        AND EXISTS (SELECT 1 FROM bookings w WHERE w.class_id = c.id AND w.status = 'waitlist')
+        AND (SELECT COUNT(*) FROM bookings b
+              WHERE b.class_id = c.id AND b.status IN ('confirmed', 'checked_in')) < c.max_capacity`,
+    [BOOKING_LEAD_HOURS],
+  );
+  if (r.rows.length) await onSeatReleased(r.rows.map((x) => x.id), { source: "sweep" });
+});
+
 // Responsiva firmada — helper compartido por /bookings, /bookings/with-guest
 // y /admin/bookings/assign (auditoría 2026-09-27, bloque 1, tarea 5).
 const hasSignedWaiver = async (db, userId) =>
   (await db.query("SELECT 1 FROM waivers WHERE user_id = $1 LIMIT 1", [userId]).catch(() => ({ rows: [] }))).rows.length > 0;
 const WAIVER_REQUIRED_MSG = "Antes de tu primera reserva necesitas leer y firmar la responsiva y consentimiento informado.";
+
+// WhatsApp de una reserva nueva (app y asignación) según su estado final: la que
+// queda en la fila usa su propia llave (bookingNotice, server/lib/waitlist.js),
+// nunca la plantilla de "reserva confirmada". Las plantillas usan {firstName}.
+function sendBookingNoticeWhatsApp(u, cl, status) {
+  const firstName = firstNameOf(u?.display_name, "Alumna");
+  const date = cl?.date ? new Date(cl.date).toLocaleDateString("es-MX") : "";
+  const time = cl?.start_time ? String(cl.start_time).slice(0, 5) : "";
+  const notice = bookingNotice({
+    status, firstName, className: cl?.class_type_name, date, time, cutoffHours: BOOKING_LEAD_HOURS,
+  });
+  if (!notice) return Promise.resolve({ sent: false, reason: "no_notice" });
+  return sendConfiguredWhatsAppTemplate({
+    templateKey: notice.templateKey,
+    phone: u?.phone,
+    vars: { firstName, name: u?.display_name || firstName, class: cl?.class_type_name || "Clase", date, time },
+    fallbackMessage: notice.fallbackMessage,
+  });
+}
 
 // POST /api/bookings
 app.post("/api/bookings", authMiddleware, async (req, res) => {
@@ -3763,7 +4095,21 @@ app.post("/api/bookings", authMiddleware, async (req, res) => {
   if (!(await hasSignedWaiver(pool, req.userId))) {
     return res.status(403).json({ code: "WAIVER_REQUIRED", message: WAIVER_REQUIRED_MSG });
   }
+  // La política se lee antes de tomar el cliente de la transacción: con el pool
+  // lleno, pedir otra conexión teniendo ésta podía dejar a la petición
+  // esperándose a sí misma (misma regla que en DELETE /bookings/:id). De aquí
+  // sale cancelWindowHours para el correo de "Reserva confirmada".
+  let policy;
+  try {
+    policy = await getBookingPolicy();
+  } catch (err) {
+    console.error("POST bookings policy error:", err.message);
+    return res.status(500).json({ message: "Error interno" });
+  }
   const client = await pool.connect();
+  // El cliente se suelta justo después del COMMIT: la subida de la fila pide su
+  // propia conexión (auditoría 2026-09-27, P1-1).
+  let released = false;
   try {
     await client.query("BEGIN");
 
@@ -3817,15 +4163,24 @@ app.post("/api/bookings", authMiddleware, async (req, res) => {
       });
     }
 
-    // Lock selected membership row to prevent double consumption
+    // Lock selected membership row to prevent double consumption. Bajo el
+    // candado se revisa otra vez que siga vigente: un reembolso total o una
+    // cancelación pudo confirmarse entre la elección y el candado, y en una
+    // ilimitada (clases NULL) el tope de clases no lo detecta.
     const lockedMembershipRes = await client.query(
-      "SELECT id, classes_remaining FROM memberships WHERE id = $1 FOR UPDATE",
+      `SELECT id, classes_remaining, status::text AS status, end_date,
+              ${MEMBERSHIP_EXPIRED_SQL} AS expired
+         FROM memberships WHERE id = $1 FOR UPDATE`,
       [membership.id]
     );
     const lockedMembership = lockedMembershipRes.rows[0];
     if (!lockedMembership) {
       await client.query("ROLLBACK");
       return res.status(403).json({ message: "No se encontró una membresía válida para esta reserva." });
+    }
+    if (lockedMembership.status !== "active" || lockedMembership.expired) {
+      await client.query("ROLLBACK");
+      return res.status(409).json({ code: "MEMBERSHIP_NOT_CURRENT", message: "Tu paquete ya no está vigente." });
     }
 
     if (!isMembershipCategoryCompatible(membership.class_category, clsCategory)) {
@@ -3865,15 +4220,23 @@ app.post("/api/bookings", authMiddleware, async (req, res) => {
       return res.status(403).json({ message: weeklyCheck.message });
     }
 
-    const isWaitlist = (await liveBookingCount(classId, client)) >= cls.max_capacity;
-    const status = isWaitlist ? "waitlist" : "confirmed";
+    // Lista de espera por orden de llegada (auditoría 2026-09-27, P1-1): si ya
+    // hay fila y la subida aplica, la reserva nueva entra a la fila aunque haya
+    // lugar. Tras el COMMIT corre la subida: si las de adelante no pueden usar el
+    // lugar, sube ella. Nadie se salta la fila y el lugar no se desperdicia.
+    const liveNow = await liveBookingCount(classId, client);
+    const queueFirst = queueBlocksNewBooking({
+      waiting: await waitingCount(classId, client), startsAt: cls.starts_at, now: Date.now(), cutoffHours: BOOKING_LEAD_HOURS,
+    });
+    const insertAsWaitlist = liveNow >= cls.max_capacity || queueFirst;
+    const status = insertAsWaitlist ? "waitlist" : "confirmed";
     const result = await client.query(
       `INSERT INTO bookings (class_id, user_id, membership_id, status)
        VALUES ($1, $2, $3, $4) RETURNING *`,
       [classId, req.userId, membership.id, status]
     );
 
-    if (!isWaitlist) {
+    if (!insertAsWaitlist) {
       // Cupo: lo mantiene el trigger update_class_booking_count (auditoría 2026-09-08, P1-6).
       if (!isUnlimitedClasses(lockedMembership.classes_remaining)) {
         // Descuenta total y, si es mixto, el bucket del área de la clase.
@@ -3881,6 +4244,20 @@ app.post("/api/bookings", authMiddleware, async (req, res) => {
       }
     }
     await client.query("COMMIT");
+    client.release();
+    released = true;
+
+    if (insertAsWaitlist && liveNow < cls.max_capacity) {
+      await onSeatReleased([classId], { source: "new_booking", quietUserIds: [req.userId] });
+      const final = await pool.query("SELECT status::text AS status FROM bookings WHERE id = $1", [result.rows[0].id]);
+      if (final.rows[0]?.status) result.rows[0].status = final.rows[0].status;
+    }
+    // Avisos según el estado FINAL: "Reserva confirmada" sólo si quedó
+    // exactamente confirmada (igual que en la asignación); la fila tiene su
+    // propio aviso; otro estado (la cancelaron a media petición) no avisa.
+    const finalStatus = result.rows[0].status;
+    const isWaitlist = finalStatus === "waitlist";
+    const isConfirmed = finalStatus === "confirmed";
 
     // ── Email: booking confirmed / waitlist ────────────────────────────────
     try {
@@ -3897,7 +4274,7 @@ app.post("/api/bookings", authMiddleware, async (req, res) => {
       const memAfter = await pool.query("SELECT classes_remaining FROM memberships WHERE id = $1", [membership.id]);
       const classesLeft = memAfter.rows[0]?.classes_remaining ?? null;
 
-      if (userRes.rows[0] && classFullRes.rows[0]) {
+      if (userRes.rows[0] && classFullRes.rows[0] && (isConfirmed || isWaitlist)) {
         const u = userRes.rows[0];
         const cl = classFullRes.rows[0];
         if (await areEmailNotificationsEnabled()) {
@@ -3910,23 +4287,14 @@ app.post("/api/bookings", authMiddleware, async (req, res) => {
             instructor: cl.instructor_name,
             classesLeft,
             isWaitlist,
+            waitlistCutoffHours: BOOKING_LEAD_HOURS,
+            cancelHours: policy.cancelWindowHours,
           }).catch((e) => console.error("[Email] booking confirmed:", e.message));
         }
-        sendConfiguredWhatsAppTemplate({
-          templateKey: "booking_confirmed",
-          phone: u.phone,
-          vars: {
-            name: u.display_name || "Alumna",
-            class: cl.class_type_name || "Clase",
-            date: cl.date ? new Date(cl.date).toLocaleDateString("es-MX") : "",
-            time: cl.start_time ? String(cl.start_time).slice(0, 5) : "",
-          },
-          fallbackMessage: isWaitlist
-            ? `Hola ${u.display_name || "Alumna"}, quedaste en lista de espera para ${cl.class_type_name || "tu clase"} (${cl.date || ""} ${String(cl.start_time || "").slice(0, 5)}).`
-            : `Hola ${u.display_name || "Alumna"}, tu reserva para ${cl.class_type_name || "tu clase"} (${cl.date || ""} ${String(cl.start_time || "").slice(0, 5)}) está confirmada.`,
-        }).catch((e) => console.error("[WA] booking confirmed:", e.message));
+        sendBookingNoticeWhatsApp(u, cl, finalStatus)
+          .catch((e) => console.error("[WA] booking confirmed:", e.message));
         // Notificación a la dueña/admins de nueva reserva (no espera la respuesta).
-        if (!isWaitlist) {
+        if (isConfirmed) {
           const dateStr = cl.date ? new Date(cl.date).toLocaleDateString("es-MX") : "";
           const timeStr = cl.start_time ? String(cl.start_time).slice(0, 5) : "";
           notifyAdminsByTemplate(
@@ -3946,29 +4314,49 @@ app.post("/api/bookings", authMiddleware, async (req, res) => {
     }
 
     const msg = isWaitlist ? "Añadido a lista de espera" : "Reserva confirmada";
+    // El WhatsApp de "reserva confirmada" ya salió arriba, vía
+    // sendBookingNoticeWhatsApp (respeta whatsapp_reminders, el template
+    // habilitado y usa el firstName real); aquí sólo queda refrescar el pase
+    // (antes se mandaba dos veces: ésta y notifyBookingConfirmed).
     if (isWaitlist) {
       triggerWalletPassSync(req.userId, "booking_waitlist_created");
-    } else {
-      const booking = result.rows[0];
-      const className = booking?.class_type_name;
-      const startStr = booking?.start_time
-        ? new Date(booking.start_time).toLocaleString("es-MX", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
-        : null;
-      notifyBookingConfirmed(req.userId, { className, when: startStr }).catch(() => {});
+    } else if (isConfirmed) {
+      triggerWalletPassSync(req.userId, "booking_confirmed");
     }
     return res.status(201).json({ message: msg, booking: result.rows[0] });
   } catch (err) {
-    try { await client.query("ROLLBACK"); } catch (_) { }
+    if (!released) { try { await client.query("ROLLBACK"); } catch (_) { } }
     console.error("POST bookings error:", err);
     return res.status(500).json({ message: "Error interno" });
   } finally {
-    client.release();
+    if (!released) client.release();
   }
 });
 
-// DELETE /api/bookings/:id
+// DELETE /api/bookings/:id — la clienta cancela su reserva o sale de la lista de
+// espera. Una sola política (auditoría 2026-09-27, P0-4):
+//   - cuota de cancelaciones por paquete (settings.cancellation_settings; 0 = sin límite);
+//   - ventana configurable (loyalty_config; 12 h por defecto): cancelar tarde
+//     pierde la clase y cuenta como falta.
+// Salir de la lista de espera no consulta ni suma la cuota, ni cuenta como falta.
+// Una reserva con asistencia o falta ya no se cancela desde la app. Si se libera
+// un lugar, sube la fila (onSeatReleased, después del COMMIT y con el pool libre).
+// ?expect=waitlist: la app cree que la reserva sigue en la fila. Si ya subió, 409
+// ALREADY_PROMOTED sin tocar nada; se revisa con la reserva bloqueada, así que
+// la subida y la salida no se cruzan.
 app.delete("/api/bookings/:id", authMiddleware, async (req, res) => {
+  // La política se lee antes de tomar el cliente: con el pool lleno, pedir otra
+  // conexión teniendo ésta podía dejar a la petición esperándose a sí misma.
+  let policy;
+  try {
+    policy = await getBookingPolicy();
+  } catch (err) {
+    console.error("DELETE bookings policy error:", err.message);
+    return res.status(500).json({ message: "Error interno" });
+  }
+  const expectWaitlist = req.query?.expect === "waitlist";
   const client = await pool.connect();
+  let released = false;
   try {
     await client.query("BEGIN");
 
@@ -3990,12 +4378,6 @@ app.delete("/api/bookings/:id", authMiddleware, async (req, res) => {
     }
     const booking = r.rows[0];
 
-    if (booking.status === "cancelled") {
-      await client.query("ROLLBACK");
-      return res.status(400).json({ message: "Esta reserva ya fue cancelada" });
-    }
-
-    // ── Check membership cancellation limit (max 2 per membership period) ──
     let membership = null;
     if (booking.membership_id) {
       const memRes = await client.query(
@@ -4004,126 +4386,117 @@ app.delete("/api/bookings/:id", authMiddleware, async (req, res) => {
       );
       membership = memRes.rows[0] ?? null;
     }
-
-    if (membership && (membership.cancellations_used ?? 0) >= 2) {
+    const limit = membership ? policy.cancellationLimit : 0;
+    const decision = clientCancelDecision({ bookingStatus: booking.status, used: membership?.cancellations_used ?? 0, limit, expectWaitlist });
+    if (!decision.ok) {
       await client.query("ROLLBACK");
-      return res.status(403).json({
-        message: "Has alcanzado el límite de 2 cancelaciones permitidas en tu membresía actual. Contacta con el studio si necesitas ayuda.",
-      });
+      return res.status(decision.status).json({ code: decision.code, message: decision.message });
     }
 
-    // ── Ventana de aviso para devolución de crédito (política Alma: 12 h) ──
-    // Las clases están en hora de Ciudad de México; comparamos contra el inicio real.
+    // Ventana para devolver la clase: hora del estudio contra el inicio real.
     const classStartRes = await client.query(
       `SELECT (c.date + c.start_time::time) AT TIME ZONE '${STUDIO_TIMEZONE}' AS class_start_utc
        FROM classes c WHERE c.id = $1`,
       [booking.class_id]
     );
-    const classStartUTC = classStartRes.rows[0]?.class_start_utc
-      ? new Date(classStartRes.rows[0].class_start_utc)
-      : null;
-    const now = new Date();
-    const minutesUntilClass = classStartUTC
-      ? (classStartUTC.getTime() - now.getTime()) / 60_000
-      : 999; // si no se puede determinar, se asume a tiempo
-    // Una sola ventana (default 12 h, configurable) decide falta Y pérdida de crédito.
-    let cancelWindowHours = 12;
-    try {
-      const _lc = await getLoyaltyConfig();
-      const w = Number(_lc.faltas_cancel_window_hours);
-      if (Number.isFinite(w) && w > 0) cancelWindowHours = w;
-    } catch (e) { console.warn("[cancel] loyalty config:", e.message); }
-    const isLate = isWithinCancelWindow(minutesUntilClass, cancelWindowHours); // dentro de la ventana = tardía
-    const wasConfirmed = booking.status === "confirmed";
+    const classStartUTC = classStartRes.rows[0]?.class_start_utc ? new Date(classStartRes.rows[0].class_start_utc) : null;
+    const minutesUntilClass = classStartUTC ? (classStartUTC.getTime() - Date.now()) / 60_000 : 999;
+    const isLate = decision.countsTowardQuota && isWithinCancelWindow(minutesUntilClass, policy.cancelWindowHours);
 
-    // Cancel the booking
-    await client.query(
-      "UPDATE bookings SET status = 'cancelled', cancelled_at = NOW() WHERE id = $1",
-      [req.params.id]
-    );
+    await client.query("UPDATE bookings SET status = 'cancelled', cancelled_at = NOW() WHERE id = $1", [req.params.id]);
+    // Cupo: lo mantiene el trigger update_class_booking_count (auditoría 2026-09-08, P1-6).
 
-    if (wasConfirmed) {
-      // Always free the class spot
-      // Cupo: lo mantiene el trigger update_class_booking_count (auditoría 2026-09-08, P1-6).
-
-      if (membership) {
-        // Increment cancellations_used regardless of timing
-        await client.query(
-          "UPDATE memberships SET cancellations_used = COALESCE(cancellations_used, 0) + 1 WHERE id = $1",
-          [membership.id]
-        );
-
-        // On-time: restore credit only if membership has a counted limit.
-        // Late: credit is LOST — do not restore.
-        if (!isLate && membership.classes_remaining !== null && membership.classes_remaining < 9999) {
-          // Devuelve total y, si es mixto, el bucket del área de la clase.
-          await restoreMembershipCredit(client, membership.id, booking.class_id);
-        }
+    let used = Number(membership?.cancellations_used ?? 0);
+    if (decision.countsTowardQuota && membership) {
+      const up = await client.query(
+        "UPDATE memberships SET cancellations_used = COALESCE(cancellations_used, 0) + 1 WHERE id = $1 RETURNING cancellations_used",
+        [membership.id]
+      );
+      used = Number(up.rows[0]?.cancellations_used ?? used + 1);
+      // A tiempo: la clase regresa al paquete (si tiene tope). Tarde: se pierde.
+      if (!isLate && !isUnlimitedClasses(membership.classes_remaining)) {
+        await restoreMembershipCredit(client, membership.id, booking.class_id);
       }
     }
+    const creditRestored = decision.countsTowardQuota && !isLate;
 
     await client.query("COMMIT");
+    client.release();
+    released = true;
 
-    // ── Side effects (best-effort, ya fuera de la transacción) ──────────────
-    // Falta por cancelación tardía (MISMA ventana). Excluye invitadas (guest).
-    if (req.userId && !booking.guest_profile_id && isLate) {
+    // ── Después del COMMIT (pool libre) ─────────────────────────────────────
+    // Falta por cancelación tardía (misma ventana). Excluye invitadas.
+    if (decision.countsTowardQuota && isLate && !booking.guest_profile_id) {
       try {
-        await recordFalta({ userId: req.userId, reason: `cancelación dentro de ${cancelWindowHours}h` });
+        await recordFalta({ userId: req.userId, reason: `cancelación dentro de ${policy.cancelWindowHours}h` });
       } catch (e) { console.warn("[faltas] late-cancel:", e.message); }
     }
+    // Se liberó un lugar: sube la primera de la fila que pueda usarlo (P1-1).
+    if (decision.freesSeat) await onSeatReleased([booking.class_id], { source: "client_cancel" });
 
-    // ── Email + WhatsApp: booking cancelled ────────────────────────────────
-    try {
-      const uRes = await pool.query("SELECT email, display_name, phone FROM users WHERE id = $1", [req.userId]);
-      const memAfter = membership
-        ? await pool.query("SELECT classes_remaining FROM memberships WHERE id = $1", [membership.id])
-        : null;
-      if (uRes.rows[0]) {
-        const u = uRes.rows[0];
-        if (await areEmailNotificationsEnabled()) {
-          sendBookingCancelled({
-            to: u.email,
-            name: u.display_name || "Alumna",
-            className: booking.class_type_name || "tu clase",
-            date: booking.date,
-            startTime: booking.start_time,
-            creditRestored: !isLate,
-            isLate,
-            classesLeft: memAfter?.rows[0]?.classes_remaining ?? null,
-          }).catch((e) => console.error("[Email] booking cancelled:", e.message));
+    // Correo + WhatsApp sólo al cancelar una reserva (salir de la fila no avisa).
+    if (!decision.leavingWaitlist) {
+      try {
+        const uRes = await pool.query("SELECT email, display_name, phone FROM users WHERE id = $1", [req.userId]);
+        const memAfter = membership
+          ? await pool.query("SELECT classes_remaining FROM memberships WHERE id = $1", [membership.id])
+          : null;
+        if (uRes.rows[0]) {
+          const u = uRes.rows[0];
+          if (await areEmailNotificationsEnabled()) {
+            sendBookingCancelled({
+              to: u.email,
+              name: u.display_name || "Alumna",
+              className: booking.class_type_name || "tu clase",
+              date: booking.date,
+              startTime: booking.start_time,
+              creditRestored,
+              isLate,
+              classesLeft: memAfter?.rows[0]?.classes_remaining ?? null,
+              cancelHours: policy.cancelWindowHours,
+            }).catch((e) => console.error("[Email] booking cancelled:", e.message));
+          }
+          sendConfiguredWhatsAppTemplate({
+            templateKey: "booking_cancelled",
+            phone: u.phone,
+            vars: {
+              name: u.display_name || "Alumna",
+              class: booking.class_type_name || "tu clase",
+              date: booking.date ? new Date(booking.date).toLocaleDateString("es-MX") : "",
+              time: booking.start_time ? String(booking.start_time).slice(0, 5) : "",
+              creditRestored: creditRestored ? "Sí" : "No",
+            },
+            fallbackMessage: isLate
+              ? `Hola ${u.display_name || "Alumna"}, cancelaste tu reserva de ${booking.class_type_name || "tu clase"}. La clase no se devolvió por cancelación tardía.`
+              : `Hola ${u.display_name || "Alumna"}, cancelaste tu reserva de ${booking.class_type_name || "tu clase"}. Tu crédito fue devuelto.`,
+          }).catch((e) => console.error("[WA] booking cancelled:", e.message));
         }
-        sendConfiguredWhatsAppTemplate({
-          templateKey: "booking_cancelled",
-          phone: u.phone,
-          vars: {
-            name: u.display_name || "Alumna",
-            class: booking.class_type_name || "tu clase",
-            date: booking.date ? new Date(booking.date).toLocaleDateString("es-MX") : "",
-            time: booking.start_time ? String(booking.start_time).slice(0, 5) : "",
-            creditRestored: !isLate ? "Sí" : "No",
-          },
-          fallbackMessage: isLate
-            ? `Hola ${u.display_name || "Alumna"}, cancelaste tu reserva de ${booking.class_type_name || "tu clase"}. La clase no se devolvió por cancelación tardía.`
-            : `Hola ${u.display_name || "Alumna"}, cancelaste tu reserva de ${booking.class_type_name || "tu clase"}. Tu crédito fue devuelto.`,
-        }).catch((e) => console.error("[WA] booking cancelled:", e.message));
+      } catch (emailErr) {
+        console.error("[Email] cancelled query:", emailErr.message);
       }
-    } catch (emailErr) {
-      console.error("[Email] cancelled query:", emailErr.message);
     }
 
-    triggerWalletPassSync(req.userId, isLate ? "booking_cancelled_late" : "booking_cancelled");
+    triggerWalletPassSync(req.userId, decision.leavingWaitlist ? "waitlist_left" : isLate ? "booking_cancelled_late" : "booking_cancelled");
+    const quota = cancellationQuota({ used, limit });
     return res.json({
-      message: isLate
-        ? `Reserva cancelada. Por cancelar con menos de ${cancelWindowHours} horas de anticipación, la clase cuenta como utilizada y NO se devuelve a tu paquete.`
-        : "Reserva cancelada. Se devolvió el crédito a tu paquete.",
-      creditRestored: !isLate,
+      message: decision.leavingWaitlist
+        ? "Saliste de la lista de espera. No usa una cancelación de tu paquete."
+        : isLate
+          ? `Reserva cancelada. Por cancelar con menos de ${policy.cancelWindowHours} horas de anticipación, la clase cuenta como utilizada y NO se devuelve a tu paquete.`
+          : "Reserva cancelada. Se devolvió el crédito a tu paquete.",
+      creditRestored,
+      leftWaitlist: decision.leavingWaitlist,
+      cancellationsUsed: quota.used,
+      cancellationLimit: limit,
+      cancellationsLeft: quota.left,
+      cancelWindowHours: policy.cancelWindowHours,
     });
   } catch (err) {
-    try { await client.query("ROLLBACK"); } catch (_) { }
+    if (!released) { try { await client.query("ROLLBACK"); } catch (_) { } }
     console.error("DELETE bookings error:", err.message, err.stack);
     return res.status(500).json({ message: "Error interno" });
   } finally {
-    client.release();
+    if (!released) client.release();
   }
 });
 
@@ -4755,7 +5128,7 @@ app.post("/api/discount-codes/validate", authMiddleware, async (req, res) => {
 app.get("/api/wallet/pass", authMiddleware, async (req, res) => {
   try {
     const userRes = await pool.query("SELECT email, display_name FROM users WHERE id = $1 LIMIT 1", [req.userId]);
-    const userName = userRes.rows[0]?.display_name || userRes.rows[0]?.email || "Miembro Alma";
+    const userName = userRes.rows[0]?.display_name || userRes.rows[0]?.email || PASS_DEFAULT_TEXTS.memberFallbackName;
     const pointsRes = await pool.query(
       "SELECT COALESCE(SUM(CASE WHEN type='earn' THEN points WHEN type='adjust' THEN points ELSE -points END), 0) AS total FROM loyalty_transactions WHERE user_id = $1",
       [req.userId]
@@ -5252,7 +5625,7 @@ app.get("/api/me/notifications/unread-count", authMiddleware, async (req, res) =
 
 function prettyTemplateKey(key) {
   const map = {
-    welcome: "Bienvenida a Alma",
+    welcome: "Bienvenida a HIVE",
     booking_confirmed: "Reserva confirmada",
     booking_cancelled: "Reserva cancelada",
     class_reminder: "Recordatorio de clase",
@@ -5278,16 +5651,16 @@ function prettyTemplateKey(key) {
     milestone_classes_25: "25 clases",
     milestone_classes_50: "50 clases",
     milestone_classes_100: "100 clases",
-    promo_custom: "Promo Alma",
+    promo_custom: "Promo HIVE",
     promo_dormant_invite: "Te extrañamos",
     promo_expiring_offer: "Renueva con beneficio",
     promo_birthday_month: "Feliz mes",
   };
-  return map[key] || "Aviso de Alma";
+  return map[key] || "Aviso de HIVE";
 }
 
 function humanizeMotivationKey(key) {
-  if (key.startsWith("milestone_")) return "Lograste un nuevo milestone Alma.";
+  if (key.startsWith("milestone_")) return "Lograste un nuevo milestone HIVE.";
   if (key.startsWith("motivation_")) return "Te enviamos un mensaje motivacional al WhatsApp.";
   if (key.startsWith("promo_")) return "Te enviamos una promoción al WhatsApp.";
   if (key === "class_attended") return "Tenemos tu check-in.";
@@ -5372,10 +5745,10 @@ app.post("/api/loyalty/redeem", authMiddleware, async (req, res) => {
 
 // ─── Google Wallet helpers ──────────────────────────────────────────────────
 
-const SITE_URL = process.env.SITE_URL || "https://alma-movement.com.mx";
+const SITE_URL = process.env.SITE_URL || "https://www.almamovement.com.mx";
 const GW_ISSUER_ID = process.env.GOOGLE_ISSUER_ID || "";
-const GW_ISSUER_NAME = process.env.GOOGLE_ISSUER_NAME || "Alma Movement";
-const GW_PROGRAM_NAME = process.env.GOOGLE_PROGRAM_NAME || "Alma Club";
+const GW_ISSUER_NAME = process.env.GOOGLE_ISSUER_NAME || PASS_DEFAULT_TEXTS.issuerName;
+const GW_PROGRAM_NAME = process.env.GOOGLE_PROGRAM_NAME || PASS_DEFAULT_TEXTS.programName;
 const GW_HEX_BG = process.env.GOOGLE_HEX_BACKGROUND_COLOR || "#FFF7F2";
 const GW_HEX_BG_EVENT = process.env.GOOGLE_HEX_BACKGROUND_COLOR_EVENT || "#FFF7F2";
 
@@ -5534,13 +5907,13 @@ async function ensureGoogleWalletClass() {
       programName: GW_PROGRAM_NAME,
       programLogo: {
         sourceUri: { uri: `${SITE_URL}/alma-mark-light.png` },
-        contentDescription: { defaultValue: { language: "es", value: "Alma Movement" } },
+        contentDescription: { defaultValue: { language: "es", value: PASS_DEFAULT_TEXTS.logoDescription } },
       },
       heroImage: {
-        sourceUri: { uri: `${SITE_URL}/wallet-hero-alma.png` },
-        contentDescription: { defaultValue: { language: "es", value: "Alma Movement — Pilates Studio" } },
+        sourceUri: { uri: `${SITE_URL}/wallet-hero-hive.png` },
+        contentDescription: { defaultValue: { language: "es", value: PASS_DEFAULT_TEXTS.heroDescription } },
       },
-      // Tarjeta cálida Desert Rock — paleta oficial Alma (club exclusivo)
+      // Tarjeta cálida Desert Rock — paleta oficial HIVE (club exclusivo)
       hexBackgroundColor: "#A48D78",
       reviewStatus: "UNDER_REVIEW",
       countryCode: "MX",
@@ -5551,7 +5924,7 @@ async function ensureGoogleWalletClass() {
       localizedProgramName: {
         defaultValue: { language: "es", value: GW_PROGRAM_NAME },
         translatedValues: [
-          { language: "es", value: "Alma Club — Pilates · Barre · Reformer/Tower" },
+          { language: "es", value: PASS_DEFAULT_TEXTS.programNameTranslated },
         ],
       },
     };
@@ -5634,7 +6007,7 @@ function buildGoogleWalletSaveUrl({ userId, userName, points, qrCode, membership
   const nonRepeatable = hasMembership && parseBooleanFlag(membership.is_non_repeatable);
 
   // Header label
-  let passHeader = "ALMA CLUB";
+  let passHeader = PASS_DEFAULT_TEXTS.passHeader;
   if (hasEventPass) {
     passHeader = "PASE DE EVENTO";
   } else if (hasMembership) {
@@ -5737,7 +6110,7 @@ function buildGoogleWalletSaveUrl({ userId, userName, points, qrCode, membership
   // Row 5: Points
   textModules.push({
     id: "puntos",
-    header: "PUNTOS ALMA CLUB",
+    header: PASS_DEFAULT_TEXTS.pointsLabel,
     body: `${points.toLocaleString("es-MX")} pts`,
   });
 
@@ -5804,14 +6177,14 @@ function buildGoogleWalletSaveUrl({ userId, userName, points, qrCode, membership
     state: "ACTIVE",
     accountId: userId,
     accountName: userName,
-    // Tarjeta cálida Desert Rock — paleta oficial Alma (club exclusivo)
+    // Tarjeta cálida Desert Rock — paleta oficial HIVE (club exclusivo)
     hexBackgroundColor: "#A48D78",
     // Hero a nivel OBJETO: sobreescribe el hero de la clase. Se firma local
     // (sin OAuth), así que limpia el branding viejo aunque la clase persistida
     // en Google no se pueda actualizar todavía. ?v fuerza re-fetch del CDN.
     heroImage: {
-      sourceUri: { uri: `${SITE_URL}/wallet-hero-alma.png?v=warm2` },
-      contentDescription: { defaultValue: { language: "es", value: "Alma Movement" } },
+      sourceUri: { uri: `${SITE_URL}/wallet-hero-hive.png?v=hive1` },
+      contentDescription: { defaultValue: { language: "es", value: PASS_DEFAULT_TEXTS.heroDescription } },
     },
     barcode: {
       type: "QR_CODE",
@@ -6979,7 +7352,7 @@ async function notifyPointsEarned(userId, points, totalPoints) {
       userId,
       "points_earned",
       { points, totalPoints },
-      ({ firstName }) => `${firstName}, sumaste ${points} puntos Alma. Total: ${totalPoints}.`,
+      ({ firstName }) => `${firstName}, sumaste ${points} puntos HIVE. Total: ${totalPoints}.`,
     ).catch(() => {});
   }
 }
@@ -6998,7 +7371,7 @@ async function notifyMembershipRenewed(userId, planName, ctx = {}) {
       startDate: ctx.startDate || "",
       endDate: ctx.endDate || "",
     },
-    ({ firstName, plan }) => `${firstName}, tu paquete ${plan} ya quedó activo. Tu pase Alma está al día.`,
+    ({ firstName, plan }) => `${firstName}, tu paquete ${plan} ya quedó activo. Tu pase HIVE está al día.`,
   ).catch(() => {});
 }
 
@@ -7014,9 +7387,9 @@ async function notifyMembershipExpiring(userId, daysRemaining) {
     : days === 1 ? "membership_expiring_tomorrow"
     : "membership_expiring_n_days";
   const fallback = ({ firstName }) => {
-    if (days <= 0) return `${firstName}, hoy vence tu paquete Alma. Renueva desde la app.`;
-    if (days === 1) return `${firstName}, mañana vence tu paquete Alma. Renueva desde la app.`;
-    return `${firstName}, te quedan ${days} días en tu paquete Alma.`;
+    if (days <= 0) return `${firstName}, hoy vence tu paquete HIVE. Renueva desde la app.`;
+    if (days === 1) return `${firstName}, mañana vence tu paquete HIVE. Renueva desde la app.`;
+    return `${firstName}, te quedan ${days} días en tu paquete HIVE.`;
   };
   notifyByTemplate(userId, key, { days }, fallback).catch(() => {});
 }
@@ -7049,7 +7422,7 @@ async function notifyBookingConfirmed(userId, ctx = {}) {
       date: ctx.date || ctx.when || "",
       time: ctx.time || "",
     },
-    ({ firstName, class: cls }) => `${firstName}, te apartamos lugar de ${cls}. Tu pase Alma ya lo trae cargado.`,
+    ({ firstName, class: cls }) => `${firstName}, te apartamos lugar de ${cls}. Tu pase HIVE ya lo trae cargado.`,
   ).catch(() => {});
 }
 
@@ -7081,7 +7454,7 @@ async function notifyEventRegistered(userId, ctx = {}) {
     userId,
     "event_registered",
     { eventTitle: ctx.eventTitle || "tu evento" },
-    ({ firstName, eventTitle }) => `${firstName}, quedaste inscrita a ${eventTitle}. En tu Alma Wallet ya tienes el pase con QR.`,
+    ({ firstName, eventTitle }) => `${firstName}, quedaste inscrita a ${eventTitle}. En tu HIVE Wallet ya tienes el pase con QR.`,
   ).catch(() => {});
 }
 
@@ -7306,10 +7679,10 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
   const eventTimeLong = eventStartTimeLabel && eventEndTimeLabel
     ? `${eventStartTimeLabel} - ${eventEndTimeLabel}`
     : (eventStartTimeLabel || "Horario por confirmar");
-  const eventLocationShort = truncateWalletField(activeEventPass?.eventLocation || "Alma Movement", 24);
-  const eventLocationLong = truncateWalletField(activeEventPass?.eventLocation || "Alma Movement", 38);
+  const eventLocationShort = truncateWalletField(activeEventPass?.eventLocation || PASS_DEFAULT_TEXTS.eventLocationDefault, 24);
+  const eventLocationLong = truncateWalletField(activeEventPass?.eventLocation || PASS_DEFAULT_TEXTS.eventLocationDefault, 38);
   const eventCodeLabel = truncateWalletField(activeEventPass?.passCode || "—", 18);
-  // Alma lockscreen relevance:
+  // HIVE lockscreen relevance:
   // - Para membership pass: 30 min antes de la próxima clase (si existe).
   //   Apple muestra el pase en la lockscreen automáticamente alrededor de esta hora.
   // - Geofence: usar `locations` (configurada abajo) para que también aparezca
@@ -7379,7 +7752,7 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
   const hasIconStampMode = hasMembership && !isUnlimited && stripStampState.total > 0;
   const membershipHeadline = isTrialSingleSession
     ? "Clase Muestra"
-    : (isUnlimited ? "Meta abierta" : "Alma Pass");
+    : (isUnlimited ? "Meta abierta" : PASS_DEFAULT_TEXTS.membershipHeadline);
   const memberDisplayName = truncateWalletField(userName, 22);
   const planDisplayName = truncateWalletField(
     hasMembership ? (membership.plan_name || `${membershipCategoryLabel} ${isUnlimited ? "Ilimitado" : ""}`.trim()) : "",
@@ -7580,8 +7953,8 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
     backFields.push(
       {
         key: "intro_back",
-        label: "Bienvenida a Alma",
-        value: "Te recibimos como te recibe una amiga. Grupos pequeños (4 en Reformer/Tower, 8 en Studio), atención personalizada y alguien que te conoce por tu nombre.",
+        label: PASS_DEFAULT_TEXTS.welcomeBackLabel,
+        value: "Te recibimos como te recibe una amiga. Grupos pequeños: el cupo de cada clase se ve en la app. Atención personalizada y alguien que te conoce por tu nombre.",
       },
       {
         key: "muestra_back",
@@ -7704,17 +8077,18 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
 
   backFields.push(
     { key: "cliente", label: "CLIENTE", value: userName },
-    { key: "puntos", label: "PUNTOS ALMA CLUB", value: `${points.toLocaleString("es-MX")} pts` },
-    { key: "studio", label: "ESTUDIO", value: "Plaza Arce, Calle Acueducto de Querétaro 513, Jurica Acueducto, 76230 Juriquilla, Qro." },
-    { key: "horario_studio", label: "HORARIOS", value: "Lun a Vie 7am a 3pm y 5pm a 9pm · Sáb 7am a 9am" },
-    { key: "telefono", label: "WHATSAPP", value: "444 307 3266" },
+    { key: "puntos", label: PASS_DEFAULT_TEXTS.pointsLabel, value: `${points.toLocaleString("es-MX")} pts` },
+    { key: "studio", label: "ESTUDIO", value: PASS_DEFAULT_TEXTS.studioAddress },
+    { key: "horario_studio", label: "HORARIOS", value: PASS_DEFAULT_TEXTS.studioHours },
+    // Sin WhatsApp/teléfono público todavía (STUDIO.phone es null en
+    // src/lib/studio.ts): se omite el campo en vez de mostrar un número viejo.
     { key: "web", label: "RESERVAR EN LÍNEA", value: `${SITE_URL}/app/bookings` },
     {
       key: "terms",
       label: "TÉRMINOS",
       value: hasEventPass
         ? "Pase válido para un acceso al evento indicado. Presenta el QR en recepción."
-        : "Pase personal para clases en Alma Movement. Presenta tu QR al llegar. Cancelaciones: alumnas nuevas 4-5 h antes, recurrentes 2 h antes.",
+        : PASS_DEFAULT_TEXTS.termsDefault,
     }
   );
 
@@ -7775,10 +8149,10 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
     passTypeIdentifier: APPLE_PASS_TYPE_ID,
     serialNumber,
     teamIdentifier: APPLE_TEAM_ID,
-    organizationName: "Alma Movement",
+    organizationName: PASS_DEFAULT_TEXTS.organizationName,
     description: hasEventPass
-      ? `Evento — ${activeEventPass?.eventTitle || "Alma Movement"}`
-      : `Alma Pass — ${progressSummary.goalLabel}`,
+      ? `Evento — ${activeEventPass?.eventTitle || PASS_DEFAULT_TEXTS.eventLocationDefault}`
+      : `${PASS_DEFAULT_TEXTS.membershipHeadline} — ${progressSummary.goalLabel}`,
     logoText: "",
     foregroundColor: passForeground,
     backgroundColor: passBackground,
@@ -7814,16 +8188,18 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
     authenticationToken: APPLE_AUTH_TOKEN,
     relevantDate: almaRelevantDate || eventRelevantDate,
     // Geofence: pase aparece en lockscreen cuando la alumna está cerca del estudio.
-    // Coords aproximadas de Plaza Arce, Juriquilla, Querétaro (Av. Nicolás Zapata 845).
+    // El fallback de abajo son las coords viejas de Plaza Arce, Juriquilla,
+    // Querétaro (sede anterior a HIVE) — quedan solo por si no hay env vars.
+    // En producción define BUSINESS_LATITUDE/BUSINESS_LONGITUDE con las coords
+    // reales de Cuauhtémoc #68, Del Carmen, Coyoacán, CDMX (src/lib/studio.ts).
     // Apple alerta cuando entras al radio.
     locations: [
       {
-        // Plaza Arce, Juriquilla, Querétaro (Av. Nicolás Zapata 845).
         latitude: Number(process.env.BUSINESS_LATITUDE || 22.1536775),
         longitude: Number(process.env.BUSINESS_LONGITUDE || -100.9970307),
         relevantText: hasEventPass
           ? "Estás cerca del estudio. Saca tu pase del evento."
-          : "Estás cerca de Alma. Saca tu pase para check-in.",
+          : PASS_DEFAULT_TEXTS.geofenceRelevantText,
       },
     ],
     maxDistance: Number(process.env.BUSINESS_PASS_RADIUS_M || 150),
@@ -8099,7 +8475,7 @@ app.get("/api/wallet/apple/pkpass", authMiddleware, async (req, res) => {
         });
         console.log("[Apple Wallet] ✅ .pkpass generated, size:", pkpassBuffer.length, "bytes");
         res.setHeader("Content-Type", "application/vnd.apple.pkpass");
-        res.setHeader("Content-Disposition", `attachment; filename="alma-pass.pkpass"`);
+        res.setHeader("Content-Disposition", `attachment; filename="hive-pass.pkpass"`);
         res.setHeader("Content-Length", pkpassBuffer.length);
         return res.send(pkpassBuffer);
       } catch (pkpassErr) {
@@ -8147,8 +8523,8 @@ app.get("/api/wallet/apple/pkpass", authMiddleware, async (req, res) => {
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Alma Club">
-<title>Alma Club — ${userName}</title>
+<meta name="apple-mobile-web-app-title" content="${PASS_DEFAULT_TEXTS.webPassTitle}">
+<title>${PASS_DEFAULT_TEXTS.webPassTitle} — ${userName}</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#241B1A;color:#FAF9F6;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
@@ -8184,7 +8560,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
 <body>
 <div class="pass">
   <div class="header">
-    <div class="logo">Alma Movement</div>
+    <div class="logo">${PASS_DEFAULT_TEXTS.webPassLogo}</div>
     <div class="badge">Club</div>
   </div>
   <div class="name">${userName}</div>
@@ -8244,7 +8620,7 @@ app.get("/api/wallet/events/apple/pkpass", authMiddleware, async (req, res) => {
     const eventTimeLong = eventStartTimeLabel && eventEndTimeLabel
       ? `${eventStartTimeLabel} - ${eventEndTimeLabel}`
       : (eventStartTimeLabel || "Horario por confirmar");
-    const eventLocationLong = truncateWalletField(activeEventPass?.eventLocation || "Alma Movement", 38);
+    const eventLocationLong = truncateWalletField(activeEventPass?.eventLocation || PASS_DEFAULT_TEXTS.eventLocationDefault, 38);
 
     if (isAppleWalletConfigured()) {
       const pkpassBuffer = await generateApplePkpass({
@@ -8267,7 +8643,7 @@ app.get("/api/wallet/events/apple/pkpass", authMiddleware, async (req, res) => {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Pase de Evento — Alma</title>
+<title>${PASS_DEFAULT_TEXTS.webEventPassTitle}</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#241B1A;color:#FAF9F6;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
@@ -8289,7 +8665,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
   <div class="pass">
     <div class="header">
       <span class="badge">Pase de evento</span>
-      <div class="title">${activeEventPass.eventTitle || "Evento Alma"}</div>
+      <div class="title">${activeEventPass.eventTitle || PASS_DEFAULT_TEXTS.eventTitleDefault}</div>
     </div>
     <div class="meta">
       <div class="meta-item">
@@ -8302,7 +8678,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
       </div>
       <div class="meta-item" style="grid-column:1 / span 2;">
         <div class="meta-label">Sede</div>
-        <div class="meta-value">${eventLocationLong || "Alma Movement"}</div>
+        <div class="meta-value">${eventLocationLong || PASS_DEFAULT_TEXTS.eventLocationDefault}</div>
       </div>
     </div>
     <div class="qr"><img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(activeEventPass.passCode || qrCode)}&bgcolor=FFFFFF&color=1F0047" alt="QR"/></div>
@@ -8592,15 +8968,7 @@ app.get("/api/admin/users/:userId/waiver", adminMiddleware, async (req, res) => 
   }
 });
 
-// GET /api/admin/users/:userId/waiver/pdf — responsiva firmada como PDF descargable
-const RESPONSIVA_PDF_SECTIONS = [
-  { n: "1", title: "Aceptación de riesgo", body: "Participo de forma voluntaria en las clases, entrenamientos y actividades de Alma Movement (Pilates Reformer, Tower, Mat, Barre y Sculpt), entendiendo que la práctica de ejercicio físico implica riesgos inherentes, incluyendo lesiones musculares, articulares o caídas. Asumo la responsabilidad por cualquier lesión, accidente o daño físico que pudiera ocurrir durante o después de las clases, y libero de toda responsabilidad a Alma Movement, sus coaches, personal y representantes por cualquier incidente derivado de mi participación." },
-  { n: "2", title: "Condición física y lesiones", body: "Declaro encontrarme en condiciones físicas adecuadas para realizar actividad física. Es mi responsabilidad informar previamente a las coaches o al personal sobre cualquier lesión, molestia, condición médica, embarazo u otra situación que pueda afectar mi práctica. Alma Movement no se hace responsable por lesiones agravadas por falta de comunicación de mi parte." },
-  { n: "3", title: "Normas del estudio", body: "Para la seguridad, higiene y experiencia de todas, acepto: uso obligatorio de calcetines antiderrapantes en todas las clases; llegar 10 minutos antes; respetar el horario de inicio (no se permite el acceso una vez iniciada la clase); mantener el celular en silencio; no ingresar bajo efectos de alcohol o sustancias que alteren el estado físico; y detenerme y avisar de inmediato a la coach en caso de dolor, mareo o malestar." },
-  { n: "4", title: "Uso de imagen", body: "Autorizo a Alma Movement a utilizar fotografías o videos tomados durante las clases para fines promocionales, redes sociales y material de comunicación, sin derecho a compensación económica. Esta autorización es opcional y la indico abajo." },
-  { n: "5", title: "Firma de conformidad", body: "Declaro haber leído y comprendido completamente este documento. Al firmar, acepto los términos aquí descritos y libero de toda responsabilidad a Alma Movement por cualquier lesión o daño derivado de mi participación." },
-];
-
+// GET /api/admin/users/:userId/waiver/pdf — responsiva firmada como PDF, con el texto de SU versión (bloque 3, punto 7)
 app.get("/api/admin/users/:userId/waiver/pdf", adminMiddleware, async (req, res) => {
   try {
     const wr = await pool.query(
@@ -8609,6 +8977,7 @@ app.get("/api/admin/users/:userId/waiver/pdf", adminMiddleware, async (req, res)
     );
     const w = wr.rows[0];
     if (!w) return res.status(404).json({ message: "Sin responsiva firmada" });
+    const documento = responsivaDocument(w.waiver_version);
 
     const { default: PDFDocument } = await import("pdfkit");
     const doc = new PDFDocument({ size: "A4", margin: 50 });
@@ -8621,8 +8990,8 @@ app.get("/api/admin/users/:userId/waiver/pdf", adminMiddleware, async (req, res)
     res.setHeader("Content-Disposition", `inline; filename="responsiva_${safeName}.pdf"`);
     doc.pipe(res);
 
-    doc.fillColor(INK).font("Helvetica-Bold").fontSize(16).text("Alma Movement");
-    doc.fillColor(STONE).font("Helvetica").fontSize(11).text("Responsiva y Consentimiento Informado");
+    doc.fillColor(INK).font("Helvetica-Bold").fontSize(16).text(documento.studio);
+    doc.fillColor(STONE).font("Helvetica").fontSize(11).text(documento.title);
     doc.moveDown(0.4);
     doc.strokeColor("#E0D5C6").lineWidth(1).moveTo(50, doc.y).lineTo(545, doc.y).stroke();
     doc.moveDown(0.8);
@@ -8639,7 +9008,7 @@ app.get("/api/admin/users/:userId/waiver/pdf", adminMiddleware, async (req, res)
 
     doc.fillColor(INK).font("Helvetica-Bold").fontSize(11).text("Términos aceptados");
     doc.moveDown(0.3);
-    for (const s of RESPONSIVA_PDF_SECTIONS) {
+    for (const s of documento.sections) {
       doc.font("Helvetica-Bold").fontSize(10).fillColor(INK).text(`${s.n}. ${s.title}`);
       doc.font("Helvetica").fontSize(9).fillColor(BODY).text(s.body, { align: "justify" });
       doc.moveDown(0.5);
@@ -8666,9 +9035,13 @@ app.get("/api/admin/users/:userId/waiver/pdf", adminMiddleware, async (req, res)
 
 // ─── Routes: /api/users ─────────────────────────────────────────────────────
 
-// PUT /api/users/:id
+// PUT /api/users/:id — la clienta edita su perfil o la dueña edita a cualquiera.
+// Si una clienta escribe datos de salud nuevos sin consentimiento expreso
+// vigente, pide la casilla (400 HEALTH_CONSENT_REQUIRED) y no guarda nada. Editar
+// otros datos nunca lo pide, y el personal no queda bloqueado ni al editar su
+// propio perfil: el consentimiento lo da la titular de los datos, y el personal
+// no captura salud propia por aquí (auditoría 2026-09-27, P1-10).
 app.put("/api/users/:id", authMiddleware, async (req, res) => {
-  // Allow own profile edit OR admin editing any user
   try {
     const selfRes = await pool.query("SELECT role FROM users WHERE id = $1", [req.userId]);
     const callerRole = selfRes.rows[0]?.role || "client";
@@ -8681,11 +9054,34 @@ app.put("/api/users/:id", authMiddleware, async (req, res) => {
       emergencyContactName, emergencyContactPhone, healthNotes,
       receiveReminders, receivePromotions, receiveWeeklySummary,
       acceptsCommunications,
-      role,
+      role, healthConsent,
     } = req.body;
+    // Un tipo raro en un dato de salud (número, arreglo, objeto…) haría fallar
+    // la escritura en la base con un 500; se rechaza aquí con 400, antes de
+    // tocar nada.
+    if (healthNotes !== undefined && healthNotes !== null && typeof healthNotes !== "string") {
+      return res.status(400).json({ message: "Las notas de salud deben ser texto." });
+    }
     // Non-admins cannot change role
     const newRole = isAdminCaller && role ? role : null;
     const targetId = req.params.id;
+    const cur = await pool.query(
+      "SELECT health_notes, has_injury, injury_details, health_consent_version, health_consent_at FROM users WHERE id = $1",
+      [targetId],
+    );
+    if (!cur.rows.length) return res.status(404).json({ message: "Usuario no encontrado" });
+    const selfEdit = targetId === req.userId;
+    // La casilla sólo se exige si la clienta edita su propio perfil: es ella
+    // quien consiente sobre sus datos. El personal no queda bloqueado, ni
+    // siquiera al editar el suyo.
+    const consentApplies = selfEdit && callerRole === "client";
+    const hasConsent = hasCurrentHealthConsent(cur.rows[0]);
+    const consentGiven = healthConsent === true;
+    if (consentApplies) {
+      const problem = healthConsentProblem({ changes: healthDataChanges(cur.rows[0], { healthNotes }), consentGiven, hasConsent });
+      if (problem) return res.status(400).json(problem);
+    }
+    const recordConsent = consentApplies && consentGiven && !hasConsent;
     const r = await pool.query(
       `UPDATE users SET
          display_name              = COALESCE($1, display_name),
@@ -8700,6 +9096,8 @@ app.put("/api/users/:id", authMiddleware, async (req, res) => {
          accepts_communications    = COALESCE($10, accepts_communications),
          role                      = COALESCE($11, role),
          gender                    = COALESCE($12, gender),
+         health_consent_version    = CASE WHEN $14 THEN $15 ELSE health_consent_version END,
+         health_consent_at         = CASE WHEN $14 THEN NOW() ELSE health_consent_at END,
          updated_at                = NOW()
        WHERE id = $13
        RETURNING *`,
@@ -8711,11 +9109,31 @@ app.put("/api/users/:id", authMiddleware, async (req, res) => {
         newRole,
         gender || null,
         targetId,
+        recordConsent, PRIVACY_NOTICE_VERSION,
       ]
     );
     return res.json({ user: mapUser(r.rows[0]) });
   } catch (err) {
     console.error("PUT users/:id error:", err);
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// DELETE /api/me/health-consent — la clienta retira su consentimiento para datos
+// de salud: se borran sus notas de salud y sus lesiones registradas
+// (auditoría 2026-09-27, P1-10).
+app.delete("/api/me/health-consent", authMiddleware, async (req, res) => {
+  try {
+    const r = await pool.query(
+      `UPDATE users SET health_notes = NULL, has_injury = NULL, injury_details = NULL,
+              health_consent_version = NULL, health_consent_at = NULL, updated_at = NOW()
+        WHERE id = $1 RETURNING *`,
+      [req.userId],
+    );
+    if (!r.rows.length) return res.status(404).json({ message: "Usuario no encontrado" });
+    return res.json({ user: mapUser(r.rows[0]), message: "Retiraste tu consentimiento: borramos tus datos de salud de tu perfil." });
+  } catch (err) {
+    console.error("[DELETE /me/health-consent]", err.message);
     return res.status(500).json({ message: "Error interno" });
   }
 });
@@ -9278,113 +9696,145 @@ async function applyCancellationRollback(client, booking, opts = {}) {
   return result;
 }
 
+// ── Cancelar una clase (compartido por PUT /classes/:id/cancel y "Limpiar
+// semana"). Auditoría 2026-09-27, bloque 2. ─────────────────────────────────
+/**
+ * Dentro de una transacción abierta: marca la clase cancelada con quién y por
+ * qué, cancela sus reservas activas devolviendo crédito y puntos
+ * (applyCancellationRollback) y deja la fila en la bitácora. Devuelve null si
+ * la clase no existe o ya estaba cancelada. Los avisos van DESPUÉS del COMMIT
+ * con notifyClassCancelled().
+ */
+async function cancelClassInTx(client, classId, { actorId, reason, source = "manual" }) {
+  const actor = isUuid(actorId) ? actorId : null;
+  const why = cleanReason(reason);
+  const cls = await client.query(
+    `WITH prev AS (SELECT id, status::text AS status FROM classes WHERE id = $1 FOR UPDATE)
+     UPDATE classes c
+        SET status = 'cancelled', updated_at = NOW(), cancelled_at = NOW(),
+            cancelled_by = $2, cancellation_reason = $3
+       FROM prev
+      WHERE c.id = prev.id AND prev.status <> 'cancelled'
+      RETURNING c.id, c.date, c.start_time, c.class_type_id, to_char(c.date, 'YYYY-MM-DD') AS day, prev.status AS prev_status`,
+    [classId, actor, why],
+  );
+  if (!cls.rows.length) return null;
+  const classRow = cls.rows[0];
+
+  // Reservas activas ANTES de cancelarlas (incluye checked_in: la admin puede
+  // cancelar una clase a posteriori).
+  const bookingsRes = await client.query(
+    `SELECT b.id, b.user_id, b.class_id, b.membership_id, b.status, b.checked_in_at,
+            c.date AS class_date,
+            u.display_name, u.phone, ct.name AS class_name
+       FROM bookings b
+       LEFT JOIN users u ON u.id = b.user_id
+       LEFT JOIN classes c ON c.id = b.class_id
+       LEFT JOIN class_types ct ON ct.id = c.class_type_id
+      WHERE b.class_id = $1 AND b.status NOT IN ('cancelled', 'no_show')`,
+    [classId],
+  );
+  const activeBookings = bookingsRes.rows;
+  let creditsRestored = 0;
+  let pointsReverted = 0;
+  for (const b of activeBookings) {
+    await client.query(
+      `UPDATE bookings SET status='cancelled', cancelled_at=NOW(), cancelled_by=$2,
+              cancellation_reason = COALESCE($3, cancellation_reason)
+        WHERE id=$1`,
+      [b.id, actor, why],
+    );
+    // Al cancelar la clase completa se devuelve crédito también a quienes ya
+    // tenían check-in (la clase no ocurrió).
+    const rollback = await applyCancellationRollback(client, b, { refundCheckedIn: true });
+    if (rollback.creditRestored) creditsRestored++;
+    if (rollback.pointsReverted) pointsReverted += rollback.pointsReverted;
+  }
+  // Red de seguridad: recalcula el cupo desde las reservas vivas en vez de asumir 0.
+  await client.query(
+    `UPDATE classes c SET current_bookings = COALESCE((
+       SELECT COUNT(*) FROM bookings b WHERE b.class_id = c.id AND b.status IN ('confirmed','checked_in')
+     ), 0) WHERE c.id = $1`,
+    [classId],
+  );
+  await recordAudit(client, {
+    actorId: actor, action: "class.cancel", entityType: "class", entityId: classRow.id, reason: why,
+    before: { status: classRow.prev_status }, after: { status: "cancelled" },
+    meta: {
+      source, day: classRow.day, start_time: String(classRow.start_time).slice(0, 5),
+      bookings_cancelled: activeBookings.length, credits_restored: creditsRestored, points_reverted: pointsReverted,
+      booking_ids: activeBookings.map((b) => b.id),
+    },
+  });
+  return { classRow, activeBookings, creditsRestored, pointsReverted };
+}
+
+/** Avisos de una clase cancelada, fuera de la transacción. Con el canal caído o
+ *  los avisos apagados no se intenta y se devuelve la lista para avisar a mano
+ *  (auditoría 2026-09-27, P0-1). */
+async function notifyClassCancelled(classRow, activeBookings, reason) {
+  const dateStr = classRow.date ? new Date(classRow.date).toLocaleDateString("es-MX", { weekday: "short", day: "numeric", month: "short" }) : "";
+  const timeStr = classRow.start_time ? String(classRow.start_time).slice(0, 5) : "";
+  const notifSettings = await getSettingsValue("notification_settings", DEFAULT_NOTIFICATION_SETTINGS);
+  const waOn = notifSettings?.whatsapp_reminders !== false;
+  const channel = waOn ? await whatsappChannelState() : { connected: false, state: "disabled" };
+  let waQueued = 0;
+  const waUnreached = [];
+  for (const b of activeBookings) {
+    if (!b.user_id) continue;
+    triggerWalletPassSync(b.user_id, "admin_class_cancelled");
+    if (!channel.connected) {
+      waUnreached.push({ user_id: b.user_id, display_name: b.display_name, phone: b.phone });
+      continue;
+    }
+    const className = b.class_name || "tu clase";
+    const cancelReason = reason ? ` (motivo: ${reason})` : "";
+    notifyByTemplate(
+      b.user_id,
+      "booking_cancelled",
+      { class: className, date: dateStr, time: timeStr, creditRestored: "Sí" },
+      ({ firstName }) =>
+        `${firstName}, tuvimos que cancelar la clase de ${className}${dateStr ? ` del ${dateStr}` : ""}${timeStr ? ` a las ${timeStr}` : ""}.${cancelReason} Tu clase regresó a tu paquete.`,
+    ).catch(() => {});
+    waQueued++;
+  }
+  return { waQueued, waUnreached, channelState: channel.state };
+}
+
 // PUT /api/classes/:id/cancel — admin cancela clase completa. Cascada:
-//   1. classes.status = 'cancelled'
+//   1. classes.status = 'cancelled', con quién y por qué.
 //   2. Cada booking activo: status='cancelled', cancelled_at=NOW(), restaura
 //      crédito al membership (siempre, al cancelar el estudio la clase).
 //   3. WA a cada alumna con reason opcional.
-// Body opcional: { reason: "instructora enferma" } se incluye en el WA.
+// Body opcional: { reason: "instructora enferma" } se incluye en el WA y en la
+// bitácora. La respuesta no cambia (auditoría 2026-09-27, bloque 2).
 app.put("/api/classes/:id/cancel", adminMiddleware, async (req, res) => {
   const { reason } = req.body || {};
+  // Mismo motivo limpio (recortado, sin espacios en los extremos) en la clase,
+  // la bitácora, el WhatsApp y la respuesta — no el crudo del body.
+  const why = cleanReason(reason);
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-
-    // 1) Cancel class
-    const cls = await client.query(
-      `UPDATE classes SET status='cancelled', updated_at=NOW()
-        WHERE id=$1 AND status != 'cancelled'
-        RETURNING id, date, start_time, class_type_id`,
-      [req.params.id],
-    );
-    if (!cls.rows.length) {
+    const done = await cancelClassInTx(client, req.params.id, { actorId: req.userId, reason: why, source: "manual" });
+    if (!done) {
       await client.query("ROLLBACK");
       return res.status(404).json({ message: "Clase no encontrada o ya cancelada" });
     }
-    const classRow = cls.rows[0];
-
-    // 2) Get active bookings BEFORE cancelling them (incluye checked_in
-    //    porque la admin puede cancelar una clase a posteriori)
-    const bookingsRes = await client.query(
-      `SELECT b.id, b.user_id, b.class_id, b.membership_id, b.status, b.checked_in_at,
-              c.date AS class_date,
-              u.display_name, u.phone, ct.name AS class_name
-         FROM bookings b
-         LEFT JOIN users u ON u.id = b.user_id
-         LEFT JOIN classes c ON c.id = b.class_id
-         LEFT JOIN class_types ct ON ct.id = c.class_type_id
-        WHERE b.class_id = $1 AND b.status NOT IN ('cancelled', 'no_show')`,
-      [req.params.id],
-    );
-    const activeBookings = bookingsRes.rows;
-
-    // 3) Cancel each booking + apply full rollback (credits, loyalty)
-    let creditsRestored = 0;
-    let pointsReverted = 0;
-    for (const b of activeBookings) {
-      await client.query(
-        `UPDATE bookings SET status='cancelled', cancelled_at=NOW() WHERE id=$1`,
-        [b.id],
-      );
-      // Al cancelar la clase completa, devolver crédito también a las que
-      // tenían check-in (la clase no ocurrió, no deberían pagarla).
-      const rollback = await applyCancellationRollback(client, b, { refundCheckedIn: true });
-      if (rollback.creditRestored) creditsRestored++;
-      if (rollback.pointsReverted) pointsReverted += rollback.pointsReverted;
-    }
-    // 4) Reset class.current_bookings
-    // Red de seguridad: recalcula desde las reservas vivas en vez de asumir 0.
-      await client.query(
-        `UPDATE classes c SET current_bookings = COALESCE((
-           SELECT COUNT(*) FROM bookings b WHERE b.class_id = c.id AND b.status IN ('confirmed','checked_in')
-         ), 0) WHERE c.id = $1`,
-        [req.params.id],
-      );
-
     await client.query("COMMIT");
-
-    // 5) Notify each alumna (fire-and-forget WA + wallet sync, fuera de tx).
-    // Si el canal de WhatsApp está caído (o los recordatorios están apagados),
-    // no se intenta el envío ni se cuenta como "enviado": se junta la lista
-    // para que recepción avise a mano (auditoría 2026-09-27, P0-1).
-    const dateStr = classRow.date ? new Date(classRow.date).toLocaleDateString("es-MX", { weekday: "short", day: "numeric", month: "short" }) : "";
-    const timeStr = classRow.start_time ? String(classRow.start_time).slice(0, 5) : "";
-    const notifSettings = await getSettingsValue("notification_settings", DEFAULT_NOTIFICATION_SETTINGS);
-    const waOn = notifSettings?.whatsapp_reminders !== false;
-    const channel = waOn ? await whatsappChannelState() : { connected: false, state: "disabled" };
-    let waQueued = 0;
-    const waUnreached = [];
-    for (const b of activeBookings) {
-      if (!b.user_id) continue;
-      triggerWalletPassSync(b.user_id, "admin_class_cancelled");
-      if (!channel.connected) {
-        waUnreached.push({ user_id: b.user_id, display_name: b.display_name, phone: b.phone });
-        continue;
-      }
-      const className = b.class_name || "tu clase";
-      const cancelReason = reason ? ` (motivo: ${reason})` : "";
-      notifyByTemplate(
-        b.user_id,
-        "booking_cancelled",
-        { class: className, date: dateStr, time: timeStr, creditRestored: "Sí" },
-        ({ firstName }) =>
-          `${firstName}, tuvimos que cancelar la clase de ${className}${dateStr ? ` del ${dateStr}` : ""}${timeStr ? ` a las ${timeStr}` : ""}.${cancelReason} Tu clase regresó a tu paquete.`,
-      ).catch(() => {});
-      waQueued++;
-    }
-
+    const wa = await notifyClassCancelled(done.classRow, done.activeBookings, why);
     return res.json({
       data: {
-        class_id: classRow.id,
-        bookings_cancelled: activeBookings.length,
-        credits_restored: creditsRestored,
-        points_reverted: pointsReverted,
-        wa_queued: waQueued,
-        wa_failed: waUnreached.length,
-        wa_unreached: waUnreached,
+        class_id: done.classRow.id,
+        bookings_cancelled: done.activeBookings.length,
+        credits_restored: done.creditsRestored,
+        points_reverted: done.pointsReverted,
+        wa_queued: wa.waQueued,
+        wa_failed: wa.waUnreached.length,
+        wa_unreached: wa.waUnreached,
         // "disabled" = la dueña apagó los avisos; otro estado = canal caído.
-        wa_channel_state: channel.state,
-        reason: reason || null,
+        wa_channel_state: wa.channelState,
+        reason: why,
       },
     });
   } catch (err) {
@@ -9429,31 +9879,38 @@ app.put("/api/classes/:id/reopen", adminMiddleware, async (req, res) => {
     if (!r.rows.length) {
       return res.status(404).json({ message: "Clase no encontrada o no está cerrada" });
     }
-    return res.json({ data: r.rows[0] });
+    // Mientras estuvo cerrada no subió nadie: al reabrir, sube la fila (P1-1).
+    const promoted = await onSeatReleased([req.params.id], { source: "reopen" });
+    return res.json({ data: r.rows[0], waitlist_promoted: promoted });
   } catch (err) {
     console.error("[PUT /classes/:id/reopen]", err.message);
     return res.status(500).json({ message: "Error interno" });
   }
 });
 
-// DELETE /api/admin/bookings/:id — admin cancela un booking individual
-// con override de política de 2h. Devuelve crédito siempre. Optional body
-// { reason } se incluye en WA.
+// DELETE /api/admin/bookings/:id — el estudio cancela una reserva (override de
+// la política de 2 h). Motivo obligatorio: queda en la reserva, en la bitácora
+// y, como antes, en el WhatsApp (auditoría 2026-09-27, P0-3).
 app.delete("/api/admin/bookings/:id", adminMiddleware, async (req, res) => {
   // refundCredit (default true): la admin decide si devolver el crédito. En false
   // se cancela y libera el lugar pero la clase cuenta como usada (ej. una falta).
   const { reason, refundCredit } = req.body || {};
+  const problem = reasonProblem(reason);
+  if (problem) return res.status(400).json({ code: "REASON_REQUIRED", message: problem });
+  const why = cleanReason(reason);
   const client = await pool.connect();
+  // Se suelta tras el COMMIT: la subida de la fila pide su propia conexión (P1-1).
+  let released = false;
   try {
     await client.query("BEGIN");
-
     const r = await client.query(
       `SELECT b.id, b.user_id, b.class_id, b.membership_id, b.status, b.checked_in_at,
-              c.date, c.start_time, ct.name AS class_name
+              c.date, c.start_time, to_char(c.date, 'YYYY-MM-DD') AS day, ct.name AS class_name
          FROM bookings b
          JOIN classes c ON c.id = b.class_id
          JOIN class_types ct ON ct.id = c.class_type_id
-        WHERE b.id = $1`,
+        WHERE b.id = $1
+        FOR UPDATE OF b`,
       [req.params.id],
     );
     if (!r.rows.length) {
@@ -9465,55 +9922,55 @@ app.delete("/api/admin/bookings/:id", adminMiddleware, async (req, res) => {
       await client.query("ROLLBACK");
       return res.status(400).json({ message: "Esta reserva ya estaba cancelada" });
     }
-
-    // Cancel booking
     await client.query(
-      `UPDATE bookings SET status='cancelled', cancelled_at=NOW() WHERE id=$1`,
-      [req.params.id],
+      `UPDATE bookings SET status='cancelled', cancelled_at=NOW(), cancelled_by=$2, cancellation_reason=$3 WHERE id=$1`,
+      [req.params.id, req.userId, why],
     );
-
-    // Apply full rollback: credits, loyalty points. La admin
-    // que cancela manualmente espera que el crédito se devuelva incluso si
-    // la alumna ya tenía check-in (suele ser un check-in por error o
-    // re-clasificación de la asistencia).
+    // Rollback completo (créditos y puntos). La admin que cancela a mano espera
+    // que el crédito se devuelva incluso si ya tenía check-in (suele ser un
+    // check-in por error o re-clasificación de la asistencia).
     const rb = await applyCancellationRollback(client, booking, { refundCheckedIn: true, skipCreditRestore: refundCredit === false });
-
+    await recordAudit(client, {
+      actorId: req.userId, action: "booking.cancel", entityType: "booking", entityId: booking.id,
+      subjectUserId: booking.user_id, reason: why,
+      before: { status: booking.status }, after: { status: "cancelled" },
+      meta: {
+        class_id: booking.class_id, day: booking.day, class_name: booking.class_name,
+        refund_credit_requested: refundCredit !== false, credit_restored: rb.creditRestored, points_reverted: rb.pointsReverted,
+      },
+    });
     await client.query("COMMIT");
+    client.release();
+    released = true;
 
-    // WA + wallet sync
+    // WA + wallet sync (igual que antes)
     if (booking.user_id) {
       const dateStr = booking.date ? new Date(booking.date).toLocaleDateString("es-MX", { weekday: "short", day: "numeric", month: "short" }) : "";
       const timeStr = booking.start_time ? String(booking.start_time).slice(0, 5) : "";
-      const cancelReason = reason ? ` (motivo: ${reason})` : "";
       notifyByTemplate(
         booking.user_id,
         "booking_cancelled",
-        {
-          class: booking.class_name || "tu clase",
-          date: dateStr,
-          time: timeStr,
-          creditRestored: rb.creditRestored ? "Sí" : "No",
-        },
+        { class: booking.class_name || "tu clase", date: dateStr, time: timeStr, creditRestored: rb.creditRestored ? "Sí" : "No" },
         ({ firstName }) =>
-          `${firstName}, cancelamos tu reserva de ${booking.class_name || "la clase"}${dateStr ? ` del ${dateStr}` : ""}.${cancelReason}${rb.creditRestored ? " Tu clase regresó a tu paquete." : ""}`,
+          `${firstName}, cancelamos tu reserva de ${booking.class_name || "la clase"}${dateStr ? ` del ${dateStr}` : ""}. (motivo: ${why})${rb.creditRestored ? " Tu clase regresó a tu paquete." : ""}`,
       ).catch(() => {});
       triggerWalletPassSync(booking.user_id, "admin_booking_cancelled");
     }
-
-    return res.json({
-      data: {
-        id: booking.id,
-        credit_restored: rb.creditRestored,
-        points_reverted: rb.pointsReverted,
-        reason: reason || null,
-      },
-    });
+    // Si ocupaba lugar, sube la fila (P1-1). La respuesta dice a quién, para
+    // que recepción avise a mano si no le llegó el WhatsApp.
+    const promoted = ["confirmed", "checked_in"].includes(booking.status)
+      ? await onSeatReleased([booking.class_id], { source: "studio_cancel" })
+      : [];
+    return res.json({ data: {
+      id: booking.id, credit_restored: rb.creditRestored, points_reverted: rb.pointsReverted, reason: why,
+      waitlist_promoted: promoted,
+    } });
   } catch (err) {
-    await client.query("ROLLBACK").catch(() => {});
+    if (!released) await client.query("ROLLBACK").catch(() => {});
     console.error("[DELETE /admin/bookings/:id]", err.message);
     return res.status(500).json({ message: "Error interno" });
   } finally {
-    client.release();
+    if (!released) client.release();
   }
 });
 
@@ -9913,22 +10370,32 @@ app.post("/api/admin/visit-sale", adminMiddleware, async (req, res) => {
     const _eff = resolveEffectivePrice(plan, _gen?.opening_pricing_active !== false);
     const guest = await findOrCreateGuestProfile({ ...profile, hostUserId }, dbClient);
     const user = await findOrCreateGuestUser(guest, dbClient);
-    const startStr = startDate ? String(startDate).slice(0, 10) : todayInStudio();
+    const startStr = startDate ? saleStartDay(startDate) : todayInStudio();
+    if (!startStr) {
+      await dbClient.query("ROLLBACK");
+      return res.status(400).json({ message: "Fecha de inicio inválida (usa AAAA-MM-DD)." });
+    }
     const endStr = calcMembershipEndDate(startStr, plan);
     const pm = normalizePaymentMethod(paymentMethod);
-    const memRes = await dbClient.query(
-      `INSERT INTO memberships
-         (user_id, plan_id, status, payment_method, start_date, end_date, classes_remaining, notes)
-       VALUES ($1, $2, 'active', $3, $4, $5, $6, $7)
-       RETURNING *`,
-      [user.id, plan.id, pm, startStr, endStr, plan.class_limit ?? null,
-       `Venta visita POS — ${guest.display_name}`]
-    );
+    if (!pm) {
+      await dbClient.query("ROLLBACK");
+      return res.status(400).json({ message: PAYMENT_METHOD_INVALID });
+    }
+    // Orden primero y membresía ligada a ella (order_id): /api/payments la
+    // cuenta una sola vez y un reembolso encuentra la membresía.
     const orderRes = await dbClient.query(
-      `INSERT INTO orders (user_id, plan_id, status, payment_method, total_amount, channel, verified_at, verified_by)
-       VALUES ($1, $2, 'approved', $3, $4, 'pos_visit', NOW(), $5)
+      `INSERT INTO orders (user_id, plan_id, status, payment_method, subtotal, total_amount, channel, verified_at, verified_by)
+       VALUES ($1, $2, 'approved', $3, $4, $4, 'pos_visit', NOW(), $5)
        RETURNING *`,
       [user.id, plan.id, pm, _eff ?? 0, req.userId || null]
+    );
+    const memRes = await dbClient.query(
+      `INSERT INTO memberships
+         (user_id, plan_id, status, payment_method, start_date, end_date, classes_remaining, notes, order_id)
+       VALUES ($1, $2, 'active', $3, $4, $5, $6, $7, $8)
+       RETURNING *`,
+      [user.id, plan.id, pm, startStr, endStr, plan.class_limit ?? null,
+       `Venta visita POS — ${guest.display_name}`, orderRes.rows[0].id]
     );
     await dbClient.query("COMMIT");
     return res.status(201).json({
@@ -10054,24 +10521,29 @@ app.post("/api/admin/classes/:id/walkin-visit", adminMiddleware, async (req, res
       const plan = planRes.rows[0];
       const _gen = await getSettingValueWithDefaults("general_settings");
       const _eff = resolveEffectivePrice(plan, _gen?.opening_pricing_active !== false);
-      const pm = normalizePaymentMethod(sale.paymentMethod || "cash");
+      const pm = normalizePaymentMethod(sale.paymentMethod);
+      if (!pm) {
+        await dbClient.query("ROLLBACK");
+        return res.status(400).json({ message: PAYMENT_METHOD_INVALID });
+      }
       const startStr = todayInStudio();
       const endStr = calcMembershipEndDate(startStr, plan);
-      const memIns = await dbClient.query(
-        `INSERT INTO memberships
-           (user_id, plan_id, status, payment_method, start_date, end_date, classes_remaining, notes)
-         VALUES ($1, $2, 'active', $3, $4, $5, $6, $7) RETURNING *`,
-        [user.id, plan.id, pm, startStr, endStr, plan.class_limit ?? 1,
-         `Venta visita en roster — ${guest.display_name}`]
-      );
-      memRow = memIns.rows[0];
+      // Orden primero y membresía ligada a ella (order_id), como en visit-sale.
       const orderIns = await dbClient.query(
-        `INSERT INTO orders (user_id, plan_id, status, payment_method, total_amount, channel, verified_at, verified_by)
-         VALUES ($1, $2, 'approved', $3, $4, 'pos_visit', NOW(), $5)
+        `INSERT INTO orders (user_id, plan_id, status, payment_method, subtotal, total_amount, channel, verified_at, verified_by)
+         VALUES ($1, $2, 'approved', $3, $4, $4, 'pos_visit', NOW(), $5)
          RETURNING *`,
         [user.id, plan.id, pm, _eff ?? 0, req.userId || null]
       );
       saleOrder = orderIns.rows[0];
+      const memIns = await dbClient.query(
+        `INSERT INTO memberships
+           (user_id, plan_id, status, payment_method, start_date, end_date, classes_remaining, notes, order_id)
+         VALUES ($1, $2, 'active', $3, $4, $5, $6, $7, $8) RETURNING *`,
+        [user.id, plan.id, pm, startStr, endStr, plan.class_limit ?? 1,
+         `Venta visita en roster — ${guest.display_name}`, saleOrder.id]
+      );
+      memRow = memIns.rows[0];
     }
 
     // Crear booking confirmed + descontar crédito + actualizar contador.
@@ -10293,71 +10765,111 @@ app.post("/api/bookings/with-guest", authMiddleware, async (req, res) => {
   }
 });
 
-// DELETE /api/classes/week — clear classes in date range
+// DELETE /api/classes/week — "Limpiar semana" sin borrar historial
+// (auditoría 2026-09-27, P1-5 · I6). Borra sólo las clases sin ninguna reserva;
+// las que tienen reservas y no han empezado se cancelan con el flujo de
+// cancelar clase (devuelve créditos y avisa); las que ya empezaron no se tocan.
+// Sin force, si hay reservas activas responde 409 con el resumen; con force
+// exige motivo porque cancela reservas.
 app.delete("/api/classes/week", adminMiddleware, async (req, res) => {
+  const { startDate, endDate, force, reason } = req.body || {};
+  const start = typeof startDate === "string" ? startDate.slice(0, 10) : null;
+  const end = typeof endDate === "string" ? endDate.slice(0, 10) : null;
+  const rangeProblem = weekRangeProblem(start, end);
+  if (rangeProblem) return res.status(400).json({ message: rangeProblem });
   const client = await pool.connect();
   try {
-    // force=true: cancela las reservas activas (devolviendo crédito) y limpia igual.
-    const { startDate, endDate, force } = req.body || {};
-    const start = typeof startDate === "string" ? startDate.slice(0, 10) : null;
-    const end = typeof endDate === "string" ? endDate.slice(0, 10) : null;
-
-    if (!start || !end) {
-      client.release();
-      return res.status(400).json({ message: "startDate y endDate requeridos" });
-    }
-    if (start > end) {
-      client.release();
-      return res.status(400).json({ message: "Rango de fechas inválido" });
-    }
-
     await client.query("BEGIN");
-
-    const activeRes = await client.query(
-      `SELECT b.id, b.user_id, b.class_id, b.membership_id, b.status
-         FROM bookings b
-         JOIN classes c ON c.id = b.class_id
+    await client.query("SELECT id FROM classes WHERE date >= $1 AND date <= $2 FOR UPDATE", [start, end]);
+    const rows = (await client.query(
+      `SELECT c.id, c.status::text AS status,
+              ((c.date + c.start_time) AT TIME ZONE '${STUDIO_TIMEZONE}') <= NOW() AS started,
+              COUNT(b.id)::int AS total_bookings,
+              (COUNT(b.id) FILTER (WHERE b.status IN ('confirmed','checked_in','waitlist')))::int AS active_bookings
+         FROM classes c
+         LEFT JOIN bookings b ON b.class_id = c.id
         WHERE c.date >= $1 AND c.date <= $2
-          AND b.status != 'cancelled'`,
-      [start, end]
-    );
-    if (activeRes.rows.length > 0 && !force) {
+        GROUP BY c.id
+        ORDER BY c.date, c.start_time`,
+      [start, end],
+    )).rows;
+    const plan = planWeekClear(rows);
+    if (plan.activeBookings > 0 && !force) {
       await client.query("ROLLBACK");
       return res.status(409).json({
-        message: "No se puede limpiar esta semana porque hay reservas activas.",
-        activeBookings: activeRes.rows.length,
+        code: "ACTIVE_BOOKINGS",
+        message: "Hay reservas activas esta semana. Esas clases se cancelan (se devuelve el crédito y se avisa a cada alumna) en lugar de borrarse.",
+        activeBookings: plan.activeBookings,
+        classesToCancel: plan.cancel.length,
+        classesToDelete: plan.delete.length,
+        classesKept: plan.keep.length,
       });
     }
-
-    // Forzado: devuelve crédito (y revierte puntos) de cada reserva activa.
-    for (const b of activeRes.rows) {
-      await applyCancellationRollback(client, b, { refundCheckedIn: true });
+    if (plan.activeBookings > 0) {
+      const problem = reasonProblem(reason);
+      if (problem) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({ code: "REASON_REQUIRED", message: problem });
+      }
     }
-
-    // Borra TODAS las reservas del rango (activas + canceladas) para que el
-    // DELETE de clases no choque con la FK, y luego borra las clases.
-    await client.query(
-      `DELETE FROM bookings WHERE class_id IN (SELECT id FROM classes WHERE date >= $1 AND date <= $2)`,
-      [start, end]
-    );
-    const deleted = await client.query(
-      "DELETE FROM classes WHERE date >= $1 AND date <= $2 RETURNING id",
-      [start, end]
-    );
+    const cancelled = [];
+    for (const id of plan.cancel) {
+      const done = await cancelClassInTx(client, id, { actorId: req.userId, reason: cleanReason(reason) || "Limpieza de la semana", source: "week_clear" });
+      if (done) cancelled.push(done);
+    }
+    let deleted = 0;
+    let deletedIds = [];
+    if (plan.delete.length) {
+      // NOT EXISTS: una clase que recibió una reserva entre el conteo y aquí no se borra.
+      const del = await client.query(
+        `DELETE FROM classes c
+          WHERE c.id = ANY($1::uuid[])
+            AND NOT EXISTS (SELECT 1 FROM bookings b WHERE b.class_id = c.id)
+          RETURNING c.id`,
+        [plan.delete],
+      );
+      deletedIds = del.rows.map((r) => r.id);
+      deleted = deletedIds.length;
+    }
+    // Si el NOT EXISTS salvó alguna (le llegó una reserva entre el conteo y el
+    // DELETE), esa clase se conserva, no se borró: va con las que ya se conservaban.
+    const savedIds = plan.delete.filter((id) => !deletedIds.includes(id));
+    const keptIds = [...plan.keep, ...savedIds];
+    const bookingsCancelled = cancelled.reduce((s, c) => s + c.activeBookings.length, 0);
+    const creditsRestored = cancelled.reduce((s, c) => s + c.creditsRestored, 0);
+    await recordAudit(client, {
+      actorId: req.userId, action: "class.week_clear", entityType: "class_week",
+      reason: plan.activeBookings > 0 ? reason : null,
+      after: { deleted, cancelled: cancelled.length, kept: keptIds.length },
+      meta: {
+        start, end, deleted_ids: deletedIds, cancelled_ids: cancelled.map((c) => c.classRow.id), kept_ids: keptIds,
+        bookings_cancelled: bookingsCancelled, credits_restored: creditsRestored,
+      },
+    });
     await client.query("COMMIT");
 
-    for (const b of activeRes.rows) {
-      if (b.user_id) triggerWalletPassSync(b.user_id, "week_cleared");
+    // Avisos después del COMMIT, igual que al cancelar una clase.
+    let waQueued = 0;
+    let channelState = null;
+    const unreached = new Map();
+    for (const c of cancelled) {
+      if (!c.activeBookings.length) continue;
+      const wa = await notifyClassCancelled(c.classRow, c.activeBookings, cleanReason(reason));
+      waQueued += wa.waQueued;
+      channelState = wa.channelState;
+      for (const u of wa.waUnreached) if (!unreached.has(u.user_id)) unreached.set(u.user_id, u);
     }
     return res.json({
-      deleted: deleted.rowCount ?? deleted.rows.length,
-      bookingsCancelled: activeRes.rows.length,
-      startDate: start,
-      endDate: end,
+      deleted, cancelled: cancelled.length, kept: keptIds.length, bookingsCancelled, creditsRestored,
+      wa_queued: waQueued, wa_failed: unreached.size, wa_unreached: [...unreached.values()], wa_channel_state: channelState,
+      startDate: start, endDate: end,
     });
   } catch (err) {
     await client.query("ROLLBACK").catch(() => {});
-    console.error("DELETE /classes/week error:", err);
+    if (err?.code === "23503") {
+      return res.status(409).json({ message: "Alguna clase tiene registros ligados: cancélala en lugar de borrarla." });
+    }
+    console.error("[DELETE /classes/week]", err.message);
     return res.status(500).json({ message: "Error interno" });
   } finally {
     client.release();
@@ -10588,7 +11100,7 @@ app.post("/api/schedules/reset-alma", adminMiddleware, async (req, res) => {
     const r = await pool.query("SELECT * FROM schedule_slots ORDER BY day_of_week, time_slot");
     return res.json({
       data: { slots: r.rows, classesCreated: 0 },
-      message: "Plantilla Alma restablecida (23 slots)",
+      message: "Plantilla HIVE restablecida (23 slots)",
     });
   }
 
@@ -10669,7 +11181,7 @@ app.post("/api/schedules/reset-alma", adminMiddleware, async (req, res) => {
       classTypeId,
       instructorId,
     },
-    message: `Plantilla Alma restablecida. ${created.length} clases creadas (${skipped.length} ya existían).`,
+    message: `Plantilla HIVE restablecida. ${created.length} clases creadas (${skipped.length} ya existían).`,
   });
 });
 
@@ -11331,6 +11843,13 @@ function pctChange(curr, prev) {
   return Number((((curr - prev) / prev) * 100).toFixed(1));
 }
 
+// Ingreso neto en caja de un rango: ventas aprobadas − reembolsos registrados en
+// el rango (auditoría 2026-09-27, P1-12). Un reembolso resta en su fecha: no
+// reescribe meses cerrados.
+const NET_REVENUE_SQL = `SELECT
+    (SELECT COALESCE(SUM(total_amount), 0) FROM orders WHERE status = 'approved' AND created_at BETWEEN $1 AND $2) AS gross,
+    (SELECT COALESCE(SUM(amount), 0) FROM refunds WHERE created_at BETWEEN $1 AND $2) AS refunds`;
+
 app.get("/api/reports/overview", ownerMiddleware, async (req, res) => {
   try {
     const range = parseDateRange(req);
@@ -11338,7 +11857,7 @@ app.get("/api/reports/overview", ownerMiddleware, async (req, res) => {
     const [members, revenue, bookings, classes, newMembers, reviews, churn,
            prevRevenue, prevBookings, prevNewMembers, prevReviews] = await Promise.all([
       pool.query(`SELECT COUNT(*) FROM memberships WHERE status = 'active' AND (end_date IS NULL OR end_date >= (NOW() AT TIME ZONE '${STUDIO_TIMEZONE}')::date)`),
-      pool.query("SELECT COALESCE(SUM(total_amount),0) AS total FROM orders WHERE status='approved' AND created_at BETWEEN $1 AND $2", [range.from, range.to]),
+      pool.query(NET_REVENUE_SQL, [range.from, range.to]),
       pool.query(
         `SELECT
             COUNT(*) FILTER (WHERE status != 'cancelled') AS total,
@@ -11380,7 +11899,7 @@ app.get("/api/reports/overview", ownerMiddleware, async (req, res) => {
            GREATEST(1, (SELECT COUNT(*) FROM active_30d_ago))::int AS base`,
       ),
       // Previous period (mismo número de días hacia atrás)
-      pool.query("SELECT COALESCE(SUM(total_amount),0) AS total FROM orders WHERE status='approved' AND created_at BETWEEN $1 AND $2", [range.prevFrom, range.prevTo]),
+      pool.query(NET_REVENUE_SQL, [range.prevFrom, range.prevTo]),
       pool.query(
         `SELECT
             COUNT(*) FILTER (WHERE status != 'cancelled') AS total,
@@ -11407,10 +11926,13 @@ app.get("/api/reports/overview", ownerMiddleware, async (req, res) => {
       ? Number(((cancelled / totalIncludingCancelled) * 100).toFixed(1))
       : 0;
     const churnRate = Number((100 * churn.rows[0].churned / churn.rows[0].base).toFixed(1));
-    const monthlyRevenue = parseFloat(revenue.rows[0].total);
+    const grossRevenue = parseFloat(revenue.rows[0].gross);
+    const refundsTotal = parseFloat(revenue.rows[0].refunds);
+    // round2: restar flotantes dejaba colas como 699.9300000000001 en el JSON.
+    const monthlyRevenue = round2(grossRevenue - refundsTotal);
     const newMembersCount = parseInt(newMembers.rows[0].count || 0);
     const reviewsAvg = Number(parseFloat(reviews.rows[0].average || 0).toFixed(1));
-    const prevRev = parseFloat(prevRevenue.rows[0].total);
+    const prevRev = round2(parseFloat(prevRevenue.rows[0].gross) - parseFloat(prevRevenue.rows[0].refunds));
     const prevBookingsCount = parseInt(prevBookings.rows[0].total || 0);
     const prevAttended = parseInt(prevBookings.rows[0].attended || 0);
     const prevOccupancy = prevBookingsCount > 0 ? (prevAttended / prevBookingsCount) * 100 : 0;
@@ -11426,6 +11948,8 @@ app.get("/api/reports/overview", ownerMiddleware, async (req, res) => {
       data: {
         activeMembers: parseInt(members.rows[0].count),
         monthlyRevenue,
+        grossRevenue,
+        refundsTotal,
         monthlyBookings, // ahora excluye canceladas
         cancelledBookings: cancelled,
         cancelRate,
@@ -11458,16 +11982,25 @@ app.get("/api/reports/overview", ownerMiddleware, async (req, res) => {
 // Sparkline data: ingresos por semana últimas 12 semanas
 app.get("/api/reports/revenue-sparkline", ownerMiddleware, async (req, res) => {
   try {
+    // Neto: ventas de la semana − reembolsos de la semana (auditoría 2026-09-27, P1-12).
     const r = await pool.query(`
       WITH weeks AS (
         SELECT DATE_TRUNC('week', CURRENT_DATE) - (INTERVAL '1 week' * gs.n) AS week_start
         FROM generate_series(0, 11) AS gs(n)
+      ),
+      sales AS (
+        SELECT DATE_TRUNC('week', created_at) AS week_start, SUM(total_amount) AS amount
+          FROM orders WHERE status = 'approved' GROUP BY 1
+      ),
+      refunded AS (
+        SELECT DATE_TRUNC('week', created_at) AS week_start, SUM(amount) AS amount
+          FROM refunds GROUP BY 1
       )
       SELECT w.week_start AS week,
-             COALESCE(SUM(o.total_amount), 0)::int AS amount
+             (COALESCE(s.amount, 0) - COALESCE(rf.amount, 0))::int AS amount
         FROM weeks w
-        LEFT JOIN orders o ON DATE_TRUNC('week', o.created_at) = w.week_start AND o.status = 'approved'
-       GROUP BY w.week_start
+        LEFT JOIN sales s ON s.week_start = w.week_start
+        LEFT JOIN refunded rf ON rf.week_start = w.week_start
        ORDER BY w.week_start ASC
     `);
     return res.json({ data: r.rows });
@@ -11488,12 +12021,21 @@ app.get("/api/reports/revenue", ownerMiddleware, async (req, res) => {
            FROM orders
           WHERE status = 'approved'
           GROUP BY 1
+       ),
+       -- Reembolsos en el mes en que se registraron (auditoría 2026-09-27, P1-12):
+       -- amount es neto y no reescribe meses cerrados.
+       refunds_by_month AS (
+         SELECT DATE_TRUNC('month', created_at) AS month_start, COALESCE(SUM(amount), 0) AS total
+           FROM refunds
+          GROUP BY 1
        )
        SELECT m.month_start AS month,
-              COALESCE(o.total, 0) AS amount,
-              COALESCE(o.count, 0) AS count
+              COALESCE(o.total, 0) - COALESCE(rf.total, 0) AS amount,
+              COALESCE(o.count, 0) AS count,
+              COALESCE(rf.total, 0) AS refunds
          FROM months m
          LEFT JOIN orders_by_month o ON o.month_start = m.month_start
+         LEFT JOIN refunds_by_month rf ON rf.month_start = m.month_start
         ORDER BY m.month_start ASC`
     );
     return res.json({ data: r.rows });
@@ -11767,7 +12309,7 @@ app.post("/api/admin/referrals/codes", adminMiddleware, async (req, res) => {
       // Auto-generar código corto y único
       const chars = "ABCDEFGHIJKLMNPQRSTUVWXYZ23456789";
       do {
-        code = "ALMA-" + Array.from({ length: 5 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+        code = "HIVE-" + Array.from({ length: 5 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
         const exists = await pool.query("SELECT 1 FROM referral_codes WHERE code = $1", [code]);
         if (!exists.rows.length) break;
       } while (true);
@@ -11861,6 +12403,11 @@ app.get("/api/settings/:key", adminMiddleware, async (req, res) => {
 
 app.put("/api/settings/:key", adminMiddleware, async (req, res) => {
   try {
+    // La cuota de cancelaciones tiene su ruta (sólo la dueña, validada y en la
+    // bitácora): por aquí recepción podía cambiarla (auditoría 2026-09-27, P0-4).
+    if (req.params.key === "cancellation_settings") {
+      return res.status(400).json({ message: "La cuota de cancelaciones se cambia en Configuración → Políticas." });
+    }
     const { value } = req.body;
     if (value === undefined) {
       return res.status(400).json({ message: "Falta `value` en el body" });
@@ -11873,6 +12420,66 @@ app.put("/api/settings/:key", adminMiddleware, async (req, res) => {
     );
     return res.json({ data: { key: req.params.key, value: merged } });
   } catch (err) { return res.status(500).json({ message: "Error interno" }); }
+});
+
+// ── Política de reservas y cancelación (auditoría 2026-09-27, P0-4) ─────────
+// Cuota de cancelaciones por paquete (settings.cancellation_settings; 2 por
+// defecto, 0 = sin límite), ventana real (loyalty_config) y cierre de reservas y
+// de la lista de espera (BOOKING_LEAD_HOURS). La app, los legales y el panel la
+// leen de aquí: una sola política.
+async function getBookingPolicy(db = pool) {
+  const [raw, loyalty] = await Promise.all([
+    db.query("SELECT value FROM settings WHERE key = 'cancellation_settings' LIMIT 1")
+      .then((r) => r.rows[0]?.value ?? null)
+      .catch(() => null),
+    getLoyaltyConfig(db),
+  ]);
+  return publicBookingPolicy({ settings: raw, loyalty, bookingLeadHours: BOOKING_LEAD_HOURS });
+}
+
+app.get("/api/public/booking-policy", async (_req, res) => {
+  try {
+    return res.json({ data: await getBookingPolicy() });
+  } catch (err) {
+    console.error("[GET /public/booking-policy]", err.message);
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// PUT /api/admin/booking-policy — sólo la dueña fija la cuota de cancelaciones.
+app.put("/api/admin/booking-policy", ownerMiddleware, async (req, res) => {
+  const problem = cancellationLimitProblem(req.body?.cancellationLimit);
+  if (problem) return res.status(400).json({ message: problem });
+  const next = Number(req.body.cancellationLimit);
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const cur = await client.query("SELECT value FROM settings WHERE key = 'cancellation_settings' FOR UPDATE");
+    const raw = cur.rows[0]?.value && typeof cur.rows[0].value === "object" ? cur.rows[0].value : {};
+    const prev = normalizeCancellationSettings(raw).max_cancellations;
+    await client.query(
+      `INSERT INTO settings (key, value) VALUES ('cancellation_settings', $1::jsonb)
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
+      [JSON.stringify({ ...raw, max_cancellations: next })],
+    );
+    if (prev !== next) {
+      await recordAudit(client, {
+        actorId: req.userId, action: "settings.update", entityType: "settings",
+        before: { max_cancellations: prev }, after: { max_cancellations: next },
+        meta: { key: "cancellation_settings" },
+      });
+    }
+    await client.query("COMMIT");
+    // Con el mismo cliente: pedir otra conexión del pool teniendo ésta puede
+    // quedarse esperando si el pool está lleno.
+    return res.json({ data: await getBookingPolicy(client) });
+  } catch (err) {
+    await client.query("ROLLBACK").catch(() => {});
+    console.error("[PUT /admin/booking-policy]", err.message);
+    return res.status(500).json({ message: "Error interno" });
+  } finally {
+    client.release();
+  }
 });
 
 // ── Datos de transferencia bancaria — editables por el admin ─────────────────
@@ -12128,7 +12735,7 @@ app.post("/api/admin/whatsapp-templates/test-send", adminMiddleware, async (req,
       startDate: "1 mayo", endDate: "31 mayo",
       expiresAt: "31 mayo",
       reason: "comprobante ilegible",
-      link: "https://alma-movement.app/test",
+      link: "https://www.almamovement.com.mx/test",
       creditRestored: "Sí",
       ...(vars || {}),
     };
@@ -12449,7 +13056,7 @@ app.get("/api/evolution/status", adminMiddleware, async (req, res) => {
 // Idempotente — se puede llamar las veces que quieras. Evolution v2 espera
 // POST /webhook/set/:instance con body { webhook: { url, events, enabled } }.
 async function configureEvolutionWebhook() {
-  const webhookUrl = (process.env.SITE_URL || "https://alma-movement-production.up.railway.app").replace(/\/$/, "") + "/api/webhook/evolution";
+  const webhookUrl = (process.env.SITE_URL || "https://www.almamovement.com.mx").replace(/\/$/, "") + "/api/webhook/evolution";
   try {
     await evolutionApi.post(`/webhook/set/${EVOLUTION_INSTANCE}`, {
       webhook: {
@@ -12551,7 +13158,7 @@ app.post("/api/evolution/connect", adminMiddleware, async (req, res) => {
 
       if (createAlreadyInUse) {
         return res.status(409).json({
-          message: `No se pudo obtener QR para la instancia "${EVOLUTION_INSTANCE}". Ese nombre ya está en uso. Cambia EVOLUTION_INSTANCE_NAME en Railway por un nombre único (ej. alma-movement-2026).`,
+          message: `No se pudo obtener QR para la instancia "${EVOLUTION_INSTANCE}". Ese nombre ya está en uso. Cambia EVOLUTION_INSTANCE_NAME en Railway por un nombre único (ej. hive-pilates-2026).`,
         });
       }
       return res.status(502).json({ message: "Evolution respondió sin QR. Intenta nuevamente en unos segundos." });
@@ -12596,7 +13203,7 @@ app.post("/api/evolution/send-test", adminMiddleware, async (req, res) => {
     const number = normalisePhone(phone);
     await queueWhatsAppSend(
       number,
-      "✅ Mensaje de prueba desde Alma Movement. ¡WhatsApp conectado correctamente!",
+      "✅ Mensaje de prueba desde HIVE Pilates Studio. ¡WhatsApp conectado correctamente!",
     );
     return res.json({ data: { message: "Mensaje de prueba enviado correctamente" } });
   } catch (err) {
@@ -12927,7 +13534,12 @@ app.get("/api/admin/stats", adminMiddleware, async (req, res) => {
     const [classesToday, activeMembers, monthlyRevenue, pendingAlerts] = await Promise.all([
       pool.query("SELECT COUNT(*) FROM classes WHERE date = $1", [today]),
       pool.query(`SELECT COUNT(*) FROM memberships WHERE status = 'active' AND (end_date IS NULL OR end_date >= (NOW() AT TIME ZONE '${STUDIO_TIMEZONE}')::date)`),
-      pool.query("SELECT COALESCE(SUM(total_amount),0) AS total FROM orders WHERE status = 'approved' AND created_at >= $1", [monthStart]),
+      // Neto: ventas del mes − reembolsos del mes (auditoría 2026-09-27, P1-12).
+      pool.query(
+        `SELECT (SELECT COALESCE(SUM(total_amount), 0) FROM orders WHERE status = 'approved' AND created_at >= $1)
+              - (SELECT COALESCE(SUM(amount), 0) FROM refunds WHERE created_at >= $1) AS total`,
+        [monthStart],
+      ),
       pool.query("SELECT COUNT(*) FROM orders WHERE status = 'pending_verification'"),
     ]);
 
@@ -12952,7 +13564,7 @@ app.get("/api/admin/stats", adminMiddleware, async (req, res) => {
 app.get("/api/users", adminMiddleware, async (req, res) => {
   try {
     const { role, search = "" } = req.query;
-    let q = `SELECT id, display_name, email, phone, role, created_at FROM users WHERE 1=1`;
+    let q = `SELECT id, display_name, email, phone, role, created_at FROM users WHERE anonymized_at IS NULL`;
     const params = [];
     if (role) { params.push(role); q += ` AND role = $${params.length}`; }
     const searchValue = String(search ?? "").trim();
@@ -12998,38 +13610,148 @@ app.post("/api/users", adminMiddleware, async (req, res) => {
   }
 });
 
-// DELETE /api/users/:id
-app.delete("/api/users/:id", adminMiddleware, async (req, res) => {
+// Columnas que existen en la base, por tabla (la baja sólo toca ésas).
+async function existingColumns(db, tables) {
+  const r = await db.query(
+    `SELECT table_name, column_name FROM information_schema.columns
+      WHERE table_schema = current_schema() AND table_name = ANY($1::text[])`,
+    [tables],
+  );
+  const out = Object.fromEntries(tables.map((t) => [t, new Set()]));
+  for (const row of r.rows) out[row.table_name]?.add(row.column_name);
+  return out;
+}
+
+// DELETE /api/users/:id — dar de baja a una clienta SIN borrar su historial
+// (auditoría 2026-09-27, P1-5 · A9 · EC15). Antes el DELETE se llevaba en cascada
+// sus órdenes, pagos y reservas. Ahora se anonimiza: se quitan sus datos
+// personales y de salud, se cierra su acceso y se conserva todo lo demás con el
+// mismo id. Sólo la dueña: es irreversible.
+app.delete("/api/users/:id", ownerMiddleware, async (req, res) => {
+  // `id` no se valida aquí: app.param("id") (arriba, registro de rutas) ya
+  // responde 400 "Identificador inválido" para cualquier valor que no sea un
+  // UUID, antes de que este handler corra.
+  const client = await pool.connect();
   try {
-    const id = req.params.id;
+    await client.query("BEGIN");
+    const cur = await client.query(
+      "SELECT id, role::text AS role, is_active, anonymized_at, guest_profile_id FROM users WHERE id = $1 FOR UPDATE",
+      [req.params.id],
+    );
+    if (!cur.rows.length) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ message: "Clienta no encontrada" });
+    }
+    const target = cur.rows[0];
+    // `target.id` es el id tal como Postgres lo normaliza (uuid canónico en
+    // minúsculas), no el texto crudo de la URL: si llega en otra mayúscula o
+    // minúscula, de aquí en adelante se usa el normalizado para que el correo
+    // anónimo, el candado de caché (accountGate) y el serial de Apple Wallet
+    // coincidan exactamente con lo que ya usa el resto del sistema (que siempre
+    // trabaja con el id normalizado que devuelve la base).
+    const id = target.id;
     if (id === req.userId) {
+      await client.query("ROLLBACK");
       return res.status(400).json({ message: "No puedes eliminar tu propia cuenta." });
     }
-    // No borrar clientas con historial vivo: membresías activas o reservas próximas.
-    const deps = await pool.query(
+    if (!["client", "guest"].includes(target.role)) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({ message: "Sólo se pueden dar de baja clientas desde aquí." });
+    }
+    if (target.anonymized_at) {
+      await client.query("ROLLBACK");
+      return res.json({ message: "La clienta ya estaba dada de baja.", data: { id, alreadyAnonymized: true } });
+    }
+    // No dar de baja con historial vivo: membresías activas o reservas próximas.
+    const deps = await client.query(
       `SELECT
          (SELECT COUNT(*) FROM memberships
             WHERE user_id = $1 AND status IN ('active','pending_activation','pending_payment')) AS memberships,
          (SELECT COUNT(*) FROM bookings b JOIN classes c ON b.class_id = c.id
             WHERE b.user_id = $1 AND b.status IN ('confirmed','checked_in')
               AND c.date >= (NOW() AT TIME ZONE '${STUDIO_TIMEZONE}')::date) AS upcoming`,
-      [id]
+      [id],
     );
     const d = deps.rows[0] || {};
     if (Number(d.memberships) > 0 || Number(d.upcoming) > 0) {
+      await client.query("ROLLBACK");
       return res.status(409).json({
         message: "No se puede eliminar: la clienta tiene membresías activas o reservas próximas. Cancélalas primero.",
       });
     }
-    const del = await pool.query("DELETE FROM users WHERE id = $1 RETURNING id", [id]);
-    if (!del.rows.length) return res.status(404).json({ message: "Usuario no encontrado" });
-    return res.json({ message: "Usuario eliminado" });
-  } catch (err) {
-    console.error("DELETE /api/users/:id error:", err);
-    if (err?.code === "23503") {
-      return res.status(409).json({ message: "No se puede eliminar: la clienta tiene historial asociado (reservas o pagos). Considera desactivarla en su lugar." });
+    // La lista de espera no cuenta para el candado de "reservas próximas"
+    // (no ocupa cupo ni consume crédito), pero si la clienta se va no debe
+    // quedar esperando un lugar en una clase futura: se cancelan esos
+    // lugares en la misma transacción. Sin devolver crédito: la lista de
+    // espera no lo consume.
+    const waitlistCancel = await client.query(
+      `UPDATE bookings b SET status = 'cancelled', cancelled_at = NOW(), cancelled_by = $2,
+              cancellation_reason = 'Baja de la clienta'
+         FROM classes c
+        WHERE b.class_id = c.id AND b.user_id = $1 AND b.status = 'waitlist'
+          AND c.date >= (NOW() AT TIME ZONE '${STUDIO_TIMEZONE}')::date
+       RETURNING b.id`,
+      [id, req.userId],
+    );
+    const waitlistCancelled = waitlistCancel.rows.length;
+
+    const kept = (await client.query(
+      `SELECT (SELECT COUNT(*)::int FROM memberships WHERE user_id = $1) AS memberships,
+              (SELECT COUNT(*)::int FROM orders WHERE user_id = $1) AS orders,
+              (SELECT COUNT(*)::int FROM bookings WHERE user_id = $1) AS bookings,
+              (SELECT COUNT(*)::int FROM event_registrations WHERE user_id = $1) AS "eventRegistrations"`,
+      [id],
+    )).rows[0];
+
+    const cols = await existingColumns(client, ["users", "waivers", "guest_profiles", "event_registrations", "campaign_logs"]);
+    const u = buildAnonymizeUpdate({
+      table: "users", values: userAnonymizationValues(id, req.userId),
+      nowColumns: ["anonymized_at", "updated_at"], existing: cols.users, id,
+    });
+    await client.query(u.sql, u.params);
+    const w = buildAnonymizeUpdate({ table: "waivers", values: WAIVER_ANON_VALUES, existing: cols.waivers, idColumn: "user_id", id });
+    if (w) await client.query(w.sql, w.params);
+    if (target.guest_profile_id) {
+      const g = buildAnonymizeUpdate({ table: "guest_profiles", values: GUEST_ANON_VALUES, nowColumns: ["updated_at"], existing: cols.guest_profiles, id: target.guest_profile_id });
+      if (g) await client.query(g.sql, g.params);
     }
+    // Inscripciones a eventos: se conserva la fila (el evento asistido queda
+    // en el historial), pero el nombre, correo y teléfono con los que se
+    // inscribió se anonimizan igual que en `users`.
+    const er = buildAnonymizeUpdate({
+      table: "event_registrations", values: eventRegistrationAnonValues(id),
+      nowColumns: ["updated_at"], existing: cols.event_registrations, idColumn: "user_id", id,
+    });
+    if (er) await client.query(er.sql, er.params);
+    // campaign_logs.phone: sólo si la tabla y sus columnas existen en esta base
+    // (no está en schema_complete.sql, sólo la crea ensureSchema). Sin forma de
+    // ligar una fila a la usuaria (sin user_id) no hay nada que anonimizar ahí.
+    if (cols.campaign_logs.has("user_id") && cols.campaign_logs.has("phone")) {
+      await client.query("UPDATE campaign_logs SET phone = NULL WHERE user_id = $1", [id]);
+    }
+    await client.query("UPDATE referral_codes SET is_active = false WHERE user_id = $1", [id]);
+    await client.query("DELETE FROM password_reset_tokens WHERE user_id = $1", [id]);
+    const serial = buildAppleWalletSerialFromUserId(id);
+    await client.query("DELETE FROM apple_wallet_devices WHERE serial_number = $1 OR serial_number LIKE $2", [serial, `${serial}_ev_%`]);
+    await recordAudit(client, {
+      actorId: req.userId, action: "user.anonymize", entityType: "user", entityId: id, subjectUserId: id,
+      reason: req.body?.reason,
+      before: { role: target.role, is_active: target.is_active !== false },
+      after: { is_active: false, anonymized: true },
+      meta: { kept, waitlist_cancelled: waitlistCancelled },
+    });
+    await client.query("COMMIT");
+    accountGate.forget(id);
+    return res.json({
+      message: "Clienta dada de baja: se borraron sus datos personales y se conserva su historial.",
+      data: { id, anonymized: true, kept },
+    });
+  } catch (err) {
+    await client.query("ROLLBACK").catch(() => {});
+    console.error("DELETE /api/users/:id error:", err);
     return res.status(500).json({ message: "Error interno" });
+  } finally {
+    client.release();
   }
 });
 
@@ -13068,6 +13790,7 @@ app.get("/api/memberships", adminMiddleware, async (req, res) => {
     if (userId) { params.push(userId); q += ` AND m.user_id = $${params.length}`; }
     params.push(parseInt(limit)); q += ` ORDER BY m.created_at DESC LIMIT $${params.length}`;
     const r = await pool.query(q, params);
+    const policy = await getBookingPolicy();
     return res.json({
       data: r.rows.map(m => ({
         id: m.id,
@@ -13084,6 +13807,8 @@ app.get("/api/memberships", adminMiddleware, async (req, res) => {
         studioRemaining: m.studio_remaining,
         rtRemaining: m.rt_remaining,
         classLimit: m.class_limit,
+        cancellationsUsed: Number(m.cancellations_used ?? 0),
+        cancellationLimit: policy.cancellationLimit,
         durationDays: m.duration_days ?? null,
         createdAt: m.created_at,
       }))
@@ -13094,11 +13819,17 @@ app.get("/api/memberships", adminMiddleware, async (req, res) => {
   }
 });
 
-// POST /api/memberships — admin assigns membership to a user
+// POST /api/memberships — venta en mostrador: activa la membresía y su orden
+// aprobada en una transacción. Guarda quién vendió (activated_by), la
+// referencia del pago y, si lo cobrado es $0 o distinto al plan, el motivo
+// obligatorio; todo en la bitácora (auditoría 2026-09-27, P0-3 · E2).
 app.post("/api/memberships", adminMiddleware, async (req, res) => {
   try {
-    const { userId, planId, startDate } = req.body;
+    const { userId, planId, startDate } = req.body || {};
     if (!userId || !planId) return res.status(400).json({ message: "userId y planId requeridos" });
+    if (!isUuid(userId) || !isUuid(planId)) return res.status(400).json({ message: "Identificador inválido" });
+    const anonConflict = await anonymizedSaleConflict(userId);
+    if (anonConflict) return res.status(409).json(anonConflict);
     // El método de pago se exige explícito: el default anterior ("efectivo") ni
     // siquiera era un valor del enum payment_method y reventaba con 500, además
     // de registrar como efectivo lo que quizá fue transferencia.
@@ -13109,42 +13840,66 @@ app.post("/api/memberships", adminMiddleware, async (req, res) => {
         message: `Método de pago requerido. Opciones: ${PAYMENT_METHODS.join(", ")}.`,
       });
     }
+    // "2026-02-30" no da NaN en `new Date()`: se corre silenciosamente a marzo,
+    // y "2026-09-25 junk" también parsea a una fecha válida pero equivocada
+    // (JS ignora la basura y cambia de mes). `saleStartDay` exige el día
+    // AAAA-MM-DD exacto (o un ISO completo del que sólo recorta la hora) y
+    // `start` se arma desde ese día ya validado, nunca desde el texto crudo.
+    const startProblem = saleStartProblem(startDate);
+    if (startProblem) return res.status(400).json({ message: startProblem });
+    const start = startDate ? new Date(`${saleStartDay(startDate)}T00:00:00Z`) : new Date();
+    const ref = cleanPaymentReference(req.body.paymentReference);
+    if (!ref.ok) return res.status(400).json({ message: ref.message });
+
     const planRes = await pool.query("SELECT * FROM plans WHERE id = $1 AND is_active = true", [planId]);
     if (!planRes.rows.length) return res.status(404).json({ message: "Plan no encontrado" });
     const plan = planRes.rows[0];
     const _gen = await getSettingValueWithDefaults("general_settings");
     const _eff = resolveEffectivePrice(plan, _gen?.opening_pricing_active !== false);
+    const sale = saleAmountPlan({ listPrice: _eff ?? 0, amount: req.body.amount, reason: req.body.reason });
+    if (!sale.ok) return res.status(400).json({ ...(sale.code ? { code: sale.code } : {}), message: sale.message });
     const nonRepeatableConflict = await findNonRepeatablePlanConflict({ userId, plan });
     if (nonRepeatableConflict) {
       return res.status(409).json({ message: nonRepeatableConflict.message });
     }
-    const start = startDate ? new Date(startDate) : new Date();
     const end = new Date(start);
     end.setDate(end.getDate() + (plan.duration_days || 30));
 
-    // La venta de mostrador (efectivo/transferencia) también genera su orden
-    // aprobada: los ingresos se calculan sobre `orders`, así que sin esto todo
-    // lo cobrado en recepción quedaba fuera del reporte. Membresía y orden se
-    // escriben en la misma transacción. Auditoría 2026-09-08, P0-3.
+    // Membresía, orden, referencia y bitácora en la misma transacción: los
+    // ingresos se calculan sobre `orders` (auditoría 2026-09-08, P0-3).
     const saleClient = await pool.connect();
     let r;
     try {
       await saleClient.query("BEGIN");
       r = await saleClient.query(
-        `INSERT INTO memberships (user_id, plan_id, status, payment_method, start_date, end_date, classes_remaining)
-         VALUES ($1,$2,'active',$3,$4,$5,$6) RETURNING *`,
-        [userId, planId, paymentMethod, start.toISOString(), end.toISOString(), plan.class_limit ?? null]
+        `INSERT INTO memberships (user_id, plan_id, status, payment_method, start_date, end_date, classes_remaining, activated_by, activated_at)
+         VALUES ($1,$2,'active',$3,$4,$5,$6,$7,NOW())
+         RETURNING *, to_char(start_date, 'YYYY-MM-DD') AS start_ymd, to_char(end_date, 'YYYY-MM-DD') AS end_ymd`,
+        [userId, planId, paymentMethod, start.toISOString(), end.toISOString(), plan.class_limit ?? null, req.userId || null]
       );
       const orderRes = await saleClient.query(
-        `INSERT INTO orders (user_id, plan_id, status, payment_method, subtotal, tax_amount, total_amount,
+        `INSERT INTO orders (user_id, plan_id, status, payment_method, subtotal, tax_amount, total_amount, discount_amount,
                              channel, verified_at, verified_by, approved_at, approved_by, paid_at)
-         VALUES ($1,$2,'approved',$3,$4,0,$4,'counter',NOW(),$5,NOW(),$5,NOW())
-         RETURNING id`,
-        [userId, planId, paymentMethod, _eff ?? 0, req.userId || null]
+         VALUES ($1,$2,'approved',$3,$4,0,$5,$6,'counter',NOW(),$7,NOW(),$7,NOW())
+         RETURNING id, order_number`,
+        [userId, planId, paymentMethod, sale.subtotal, sale.amount, sale.discount, req.userId || null]
       );
-      await saleClient.query(`UPDATE memberships SET order_id = $2 WHERE id = $1`,
-        [r.rows[0].id, orderRes.rows[0].id]);
-      r.rows[0].order_id = orderRes.rows[0].id;
+      const order = orderRes.rows[0];
+      const paymentReference = ref.value || order.order_number || order.id;
+      await saleClient.query(`UPDATE memberships SET order_id = $2, payment_reference = $3 WHERE id = $1`,
+        [r.rows[0].id, order.id, paymentReference]);
+      r.rows[0].order_id = order.id;
+      r.rows[0].payment_reference = paymentReference;
+      await recordAudit(saleClient, {
+        actorId: req.userId, action: "membership.sale", entityType: "membership", entityId: r.rows[0].id,
+        subjectUserId: userId, reason: sale.courtesy || sale.priceDiffers ? req.body.reason : null,
+        after: saleAuditAfter({
+          plan, listPrice: sale.listPrice, amount: sale.amount, paymentMethod, paymentReference,
+          orderId: order.id, startDate: r.rows[0].start_ymd, endDate: r.rows[0].end_ymd,
+          classesRemaining: plan.class_limit ?? null,
+        }),
+        meta: { source: "mostrador", courtesy: sale.courtesy, price_differs: sale.priceDiffers },
+      });
       await saleClient.query("COMMIT");
     } catch (saleErr) {
       await saleClient.query("ROLLBACK").catch(() => { });
@@ -13186,11 +13941,15 @@ app.post("/api/memberships", adminMiddleware, async (req, res) => {
       console.error("[Email] membership create query:", emailErr.message);
     }
 
-    // ── Award loyalty points for membership purchase ────────────────────
-    if (userId && Number(_eff) > 0) {
+    // ── Puntos por compra: sobre lo cobrado (una cortesía no da puntos) ──
+    // La descripción se queda con `plan.price` (no `sale.amount`): así sigue
+    // coincidiendo con la que arma /admin/loyalty/recalculate/:userId para no
+    // duplicar puntos al recalcular; los PUNTOS sí se calculan sobre lo
+    // cobrado.
+    if (userId && sale.amount > 0) {
       try {
         const cfg = await getLoyaltyConfig();
-        const pts = Math.floor(Number(_eff) * cfg.points_per_peso);
+        const pts = Math.floor(sale.amount * cfg.points_per_peso);
         if (cfg.enabled !== false && pts > 0) {
           await pool.query(
             "INSERT INTO loyalty_transactions (user_id, type, points, description) VALUES ($1, 'earn', $2, $3)",
@@ -13295,6 +14054,8 @@ app.put("/api/memberships/:id/cancel", adminMiddleware, async (req, res) => {
   const { reason } = req.body || {};
   const cancellationReason = (reason && String(reason).trim()) || "Cancelada por admin";
   const client = await pool.connect();
+  // Se suelta tras el COMMIT: la subida de la fila pide su propia conexión (P1-1).
+  let released = false;
   try {
     await client.query("BEGIN");
 
@@ -13342,79 +14103,110 @@ app.put("/api/memberships/:id/cancel", adminMiddleware, async (req, res) => {
     }
 
     await client.query("COMMIT");
+    client.release();
+    released = true;
 
     // Side effects fuera de la transacción (fire-and-forget).
     triggerWalletPassSync(membership.user_id, "membership_cancelled");
+    // Los lugares que dejan sus reservas futuras suben la fila (P1-1).
+    const promoted = await onSeatReleased(futureBookings.rows.map((b) => b.class_id), { source: "membership_cancel" });
 
     return res.json({
       data: membership,
       bookings_cancelled: bookingsCancelled,
       reason: cancellationReason,
+      waitlist_promoted: promoted,
     });
   } catch (err) {
-    await client.query("ROLLBACK").catch(() => {});
+    if (!released) await client.query("ROLLBACK").catch(() => {});
     console.error("PUT /memberships/:id/cancel error:", err);
     return res.status(500).json({ message: "Error interno" });
   } finally {
-    client.release();
+    if (!released) client.release();
   }
 });
 
-// PUT /api/memberships/:id — update any field
+// PUT /api/memberships/:id — ajuste de saldo, vigencia, estado o método.
+// Cambiar saldo, vigencia o estado exige motivo; todo cambio queda en la
+// bitácora con el antes y el después (auditoría 2026-09-27, P0-3 · D12 · I5).
+// El panel manda todos los campos aunque no cambien: sólo cuenta lo que cambia
+// de verdad (9999 e ilimitado son lo mismo).
 app.put("/api/memberships/:id", adminMiddleware, async (req, res) => {
+  const { status, classesRemaining, endDate, startDate, paymentMethod, reason, cancellationsUsed } = req.body || {};
+  const client = await pool.connect();
   try {
-    const { status, classesRemaining, endDate, startDate, paymentMethod } = req.body;
-
-    // Validar enum de status.
-    const VALID_STATUS = ["pending_payment", "pending_activation", "active", "expired", "paused", "cancelled"];
-    if (status !== undefined && status !== null && !VALID_STATUS.includes(status)) {
-      return res.status(400).json({
-        message: `status inválido. Debe ser uno de: ${VALID_STATUS.join(", ")}`,
-      });
+    await client.query("BEGIN");
+    const cur = await client.query(
+      `SELECT m.id, m.user_id, m.status::text AS status, m.classes_remaining,
+              COALESCE(m.cancellations_used, 0)::int AS cancellations_used,
+              m.payment_method::text AS payment_method,
+              to_char(m.start_date, 'YYYY-MM-DD') AS start_date, to_char(m.end_date, 'YYYY-MM-DD') AS end_date,
+              p.duration_days, p.class_limit AS plan_class_limit, p.name AS plan_name
+         FROM memberships m
+         LEFT JOIN plans p ON p.id = m.plan_id
+        WHERE m.id = $1
+        FOR UPDATE OF m`,
+      [req.params.id],
+    );
+    if (!cur.rows.length) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ message: "Membresía no encontrada" });
     }
-
-    if (classesRemaining !== undefined && classesRemaining !== null) {
-      const n = Number(classesRemaining);
-      if (!Number.isFinite(n) || n < 0) {
-        return res.status(400).json({ message: "classesRemaining debe ser >= 0" });
+    const before = cur.rows[0];
+    const plan = planMembershipAdjust({ before, input: { status, classesRemaining, startDate, endDate, paymentMethod, cancellationsUsed } });
+    if (!plan.ok) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({ message: plan.message });
+    }
+    if (!plan.changes.changed.length) {
+      const same = await client.query("SELECT * FROM memberships WHERE id = $1", [req.params.id]);
+      await client.query("ROLLBACK");
+      return res.json({ data: same.rows[0], unchanged: true });
+    }
+    if (plan.needsReason) {
+      const problem = reasonProblem(reason);
+      if (problem) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({ code: "REASON_REQUIRED", message: problem });
       }
     }
-
-    // Si se cambia start_date y no se provee end_date explícito,
-    // recalcular end_date = start_date + duration_days del plan.
-    let resolvedEndDate = endDate || null;
-    if (startDate && !endDate) {
-      const planRes = await pool.query(
-        `SELECT p.duration_days FROM memberships m JOIN plans p ON p.id = m.plan_id WHERE m.id = $1`,
-        [req.params.id]
-      );
-      const durationDays = planRes.rows[0]?.duration_days;
-      if (durationDays) {
-        const d = new Date(startDate);
-        d.setDate(d.getDate() + durationDays);
-        resolvedEndDate = d.toISOString().slice(0, 10);
-      }
-    }
-
-    const r = await pool.query(
+    // Sólo se escriben los campos que de verdad cambiaron (`plan.changes`), no
+    // todo `plan.next`: si el panel manda 9999 sobre una membresía ilimitada
+    // (NULL) para otro campo (p. ej. sólo el estado), 9999 y NULL son el mismo
+    // valor y no debe grabarse — si se grabara, quedaría un cambio real de
+    // dato sin motivo ni bitácora.
+    const n = plan.next;
+    const changed = new Set(plan.changes.changed);
+    const val = (key) => (changed.has(key) ? n[key] ?? null : null);
+    const r = await client.query(
       `UPDATE memberships SET
          status = COALESCE($1, status),
          classes_remaining = COALESCE($2, classes_remaining),
          end_date = COALESCE($3, end_date),
          start_date = COALESCE($4, start_date),
          payment_method = COALESCE($5, payment_method),
+         cancellations_used = COALESCE($6, cancellations_used),
          updated_at = NOW()
-       WHERE id = $6 RETURNING *`,
-      [status || null, classesRemaining ?? null, resolvedEndDate, startDate || null, paymentMethod || null, req.params.id]
+       WHERE id = $7 RETURNING *`,
+      [val("status"), val("classes_remaining"), val("end_date"), val("start_date"), val("payment_method"), val("cancellations_used"), req.params.id],
     );
-    if (!r.rows.length) return res.status(404).json({ message: "Membresía no encontrada" });
-    // Si el admin cambió el total de una membresía mixta, re-reparte los buckets.
-    if (classesRemaining != null) await resyncMixtoBuckets(pool, req.params.id);
+    // Si cambió el total de una membresía mixta, re-reparte los buckets.
+    if (plan.changes.changed.includes("classes_remaining")) await resyncMixtoBuckets(client, req.params.id);
+    await recordAudit(client, {
+      actorId: req.userId, action: "membership.adjust", entityType: "membership", entityId: req.params.id,
+      subjectUserId: before.user_id, reason: cleanReason(reason),
+      before: plan.changes.before, after: plan.changes.after,
+      meta: { plan_name: before.plan_name ?? null, plan_class_limit: before.plan_class_limit ?? null, above_plan: plan.abovePlan },
+    });
+    await client.query("COMMIT");
     triggerWalletPassSync(r.rows[0].user_id, "membership_updated");
     return res.json({ data: r.rows[0] });
   } catch (err) {
+    await client.query("ROLLBACK").catch(() => {});
     console.error("PUT /memberships/:id error:", err);
     return res.status(500).json({ message: "Error interno" });
+  } finally {
+    client.release();
   }
 });
 
@@ -13509,48 +14301,72 @@ app.put("/api/plans/:id", adminMiddleware, async (req, res) => {
   }
 });
 
-// DELETE /api/plans/:id
+// DELETE /api/plans/:id — un plan con historial (membresías, órdenes o códigos
+// de descuento) se ARCHIVA: deja de venderse (is_active = false) y su historial
+// se conserva. Sólo un plan sin nada ligado se borra. `?cascade=true` ya no
+// borra nada: antes se llevaba membresías y órdenes (auditoría 2026-09-27,
+// familia de P1-5). Todo queda en la bitácora.
 app.delete("/api/plans/:id", adminMiddleware, async (req, res) => {
-  const cascade = parseBooleanFlag(
+  const cascadeRequested = parseBooleanFlag(
     req.query?.cascade ?? req.query?.purgeRelated ?? req.body?.cascade ?? req.body?.purgeRelated
   );
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-
-    if (cascade) {
-      await client.query(
-        `UPDATE memberships
-            SET order_id = NULL
-          WHERE order_id IN (SELECT id FROM orders WHERE plan_id = $1)`,
-        [req.params.id]
-      ).catch(() => {});
-      await client.query("DELETE FROM discount_codes WHERE plan_id = $1", [req.params.id]).catch(() => {});
-      await client.query("DELETE FROM memberships WHERE plan_id = $1", [req.params.id]).catch(() => {});
-      await client.query("DELETE FROM orders WHERE plan_id = $1", [req.params.id]).catch(() => {});
-    }
-
-    const del = await client.query("DELETE FROM plans WHERE id = $1 RETURNING id", [req.params.id]);
-    if (!del.rows.length) {
+    const cur = await client.query(
+      `SELECT p.id, p.name, p.price, p.is_active,
+              (SELECT COUNT(*)::int FROM memberships m WHERE m.plan_id = p.id) AS memberships,
+              (SELECT COUNT(*)::int FROM orders o WHERE o.plan_id = p.id) AS orders,
+              (SELECT COUNT(*)::int FROM discount_codes d WHERE d.plan_id = p.id) AS discount_codes
+         FROM plans p
+        WHERE p.id = $1
+        FOR UPDATE OF p`,
+      [req.params.id],
+    );
+    if (!cur.rows.length) {
       await client.query("ROLLBACK");
       return res.status(404).json({ message: "Plan no encontrado" });
     }
+    const plan = cur.rows[0];
+    const kept = { memberships: plan.memberships, orders: plan.orders, discount_codes: plan.discount_codes };
+    const archivar = async (porque) => {
+      await client.query(
+        `UPDATE plans SET is_active = false, archived_at = COALESCE(archived_at, NOW()),
+                archived_by = COALESCE(archived_by, $2), updated_at = NOW()
+          WHERE id = $1`,
+        [plan.id, req.userId],
+      );
+      await recordAudit(client, {
+        actorId: req.userId, action: "plan.archive", entityType: "plan", entityId: plan.id,
+        before: { for_sale: plan.is_active !== false }, after: { for_sale: false },
+        meta: { plan_name: plan.name, kept, cascade_requested: cascadeRequested, why: porque },
+      });
+      await client.query("COMMIT");
+      return res.json({
+        message: "Plan archivado: tiene membresías, órdenes o códigos de descuento, así que se ocultó de la venta y su historial se conserva.",
+        data: { id: plan.id, archived: true, kept },
+      });
+    };
+    if (plan.memberships + plan.orders + plan.discount_codes > 0) return await archivar("historial");
 
-    await client.query("COMMIT");
-    if (cascade) {
-      return res.json({ message: "Plan y datos relacionados eliminados" });
+    // Sin nada ligado: se borra. Si otra tabla lo referencia, se archiva.
+    await client.query("SAVEPOINT borrar_plan");
+    try {
+      await client.query("DELETE FROM plans WHERE id = $1", [plan.id]);
+    } catch (err) {
+      if (err?.code !== "23503") throw err;
+      await client.query("ROLLBACK TO SAVEPOINT borrar_plan");
+      return await archivar("referencias");
     }
-    return res.json({ message: "Plan eliminado" });
+    await recordAudit(client, {
+      actorId: req.userId, action: "plan.delete", entityType: "plan", entityId: plan.id,
+      before: { plan_name: plan.name, list_price: Number(plan.price), for_sale: plan.is_active !== false },
+      meta: { plan_name: plan.name },
+    });
+    await client.query("COMMIT");
+    return res.json({ message: "Plan eliminado", data: { id: plan.id, deleted: true } });
   } catch (err) {
     await client.query("ROLLBACK").catch(() => {});
-    if (!cascade && err?.code === "23503") {
-      try {
-        await pool.query("UPDATE plans SET is_active = false, updated_at = NOW() WHERE id = $1", [req.params.id]);
-        return res.json({ message: "Plan desactivado (tiene registros asociados)" });
-      } catch (softErr) {
-        console.error("[DELETE /plans soft-delete]", softErr?.message || softErr);
-      }
-    }
     console.error("[DELETE /plans]", err.message);
     return res.status(500).json({ message: "Error interno" });
   } finally {
@@ -13654,6 +14470,8 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
   const { classId, userId, guest, guestSale } = req.body;
   if (!classId || !userId) return res.status(400).json({ message: "classId y userId requeridos" });
   if (!isUuid(classId) || !isUuid(userId)) return res.status(400).json({ message: "Identificador inválido" });
+  const anonConflict = await anonymizedSaleConflict(userId);
+  if (anonConflict) return res.status(409).json(anonConflict);
   // Responsiva: recepción puede asignar sin firma si deja el motivo por el que
   // la clienta firmará en recepción (auditoría 2026-09-27, bloque 1, tarea 5).
   const override = req.body?.waiverOverride;
@@ -13668,7 +14486,18 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
     return res.status(400).json({ message: "Confirma el waiver de la acompañante" });
   }
   const hasGuestSale = withGuest && guestSale && typeof guestSale === "object" && guestSale.planId;
+  // La política se lee antes de tomar el cliente de la transacción, igual que
+  // en POST /api/bookings: de aquí sale cancelWindowHours para el correo.
+  let policy;
+  try {
+    policy = await getBookingPolicy();
+  } catch (err) {
+    console.error("POST admin/bookings/assign policy error:", err.message);
+    return res.status(500).json({ message: "Error interno" });
+  }
   const client = await pool.connect();
+  // Se suelta tras el COMMIT: la subida de la fila pide su propia conexión (P1-1).
+  let released = false;
   try {
     await client.query("BEGIN");
 
@@ -13703,14 +14532,21 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
       return res.status(403).json({ message: "La clienta no tiene membresía activa con créditos para esta clase" });
     }
 
+    // Vigencia revisada bajo candado, como en POST /api/bookings.
     const lockedMembershipRes = await client.query(
-      "SELECT id, classes_remaining FROM memberships WHERE id = $1 FOR UPDATE",
+      `SELECT id, classes_remaining, status::text AS status, end_date,
+              ${MEMBERSHIP_EXPIRED_SQL} AS expired
+         FROM memberships WHERE id = $1 FOR UPDATE`,
       [membership.id]
     );
     const lockedMembership = lockedMembershipRes.rows[0];
     if (!lockedMembership) {
       await client.query("ROLLBACK");
       return res.status(403).json({ message: "No se encontró una membresía válida para esta clase" });
+    }
+    if (lockedMembership.status !== "active" || lockedMembership.expired) {
+      await client.query("ROLLBACK");
+      return res.status(409).json({ code: "MEMBERSHIP_NOT_CURRENT", message: "El paquete de la clienta ya no está vigente." });
     }
 
     if (!isMembershipCategoryCompatible(membership.class_category, clsCategory)) {
@@ -13750,7 +14586,15 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
       });
     }
 
-    const isWaitlist = (await liveBookingCount(classId, client)) >= cls.max_capacity;
+    // Misma regla que la app (P1-1): con fila y subida vigente, la socia entra a
+    // la fila aunque haya lugar; a menos de 2 h el lugar queda libre y se asigna.
+    // En una clase cerrada no hay subida, así que la fila no bloquea: recepción
+    // asigna el lugar libre como antes.
+    const liveNow = await liveBookingCount(classId, client);
+    const queueFirst = cls.status === "scheduled" && queueBlocksNewBooking({
+      waiting: await waitingCount(classId, client), startsAt: cls.starts_at, now: Date.now(), cutoffHours: BOOKING_LEAD_HOURS,
+    });
+    let isWaitlist = liveNow >= cls.max_capacity || queueFirst;
     const bookingStatus = isWaitlist ? "waitlist" : "confirmed";
     const result = await client.query(
       `INSERT INTO bookings (class_id, user_id, membership_id, status, waiver_override_reason, waiver_override_by, waiver_override_at)
@@ -13775,7 +14619,7 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
       if (isWaitlist) {
         await client.query("ROLLBACK");
         return res.status(409).json({
-          message: "La socia entró en lista de espera; no se puede agregar acompañante.",
+          message: "La socia quedaría en lista de espera (la clase está llena o ya tiene fila); no se puede agregar acompañante.",
         });
       }
       const occupiedAfter = await liveBookingCount(classId, client);
@@ -13824,26 +14668,33 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
         const plan = planRes.rows[0];
         const _gen = await getSettingValueWithDefaults("general_settings");
         const _eff = resolveEffectivePrice(plan, _gen?.opening_pricing_active !== false);
-        const pm = normalizePaymentMethod(guestSale.paymentMethod || "cash");
+        const pm = normalizePaymentMethod(guestSale.paymentMethod);
+        if (!pm) {
+          await client.query("ROLLBACK");
+          return res.status(400).json({ message: PAYMENT_METHOD_INVALID });
+        }
         const startStr = todayInStudio();
         const endStr = calcMembershipEndDate(startStr, plan);
         // Si no especifica class_limit, asumimos clase suelta (1).
         const credits = plan.class_limit ?? 1;
-        const memIns = await client.query(
-          `INSERT INTO memberships
-             (user_id, plan_id, status, payment_method, start_date, end_date, classes_remaining, notes)
-           VALUES ($1, $2, 'active', $3, $4, $5, $6, $7) RETURNING *`,
-          [guestUser.id, plan.id, pm, startStr, endStr, credits,
-           `Venta acompañante en roster — invitada por user ${userId}`]
-        );
-        const memRow = memIns.rows[0];
+        // Primero la orden y luego la membresía ligada a ella (order_id): así
+        // /api/payments la cuenta una sola vez (por la orden) y un reembolso
+        // encuentra la membresía. Las ventas viejas sin order_id no se tocan.
         const orderIns = await client.query(
-          `INSERT INTO orders (user_id, plan_id, status, payment_method, total_amount, channel, verified_at, verified_by)
-           VALUES ($1, $2, 'approved', $3, $4, 'pos_guest_sale', NOW(), $5)
+          `INSERT INTO orders (user_id, plan_id, status, payment_method, subtotal, total_amount, channel, verified_at, verified_by)
+           VALUES ($1, $2, 'approved', $3, $4, $4, 'pos_guest_sale', NOW(), $5)
            RETURNING *`,
           [guestUser.id, plan.id, pm, _eff ?? 0, req.userId || null]
         );
         guestSaleOrder = orderIns.rows[0];
+        const memIns = await client.query(
+          `INSERT INTO memberships
+             (user_id, plan_id, status, payment_method, start_date, end_date, classes_remaining, notes, order_id)
+           VALUES ($1, $2, 'active', $3, $4, $5, $6, $7, $8) RETURNING *`,
+          [guestUser.id, plan.id, pm, startStr, endStr, credits,
+           `Venta acompañante en roster — invitada por user ${userId}`, guestSaleOrder.id]
+        );
+        const memRow = memIns.rows[0];
         guestMembershipId = memRow.id;
         guestMembershipCreditsAfter = (memRow.classes_remaining ?? 1) - 1;
         if (memRow.classes_remaining !== null) {
@@ -13902,6 +14753,18 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
     }
 
     await client.query("COMMIT");
+    client.release();
+    released = true;
+
+    if (isWaitlist && liveNow < cls.max_capacity) {
+      // Entró a la fila con lugar libre: corre la subida (quizá sube ella).
+      await onSeatReleased([classId], { source: "new_booking", quietUserIds: [userId] });
+      const st = await pool.query("SELECT status::text AS status FROM bookings WHERE id = $1", [result.rows[0].id]);
+      if (st.rows[0]?.status === "confirmed") {
+        isWaitlist = false;
+        result.rows[0].status = "confirmed";
+      }
+    }
 
     try {
       const userRes = await pool.query("SELECT email, display_name, phone FROM users WHERE id = $1", [userId]);
@@ -13930,21 +14793,12 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
             instructor: cl.instructor_name,
             classesLeft,
             isWaitlist,
+            waitlistCutoffHours: BOOKING_LEAD_HOURS,
+            cancelHours: policy.cancelWindowHours,
           }).catch((e) => console.error("[Email] booking confirmed (admin):", e.message));
         }
-        sendConfiguredWhatsAppTemplate({
-          templateKey: "booking_confirmed",
-          phone: u.phone,
-          vars: {
-            name: u.display_name || "Alumna",
-            class: cl.class_type_name || "Clase",
-            date: cl.date ? new Date(cl.date).toLocaleDateString("es-MX") : "",
-            time: cl.start_time ? String(cl.start_time).slice(0, 5) : "",
-          },
-          fallbackMessage: isWaitlist
-            ? `Hola ${u.display_name || "Alumna"}, quedaste en lista de espera para ${cl.class_type_name || "tu clase"} (${cl.date || ""} ${String(cl.start_time || "").slice(0, 5)}).`
-            : `Hola ${u.display_name || "Alumna"}, tu reserva para ${cl.class_type_name || "tu clase"} (${cl.date || ""} ${String(cl.start_time || "").slice(0, 5)}) está confirmada.`,
-        }).catch((e) => console.error("[WA] booking confirmed (admin):", e.message));
+        sendBookingNoticeWhatsApp(u, cl, isWaitlist ? "waitlist" : "confirmed")
+          .catch((e) => console.error("[WA] booking confirmed (admin):", e.message));
         // Notifica a la dueña/admins (puede haber otras recepcionistas o instructoras).
         if (!isWaitlist) {
           const dateStr = cl.date ? new Date(cl.date).toLocaleDateString("es-MX") : "";
@@ -13978,7 +14832,7 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
       data: { booking: result.rows[0], isWaitlist, guest: guestData },
     });
   } catch (err) {
-    try { await client.query("ROLLBACK"); } catch (_) { }
+    if (!released) { try { await client.query("ROLLBACK"); } catch (_) { } }
     console.error("POST /admin/bookings/assign error:", err);
     // Devolver detalle del error de Postgres (constraint que falló) en lugar
     // del genérico "Error interno", para que la admin pueda diagnosticar y
@@ -13997,7 +14851,7 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
       ...(constraint ? { constraint } : {}),
     });
   } finally {
-    client.release();
+    if (!released) client.release();
   }
 });
 
@@ -14015,14 +14869,41 @@ async function studioNow(client = pool) {
 async function awardCheckinPoints(userId) {
   try {
     const cfg = await getLoyaltyConfig();
-    const pts = cfg.points_per_class;
-    if (cfg.enabled !== false && pts > 0) {
-      await pool.query(
-        "INSERT INTO loyalty_transactions (user_id, type, points, description) VALUES ($1, 'earn', $2, 'Clase asistida')",
-        [userId, pts],
-      );
-    }
+    await insertCheckinPoints(pool, userId, cfg);
   } catch (e) { console.warn("[check-in] loyalty insert failed:", e?.message); }
+}
+
+// Inserta los puntos de "Clase asistida": los comparte el check-in (lista/QR,
+// dentro del try/catch best-effort de awardCheckinPoints) y la corrección de
+// falta (dentro de su transacción). Devuelve los puntos otorgados (0 si el
+// programa está apagado); lanza si la base falla.
+async function insertCheckinPoints(q, userId, cfg) {
+  const pts = Number(cfg.points_per_class);
+  if (cfg.enabled === false || !(pts > 0)) return 0;
+  await q.query(
+    "INSERT INTO loyalty_transactions (user_id, type, points, description) VALUES ($1, 'earn', $2, 'Clase asistida')",
+    [userId, pts],
+  );
+  return pts;
+}
+
+// Refleja en Wellhub una asistencia marcada en el estudio (lista o corrección
+// de falta) para que la visita se facture. Best-effort, sin esperar.
+function reflectWellhubVisit(booking) {
+  (async () => {
+    try {
+      const creds = await getWellhubCredentials(pool);
+      if (creds && creds.is_enabled) {
+        const u = await pool.query("SELECT wellhub_id FROM users WHERE id=$1", [booking.user_id]);
+        const vres = await wellhubValidateVisit(creds, { customCode: u.rows[0]?.wellhub_id });
+        await pool.query(
+          `INSERT INTO partner_checkins (booking_id, user_id, channel, status, method, validated_at, external_response)
+           VALUES ($1,$2,'wellhub',$3,'manual',NOW(),$4)`,
+          [booking.id, booking.user_id, vres.ok ? "confirmed" : "failed", JSON.stringify(vres.data || {})],
+        );
+      }
+    } catch (e) { console.warn("[wellhub] reflect visit:", e.message); }
+  })();
 }
 
 // PUT /api/bookings/:id/check-in
@@ -14059,24 +14940,14 @@ app.put("/api/bookings/:id/check-in", adminMiddleware, async (req, res) => {
     const booking = r.rows[0];
     // ── Reflejar visita Wellhub si el check-in fue local (recepción/QR/coach) ──
     // Fire-and-forget, best-effort: valida la visita contra Wellhub para facturar.
-    if (booking.channel === "wellhub" && !wasAlreadyCheckedIn) {
-      (async () => {
-        try {
-          const creds = await getWellhubCredentials(pool);
-          if (creds && creds.is_enabled) {
-            const u = await pool.query("SELECT wellhub_id FROM users WHERE id=$1", [booking.user_id]);
-            const vres = await wellhubValidateVisit(creds, { customCode: u.rows[0]?.wellhub_id });
-            await pool.query(
-              `INSERT INTO partner_checkins (booking_id, user_id, channel, status, method, validated_at, external_response)
-               VALUES ($1,$2,'wellhub',$3,'manual',NOW(),$4)`,
-              [booking.id, booking.user_id, vres.ok ? "confirmed" : "failed", JSON.stringify(vres.data || {})],
-            );
-          }
-        } catch (e) { console.warn("[wellhub] reflect visit:", e.message); }
-      })();
-    }
+    if (booking.channel === "wellhub" && !wasAlreadyCheckedIn) reflectWellhubVisit(booking);
     // 3) Otorgar +10 pts SOLO si es primer check-in.
     if (booking.user_id && !wasAlreadyCheckedIn) await awardCheckinPoints(booking.user_id);
+    await recordAuditBestEffort(pool, {
+      actorId: req.userId, action: "booking.checkin", entityType: "booking", entityId: booking.id,
+      subjectUserId: booking.user_id, before: { status: bk.status }, after: { status: "checked_in" },
+      meta: { method: "manual", class_id: booking.class_id },
+    });
     // 4) notifyClassAttended (motivación + milestones + wallet sync) SOLO si es primer check-in.
     if (booking.user_id && !wasAlreadyCheckedIn) {
       // Get className for the notify ctx
@@ -14098,10 +14969,7 @@ app.put("/api/bookings/:id/check-in", adminMiddleware, async (req, res) => {
     });
   } catch (err) {
     console.error("[check-in] error:", err?.message, err?.code, err?.detail);
-    return res.status(500).json({
-      message: "Error interno",
-      error: err?.message?.slice(0, 160) || null,
-    });
+    return res.status(500).json({ message: "Error interno" });
   }
 });
 
@@ -14168,6 +15036,11 @@ app.post("/api/admin/checkin/scan", adminMiddleware, async (req, res) => {
     );
     // Puntos por asistir (igual que el check-in manual del roster)
     await awardCheckinPoints(userId);
+    await recordAuditBestEffort(pool, {
+      actorId: req.userId, action: "booking.checkin", entityType: "booking", entityId: bk.id,
+      subjectUserId: userId, before: { status: bk.status }, after: { status: "checked_in" },
+      meta: { method: "qr", class_name: bk.class_name },
+    });
 
     // Igual que el check-in manual del roster: dispara motivación, milestones y
     // sincronización del pase de wallet (antes el check-in por QR no lo hacía).
@@ -14185,24 +15058,130 @@ app.post("/api/admin/checkin/scan", adminMiddleware, async (req, res) => {
   }
 });
 
-// PUT /api/bookings/:id/no-show
+// PUT /api/bookings/:id/no-show — marca falta. La falta queda ligada a ESTA
+// reserva (falta_recorded_at) para poder corregirla el mismo día, y el cambio
+// queda en la bitácora (auditoría 2026-09-27, bloque 2).
 app.put("/api/bookings/:id/no-show", adminMiddleware, async (req, res) => {
   try {
     const r = await pool.query(
-      "UPDATE bookings SET status = 'no_show' WHERE id = $1 AND status NOT IN ('cancelled','no_show') RETURNING *",
+      `WITH prev AS (SELECT id, status::text AS status FROM bookings WHERE id = $1 FOR UPDATE)
+       UPDATE bookings b SET status = 'no_show'
+         FROM prev
+        WHERE b.id = prev.id AND prev.status NOT IN ('cancelled', 'no_show')
+       RETURNING b.*, prev.status AS prev_status`,
       [req.params.id]
     );
     if (!r.rows.length) return res.status(404).json({ message: "Reserva no encontrada o ya procesada" });
-    triggerWalletPassSync(r.rows[0].user_id, "booking_no_show");
+    const { prev_status: prevStatus, ...bk } = r.rows[0];
+    triggerWalletPassSync(bk.user_id, "booking_no_show");
     // Registrar falta por no-show (excluye invitadas con guest_profile_id).
+    let falta = null;
     try {
-      if (r.rows[0]?.user_id && !r.rows[0]?.guest_profile_id) {
-        await recordFalta({ userId: r.rows[0].user_id, reason: "no-show" });
+      if (bk.user_id && !bk.guest_profile_id) {
+        falta = await recordFalta({ userId: bk.user_id, reason: "no-show" });
+        if (falta.faltasCount > 0) {
+          // Sólo si sigue en falta: si ya la corrigieron a asistencia mientras
+          // esto corría, no le vuelve a poner una marca de falta.
+          await pool.query("UPDATE bookings SET falta_recorded_at = NOW() WHERE id = $1 AND status = 'no_show'", [bk.id]);
+        }
       }
     } catch (e) { console.warn("[faltas] no-show:", e.message); }
-    return res.json({ data: r.rows[0] });
+    await recordAuditBestEffort(pool, {
+      actorId: req.userId, action: "booking.no_show", entityType: "booking", entityId: bk.id,
+      subjectUserId: bk.user_id, before: { status: prevStatus }, after: { status: "no_show" },
+      meta: { falta_recorded: Boolean(falta?.faltasCount), penalty_applied: Boolean(falta?.penaltyApplied) },
+    });
+    return res.json({ data: bk });
   } catch (err) {
+    console.error("[PUT /bookings/:id/no-show]", err.message);
     return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// PUT /api/bookings/:id/correct-no-show — corrige a asistencia una falta
+// marcada por error, sólo el mismo día de la clase y con motivo. Revierte la
+// falta que registró ESTA reserva (el contador y, si esa falta completó el
+// umbral, la penalización), da los puntos de asistencia una sola vez y deja
+// constancia en la bitácora. Pedido del dueño, auditoría 2026-09-27, bloque 2.
+app.put("/api/bookings/:id/correct-no-show", adminMiddleware, async (req, res) => {
+  const reason = req.body?.reason;
+  const problem = reasonProblem(reason);
+  if (problem) return res.status(400).json({ code: "REASON_REQUIRED", message: problem });
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const cur = await client.query(
+      `SELECT b.id, b.user_id, b.status::text AS status, b.checked_in_at, b.guest_profile_id,
+              b.falta_recorded_at, b.channel, c.status::text AS class_status,
+              to_char(c.date, 'YYYY-MM-DD') AS class_date, ct.name AS class_name
+         FROM bookings b
+         JOIN classes c ON c.id = b.class_id
+         LEFT JOIN class_types ct ON ct.id = c.class_type_id
+        WHERE b.id = $1
+        FOR UPDATE OF b`,
+      [req.params.id],
+    );
+    if (!cur.rows.length) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ message: "Reserva no encontrada" });
+    }
+    const bk = cur.rows[0];
+    const { nowDate } = await studioNow(client);
+    const rule = noShowCorrectionRule({ bookingStatus: bk.status, classStatus: bk.class_status, classDate: bk.class_date, nowDate });
+    if (!rule.ok) {
+      await client.query("ROLLBACK");
+      return res.status(409).json({ code: rule.code, message: rule.message });
+    }
+    const firstAttendance = !bk.checked_in_at;
+    await client.query(
+      `UPDATE bookings
+          SET status = 'checked_in', checked_in_at = COALESCE(checked_in_at, NOW()),
+              checked_in_by = COALESCE(checked_in_by, $2), falta_recorded_at = NULL
+        WHERE id = $1`,
+      [bk.id, req.userId],
+    );
+    const cfg = await getLoyaltyConfig(client);
+    let faltas = null;
+    if (bk.falta_recorded_at && bk.user_id && !bk.guest_profile_id) {
+      const u = await client.query("SELECT COALESCE(faltas_count, 0)::int AS n FROM users WHERE id = $1 FOR UPDATE", [bk.user_id]);
+      const antes = Number(u.rows[0]?.n ?? 0);
+      const rev = faltaReversal({ faltasCount: antes, threshold: cfg.faltas_threshold, penaltyPoints: cfg.faltas_penalty_points });
+      await client.query("UPDATE users SET faltas_count = $2 WHERE id = $1", [bk.user_id, rev.newCount]);
+      if (rev.refundPoints > 0) {
+        await client.query(
+          "INSERT INTO loyalty_transactions (user_id, type, points, description) VALUES ($1, 'adjust', $2, $3)",
+          [bk.user_id, rev.refundPoints, "Reverso de penalización: falta corregida a asistencia"],
+        );
+      }
+      faltas = { antes, despues: rev.newCount, refund: rev.refundPoints };
+    }
+    let pointsAwarded = 0;
+    if (firstAttendance && bk.user_id) {
+      pointsAwarded = await insertCheckinPoints(client, bk.user_id, cfg);
+    }
+    await recordAudit(client, {
+      actorId: req.userId, action: "booking.no_show_corrected", entityType: "booking", entityId: bk.id,
+      subjectUserId: bk.user_id, reason,
+      before: { status: "no_show", ...(faltas ? { faltas_count: faltas.antes } : {}) },
+      after: { status: "checked_in", ...(faltas ? { faltas_count: faltas.despues } : {}) },
+      meta: { class_name: bk.class_name, falta_reverted: Boolean(faltas), penalty_refunded: faltas?.refund ?? 0, points_awarded: pointsAwarded },
+    });
+    await client.query("COMMIT");
+    if (bk.user_id) {
+      triggerWalletPassSync(bk.user_id, "no_show_corrected");
+      if (pointsAwarded > 0) {
+        checkLoyaltyMilestones(bk.user_id).catch((e) => console.warn("[Milestones] corrección de falta:", e?.message));
+      }
+    }
+    if (bk.channel === "wellhub" && firstAttendance) reflectWellhubVisit({ id: bk.id, user_id: bk.user_id });
+    const row = await pool.query("SELECT * FROM bookings WHERE id = $1", [bk.id]);
+    return res.json({ data: row.rows[0], falta_reverted: Boolean(faltas), penalty_refunded: faltas?.refund ?? 0, points_awarded: pointsAwarded });
+  } catch (err) {
+    await client.query("ROLLBACK").catch(() => {});
+    console.error("[PUT /bookings/:id/correct-no-show]", err.message);
+    return res.status(500).json({ message: "Error interno" });
+  } finally {
+    client.release();
   }
 });
 
@@ -14215,6 +15194,11 @@ app.get("/api/classes/:id/roster", adminMiddleware, async (req, res) => {
               m.plan_id, p.name AS plan_name, m.classes_remaining,
               COALESCE(u.has_injury, false) AS has_injury, u.injury_details, u.health_notes,
               NOT EXISTS (SELECT 1 FROM bookings pb WHERE pb.user_id = b.user_id AND pb.checked_in_at IS NOT NULL AND pb.id <> b.id) AS first_visit
+              , CASE WHEN b.status = 'waitlist' THEN (
+                  SELECT COUNT(*)::int + 1 FROM bookings w
+                   WHERE w.class_id = b.class_id AND w.status = 'waitlist'
+                     AND (w.created_at, w.id) < (b.created_at, b.id)
+                ) END AS waitlist_position
        FROM bookings b
        JOIN users u ON b.user_id = u.id
        LEFT JOIN memberships m ON b.membership_id = m.id
@@ -14226,6 +15210,8 @@ app.get("/api/classes/:id/roster", adminMiddleware, async (req, res) => {
          WHEN 'waitlist'   THEN 3
          WHEN 'no_show'    THEN 4
          ELSE 5 END,
+         CASE WHEN b.status = 'waitlist' THEN b.created_at END ASC NULLS LAST,
+         CASE WHEN b.status = 'waitlist' THEN b.id END ASC NULLS LAST,
          u.display_name ASC`,
       [req.params.id]
     );
@@ -14259,6 +15245,14 @@ app.post("/api/admin/clients/manual", adminMiddleware, async (req, res) => {
     } = req.body;
     if (!displayName || !email) return res.status(400).json({ message: "Nombre y email son requeridos" });
 
+    // El alta es un upsert por email: si ya hay una clienta dada de baja con
+    // este correo, el ON CONFLICT de abajo la reactivaría sin querer.
+    const emailNorm = email.toLowerCase().trim();
+    const existingByEmail = await client.query("SELECT id, anonymized_at FROM users WHERE email = $1", [emailNorm]);
+    if (existingByEmail.rows.length && existingByEmail.rows[0].anonymized_at) {
+      return res.status(409).json({ code: "ACCOUNT_ANONYMIZED", message: "Esta clienta fue dada de baja." });
+    }
+
     await client.query("BEGIN");
 
     // 1. Create user (random password — they can reset later)
@@ -14273,7 +15267,7 @@ app.post("/api/admin/clients/manual", adminMiddleware, async (req, res) => {
          phone = EXCLUDED.phone,
          updated_at = NOW()
        RETURNING id, display_name, email`,
-      [displayName, email.toLowerCase().trim(), phone || null, dateOfBirth || null,
+      [displayName, emailNorm, phone || null, dateOfBirth || null,
         emergencyContactName || null, emergencyContactPhone || null, healthNotes || null, hash]
     );
     const user = userRes.rows[0];
@@ -14291,7 +15285,11 @@ app.post("/api/admin/clients/manual", adminMiddleware, async (req, res) => {
         await client.query("ROLLBACK");
         return res.status(409).json({ message: nonRepeatableConflict.message });
       }
-      const start = startDate ? new Date(startDate) : new Date();
+      // Misma validación que la venta en mostrador: día AAAA-MM-DD exacto,
+      // nunca texto crudo con basura pegada.
+      const startProblem = saleStartProblem(startDate);
+      if (startProblem) { await client.query("ROLLBACK"); return res.status(400).json({ message: startProblem }); }
+      const start = startDate ? new Date(`${saleStartDay(startDate)}T00:00:00Z`) : new Date();
       const end = new Date(start);
       end.setDate(end.getDate() + plan.duration_days);
 
@@ -14329,14 +15327,26 @@ app.post("/api/admin/clients/manual", adminMiddleware, async (req, res) => {
         await client.query("UPDATE discount_codes SET uses_count = uses_count + 1 WHERE id = $1", [dc.id]).catch(() => {});
       }
 
+      // Cortesía en el alta manual (sale en $0): exige motivo, en `reason` o en
+      // Notas del formulario (auditoría 2026-09-27, P0-3).
+      const chargedPrice = Math.max(0, (Number(_eff) || 0) - orderDiscount);
+      const saleReason = typeof req.body.reason === "string" && req.body.reason.trim() ? req.body.reason : notes;
+      if (chargedPrice === 0) {
+        const p = reasonProblem(saleReason);
+        if (p) {
+          await client.query("ROLLBACK");
+          return res.status(400).json({ code: "REASON_REQUIRED", message: `Es una cortesía ($0): escribe el motivo en Notas. ${p}` });
+        }
+      }
+
       const memRes = await client.query(
         `INSERT INTO memberships (user_id, plan_id, status, payment_method, start_date, end_date,
-          classes_remaining, notes)
-         VALUES ($1,$2,'active',$3,$4,$5,$6,$7) RETURNING *`,
+          classes_remaining, notes, activated_by, activated_at)
+         VALUES ($1,$2,'active',$3,$4,$5,$6,$7,$8,NOW()) RETURNING *`,
         [user.id, plan.id, paymentMethod, start.toISOString().split("T")[0],
         end.toISOString().split("T")[0],
         plan.class_limit === 0 ? null : plan.class_limit,
-        (notes || `Alta manual por admin`) + priceNote]
+        (notes || `Alta manual por admin`) + priceNote, req.userId || null]
       );
       membership = camelRow(memRes.rows[0]);
 
@@ -14349,13 +15359,25 @@ app.post("/api/admin/clients/manual", adminMiddleware, async (req, res) => {
                              total_amount, discount_amount, channel, verified_at, verified_by,
                              approved_at, approved_by, paid_at)
          VALUES ($1,$2,'approved',$3,$4,0,$5,$6,'counter',NOW(),$7,NOW(),$7,NOW())
-         RETURNING id`,
+         RETURNING id, order_number`,
         [user.id, plan.id, paymentMethod, Number(_eff) || 0,
-         Math.max(0, (Number(_eff) || 0) - orderDiscount), orderDiscount, req.userId || null]
+         chargedPrice, orderDiscount, req.userId || null]
       );
-      await client.query(`UPDATE memberships SET order_id = $2 WHERE id = $1`,
-        [memRes.rows[0].id, ordRes.rows[0].id]);
+      const paymentReference = ordRes.rows[0].order_number || ordRes.rows[0].id;
+      await client.query(`UPDATE memberships SET order_id = $2, payment_reference = $3 WHERE id = $1`,
+        [memRes.rows[0].id, ordRes.rows[0].id, paymentReference]);
       membership.orderId = ordRes.rows[0].id;
+      membership.paymentReference = paymentReference;
+      await recordAudit(client, {
+        actorId: req.userId, action: "membership.sale", entityType: "membership", entityId: memRes.rows[0].id,
+        subjectUserId: user.id, reason: chargedPrice === 0 ? saleReason : null,
+        after: saleAuditAfter({
+          plan, listPrice: Number(_eff) || 0, amount: chargedPrice, paymentMethod, paymentReference,
+          orderId: ordRes.rows[0].id, startDate: start.toISOString().split("T")[0], endDate: end.toISOString().split("T")[0],
+          classesRemaining: plan.class_limit === 0 ? null : plan.class_limit,
+        }),
+        meta: { source: "alta_manual", courtesy: chargedPrice === 0, price_differs: orderDiscount > 0, discount_code: discountCode || null },
+      });
     }
 
     await client.query("COMMIT");
@@ -14653,69 +15675,304 @@ app.put("/api/admin/orders/:id/reject", adminMiddleware, async (req, res) => {
 
 // ─── Payments admin ──────────────────────────────────────────────────────────
 
-// GET /api/payments
+// GET /api/payments — el libro de cobros de la dueña: órdenes aprobadas,
+// membresías viejas sin orden y, desde el bloque 3, los reembolsos como filas
+// negativas en su fecha (auditoría 2026-09-27, P1-12). Cada orden trae su
+// reembolso, su canal y su membresía para el diálogo "Reembolsar". `total` es neto.
 app.get("/api/payments", ownerMiddleware, async (req, res) => {
   try {
-    const { startDate, endDate, userId, limit = 200 } = req.query;
+    const { startDate, endDate, userId } = req.query;
+    // Un filtro basura daba 500 (Postgres rechazaba el uuid o la fecha). isDay
+    // pide además que el día exista (ida y vuelta por Date): "2026-02-30" pasa
+    // el formato pero Postgres lo rechaza.
+    if (userId && !isUuid(String(userId))) return res.status(400).json({ message: "Identificador inválido" });
+    for (const d of [startDate, endDate]) {
+      if (d && !isDay(d)) return res.status(400).json({ message: "Fecha inválida (usa AAAA-MM-DD)." });
+    }
+    const limit = Math.min(1000, Math.max(1, Number.parseInt(String(req.query.limit ?? "200"), 10) || 200));
     const params = [];
-    let startIdx = null;
-    let endIdx = null;
-    let userIdx = null;
-    if (startDate) { params.push(startDate); startIdx = params.length; }
-    if (endDate) { params.push(endDate); endIdx = params.length; }
-    // Filtro por user_id — la ficha del cliente (ClientDetail) llama a este
-    // endpoint con ?userId=<uuid>; sin este filtro veía pagos/membresías
-    // globales en la pestaña Pagos de cada cliente. Se aplica a ambas
-    // subqueries del UNION (orders y memberships).
-    if (userId) { params.push(userId); userIdx = params.length; }
-    // Include approved orders AND manually-assigned memberships
-    let q = `
-      SELECT
-        o.id,
-        o.user_id,
-        u.display_name AS user_name,
-        p.name AS plan_name,
-        o.total_amount,
-        o.payment_method AS method,
-        o.status::text AS status,
-        o.created_at,
-        'order' AS source
-      FROM orders o
-      LEFT JOIN users u ON o.user_id = u.id
-      LEFT JOIN plans p ON o.plan_id = p.id
-      WHERE o.status = 'approved'`;
-    if (startIdx) q += ` AND o.created_at >= $${startIdx}`;
-    if (endIdx) q += ` AND o.created_at <= $${endIdx}`;
-    if (userIdx) q += ` AND o.user_id = $${userIdx}`;
-
-    // Also fetch memberships assigned directly (cash/card/transfer)
-    let mq = `
-      SELECT
-        m.id,
-        m.user_id,
-        u.display_name AS user_name,
-        p.name AS plan_name,
-        p.price AS total_amount,
-        m.payment_method AS method,
-        m.status::text AS status,
-        m.created_at,
-        'membership' AS source
-      FROM memberships m
-      LEFT JOIN users u ON m.user_id = u.id
-      LEFT JOIN plans p ON m.plan_id = p.id
-      WHERE m.status = 'active' AND m.order_id IS NULL`;
-    if (startIdx) mq += ` AND m.created_at >= $${startIdx}`;
-    if (endIdx) mq += ` AND m.created_at <= $${endIdx}`;
-    if (userIdx) mq += ` AND m.user_id = $${userIdx}`;
-
-    const combined = `(${q}) UNION ALL (${mq}) ORDER BY created_at DESC LIMIT $${params.length + 1}`;
-    params.push(parseInt(limit));
-    const r = await pool.query(combined, params);
-    const total = r.rows.reduce((sum, o) => sum + parseFloat(o.total_amount || 0), 0);
-    return res.json({ data: r.rows.map((o) => ({ ...o, userName: o.user_name, planName: o.plan_name })), total });
+    const filtros = (col, userCol) => {
+      let w = "";
+      if (startDate) { params.push(startDate); w += ` AND ${col} >= $${params.length}`; }
+      // endDate inclusivo: hasta el final de ese día en la zona del estudio (la
+      // conexión ya ancla TimeZone=STUDIO_TIMEZONE), no a la medianoche que lo
+      // abre. "< día siguiente" en vez de "<= endDate" para no dejar fuera lo
+      // que se cobró ese mismo día.
+      if (endDate) { params.push(endDate); w += ` AND ${col} < ($${params.length}::date + INTERVAL '1 day')`; }
+      if (userId) { params.push(userId); w += ` AND ${userCol} = $${params.length}`; }
+      return w;
+    };
+    const ordenes = `
+      SELECT o.id, o.user_id, u.display_name AS user_name, p.name AS plan_name,
+             o.total_amount::numeric AS total_amount, o.payment_method::text AS method, o.status::text AS status,
+             o.created_at, 'order'::text AS source, o.id AS order_id, o.channel::text AS channel,
+             COALESCE(o.refunded_amount, 0)::numeric AS refunded_amount, o.refund_status::text AS refund_status,
+             mm.id AS membership_id, mm.status::text AS membership_status, mm.classes_remaining, p.class_limit,
+             NULL::text AS reason
+        FROM orders o
+        LEFT JOIN users u ON o.user_id = u.id
+        LEFT JOIN plans p ON o.plan_id = p.id
+        LEFT JOIN LATERAL (
+          SELECT m.id, m.status, m.classes_remaining FROM memberships m
+           WHERE m.order_id = o.id ORDER BY m.created_at ASC LIMIT 1
+        ) mm ON true
+       WHERE o.status = 'approved'${filtros("o.created_at", "o.user_id")}`;
+    const membresias = `
+      SELECT m.id, m.user_id, u.display_name AS user_name, p.name AS plan_name,
+             p.price::numeric AS total_amount, m.payment_method::text AS method, m.status::text AS status,
+             m.created_at, 'membership'::text AS source, NULL::uuid AS order_id, NULL::text AS channel,
+             0::numeric AS refunded_amount, NULL::text AS refund_status,
+             m.id AS membership_id, m.status::text AS membership_status, m.classes_remaining, p.class_limit,
+             NULL::text AS reason
+        FROM memberships m
+        LEFT JOIN users u ON m.user_id = u.id
+        LEFT JOIN plans p ON m.plan_id = p.id
+       WHERE m.status = 'active' AND m.order_id IS NULL${filtros("m.created_at", "m.user_id")}`;
+    const reembolsos = `
+      SELECT r.id, r.user_id, u.display_name AS user_name, p.name AS plan_name,
+             (-r.amount)::numeric AS total_amount, r.method::text AS method, 'refunded'::text AS status,
+             r.created_at, 'refund'::text AS source, r.order_id, NULL::text AS channel,
+             r.amount::numeric AS refunded_amount, NULL::text AS refund_status,
+             r.membership_id, NULL::text AS membership_status, NULL::int AS classes_remaining, NULL::int AS class_limit,
+             r.reason
+        FROM refunds r
+        LEFT JOIN users u ON r.user_id = u.id
+        LEFT JOIN orders o ON o.id = r.order_id
+        LEFT JOIN plans p ON p.id = o.plan_id
+       WHERE true${filtros("r.created_at", "r.user_id")}`;
+    params.push(limit);
+    const r = await pool.query(
+      `(${ordenes}) UNION ALL (${membresias}) UNION ALL (${reembolsos}) ORDER BY created_at DESC LIMIT $${params.length}`,
+      params,
+    );
+    const total = round2(r.rows.reduce((sum, o) => sum + parseFloat(o.total_amount || 0), 0));
+    const refundsTotal = round2(r.rows.filter((o) => o.source === "refund").reduce((sum, o) => sum + parseFloat(o.refunded_amount || 0), 0));
+    return res.json({
+      data: r.rows.map((o) => ({
+        ...o,
+        userName: o.user_name,
+        userId: o.user_id,
+        planName: o.source === "refund" ? `Reembolso · ${o.plan_name ?? "orden"}` : o.plan_name,
+        createdAt: o.created_at,
+        orderId: o.order_id ?? null,
+        refundedAmount: Number(o.refunded_amount ?? 0),
+        refundStatus: o.refund_status ?? null,
+        membershipId: o.membership_id ?? null,
+        membershipStatus: o.membership_status ?? null,
+        classesRemaining: o.classes_remaining ?? null,
+        classLimit: o.class_limit ?? null,
+      })),
+      total,
+      refundsTotal,
+    });
   } catch (err) {
     console.error("[GET /payments]", err);
     return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// ─── Reembolsos (auditoría 2026-09-27, P1-12) ───────────────────────────────
+// La dueña registra un reembolso total o parcial de una orden aprobada. El
+// dinero se devuelve fuera del sistema (efectivo, transferencia o terminal):
+// aquí no se llama a ninguna pasarela.
+//   - Total: cancela la membresía de la orden, deja sus clases en 0 y cancela
+//     sus reservas futuras (confirmadas y en fila), aunque la membresía ya
+//     estuviera cancelada; los lugares suben la fila.
+//   - Parcial: resta las clases que eligió la dueña; la membresía sigue activa.
+// La orden queda approved con refunded_amount y refund_status; los reportes
+// restan el reembolso en su fecha. Todo en una transacción con la orden
+// bloqueada: dos totales a la vez no pasan (el segundo espera y da 409).
+// Orden de candados: orden → reservas → membresía, el mismo que la subida de la
+// lista de espera (clase → reservas de la fila → membresía). Si el reembolso
+// tomara la membresía antes que las reservas, una subida que ya tiene la fila y
+// va por la membresía de esta clienta se interbloquearía con él.
+app.post("/api/admin/orders/:id/refunds", ownerMiddleware, async (req, res) => {
+  if (!isUuid(req.params.id)) return res.status(400).json({ message: "Identificador inválido" });
+  const input = req.body || {};
+  const client = await pool.connect();
+  let released = false;
+  try {
+    await client.query("BEGIN");
+    // 1. La orden, con candado.
+    const o = await client.query(
+      `SELECT o.id, o.user_id, o.status::text AS status, o.payment_method::text AS payment_method, o.channel,
+              o.total_amount, COALESCE(o.refunded_amount, 0) AS refunded_amount, o.refund_status, o.order_number,
+              p.name AS plan_name
+         FROM orders o
+         LEFT JOIN plans p ON p.id = o.plan_id
+        WHERE o.id = $1
+        FOR UPDATE OF o`,
+      [req.params.id],
+    );
+    if (!o.rows.length) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ message: "Orden no encontrada" });
+    }
+    const order = o.rows[0];
+    // 2. El id de la membresía de la orden, sin candado todavía.
+    const membershipId = (await client.query(
+      `SELECT id FROM memberships WHERE order_id = $1 ORDER BY created_at ASC LIMIT 1`,
+      [order.id],
+    )).rows[0]?.id ?? null;
+    // 3. Si es total: sus reservas futuras confirmadas y en fila, con candado.
+    let futuras = [];
+    if (membershipId && input.kind === "total") {
+      futuras = (await client.query(
+        `SELECT b.id, b.class_id, b.status::text AS status
+           FROM bookings b JOIN classes c ON c.id = b.class_id
+          WHERE b.membership_id = $1 AND b.status IN ('confirmed', 'waitlist')
+            AND ((c.date + c.start_time) AT TIME ZONE '${STUDIO_TIMEZONE}') > NOW()
+          ORDER BY b.id
+          FOR UPDATE OF b`,
+        [membershipId],
+      )).rows;
+    }
+    // 4. Sólo entonces la membresía, con candado.
+    const membership = membershipId
+      ? (await client.query(
+          `SELECT id, user_id, status::text AS status, classes_remaining FROM memberships WHERE id = $1 FOR UPDATE`,
+          [membershipId],
+        )).rows[0] ?? null
+      : null;
+    // 5. Una reserva nueva toma la membresía antes de insertarse: la que se
+    //    confirmó mientras esperábamos ese candado no salió en el paso 3. Con
+    //    SKIP LOCKED no se espera a la que otra transacción ya tiene (una
+    //    cancelación en curso, que va de la reserva a la membresía): esperarla
+    //    teniendo la membresía sería un interbloqueo.
+    //    Las saltadas no se pierden: la cancelación en curso termina sola; una
+    //    subida de la fila que esperaba esta membresía la verá cancelada y se
+    //    revierte, y la reserva que deja en 'waitlist' la cancela la sentencia
+    //    del paso 7, después del COMMIT.
+    if (membership && input.kind === "total") {
+      const tarde = (await client.query(
+        `SELECT b.id, b.class_id, b.status::text AS status
+           FROM bookings b JOIN classes c ON c.id = b.class_id
+          WHERE b.membership_id = $1 AND b.status IN ('confirmed', 'waitlist')
+            AND ((c.date + c.start_time) AT TIME ZONE '${STUDIO_TIMEZONE}') > NOW()
+            AND NOT (b.id = ANY($2::uuid[]))
+          ORDER BY b.id
+          FOR UPDATE OF b SKIP LOCKED`,
+        [membership.id, futuras.map((b) => b.id)],
+      )).rows;
+      futuras = futuras.concat(tarde);
+    }
+    const plan = refundPlan({ order, membership, input });
+    if (!plan.ok) {
+      await client.query("ROLLBACK");
+      return res.status(plan.status).json({ ...(plan.code ? { code: plan.code } : {}), message: plan.message });
+    }
+    const why = cleanReason(input.reason);
+    let membershipAfter = membership;
+    let bookings = [];
+    if (plan.kind === "total" && membership) {
+      // Si ya estaba cancelada, conserva su fecha y su motivo de cancelación;
+      // sólo le deja las clases en 0.
+      membershipAfter = (await client.query(
+        `UPDATE memberships
+            SET cancelled_at = CASE WHEN status = 'cancelled' THEN cancelled_at ELSE NOW() END,
+                cancellation_reason = CASE WHEN status = 'cancelled' THEN cancellation_reason ELSE $2 END,
+                status = 'cancelled',
+                classes_remaining = CASE WHEN classes_remaining IS NULL OR classes_remaining >= 9999
+                                         THEN classes_remaining ELSE 0 END,
+                updated_at = NOW()
+          WHERE id = $1
+          RETURNING id, status::text AS status, classes_remaining`,
+        [membership.id, `Reembolso total: ${why}`.slice(0, 500)],
+      )).rows[0];
+      await resyncMixtoBuckets(client, membership.id);
+      if (futuras.length) {
+        await client.query(
+          `UPDATE bookings SET status = 'cancelled', cancelled_at = NOW(), cancelled_by = $2, cancellation_reason = $3
+            WHERE id = ANY($1::uuid[])`,
+          [futuras.map((b) => b.id), req.userId, `Reembolso total: ${why}`.slice(0, 500)],
+        );
+        // Cupo: lo mantiene el trigger update_class_booking_count (auditoría 2026-09-08, P1-6).
+        bookings = futuras;
+      }
+    } else if (plan.classesToRemove > 0) {
+      membershipAfter = (await client.query(
+        `UPDATE memberships SET classes_remaining = GREATEST(classes_remaining - $2, 0), updated_at = NOW()
+          WHERE id = $1
+          RETURNING id, status::text AS status, classes_remaining`,
+        [membership.id, plan.classesToRemove],
+      )).rows[0];
+      await resyncMixtoBuckets(client, membership.id);
+    }
+    const refund = (await client.query(
+      `INSERT INTO refunds (order_id, membership_id, user_id, amount, kind, method, reference, reason,
+                            classes_removed, membership_cancelled, bookings_cancelled, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+       RETURNING *`,
+      [order.id, membership?.id ?? null, order.user_id, plan.amount, plan.kind, plan.method, plan.reference, why,
+       plan.classesToRemove, plan.cancelMembership, bookings.length, req.userId],
+    )).rows[0];
+    await client.query(
+      `UPDATE orders SET refunded_amount = $2, refund_status = $3, refunded_at = NOW() WHERE id = $1`,
+      [order.id, plan.newRefunded, plan.newStatus],
+    );
+    await recordAudit(client, {
+      actorId: req.userId, action: "order.refund", entityType: "order", entityId: order.id, subjectUserId: order.user_id,
+      reason: why,
+      before: {
+        refunded_amount: Number(order.refunded_amount), refund_status: order.refund_status ?? null,
+        ...(membership ? { classes_remaining: membership.classes_remaining, membership_status: membership.status } : {}),
+      },
+      after: {
+        refunded_amount: plan.newRefunded, refund_status: plan.newStatus,
+        ...(membershipAfter ? { classes_remaining: membershipAfter.classes_remaining, membership_status: membershipAfter.status } : {}),
+      },
+      meta: {
+        refund_id: refund.id, kind: plan.kind, amount: plan.amount, method: plan.method, reference: plan.reference,
+        classes_removed: plan.classesToRemove, bookings_cancelled: bookings.length,
+        order_number: order.order_number ?? null, plan_name: order.plan_name ?? null,
+      },
+    });
+    await client.query("COMMIT");
+    // La subida de la fila pide su propia conexión: se devuelve ésta antes.
+    client.release();
+    released = true;
+
+    // 7. Filas en fila que siguen ligadas a la membresía reembolsada: las que el
+    //    paso 5 saltó porque una subida las tenía y cuya subida se revirtió al
+    //    ver la membresía cancelada. Best-effort, una sola sentencia fuera de la
+    //    transacción: no vuelve a tomar la orden ni la membresía. Espera, a lo
+    //    más, a que esa subida suelte la reserva.
+    if (plan.kind === "total" && membership) {
+      try {
+        const sueltas = await pool.query(
+          `UPDATE bookings b
+              SET status = 'cancelled', cancelled_at = NOW(), cancelled_by = $2, cancellation_reason = $3
+             FROM classes c
+            WHERE c.id = b.class_id AND b.membership_id = $1 AND b.status = 'waitlist'
+              AND ((c.date + c.start_time) AT TIME ZONE '${STUDIO_TIMEZONE}') > NOW()
+            RETURNING b.id`,
+          [membership.id, req.userId, `Reembolso total: ${why}`.slice(0, 500)],
+        );
+        if (sueltas.rowCount) {
+          console.warn(`[refunds] ${sueltas.rowCount} reserva(s) en fila de la membresía ${membership.id} se cancelaron después del COMMIT`);
+        }
+      } catch (e) {
+        console.warn("[refunds] no se pudieron cancelar las filas sueltas:", e?.message);
+      }
+    }
+
+    const freed = [...new Set(bookings.filter((b) => b.status === "confirmed").map((b) => b.class_id))];
+    if (freed.length) await onSeatReleased(freed, { source: "refund" });
+    if (order.user_id) triggerWalletPassSync(order.user_id, "refund");
+    return res.status(201).json({
+      data: {
+        refund,
+        order: { id: order.id, refunded_amount: plan.newRefunded, refund_status: plan.newStatus },
+        membership: membershipAfter ?? null,
+        bookings_cancelled: bookings.length,
+      },
+    });
+  } catch (err) {
+    if (!released) await client.query("ROLLBACK").catch(() => {});
+    console.error("[POST /admin/orders/:id/refunds]", err.message);
+    return res.status(500).json({ message: "Error interno" });
+  } finally {
+    if (!released) client.release();
   }
 });
 
@@ -14996,11 +16253,14 @@ app.post("/api/admin/loyalty/recalculate/:userId", adminMiddleware, async (req, 
     const ppp = Number(cfg.points_per_peso);
     if (cfg.enabled === false) return res.json({ data: { awarded: 0, message: "Loyalty desactivado en configuración" } });
 
-    // Get all active/expired memberships for this user
+    // Get all active/expired memberships for this user, con el total de la
+    // orden ligada (si la hay): una cortesía es una orden en $0 y no debe
+    // recibir puntos retroactivos.
     const mRes = await pool.query(
-      `SELECT m.id, p.price, p.name
+      `SELECT m.id, p.price, p.name, o.total_amount
        FROM memberships m
        JOIN plans p ON m.plan_id = p.id
+       LEFT JOIN orders o ON o.id = m.order_id
        WHERE m.user_id = $1 AND m.status IN ('active','expired')`,
       [userId]
     );
@@ -15018,7 +16278,11 @@ app.post("/api/admin/loyalty/recalculate/:userId", adminMiddleware, async (req, 
       const desc = `Membresía asignada — ${m.name} ($${m.price})`;
       // Skip if already awarded for this membership (by description match)
       if (existingDescs.has(desc)) continue;
-      const pts = Math.floor(parseFloat(m.price) * ppp);
+      // Cortesía (orden ligada en $0): sin puntos, sin movimiento.
+      const orderAmount = m.total_amount == null ? null : Number(m.total_amount);
+      if (orderAmount === 0) continue;
+      const charged = orderAmount != null ? orderAmount : parseFloat(m.price);
+      const pts = Math.floor(charged * ppp);
       if (pts <= 0) continue;
       await pool.query(
         "INSERT INTO loyalty_transactions (user_id, type, points, description) VALUES ($1, 'earn', $2, $3)",
@@ -15281,6 +16545,12 @@ app.put("/api/admin/classes/:id", adminMiddleware, async (req, res) => {
       return res.status(400).json({ message: "La hora de fin debe ser posterior a la de inicio." });
     }
 
+    // Cupo y estado de antes: sólo se sube la fila si la edición libera lugar.
+    const prev = (await pool.query(
+      "SELECT max_capacity, status::text AS status FROM classes WHERE id = $1", [req.params.id],
+    )).rows[0];
+    if (!prev) return res.status(404).json({ message: "Clase no encontrada" });
+
     const r = await pool.query(
       `UPDATE classes SET
          class_type_id = COALESCE($1, class_type_id),
@@ -15302,20 +16572,63 @@ app.put("/api/admin/classes/:id", adminMiddleware, async (req, res) => {
       ]
     );
     if (!r.rows.length) return res.status(404).json({ message: "Clase no encontrada" });
-    return res.json({ data: r.rows[0] });
+    // Sube la fila sólo si hay lugares nuevos (el cupo aumentó) o la clase
+    // pasó de 'closed' a 'scheduled'. Cambiar la coach, la hora o las notas no
+    // libera nada: no debe inscribir a nadie ni descontarle una clase.
+    const promoted = classEditReleasesSeats({ before: prev, after: r.rows[0] })
+      ? await onSeatReleased([req.params.id], { source: "capacity" })
+      : [];
+    return res.json({ data: r.rows[0], waitlist_promoted: promoted });
   } catch (err) {
     console.error("[PUT /admin/classes/:id]", err.message);
     return res.status(500).json({ message: "Error interno" });
   }
 });
 
-// DELETE /api/admin/classes/:id
+// DELETE /api/admin/classes/:id — sólo borra una clase sin ninguna reserva (de
+// ningún estado): borrarla con reservas se llevaba su historial en cascada. Con
+// reservas se cancela (PUT /api/classes/:id/cancel). Auditoría 2026-09-27, P1-5.
 app.delete("/api/admin/classes/:id", adminMiddleware, async (req, res) => {
+  const client = await pool.connect();
   try {
-    await pool.query("DELETE FROM classes WHERE id = $1", [req.params.id]);
+    await client.query("BEGIN");
+    const cur = await client.query(
+      `SELECT c.id, to_char(c.date, 'YYYY-MM-DD') AS day, c.start_time, c.status::text AS status
+         FROM classes c WHERE c.id = $1 FOR UPDATE`,
+      [req.params.id],
+    );
+    if (!cur.rows.length) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ message: "Clase no encontrada" });
+    }
+    const cls = cur.rows[0];
+    // NOT EXISTS dentro del propio DELETE (no un SELECT COUNT aparte): si algo
+    // reserva la clase entre el SELECT de arriba y aquí, esta consulta ya no
+    // borra nada — nunca una foto vieja del conteo.
+    const del = await client.query(
+      `DELETE FROM classes c WHERE c.id = $1 AND NOT EXISTS (SELECT 1 FROM bookings b WHERE b.class_id = c.id)`,
+      [cls.id],
+    );
+    if (del.rowCount === 0) {
+      await client.query("ROLLBACK");
+      return res.status(409).json({ code: "CLASS_HAS_BOOKINGS", message: "Esta clase tiene reservas o historial: cancélala en lugar de borrarla." });
+    }
+    await recordAudit(client, {
+      actorId: req.userId, action: "class.delete", entityType: "class", entityId: cls.id,
+      before: { day: cls.day, start_time: String(cls.start_time).slice(0, 5), status: cls.status },
+      meta: { source: "manual" },
+    });
+    await client.query("COMMIT");
     return res.json({ message: "Clase eliminada" });
   } catch (err) {
+    await client.query("ROLLBACK").catch(() => {});
+    if (err?.code === "23503") {
+      return res.status(409).json({ code: "CLASS_HAS_BOOKINGS", message: "La clase tiene registros ligados: cancélala en lugar de borrarla." });
+    }
+    console.error("[DELETE /admin/classes/:id]", err.message);
     return res.status(500).json({ message: "Error interno" });
+  } finally {
+    client.release();
   }
 });
 
@@ -16162,9 +17475,44 @@ app.post("/api/admin/test-emails", adminMiddleware, async (req, res) => {
       ? `Se enviaron ${results.filter(r => r.startsWith("✅")).length} emails de prueba a ${testTo}`
       : "⚠️ RESEND_API_KEY no está configurada. Los emails NO se enviaron.",
     resendKeySet: hasResendKey,
-    fromEmail: process.env.EMAIL_FROM || "onboarding@resend.dev (default)",
+    fromEmail: FROM_EMAIL,
     results,
   });
+});
+
+// ─── Bitácora (audit_log) ────────────────────────────────────────────────────
+// Sólo la dueña (admin, super_admin): quién cobró, ajustó, canceló, corrigió o
+// dio de baja, cuándo, por qué y el antes/después. Auditoría 2026-09-27, P0-3.
+app.get("/api/admin/audit", ownerMiddleware, async (req, res) => {
+  const q = buildAuditQuery(req.query, { timezone: STUDIO_TIMEZONE });
+  if (!q.ok) return res.status(400).json({ message: q.message });
+  try {
+    const [rows, count] = await Promise.all([pool.query(q.sql, q.params), pool.query(q.countSql, q.countParams)]);
+    return res.json({ data: rows.rows.map(auditRowOut), page: q.page, limit: q.limit, total: Number(count.rows[0]?.n ?? 0) });
+  } catch (err) {
+    console.error("[GET /admin/audit]", err.message);
+    return res.status(500).json({ message: "Error interno" });
+  }
+});
+
+// Personas del equipo que aparecen en la bitácora (filtro "Quién").
+app.get("/api/admin/audit/actors", ownerMiddleware, async (_req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT DISTINCT ON (a.actor_id) a.actor_id AS id,
+              COALESCE(u.display_name, a.actor_name) AS name,
+              COALESCE(u.role::text, a.actor_role) AS role
+         FROM audit_log a
+         LEFT JOIN users u ON u.id = a.actor_id
+        WHERE a.actor_id IS NOT NULL
+        ORDER BY a.actor_id, a.created_at DESC`,
+    );
+    const data = r.rows.sort((x, y) => String(x.name ?? "").localeCompare(String(y.name ?? ""), "es"));
+    return res.json({ data });
+  } catch (err) {
+    console.error("[GET /admin/audit/actors]", err.message);
+    return res.status(500).json({ message: "Error interno" });
+  }
 });
 
 // ─── Healthcheck (Railway, uptime monitors) ──────────────────────────────────
@@ -16508,6 +17856,21 @@ function scheduleEmailCrons() {
       console.error("[Cron] class_reminder interval error:", e?.message),
     );
   }, 10 * 60 * 1000); // every 10 minutes
+
+  // ── Lista de espera: barrido de respaldo (auditoría 2026-09-27, P1-1) ──
+  // APAGADO por defecto: sólo se programa si WAITLIST_SWEEP_MINUTES es un
+  // número mayor que 0. En producción hay filas viejas en clases con lugar y,
+  // al desplegar, el barrido las inscribiría solas, les descontaría una clase y
+  // les mandaría aviso sin que el dueño lo decida. La subida por evento
+  // (onSeatReleased) corre siempre.
+  const sweepMin = sweepMinutes(process.env.WAITLIST_SWEEP_MINUTES);
+  if (sweepMin > 0) {
+    setInterval(() => {
+      runWaitlistSweep().catch((e) => console.error("[Cron] lista de espera:", e?.message));
+    }, sweepMin * 60 * 1000);
+  } else if (Number(process.env.WAITLIST_SWEEP_MINUTES) > MAX_SWEEP_MINUTES) {
+    console.warn(`[Cron] WAITLIST_SWEEP_MINUTES pasa de ${MAX_SWEEP_MINUTES}: el barrido de la lista de espera queda apagado.`);
+  }
 
   // ── Wellhub: reconcile inventario cada 5 min (safety net del trigger) ──
   setInterval(async () => {

@@ -34,3 +34,11 @@ export const maskSecret = (value) => {
   return "••••" + (s.length > 4 ? s.slice(-4) : "");
 };
 export const isMaskedSecret = (value) => typeof value === "string" && value.startsWith("••••");
+
+const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
+/** "AAAA-MM-DD" de un día que existe en el calendario (bloque 2). */
+export function isDay(value) {
+  if (typeof value !== "string" || !DAY_RE.test(value)) return false;
+  const d = new Date(`${value}T12:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === value;
+}

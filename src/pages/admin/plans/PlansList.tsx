@@ -38,13 +38,6 @@ const CATEGORIES = [
 
 type CategoryValue = (typeof CATEGORIES)[number]["value"];
 
-// RIESGO: el borrado en cascada se decide comparando el NOMBRE EXACTO del plan.
-// Si alguien renombra este plan en la base de datos, el caso especial deja de
-// aplicar (o aplicaría a otro plan que se llame igual) y el ?cascade=true borra
-// membresías, órdenes y códigos de descuento ligados al plan en el servidor.
-// No cambiar este string sin coordinar con server/index.js (DELETE /api/plans/:id).
-const CASCADE_DELETE_PLAN_NAME = "Sesión Extra (Socias o Inscritas)";
-
 const planSchema = z.object({
   name: z.string().min(1, "Nombre requerido"),
   description: z.string().optional(),
@@ -68,6 +61,7 @@ type PlanFormData = z.infer<typeof planSchema>;
 
 interface Plan extends PlanFormData {
   id: string;
+  archivedAt?: string | null;
 }
 
 function normalizePlanRow(row: any): Plan {
@@ -96,6 +90,7 @@ function normalizePlanRow(row: any): Plan {
     repeatKey: String(row?.repeatKey ?? row?.repeat_key ?? ""),
     sortOrder: Number(row?.sortOrder ?? row?.sort_order ?? 0),
     isVisitPack: Boolean(row?.isVisitPack ?? row?.is_visit_pack ?? false),
+    archivedAt: (row?.archivedAt ?? row?.archived_at ?? null) as string | null,
   };
 }
 
@@ -142,7 +137,7 @@ function normalizePlan(p: Plan): PlanFormData {
 
 const FormSection = ({ title, children }: { title: string; children: ReactNode }) => (
   <section className="space-y-4">
-    <p className="border-b border-line pb-2 text-[0.72rem] font-medium uppercase tracking-[0.18em] text-ink">
+    <p className="border-b border-line pb-2 text-[0.75rem] font-medium uppercase tracking-[0.18em] text-ink">
       {title}
     </p>
     {children}
@@ -211,7 +206,9 @@ function PlanCard({ p, onEdit, onToggleActive, onDelete }: {
         {rules.map((r) => <span key={r} className="rounded-full border border-line px-2.5 py-0.5 text-[0.75rem] font-bold text-ink-muted">{r}</span>)}
       </div>
       <div className="border-t border-line pt-2.5">
-        {p.isActive ? <StatusDot tone="success">Activo</StatusDot> : <StatusDot tone="muted">Inactivo</StatusDot>}
+        {p.isActive
+          ? <StatusDot tone="success">Activo</StatusDot>
+          : <StatusDot tone="muted">{p.archivedAt ? "Archivado" : "Inactivo"}</StatusDot>}
       </div>
     </article>
   );
@@ -246,13 +243,13 @@ const PlansList = () => {
     onError: (e: any) => toast({ title: e?.response?.data?.message ?? "Error al actualizar", variant: "destructive" }),
   });
 
+  // Un plan con historial se archiva en el servidor; ya no hay "Eliminar con
+  // todo" (auditoría 2026-09-27, familia de P1-5).
   const deleteMutation = useMutation({
-    mutationFn: ({ id, cascade }: { id: string; cascade?: boolean }) =>
-      api.delete(`/plans/${id}${cascade ? "?cascade=true" : ""}`),
+    mutationFn: (id: string) => api.delete(`/plans/${id}`),
     onSuccess: (res: any) => {
       qc.invalidateQueries({ queryKey: ["plans"] });
-      const msg = res?.data?.message ?? "Plan eliminado";
-      toast({ title: msg });
+      toast({ title: res?.data?.message ?? "Plan eliminado" });
     },
     onError: (e: any) => toast({ title: e?.response?.data?.message ?? "Error al eliminar", variant: "destructive" }),
   });
@@ -267,16 +264,13 @@ const PlansList = () => {
   };
 
   const requestDelete = async (p: Plan) => {
-    const isCascade = p.name === CASCADE_DELETE_PLAN_NAME;
     const ok = await confirm({
       title: `¿Eliminar "${p.name}"?`,
-      description: isCascade
-        ? "Se eliminan también todas las membresías, órdenes y códigos de descuento ligados a este plan. Esta acción no se puede deshacer."
-        : "El plan desaparece del catálogo. Si tiene membresías o ventas asociadas, se desactivará en lugar de borrarse.",
+      description: "Si el plan tiene membresías, órdenes o códigos de descuento, se archiva: deja de venderse y su historial se conserva. Si no tiene nada ligado, se borra.",
       confirmLabel: "Eliminar",
       destructive: true,
     });
-    if (ok) deleteMutation.mutate({ id: p.id, cascade: isCascade });
+    if (ok) deleteMutation.mutate(p.id);
   };
 
   return (

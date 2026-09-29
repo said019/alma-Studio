@@ -28,7 +28,8 @@ describe("Wallet en oscuro (spec 2026-09-25 §6.5)", () => {
     expect(estado).toMatch(/metrics\.hasMembership \? "text-success" : "text-ink-muted"/);
     expect(estado).not.toMatch(/"text-ink-faint"/);
   });
-  it("el archivo del pase conserva su nombre (lo cambia el sub-proyecto A)", () => {
-    expect(src).toContain('a.download = "alma-pass.pkpass"');
+  it("el pase se descarga como hive-pass.pkpass (es sólo el nombre de descarga; Apple lo pide por /api/wallet/v1/passes)", () => {
+    expect(src).toContain('a.download = "hive-pass.pkpass"');
+    expect(src).not.toMatch(/alma-pass/);
   });
 });
