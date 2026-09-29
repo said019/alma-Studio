@@ -9,8 +9,10 @@ const COLS: Record<number, string> = {
 };
 
 /* Fila de cifras en una sola tarjeta con divisores (spec §4.5). En celular
-   van de dos en dos. Hasta 5 cifras (Wellhub, T6) caben en una sola fila en
-   escritorio; con más de 5 la quinta en adelante baja de fila en celular. */
+   el grid es siempre de 2 columnas, así que a partir de la tercera cifra
+   ya baja de fila ahí. En escritorio el número de columnas crece con la
+   cantidad de cifras hasta un tope de 5 en una sola fila; con más de 5,
+   las que sobran también bajan de fila en escritorio (el tope no crece). */
 export default function KpiStrip({ items }: { items: Kpi[] }) {
   return (
     <Panel>
