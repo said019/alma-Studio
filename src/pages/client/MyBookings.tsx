@@ -143,7 +143,11 @@ const MyBookings = () => {
         const msg = err.response.data.message || "Ya subiste de la lista de espera: tu lugar está confirmado.";
         toast({ title: "Tu lugar ya está confirmado", description: msg });
         setCancelTarget(null);
+        // La subida ya descontó una clase del paquete: refresca también las
+        // membresías, no sólo la reserva, para que el cupo se vea al momento.
         qc.invalidateQueries({ queryKey: ["my-bookings"] });
+        qc.invalidateQueries({ queryKey: ["my-membership"] });
+        qc.invalidateQueries({ queryKey: ["my-memberships-all"] });
         return;
       }
       const msg = err?.response?.data?.message || "No se pudo cancelar.";

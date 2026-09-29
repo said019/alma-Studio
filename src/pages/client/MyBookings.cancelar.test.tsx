@@ -78,10 +78,13 @@ describe("Mis clases · cancelar y lista de espera (P0-4 · P1-1)", () => {
     await waitFor(() => expect(toastSpy).toHaveBeenCalledWith(expect.objectContaining({ title: "Saliste de la lista de espera" })));
   });
 
-  it("si ya subió de la fila antes de confirmar, el servidor da 409 ALREADY_PROMOTED: muestra su mensaje y refresca la lista (A1)", async () => {
+  it("si ya subió de la fila antes de confirmar, el servidor da 409 ALREADY_PROMOTED: muestra su mensaje y refresca la lista y la membresía", async () => {
     montar(0);
     await screen.findByText("Lugar 2 en la fila");
     const llamadasPrevias = vi.mocked(api.get).mock.calls.filter((c) => c[0] === "/bookings/my-bookings").length;
+    // La subida ya descontó una clase del paquete: la pantalla debe volver a
+    // pedir la membresía, no sólo la lista de reservas.
+    const llamadasMembresiaPrevias = vi.mocked(api.get).mock.calls.filter((c) => c[0] === "/memberships/mine/all").length;
     fireEvent.click(screen.getByRole("button", { name: "Salir de la lista de espera" }));
     const dlg = await screen.findByRole("alertdialog", { name: "¿Salir de la lista de espera?" });
     vi.mocked(api.delete).mockRejectedValue({
@@ -100,6 +103,10 @@ describe("Mis clases · cancelar y lista de espera (P0-4 · P1-1)", () => {
     await waitFor(() => {
       const llamadasAhora = vi.mocked(api.get).mock.calls.filter((c) => c[0] === "/bookings/my-bookings").length;
       expect(llamadasAhora).toBeGreaterThan(llamadasPrevias);
+    });
+    await waitFor(() => {
+      const llamadasMembresiaAhora = vi.mocked(api.get).mock.calls.filter((c) => c[0] === "/memberships/mine/all").length;
+      expect(llamadasMembresiaAhora).toBeGreaterThan(llamadasMembresiaPrevias);
     });
   });
 
