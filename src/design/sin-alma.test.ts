@@ -57,6 +57,13 @@ describe("sin Alma Movement, Juriquilla ni Querétaro en lo que ven las clientas
     expect(ARCHIVOS.flatMap(lineasProhibidas)).toEqual([]);
   });
 
+  it("el banco de la transferencia sale de lo capturado en el panel, no escrito en las pantallas", () => {
+    // Banorte era el banco de la marca anterior; el de HIVE se captura en
+    // Configuración → Pagos y la pantalla de transferencia lo lee de ahí.
+    const conBanco = ARCHIVOS.filter((f) => /Banorte/.test(fs.readFileSync(path.join(root, f), "utf8")));
+    expect(conBanco).toEqual([]);
+  });
+
   it("el manifest describe a HIVE en Coyoacán", () => {
     const m = JSON.parse(fs.readFileSync(path.join(root, "public/site.webmanifest"), "utf8"));
     expect(m.name).toBe("HIVE Pilates Studio");

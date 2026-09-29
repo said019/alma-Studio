@@ -545,7 +545,7 @@ const Checkout = () => {
               <div role="radiogroup" aria-label="Método de pago" className="space-y-2">
                 {[
                   { id: "card" as const, label: "Tarjeta", sub: "Visa, Mastercard — pago seguro con Stripe", icon: CreditCard },
-                  { id: "transfer" as const, label: "Transferencia", sub: "Banorte, subes tu comprobante", icon: Building2 },
+                  { id: "transfer" as const, label: "Transferencia", sub: "Subes tu comprobante", icon: Building2 },
                   { id: "cash" as const, label: "Efectivo", sub: "Pagas en recepción del estudio", icon: Banknote },
                 ].map((opt) => {
                   const Icon = opt.icon;
