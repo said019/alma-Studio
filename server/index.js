@@ -4095,6 +4095,17 @@ app.post("/api/bookings", authMiddleware, async (req, res) => {
   if (!(await hasSignedWaiver(pool, req.userId))) {
     return res.status(403).json({ code: "WAIVER_REQUIRED", message: WAIVER_REQUIRED_MSG });
   }
+  // La política se lee antes de tomar el cliente de la transacción: con el pool
+  // lleno, pedir otra conexión teniendo ésta podía dejar a la petición
+  // esperándose a sí misma (misma regla que en DELETE /bookings/:id). De aquí
+  // sale cancelWindowHours para el correo de "Reserva confirmada".
+  let policy;
+  try {
+    policy = await getBookingPolicy();
+  } catch (err) {
+    console.error("POST bookings policy error:", err.message);
+    return res.status(500).json({ message: "Error interno" });
+  }
   const client = await pool.connect();
   // El cliente se suelta justo después del COMMIT: la subida de la fila pide su
   // propia conexión (auditoría 2026-09-27, P1-1).
@@ -4277,6 +4288,7 @@ app.post("/api/bookings", authMiddleware, async (req, res) => {
             classesLeft,
             isWaitlist,
             waitlistCutoffHours: BOOKING_LEAD_HOURS,
+            cancelHours: policy.cancelWindowHours,
           }).catch((e) => console.error("[Email] booking confirmed:", e.message));
         }
         sendBookingNoticeWhatsApp(u, cl, finalStatus)
@@ -14474,6 +14486,15 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
     return res.status(400).json({ message: "Confirma el waiver de la acompañante" });
   }
   const hasGuestSale = withGuest && guestSale && typeof guestSale === "object" && guestSale.planId;
+  // La política se lee antes de tomar el cliente de la transacción, igual que
+  // en POST /api/bookings: de aquí sale cancelWindowHours para el correo.
+  let policy;
+  try {
+    policy = await getBookingPolicy();
+  } catch (err) {
+    console.error("POST admin/bookings/assign policy error:", err.message);
+    return res.status(500).json({ message: "Error interno" });
+  }
   const client = await pool.connect();
   // Se suelta tras el COMMIT: la subida de la fila pide su propia conexión (P1-1).
   let released = false;
@@ -14773,6 +14794,7 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
             classesLeft,
             isWaitlist,
             waitlistCutoffHours: BOOKING_LEAD_HOURS,
+            cancelHours: policy.cancelWindowHours,
           }).catch((e) => console.error("[Email] booking confirmed (admin):", e.message));
         }
         sendBookingNoticeWhatsApp(u, cl, isWaitlist ? "waitlist" : "confirmed")
