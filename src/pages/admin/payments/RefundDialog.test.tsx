@@ -62,6 +62,22 @@ describe("RefundDialog · el resumen no miente (A8)", () => {
     expect(within(dlg).queryByText(/La membresía sigue activa/)).toBeNull();
   });
 
+  it("parcial con la membresía vencida (expired): tampoco dice que 'sigue activa'", async () => {
+    montar({ ...BASE, membershipStatus: "expired" });
+    const dlg = await screen.findByRole("dialog");
+    fireEvent.click(within(dlg).getByLabelText("Reembolso parcial"));
+    fireEvent.change(within(dlg).getByLabelText("Monto a devolver"), { target: { value: "200" } });
+    expect(within(dlg).queryByText(/La membresía sigue activa/)).toBeNull();
+  });
+
+  it("parcial con la membresía en pausa (paused): tampoco dice que 'sigue activa'", async () => {
+    montar({ ...BASE, membershipStatus: "paused" });
+    const dlg = await screen.findByRole("dialog");
+    fireEvent.click(within(dlg).getByLabelText("Reembolso parcial"));
+    fireEvent.change(within(dlg).getByLabelText("Monto a devolver"), { target: { value: "200" } });
+    expect(within(dlg).queryByText(/La membresía sigue activa/)).toBeNull();
+  });
+
   it("parcial con membresía activa: sí dice que sigue activa", async () => {
     montar(BASE);
     const dlg = await screen.findByRole("dialog");
