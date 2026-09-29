@@ -587,7 +587,7 @@ const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: string; onBa
 
             {waiverBlocked && (
               <div className="space-y-2 rounded-xl border border-danger/25 bg-danger/10 p-3">
-                <p className="text-sm font-bold text-ink">Esta clienta no ha firmado su responsiva</p>
+                <p className="text-sm font-bold text-ink">Este usuario no ha firmado su responsiva</p>
                 <label className="flex min-h-[44px] items-center gap-2 text-sm text-ink">
                   <input type="checkbox" checked={waiverSignsAtDesk} onChange={(e) => setWaiverSignsAtDesk(e.target.checked)} />
                   Firmará en recepción

@@ -272,7 +272,7 @@ const BankInfoSettings = () => {
   return (
     <div className="space-y-5 max-w-md">
       <p className="text-sm text-ink/70">
-        Estos datos se muestran a las clientas en la pantalla de pago por transferencia (SPEI).
+        Estos datos se muestran a los usuarios en la pantalla de pago por transferencia (SPEI).
       </p>
 
       <div className="space-y-1">

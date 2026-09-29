@@ -36,7 +36,7 @@ const lineasProhibidas = (f: string) =>
     .filter(([l]) => PROHIBIDO.test(l))
     .map(([l, n]) => `${f}:${n}: ${l.trim().slice(0, 80)}`);
 
-describe("sin Alma Movement, Juriquilla ni Querétaro en lo que ven las clientas", () => {
+describe("sin Alma Movement, Juriquilla ni Querétaro en lo que ven los usuarios", () => {
   it("recorre de verdad las pantallas y el manifest", () => {
     expect(ARCHIVOS.length).toBeGreaterThan(100);
     expect(ARCHIVOS).toContain("src/components/auth/AuthShell.tsx");

@@ -45,7 +45,7 @@ const Profile = () => {
         : user?.gender === "other"
           ? "Comunidad"
           : "Alumna"
-      : (user?.role ?? "Cliente");
+      : (user?.role ?? "Usuario");
 
   const handleLogout = () => {
     logout();

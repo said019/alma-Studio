@@ -17,7 +17,7 @@ import { CalendarDays } from "lucide-react";
 
 const NOMBRE_TEMA: Record<Theme, string> = {
   light: "Claro · panel, landing y legales",
-  dark: "Oscuro · app de clienta, acceso y 404",
+  dark: "Oscuro · app de usuario, acceso y 404",
 };
 
 function ColumnaTema({ tema }: { tema: Theme }) {

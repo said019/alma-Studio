@@ -97,7 +97,7 @@ export default function RefundDialog({ payment, onClose }: { payment: Refundable
     <Dialog open onOpenChange={(v) => { if (!v) onClose(); }}>
       <DialogContent className="max-w-md border-line bg-canvas text-ink">
         <DialogHeader>
-          <DialogTitle className="font-display text-ink">Reembolsar a {payment.userName ?? "la clienta"}</DialogTitle>
+          <DialogTitle className="font-display text-ink">Reembolsar a {payment.userName ?? "el usuario"}</DialogTitle>
           <DialogDescription className="text-sm text-ink-muted">
             {payment.planName ?? "Pago"} · cobrado {formatMXN(total)}
             {Number(payment.refundedAmount ?? 0) > 0 ? ` · ya se devolvieron ${formatMXN(Number(payment.refundedAmount))}` : ""}.

@@ -440,7 +440,7 @@ const PlansList = () => {
                 />
                 <SwitchRow
                   label="No repetible"
-                  help="Cada clienta puede comprar este plan una sola vez."
+                  help="Cada usuario puede comprar este plan una sola vez."
                   checked={form.watch("isNonRepeatable")}
                   onCheckedChange={(v) => form.setValue("isNonRepeatable", v)}
                 />
@@ -476,7 +476,7 @@ const PlansList = () => {
                     <Label>Clave de repetición (grupo)</Label>
                     <Input placeholder="ej. trial_single_session" {...form.register("repeatKey")} />
                     <FieldHelp>
-                      Agrupa planes que comparten el límite de una vez por clienta. Si dos planes tienen la misma clave, comprar uno bloquea el otro. Puedes dejarlo vacío.
+                      Agrupa planes que comparten el límite de una vez por usuario. Si dos planes tienen la misma clave, comprar uno bloquea el otro. Puedes dejarlo vacío.
                     </FieldHelp>
                   </div>
                 )}

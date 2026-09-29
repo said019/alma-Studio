@@ -34,7 +34,7 @@ describe("menú de la landing", () => {
     const logo = screen.getByRole("link", { name: "HIVE Pilates Studio" });
     expect(logo.className).toMatch(/min-h-\[44px\]/);
   });
-  it("con clienta: Mi cuenta", () => {
+  it("con usuario: Mi cuenta", () => {
     login("client");
     renderPage(<LandingNav links={LINKS} />, "/");
     expect(screen.getByRole("link", { name: "Mi cuenta" })).toHaveAttribute("href", "/app");

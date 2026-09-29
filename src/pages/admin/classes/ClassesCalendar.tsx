@@ -410,7 +410,7 @@ function CalendarView({
       title: "¿Cancelar esta clase?",
       description:
         occupied > 0
-          ? `Hay ${occupied} ${occupied === 1 ? "reserva activa" : "reservas activas"}. La clase quedará cancelada y habrá que avisar a las clientas inscritas.`
+          ? `Hay ${occupied} ${occupied === 1 ? "reserva activa" : "reservas activas"}. La clase quedará cancelada y habrá que avisar a los usuarios inscritas.`
           : "La clase quedará cancelada y dejará de aceptar reservas.",
       confirmLabel: "Cancelar clase",
       destructive: true,

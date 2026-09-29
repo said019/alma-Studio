@@ -53,9 +53,9 @@ describe("Membresías", () => {
     const guardar = await screen.findByRole("button", { name: "Guardar vigencia" });
     fireEvent.change(screen.getByLabelText("Fecha de inicio"), { target: { value: "2026-10-01" } });
     expect(guardar).toBeDisabled();
-    fireEvent.change(screen.getByLabelText("Motivo del ajuste"), { target: { value: "Preventa acordada con la clienta" } });
+    fireEvent.change(screen.getByLabelText("Motivo del ajuste"), { target: { value: "Preventa acordada con el usuario" } });
     expect(guardar).toBeEnabled();
     fireEvent.click(guardar);
-    await waitFor(() => expect(mockApi.put).toHaveBeenCalledWith("/memberships/m1", { startDate: "2026-10-01", reason: "Preventa acordada con la clienta" }));
+    await waitFor(() => expect(mockApi.put).toHaveBeenCalledWith("/memberships/m1", { startDate: "2026-10-01", reason: "Preventa acordada con el usuario" }));
   });
 });

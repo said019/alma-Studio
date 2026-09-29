@@ -2740,7 +2740,7 @@ async function processPosSale({ userId, items, paymentMethod = "efectivo", disco
 }
 
 // ── Faltas (inasistencias / cancelaciones tardías) ──────────────────────────
-// Registra una falta para el usuario y, cada vez que el contador alcanza un
+// Registra una falta paral usuario y, cada vez que el contador alcanza un
 // múltiplo del umbral configurable, descuenta puntos de loyalty (asiento
 // 'adjust' con puntos negativos, mismo patrón que el reverso de check-in).
 // No aplica a invitadas (role='guest') ni a cancelaciones de admin.
@@ -3001,7 +3001,7 @@ async function anonymizedSaleConflict(userId) {
   if (!isUuid(userId)) return null;
   const r = await pool.query("SELECT anonymized_at FROM users WHERE id = $1", [userId]);
   if (r.rows.length && r.rows[0].anonymized_at) {
-    return { code: "ACCOUNT_ANONYMIZED", message: "Esta clienta fue dada de baja." };
+    return { code: "ACCOUNT_ANONYMIZED", message: "Este usuario fue dado de baja." };
   }
   return null;
 }
@@ -3356,7 +3356,7 @@ app.post("/api/auth/forgot-password", async (req, res) => {
 
     await sendPasswordResetEmail({
       to: email,
-      name: user.rows[0].display_name || "Clienta",
+      name: user.rows[0].display_name || "Usuario",
       token,
       resetUrl: `${APP_PUBLIC_URL}/auth/reset-password?token=${encodeURIComponent(token)}`,
     });
@@ -3484,7 +3484,7 @@ app.get("/api/memberships/my", authMiddleware, async (req, res) => {
        LEFT JOIN plans p ON m.plan_id = p.id
        WHERE m.user_id = $1
        ORDER BY
-         -- La que la clienta puede usar primero: activa vigente, luego
+         -- La que el usuario puede usar primero: activa vigente, luego
          -- pendientes, luego activa vencida (para mostrarle que venció) y al
          -- final el resto. Una cancelada conserva su end_date, así que no
          -- basta con "no vencida" para ganar (auditoría 2026-09-27, P1-6).
@@ -8051,7 +8051,7 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
   }
 
   backFields.push(
-    { key: "cliente", label: "CLIENTE", value: userName },
+    { key: "cliente", label: "USUARIO", value: userName },
     { key: "puntos", label: PASS_DEFAULT_TEXTS.pointsLabel, value: `${points.toLocaleString("es-MX")} pts` },
     { key: "studio", label: "ESTUDIO", value: PASS_DEFAULT_TEXTS.studioAddress },
     { key: "horario_studio", label: "HORARIOS", value: PASS_DEFAULT_TEXTS.studioHours },
@@ -13610,7 +13610,7 @@ app.delete("/api/users/:id", ownerMiddleware, async (req, res) => {
     );
     if (!cur.rows.length) {
       await client.query("ROLLBACK");
-      return res.status(404).json({ message: "Clienta no encontrada" });
+      return res.status(404).json({ message: "Usuario no encontrado" });
     }
     const target = cur.rows[0];
     // `target.id` es el id tal como Postgres lo normaliza (uuid canónico en
@@ -13626,11 +13626,11 @@ app.delete("/api/users/:id", ownerMiddleware, async (req, res) => {
     }
     if (!["client", "guest"].includes(target.role)) {
       await client.query("ROLLBACK");
-      return res.status(400).json({ message: "Sólo se pueden dar de baja clientas desde aquí." });
+      return res.status(400).json({ message: "Sólo se pueden dar de baja usuarios desde aquí." });
     }
     if (target.anonymized_at) {
       await client.query("ROLLBACK");
-      return res.json({ message: "La clienta ya estaba dada de baja.", data: { id, alreadyAnonymized: true } });
+      return res.json({ message: "El usuario ya estaba dado de baja.", data: { id, alreadyAnonymized: true } });
     }
     // No dar de baja con historial vivo: membresías activas o reservas próximas.
     const deps = await client.query(
@@ -13646,7 +13646,7 @@ app.delete("/api/users/:id", ownerMiddleware, async (req, res) => {
     if (Number(d.memberships) > 0 || Number(d.upcoming) > 0) {
       await client.query("ROLLBACK");
       return res.status(409).json({
-        message: "No se puede eliminar: la clienta tiene membresías activas o reservas próximas. Cancélalas primero.",
+        message: "No se puede eliminar: el usuario tiene membresías activas o reservas próximas. Cancélalas primero.",
       });
     }
     // La lista de espera no cuenta para el candado de "reservas próximas"
@@ -13713,7 +13713,7 @@ app.delete("/api/users/:id", ownerMiddleware, async (req, res) => {
     await client.query("COMMIT");
     accountGate.forget(id);
     return res.json({
-      message: "Clienta dada de baja: se borraron sus datos personales y se conserva su historial.",
+      message: "Usuario dado de baja: se borraron sus datos personales y se conserva su historial.",
       data: { id, anonymized: true, kept },
     });
   } catch (err) {
@@ -14452,7 +14452,7 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
   if (override && overrideReason.length < 5) return res.status(400).json({ message: "Escribe el motivo (mínimo 5 caracteres)." });
   const signed = await hasSignedWaiver(pool, userId);
   if (!signed && !override) {
-    return res.status(403).json({ code: "WAIVER_REQUIRED", message: "Esta clienta no ha firmado su responsiva." });
+    return res.status(403).json({ code: "WAIVER_REQUIRED", message: "Este usuario no ha firmado su responsiva." });
   }
   const withGuest = guest && typeof guest === "object" && guest.name && guest.phone;
   if (withGuest && !guest.acceptedWaiver) {
@@ -14503,7 +14503,7 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
     });
     if (!membership) {
       await client.query("ROLLBACK");
-      return res.status(403).json({ message: "La clienta no tiene membresía activa con créditos para esta clase" });
+      return res.status(403).json({ message: "El usuario no tiene membresía activa con créditos para esta clase" });
     }
 
     // Vigencia revisada bajo candado, como en POST /api/bookings.
@@ -14520,14 +14520,14 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
     }
     if (lockedMembership.status !== "active" || lockedMembership.expired) {
       await client.query("ROLLBACK");
-      return res.status(409).json({ code: "MEMBERSHIP_NOT_CURRENT", message: "El paquete de la clienta ya no está vigente." });
+      return res.status(409).json({ code: "MEMBERSHIP_NOT_CURRENT", message: "El paquete del usuario ya no está vigente." });
     }
 
     if (!isMembershipCategoryCompatible(membership.class_category, clsCategory)) {
       await client.query("ROLLBACK");
       const label = clsCategory === "studio" ? "Studio" : clsCategory === "reformer_tower" ? "Reformer/Tower" : "esta disciplina";
       return res.status(403).json({
-        message: `La membresía de la clienta no incluye clases de ${label}.`,
+        message: `La membresía del usuario no incluye clases de ${label}.`,
       });
     }
     if (membership.morning_only && !isWithinMorningWindow(cls.starts_at)) {
@@ -14538,7 +14538,7 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
     if (!isUnlimitedClasses(lockedMembership.classes_remaining) && Number(lockedMembership.classes_remaining) <= 0) {
       await client.query("ROLLBACK");
       return res.status(403).json({
-        message: "La clienta ya no tiene clases disponibles en su membresía.",
+        message: "El usuario ya no tiene clases disponibles en su membresía.",
       });
     }
 
@@ -14548,7 +14548,7 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
     );
     if (dupRes.rows.length > 0) {
       await client.query("ROLLBACK");
-      return res.status(409).json({ message: "La clienta ya tiene una reserva para esta clase" });
+      return res.status(409).json({ message: "El usuario ya tiene una reserva para esta clase" });
     }
 
     // Tope semanal (planes 'Barre — N Clases por semana').
@@ -14556,7 +14556,7 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
     if (!adminWeeklyCheck.ok) {
       await client.query("ROLLBACK");
       return res.status(403).json({
-        message: `La clienta llegó a su tope semanal: ${adminWeeklyCheck.limit} clase${adminWeeklyCheck.limit === 1 ? "" : "s"} por semana. Esta semana ya tiene ${adminWeeklyCheck.count} reservada${adminWeeklyCheck.count === 1 ? "" : "s"}.`,
+        message: `El usuario llegó a su tope semanal: ${adminWeeklyCheck.limit} clase${adminWeeklyCheck.limit === 1 ? "" : "s"} por semana. Esta semana ya tiene ${adminWeeklyCheck.count} reservada${adminWeeklyCheck.count === 1 ? "" : "s"}.`,
       });
     }
 
@@ -14803,7 +14803,7 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
     }
 
     const message = isWaitlist
-      ? "Clienta agregada a lista de espera"
+      ? "Usuario agregada a lista de espera"
       : guestData
         ? (guestData.chargedTo === "guest"
             ? "Socia reservada + clase suelta vendida a la acompañante"
@@ -14979,9 +14979,9 @@ app.post("/api/admin/checkin/scan", adminMiddleware, async (req, res) => {
 
     const userRes = await pool.query("SELECT id, display_name FROM users WHERE id = $1 LIMIT 1", [userId]);
     if (!userRes.rows.length) {
-      return res.status(404).json({ status: "not_found", message: "Clienta no encontrada" });
+      return res.status(404).json({ status: "not_found", message: "Usuario no encontrado" });
     }
-    const name = userRes.rows[0].display_name || "Clienta";
+    const name = userRes.rows[0].display_name || "Usuario";
 
     const bookingRes = await pool.query(
       `SELECT b.id, b.status, ct.name AS class_name, c.start_time,
@@ -15233,7 +15233,11 @@ app.post("/api/admin/clients/manual", adminMiddleware, async (req, res) => {
     const emailNorm = email.toLowerCase().trim();
     const existingByEmail = await client.query("SELECT id, anonymized_at FROM users WHERE email = $1", [emailNorm]);
     if (existingByEmail.rows.length && existingByEmail.rows[0].anonymized_at) {
-      return res.status(409).json({ code: "ACCOUNT_ANONYMIZED", message: "Esta clienta fue dada de baja." });
+      return res.status(409).json({ code: "ACCOUNT_ANONYMIZED", message: "Este usuario fue dado de baja." });
+    }
+
+    if (existingByEmail.rows.length) {
+      return res.status(409).json({ code: "EMAIL_ALREADY_REGISTERED", message: "Ya existe un usuario con ese correo. Búscalo en Usuarios para editarlo o asignarle una membresía." });
     }
 
     await client.query("BEGIN");
@@ -15245,10 +15249,6 @@ app.post("/api/admin/clients/manual", adminMiddleware, async (req, res) => {
       `INSERT INTO users (display_name, email, phone, date_of_birth, emergency_contact_name,
         emergency_contact_phone, health_notes, role, password_hash, is_active)
        VALUES ($1,$2,$3,$4,$5,$6,$7,'client',$8,true)
-       ON CONFLICT (email) DO UPDATE SET
-         display_name = EXCLUDED.display_name,
-         phone = EXCLUDED.phone,
-         updated_at = NOW()
        RETURNING id, display_name, email`,
       [displayName, emailNorm, phone || null, dateOfBirth || null,
         emergencyContactName || null, emergencyContactPhone || null, healthNotes || null, hash]
@@ -15369,12 +15369,12 @@ app.post("/api/admin/clients/manual", adminMiddleware, async (req, res) => {
     }
     return res.status(201).json({
       data: { user: camelRow(user), membership, tempPassword: planId ? undefined : tempPassword },
-      message: planId ? "Clienta registrada y membresía activada" : "Clienta registrada",
+      message: planId ? "Usuario registrado y membresía activada" : "Usuario registrado",
     });
   } catch (err) {
     await client.query("ROLLBACK");
     console.error("[POST /admin/clients/manual]", err.message);
-    if (err.code === "23505") return res.status(409).json({ message: "Ya existe una clienta con ese email" });
+    if (err.code === "23505") return res.status(409).json({ message: "Ya existe un usuario con ese email" });
     return res.status(500).json({ message: "Error interno" });
   } finally {
     client.release();
@@ -15613,7 +15613,7 @@ app.put("/api/admin/orders/:id/reject", adminMiddleware, async (req, res) => {
       const uRes = await pool.query("SELECT email, display_name, phone FROM users WHERE id = $1", [order.user_id]);
       if (uRes.rows.length) {
         const u = uRes.rows[0];
-        const userName = u.display_name || "Clienta";
+        const userName = u.display_name || "Usuario";
         const rejMsg = `Hola ${userName} 👋\n\nTu comprobante de pago fue revisado y lamentablemente *no pudo ser aprobado*.\n\n📌 Motivo: ${rejectionReason}\n\nSi crees que es un error o tienes dudas, responde este mensaje. ¡Estamos para ayudarte! 💜`;
 
         // WhatsApp notification
@@ -17346,7 +17346,7 @@ app.post("/api/events/:eventId/checkin/scan", adminMiddleware, async (req, res) 
     }
 
     return res.json({
-      message: result.alreadyCheckedIn ? "La clienta ya tenía check-in registrado" : "Check-in exitoso",
+      message: result.alreadyCheckedIn ? "El usuario ya tenía check-in registrado" : "Check-in exitoso",
       data: {
         registrationId: result.registration.id,
         name: result.registration.name,

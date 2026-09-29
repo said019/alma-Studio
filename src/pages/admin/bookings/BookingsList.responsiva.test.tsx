@@ -49,12 +49,12 @@ async function abrirYElegirSocia() {
 describe("BookingsList · responsiva al asignar", () => {
   it("403 WAIVER_REQUIRED muestra el aviso y la casilla, sin toast de error genérico", async () => {
     mockApi.post.mockRejectedValueOnce({
-      response: { status: 403, data: { code: "WAIVER_REQUIRED", message: "Esta clienta no ha firmado su responsiva." } },
+      response: { status: 403, data: { code: "WAIVER_REQUIRED", message: "Este usuario no ha firmado su responsiva." } },
     });
 
     await abrirYElegirSocia();
 
-    expect(await screen.findByText("Esta clienta no ha firmado su responsiva")).toBeInTheDocument();
+    expect(await screen.findByText("Este usuario no ha firmado su responsiva")).toBeInTheDocument();
     expect(screen.getByRole("checkbox", { name: /Firmará en recepción/ })).toBeInTheDocument();
     // Sin toast genérico de "Error al asignar reserva" para este código.
     expect(screen.queryByText("Error al asignar reserva")).toBeNull();
@@ -62,11 +62,11 @@ describe("BookingsList · responsiva al asignar", () => {
 
   it("motivo de menos de 5 caracteres deja deshabilitado el botón de reintento", async () => {
     mockApi.post.mockRejectedValueOnce({
-      response: { status: 403, data: { code: "WAIVER_REQUIRED", message: "Esta clienta no ha firmado su responsiva." } },
+      response: { status: 403, data: { code: "WAIVER_REQUIRED", message: "Este usuario no ha firmado su responsiva." } },
     });
 
     await abrirYElegirSocia();
-    await screen.findByText("Esta clienta no ha firmado su responsiva");
+    await screen.findByText("Este usuario no ha firmado su responsiva");
     fireEvent.click(screen.getByRole("checkbox", { name: /Firmará en recepción/ }));
 
     const motivo = screen.getByPlaceholderText("Motivo (obligatorio)");
@@ -79,12 +79,12 @@ describe("BookingsList · responsiva al asignar", () => {
 
   it("con motivo válido, 'Asignar de todos modos' reintenta con waiverOverride", async () => {
     mockApi.post.mockRejectedValueOnce({
-      response: { status: 403, data: { code: "WAIVER_REQUIRED", message: "Esta clienta no ha firmado su responsiva." } },
+      response: { status: 403, data: { code: "WAIVER_REQUIRED", message: "Este usuario no ha firmado su responsiva." } },
     });
     mockApi.post.mockResolvedValueOnce({ data: { message: "Reserva asignada" } });
 
     await abrirYElegirSocia();
-    await screen.findByText("Esta clienta no ha firmado su responsiva");
+    await screen.findByText("Este usuario no ha firmado su responsiva");
     fireEvent.click(screen.getByRole("checkbox", { name: /Firmará en recepción/ }));
 
     const motivo = screen.getByPlaceholderText("Motivo (obligatorio)");

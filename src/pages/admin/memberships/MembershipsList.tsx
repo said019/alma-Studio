@@ -135,7 +135,7 @@ const MembershipTable = ({
   };
 
   const requestActivate = async (m: Membership) => {
-    const who = m.userName ?? "La clienta";
+    const who = m.userName ?? "El usuario";
     const ok = await confirm({
       title: "¿Activar esta membresía?",
       description: `${who} podrá reservar de inmediato y se le avisa por correo y WhatsApp.`,
@@ -145,7 +145,7 @@ const MembershipTable = ({
   };
 
   const requestCancel = async (m: Membership) => {
-    const who = m.userName ?? "la clienta";
+    const who = m.userName ?? "el usuario";
     const ok = await confirm({
       title: "¿Cancelar esta membresía?",
       description: `Se cancelan las reservas futuras de ${who} con este plan y pierde el acceso. Los créditos restantes no se devuelven.`,
@@ -189,7 +189,7 @@ const MembershipTable = ({
           <div className="space-y-4">
             {editing && (
               <p className="text-sm text-ink/60">
-                {editing.userName ?? "Clienta"} · {editing.planName ?? ""}
+                {editing.userName ?? "Usuario"} · {editing.planName ?? ""}
               </p>
             )}
             <div className="space-y-1.5">
@@ -214,7 +214,7 @@ const MembershipTable = ({
             <div className="space-y-1.5">
               <Label htmlFor="m-reason">Motivo del ajuste</Label>
               <Textarea id="m-reason" rows={2} maxLength={500} value={reasonVal} onChange={(e) => setReasonVal(e.target.value)}
-                placeholder="Obligatorio: p. ej. preventa acordada con la clienta" />
+                placeholder="Obligatorio: p. ej. preventa acordada con el usuario" />
               <p className="text-xs text-ink/50">Queda en la bitácora con tu nombre. Mínimo {REASON_MIN_CHARS} caracteres.</p>
             </div>
             <p className="text-xs text-ink/50">
@@ -236,7 +236,7 @@ const MembershipTable = ({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Cliente</TableHead>
+              <TableHead>Usuario</TableHead>
               <TableHead>Plan</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead>Vigencia</TableHead>
@@ -296,7 +296,7 @@ const MembershipTable = ({
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" aria-label={`Acciones de la membresía de ${m.userName ?? "la clienta"}`}><MoreHorizontal size={14} /></Button>
+                          <Button variant="ghost" size="icon" aria-label={`Acciones de la membresía de ${m.userName ?? "el usuario"}`}><MoreHorizontal size={14} /></Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent>
                           <DropdownMenuItem onClick={() => openEdit(m)}>Editar vigencia</DropdownMenuItem>
@@ -343,7 +343,7 @@ const MembershipsList = () => {
     <AuthGuard>
       <AdminLayout>
         <AdminPage>
-          <AdminPageHeader kicker="Más" title="Membresías" subtitle="Activa, cancela o ajusta la vigencia de las membresías de tus clientas." />
+          <AdminPageHeader kicker="Más" title="Membresías" subtitle="Activa, cancela o ajusta la vigencia de las membresías de tus usuarios." />
           <Tabs value={tab} onValueChange={(v) => setTab(v === "all" ? null : v)}>
             <TabsList>
               <TabsTrigger value="all">Todas</TabsTrigger>
@@ -354,7 +354,7 @@ const MembershipsList = () => {
             <TabsContent value="all">
               <MembershipTable
                 emptyTitle="Aún no hay membresías"
-                emptyDescription="Cuando una clienta compre un plan, su membresía aparece aquí para activarla y darle seguimiento."
+                emptyDescription="Cuando un usuario compre un plan, su membresía aparece aquí para activarla y darle seguimiento."
               />
             </TabsContent>
             <TabsContent value="active">
@@ -375,7 +375,7 @@ const MembershipsList = () => {
               <MembershipTable
                 status="pending_payment"
                 emptyTitle="Sin pendientes de pago"
-                emptyDescription="Cuando una clienta aparte un plan sin pagar, aparecerá aquí para activarla al recibir el pago."
+                emptyDescription="Cuando un usuario aparte un plan sin pagar, aparecerá aquí para activarla al recibir el pago."
               />
             </TabsContent>
           </Tabs>

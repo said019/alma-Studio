@@ -123,7 +123,7 @@ const VisitsList = () => {
         <div className="admin-page max-w-5xl">
           <SectionTabs
             tabs={[
-              { label: "Clientas", to: "/admin/clients" },
+              { label: "Usuarios", to: "/admin/clients" },
               ...(FEATURES.visits ? [{ label: "Visitas", to: "/admin/visitas" }] : []),
               { label: "Coaches", to: "/admin/staff" },
             ]}

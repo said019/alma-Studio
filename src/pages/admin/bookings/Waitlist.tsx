@@ -138,7 +138,7 @@ const Waitlist = () => {
       ) : rosterQ.isLoading ? (
         <div className="space-y-2 p-5"><SkeletonRow /><SkeletonRow /></div>
       ) : people.length === 0 ? (
-        <p className="border-t border-line px-6 py-6 text-sm text-ink-muted">No hay clientas en lista de espera</p>
+        <p className="border-t border-line px-6 py-6 text-sm text-ink-muted">No hay usuarios en lista de espera</p>
       ) : (
         <ol>
           {people.map((p, i) => {

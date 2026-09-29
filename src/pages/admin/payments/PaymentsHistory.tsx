@@ -94,7 +94,7 @@ function PaymentsHistoryContent() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Clienta</TableHead>
+                    <TableHead>Usuario</TableHead>
                     <TableHead>Fecha</TableHead>
                     <TableHead>Método</TableHead>
                     <TableHead>Estado</TableHead>
@@ -118,7 +118,7 @@ function PaymentsHistoryContent() {
                       <TableCell className={cn("nums text-right text-[15px] font-extrabold", Number(p.total_amount ?? 0) < 0 && "text-danger")}>{formatMXN(Number(p.total_amount ?? p.amount ?? 0))}</TableCell>
                       <TableCell className="text-right">
                         {puedeReembolsar(p) && (
-                          <Button size="sm" variant="outline" aria-label={`Reembolsar el pago de ${p.userName ?? "la clienta"}`} onClick={() => setReembolso(p)}>
+                          <Button size="sm" variant="outline" aria-label={`Reembolsar el pago de ${p.userName ?? "el usuario"}`} onClick={() => setReembolso(p)}>
                             Reembolsar
                           </Button>
                         )}

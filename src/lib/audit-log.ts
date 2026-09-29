@@ -31,7 +31,7 @@ export const AUDIT_ENTITY_OPTIONS: { value: string; label: string }[] = [
   { value: "booking", label: "Reservas y asistencia" },
   { value: "class", label: "Clases" },
   { value: "class_week", label: "Limpiezas de semana" },
-  { value: "user", label: "Bajas de clientas" },
+  { value: "user", label: "Bajas de usuarios" },
   { value: "order", label: "Reembolsos" },
   { value: "plan", label: "Planes" },
   { value: "settings", label: "Configuración" },
@@ -47,7 +47,7 @@ const ACTION_LABEL: Record<string, string> = {
   "class.cancel": "Clase cancelada",
   "class.delete": "Clase borrada (sin reservas)",
   "class.week_clear": "Limpieza de semana",
-  "user.anonymize": "Clienta dada de baja (anonimizada)",
+  "user.anonymize": "Usuario dado de baja (anonimizada)",
   // Bloque 3 (auditoría 2026-09-27)
   "booking.waitlist_promoted": "Subió de la lista de espera",
   "order.refund": "Reembolso",

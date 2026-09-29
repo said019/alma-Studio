@@ -6,7 +6,7 @@ export default function PersonasTabs() {
     <SectionTabs
       aria-label="Secciones de Personas"
       tabs={[
-        { label: "Clientas", to: "/admin/clients" },
+        { label: "Usuarios", to: "/admin/clients" },
         ...(FEATURES.visits ? [{ label: "Visitas", to: "/admin/visitas" }] : []),
         { label: "Coaches", to: "/admin/staff" },
       ]}

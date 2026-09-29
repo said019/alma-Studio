@@ -236,7 +236,7 @@ const ClassTypesList = () => {
           <AdminPageHeader
             kicker="Clases"
             title="Tipos de clase"
-            subtitle={`${types.length === 1 ? "1 tipo registrado" : `${types.length} tipos registrados`} · color y categoría que ven las clientas.`}
+            subtitle={`${types.length === 1 ? "1 tipo registrado" : `${types.length} tipos registrados`} · color y categoría que ven los usuarios.`}
             actions={
               <>
                 <SectionTabs aria-label="Secciones de Clases" tabs={CLASSES_SECTION_TABS} />

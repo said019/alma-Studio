@@ -24,8 +24,8 @@ beforeEach(() => {
   loginAs("admin");
   routeApi(mockApi, {
     "/admin/stats": { pendingAlerts: 0 },
-    "/users?role=client&search=": { data: [CAMILA, FER] },
-    "/users?role=client&search=%C3%B1%26": { data: [] },
+    "/users?search=": { data: [CAMILA, FER] },
+    "/users?search=%C3%B1%26": { data: [] },
     "/users/u1": { data: { ...CAMILA, dateOfBirth: "1996-03-18T00:00:00.000Z", emergencyContactName: null, healthNotes: "Hombro derecho" } },
     "/plans?active=true": { data: [] },
     "/admin/birthdays?month=9": { data: [{ id: "u9", displayName: "Andrea Martínez", email: "andrea@correo.com", phone: "5523456789", isToday: true, day: 25, month: 9 }] },
@@ -33,22 +33,30 @@ beforeEach(() => {
 });
 afterEach(() => vi.useRealTimers());
 
-describe("Personas · Clientas", () => {
+describe("Personas · Usuarios", () => {
   it("lista con WhatsApp sólo para quien tiene teléfono", async () => {
     renderAdmin(<ClientsList />, { route: "/admin/clients" });
     expect(await screen.findByText("Camila Torres")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "WhatsApp a Camila Torres" })).toHaveAttribute("href", "https://wa.me/525512345678");
     expect(screen.queryByRole("link", { name: "WhatsApp a Fernanda Ortiz" })).toBeNull();
-    expect(screen.getByText((_, el) => el?.textContent === "2 clientas registradas")).toBeInTheDocument();
+    expect(screen.getByText((_, el) => el?.textContent === "2 usuarios registrados")).toBeInTheDocument();
+  });
+
+  it("muestra también una cuenta administradora en Usuarios", async () => {
+    routeApi(mockApi, { "/users?search=": { data: [{ ...CAMILA, displayName: "Said Romero", role: "admin" }] } });
+    renderAdmin(<ClientsList />, { route: "/admin/clients" });
+    expect(await screen.findByText("Said Romero")).toBeInTheDocument();
+    expect(mockApi.get).toHaveBeenCalledWith("/users?search=");
+    expect(screen.getByRole("heading", { name: "Usuarios" })).toBeInTheDocument();
   });
 
   it("la búsqueda va codificada", async () => {
     renderAdmin(<ClientsList />, { route: "/admin/clients" });
     fireEvent.change(await screen.findByLabelText("Buscar por nombre, email o teléfono"), { target: { value: "ñ&" } });
-    await waitFor(() => expect(mockApi.get).toHaveBeenCalledWith("/users?role=client&search=%C3%B1%26"));
+    await waitFor(() => expect(mockApi.get).toHaveBeenCalledWith("/users?search=%C3%B1%26"));
   });
 
-  it("Editar abre la clienta completa, sin campos vacíos por null", async () => {
+  it("Editar abre el usuario completa, sin campos vacíos por null", async () => {
     renderAdmin(<ClientsList />, { route: "/admin/clients" });
     await screen.findByText("Camila Torres");
     abrirMenu("Acciones de Camila Torres");
@@ -69,7 +77,7 @@ describe("Personas · Clientas", () => {
     await screen.findByText("Camila Torres");
     abrirMenu("Acciones de Camila Torres");
     fireEvent.click(await screen.findByRole("menuitem", { name: "Eliminar" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Eliminar clienta" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Eliminar usuario" }));
     await waitFor(() => expect(toastSpy).toHaveBeenCalledWith(expect.objectContaining({ description: "Tiene membresías activas" })));
   });
 
@@ -98,32 +106,32 @@ describe("Personas · Clientas", () => {
     const dlg = await screen.findByRole("alertdialog");
     expect(within(dlg).getByText(/Sus reservas, órdenes y pagos se conservan/)).toBeInTheDocument();
     fireEvent.change(within(dlg).getByRole("textbox"), { target: { value: "Lo pidió por WhatsApp" } });
-    fireEvent.click(within(dlg).getByRole("button", { name: "Eliminar clienta" }));
+    fireEvent.click(within(dlg).getByRole("button", { name: "Eliminar usuario" }));
     await waitFor(() => expect(mockApi.delete).toHaveBeenCalledWith("/users/u1", { data: { reason: "Lo pidió por WhatsApp" } }));
-    await waitFor(() => expect(toastSpy).toHaveBeenCalledWith(expect.objectContaining({ title: "Clienta dada de baja" })));
+    await waitFor(() => expect(toastSpy).toHaveBeenCalledWith(expect.objectContaining({ title: "Usuario dado de baja" })));
   });
 
   it("?birthday=month con la petición caída muestra un error, no el vacío de clientas (I4)", async () => {
     routeApi(mockApi, {
       "/admin/stats": { pendingAlerts: 0 },
-      "/users?role=client&search=": { data: [CAMILA, FER] },
+      "/users?search=": { data: [CAMILA, FER] },
       "/plans?active=true": { data: [] },
       "/admin/birthdays?month=9": Object.assign(new Error("500"), { response: { status: 500, data: {} } }),
     });
     renderAdmin(<ClientsList />, { route: "/admin/clients?birthday=month", path: "/admin/clients" });
-    expect(await screen.findByText("No pudimos cargar a las clientas")).toBeInTheDocument();
-    expect(screen.queryByText("Aún no hay clientas registradas")).toBeNull();
+    expect(await screen.findByText("No pudimos cargar a los usuarios")).toBeInTheDocument();
+    expect(screen.queryByText("Aún no hay usuarios registrados")).toBeNull();
   });
 
   it("?birthday=month sin cumpleañeras dice que nadie cumple ese mes, no el vacío de clientas (I4)", async () => {
     routeApi(mockApi, {
       "/admin/stats": { pendingAlerts: 0 },
-      "/users?role=client&search=": { data: [CAMILA, FER] },
+      "/users?search=": { data: [CAMILA, FER] },
       "/plans?active=true": { data: [] },
       "/admin/birthdays?month=9": { data: [] },
     });
     renderAdmin(<ClientsList />, { route: "/admin/clients?birthday=month", path: "/admin/clients" });
     expect(await screen.findByText("Nadie cumple años en septiembre.")).toBeInTheDocument();
-    expect(screen.queryByText("Aún no hay clientas registradas")).toBeNull();
+    expect(screen.queryByText("Aún no hay usuarios registrados")).toBeNull();
   });
 });

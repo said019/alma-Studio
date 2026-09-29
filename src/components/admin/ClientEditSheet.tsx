@@ -69,7 +69,7 @@ export default function ClientEditSheet({ clientId, open, onOpenChange }: Client
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["clients"] });
       qc.invalidateQueries({ queryKey: ["client", clientId] });
-      toast({ title: "Clienta actualizada" });
+      toast({ title: "Usuario actualizada" });
       onOpenChange(false);
     },
     onError: (e: any) =>
@@ -80,11 +80,11 @@ export default function ClientEditSheet({ clientId, open, onOpenChange }: Client
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="overflow-y-auto sm:max-w-md">
         <SheetHeader>
-          <SheetTitle>Editar clienta</SheetTitle>
-          <SheetDescription>Actualiza los datos del expediente de {user?.displayName ?? user?.display_name ?? "la clienta"}.</SheetDescription>
+          <SheetTitle>Editar usuario</SheetTitle>
+          <SheetDescription>Actualiza los datos del expediente de {user?.displayName ?? user?.display_name ?? "el usuario"}.</SheetDescription>
         </SheetHeader>
         {isError ? (
-          <ErrorState title="No pudimos cargar a la clienta" onRetry={() => refetch()} />
+          <ErrorState title="No pudimos cargar al usuario" onRetry={() => refetch()} />
         ) : isLoading || !user ? (
           <div className="mt-6 space-y-3"><Skeleton className="h-11 w-full" /><Skeleton className="h-11 w-full" /><Skeleton className="h-24 w-full" /></div>
         ) : (

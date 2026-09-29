@@ -250,7 +250,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
 
         <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-2 border-b border-line bg-surface px-3 lg:hidden">
           {isClientFile ? (
-            <Link to="/admin/clients" aria-label="Volver a Clientas" className={ICON_BTN}>
+            <Link to="/admin/clients" aria-label="Volver a Usuarios" className={ICON_BTN}>
               <ArrowLeft size={20} />
             </Link>
           ) : (
@@ -260,12 +260,12 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
           )}
           {!isClientFile && <BrandLogo variant="mark" size={26} />}
           <span className="min-w-0 truncate text-[17px] font-extrabold text-ink">
-            {isClientFile ? "Ficha de clienta" : currentItem?.label ?? "Panel"}
+            {isClientFile ? "Ficha de usuario" : currentItem?.label ?? "Panel"}
           </span>
           <button
             type="button"
             onClick={() => setSearchOpen((v) => !v)}
-            aria-label="Abrir buscador de clientas"
+            aria-label="Abrir buscador de usuarios"
             aria-expanded={searchOpen}
             className={cn(ICON_BTN, "ml-auto border border-line-strong text-ink")}
           >
@@ -275,7 +275,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
         </header>
         {searchOpen && (
           <div className="border-b border-line bg-surface px-3 py-3 lg:hidden">
-            <ClientSearch autoFocus label="Buscar clienta (celular)" onSelect={(c) => navigate(`/admin/clients/${c.id}`)} />
+            <ClientSearch autoFocus label="Buscar usuario (celular)" onSelect={(c) => navigate(`/admin/clients/${c.id}`)} />
           </div>
         )}
 

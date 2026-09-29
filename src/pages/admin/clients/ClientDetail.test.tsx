@@ -38,7 +38,7 @@ beforeEach(() => {
 });
 afterEach(() => vi.useRealTimers());
 
-describe("Ficha de clienta", () => {
+describe("Ficha de usuario", () => {
   it("la dueña ve Editar, Pagos y la membresía con Renovar; Lealtad no aparece", async () => {
     loginAs("admin");
     routeApi(mockApi, tabla());
@@ -89,7 +89,7 @@ describe("Ficha de clienta", () => {
     routeApi(mockApi, tabla());
     renderAdmin(<ClientDetail />, { route: "/admin/clients/u1", path: "/admin/clients/:id" });
     fireEvent.click(await screen.findByRole("button", { name: /Editar datos/ }));
-    expect(await screen.findByText("Editar clienta")).toBeInTheDocument();
+    expect(await screen.findByText("Editar usuario")).toBeInTheDocument();
   });
 
   it("Ver todas en Próximas clases selecciona la pestaña Reservas", async () => {

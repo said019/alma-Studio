@@ -96,7 +96,7 @@ function CashAssignment() {
   useEffect(() => {
     const u = preselectQ.data?.data ?? preselectQ.data;
     if (u?.id && !selectedUser) {
-      setSelectedUser({ id: u.id, displayName: u.displayName ?? u.display_name ?? "Clienta", email: u.email, phone: u.phone });
+      setSelectedUser({ id: u.id, displayName: u.displayName ?? u.display_name ?? "Usuario", email: u.email, phone: u.phone });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [preselectQ.data]);
@@ -159,8 +159,8 @@ function CashAssignment() {
   return (
     <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
       <div className="flex min-w-0 flex-col gap-4">
-        <Panel aria-label="Clienta" className="flex flex-col gap-3.5 p-5 lg:p-6">
-          <StepTitle n={1} done={!!selectedUser}>Clienta</StepTitle>
+        <Panel aria-label="Usuario" className="flex flex-col gap-3.5 p-5 lg:p-6">
+          <StepTitle n={1} done={!!selectedUser}>Usuario</StepTitle>
           {selectedUser ? (
             <div className="flex items-center gap-3.5 rounded-xl bg-canvas px-3.5 py-3">
               <PersonCell name={selectedUser.displayName} sub={[selectedUser.email, selectedUser.phone].filter(Boolean).join(" · ")} size={40} />
@@ -168,9 +168,9 @@ function CashAssignment() {
             </div>
           ) : (
             <>
-              {preselectQ.isError && <p className="text-[13px] font-bold text-danger">No encontramos a esa clienta. Búscala abajo.</p>}
+              {preselectQ.isError && <p className="text-[13px] font-bold text-danger">No encontramos a esa usuario. Búscala abajo.</p>}
               <ClientSearch
-                label="Buscar clienta para cobrar"
+                label="Buscar usuario para cobrar"
                 placeholder="Nombre, email o teléfono…"
                 onSelect={(c) => setSelectedUser({ id: c.id, displayName: c.displayName, email: c.email, phone: c.phone })}
               />
@@ -286,7 +286,7 @@ function CashAssignment() {
       <aside aria-label="Resumen de la membresía" className="flex flex-col gap-1.5 rounded-2xl border border-line bg-surface p-6 lg:sticky lg:top-24">
         <p className="text-[0.75rem] font-bold uppercase tracking-[0.12em] text-ink-muted">Resumen de la membresía</p>
         <dl className="mt-2">
-          {row("Clienta", selectedUser?.displayName ?? "—")}
+          {row("Usuario", selectedUser?.displayName ?? "—")}
           {row("Plan", selectedPlan?.name ?? "—")}
           {row("Vigencia", vigencia)}
           {row("Método", methodLabel)}
@@ -303,7 +303,7 @@ function CashAssignment() {
         <Button size="lg" className="w-full" disabled={!selectedUser || !selectedPlan || !amountValid || (needsReason && !reasonOk) || assignMutation.isPending} onClick={() => assignMutation.mutate()}>
           {assignMutation.isPending ? "Activando…" : "Confirmar y activar membresía"}
         </Button>
-        <p className="mt-1.5 text-center text-[0.75rem] text-ink-muted">La membresía se activa hoy y la clienta recibe su confirmación.</p>
+        <p className="mt-1.5 text-center text-[0.75rem] text-ink-muted">La membresía se activa hoy y el usuario recibe su confirmación.</p>
       </aside>
     </div>
   );

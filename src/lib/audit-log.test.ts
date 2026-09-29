@@ -37,7 +37,7 @@ describe("bitácora · textos", () => {
     ]);
   });
 
-  it("sobre quién: clienta, clase o semana", () => {
+  it("sobre quién: usuario, clase o semana", () => {
     expect(auditSubject(base)).toBe("Ana Pérez");
     expect(auditSubject({ ...base, subjectName: null, entityType: "class", meta: { day: "2026-10-01", start_time: "09:00" } })).toBe("la clase del 2026-10-01 09:00");
     expect(auditSubject({ ...base, subjectName: null, entityType: "class_week", meta: { start: "2026-09-21", end: "2026-09-27" } })).toBe("la semana del 2026-09-21 al 2026-09-27");

@@ -168,7 +168,7 @@ const TemplateCard = ({
     if (!next) {
       const ok = await confirm({
         title: "¿Desactivar este aviso?",
-        description: `El WhatsApp "${templateKey}" dejará de enviarse automáticamente a las clientas. Puedes reactivarlo cuando quieras.`,
+        description: `El WhatsApp "${templateKey}" dejará de enviarse automáticamente a los usuarios. Puedes reactivarlo cuando quieras.`,
         confirmLabel: "Desactivar",
         destructive: true,
       });

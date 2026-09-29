@@ -313,7 +313,7 @@ export const CheckinScanner = ({ open, onOpenChange }: Props) => {
             )}
           </div>
           <p className="text-center text-xs text-ink/55">
-            Apunta al <strong>QR del pase</strong> de la clienta para registrar su asistencia.
+            Apunta al <strong>QR del pase</strong> del usuario para registrar su asistencia.
           </p>
         </div>
 
@@ -359,12 +359,12 @@ export const CheckinScanner = ({ open, onOpenChange }: Props) => {
             Modo manual (si la cámara no funciona)
           </label>
           <p className="text-[11px] text-ink/70 -mt-1">
-            La clienta abre su <strong>Perfil → Mi código de acceso</strong> y le da a <strong>"Copiar código"</strong>. Te lo manda por WhatsApp y lo pegas aquí.
+            El usuario abre su <strong>Perfil → Mi código de acceso</strong> y le da a <strong>"Copiar código"</strong>. Te lo manda por WhatsApp y lo pegas aquí.
           </p>
           <p className="text-[11px] text-ink/70 -mt-1 flex items-start gap-1.5">
             <ListChecks size={12} className="mt-0.5 shrink-0 text-ink" aria-hidden="true" />
             <span>
-              Alternativa rápida sin código: usa <strong>Pasar lista</strong> (en el menú lateral), lista todas las clientas del día y marcas con un tap.
+              Alternativa rápida sin código: usa <strong>Pasar lista</strong> (en el menú lateral), lista todos los usuarios del día y marcas con un tap.
             </span>
           </p>
           <div className="flex gap-2">

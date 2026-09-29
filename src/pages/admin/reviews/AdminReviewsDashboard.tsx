@@ -245,7 +245,7 @@ const AdminReviewsDashboard = () => {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Clienta</TableHead>
+                      <TableHead>Usuario</TableHead>
                       <TableHead>Clase</TableHead>
                       <TableHead>Instructora</TableHead>
                       <TableHead>Rating</TableHead>

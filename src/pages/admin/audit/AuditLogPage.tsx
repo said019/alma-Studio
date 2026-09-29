@@ -131,7 +131,7 @@ function AuditLogContent() {
         <EmptyState
           icon={<ScrollText size={20} strokeWidth={1.8} />}
           title="Sin movimientos"
-          description={hasFilters ? "No hay registros con estos filtros." : "Cuando alguien del equipo cobre, ajuste, cancele, corrija una falta o dé de baja a una clienta, aparecerá aquí."}
+          description={hasFilters ? "No hay registros con estos filtros." : "Cuando alguien del equipo cobre, ajuste, cancele, corrija una falta o dé de baja a un usuario, aparecerá aquí."}
         />
       ) : (
         <>

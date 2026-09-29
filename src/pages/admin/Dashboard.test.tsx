@@ -7,7 +7,7 @@ import Dashboard from "./Dashboard";
 import { loginAs, renderAdmin, routeApi } from "@/test/admin-harness";
 
 const mockApi = api as unknown as { get: Mock };
-const e = (id: string, status: string, name = `Clienta ${id}`) =>
+const e = (id: string, status: string, name = `Usuario ${id}`) =>
   ({ booking_id: id, status, checked_in_at: null, user_id: id, display_name: name, guest_name: null });
 const clase = (id: string, start: string, end: string, type: string, coach: string, cap: number, roster: ReturnType<typeof e>[]) =>
   ({ id, start_time: `${start}:00`, end_time: `${end}:00`, max_capacity: cap, class_type_name: type, instructor_name: coach, roster });
@@ -138,7 +138,7 @@ describe("Inicio", () => {
     mockApi.get.mockImplementation((url: string) => (url === "/memberships?limit=5" ? pending : base(url)));
     renderAdmin(<Dashboard />, { route: "/admin/dashboard" });
     await screen.findByRole("region", { name: "Últimas membresías" });
-    expect(screen.queryByText("Aún no hay membresías recientes. Cuando una clienta compre un paquete aparecerá aquí.")).toBeNull();
+    expect(screen.queryByText("Aún no hay membresías recientes. Cuando un usuario compre un paquete aparecerá aquí.")).toBeNull();
     resolveRecent({ data: { data: [{ id: "m9", userName: "Camila Torres", planName: "Paquete 8 clases", status: "active" }] } });
     expect(await screen.findByText("Camila Torres")).toBeInTheDocument();
   });
@@ -157,7 +157,7 @@ describe("Inicio", () => {
     expect(await screen.findByRole("img", { name: /Ingresos de los últimos/ })).toBeInTheDocument();
   });
 
-  it("Clientas por última visita: mientras carga no dice que está vacío (I4)", async () => {
+  it("Usuarios por última visita: mientras carga no dice que está vacío (I4)", async () => {
     loginAs("admin");
     let resolveDormant!: (v: unknown) => void;
     const pending = new Promise((res) => { resolveDormant = res; });
@@ -165,7 +165,7 @@ describe("Inicio", () => {
     const base = mockApi.get.getMockImplementation()!;
     mockApi.get.mockImplementation((url: string) => (url === "/reports/dormant" ? pending : base(url)));
     renderAdmin(<Dashboard />, { route: "/admin/dashboard" });
-    await screen.findByRole("region", { name: "Clientas por última visita" });
+    await screen.findByRole("region", { name: "Usuarios por última visita" });
     expect(screen.queryByText("Aún no hay visitas registradas para esta gráfica.")).toBeNull();
     resolveDormant({ data: { data: { active_7d: 142, dormant_8_14d: 38, dormant_15_30d: 21, dormant_31_60d: 17, lost_60d: 29 } } });
     expect(await screen.findByText("60+ días")).toBeInTheDocument();

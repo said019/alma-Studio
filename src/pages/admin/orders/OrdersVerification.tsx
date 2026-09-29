@@ -144,8 +144,8 @@ const OrderDetail = ({ order, onZoom, onApprove, onReject, approving, rejecting 
             <div className="rounded-xl border border-line-strong/50 bg-sunken/30 px-4 py-3 space-y-1">
               <p className="text-sm font-semibold text-ink">Pago con tarjeta (automático)</p>
               <p className="text-xs leading-relaxed text-ink/70">
-                Stripe cobra y activa la membresía sola cuando la clienta completa el pago — no necesitas verificar nada.
-                Si esta orden sigue en espera, la clienta no terminó el pago: puedes ignorarla o rechazarla para limpiarla.
+                Stripe cobra y activa la membresía sola cuando el usuario completa el pago — no necesitas verificar nada.
+                Si esta orden sigue en espera, el usuario no terminó el pago: puedes ignorarla o rechazarla para limpiarla.
               </p>
             </div>
           ) : (
@@ -199,7 +199,7 @@ const OrderDetail = ({ order, onZoom, onApprove, onReject, approving, rejecting 
               {approving ? "Aprobando…" : "Aprobar"}
             </Button>
           </div>
-          <p className="text-[0.75rem] text-ink-muted">Si la rechazas, le avisamos a la clienta por email y WhatsApp con el motivo.</p>
+          <p className="text-[0.75rem] text-ink-muted">Si la rechazas, le avisamos al usuario por email y WhatsApp con el motivo.</p>
         </>
       )}
 
@@ -208,7 +208,7 @@ const OrderDetail = ({ order, onZoom, onApprove, onReject, approving, rejecting 
           <div>
             <p className="text-sm font-semibold text-ink">Rechazar orden</p>
             <p className="text-xs text-ink/70 mt-0.5">
-              Se notificará a la clienta por email y WhatsApp con el motivo.
+              Se notificará al usuario por email y WhatsApp con el motivo.
             </p>
           </div>
           <div className="space-y-1">
@@ -299,7 +299,7 @@ const OrdersBoard = ({ sources, emptyTitle, emptyDescription, emptyIcon, hideCar
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["orders"] });
       invalidateCobrosCounters();
-      toast({ title: "Orden rechazada, clienta notificada" });
+      toast({ title: "Orden rechazada, usuario notificada" });
       closeDetail();
     },
     onError: (e: any) => toast({ title: e?.response?.data?.message ?? "Error al rechazar", variant: "destructive" }),
@@ -348,7 +348,7 @@ const OrdersBoard = ({ sources, emptyTitle, emptyDescription, emptyIcon, hideCar
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Clienta</TableHead>
+                <TableHead>Usuario</TableHead>
                 <TableHead className="text-right">Monto</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead>Fecha</TableHead>
@@ -463,7 +463,7 @@ const OrdersVerification = () => {
                 sources={[{ url: "/admin/orders", queryKey: ["orders", "all"] }]}
                 emptyIcon={<Inbox size={20} strokeWidth={1.8} />}
                 emptyTitle="Aún no hay órdenes"
-                emptyDescription="Cuando una clienta suba un comprobante de pago, aparecerá aquí."
+                emptyDescription="Cuando un usuario suba un comprobante de pago, aparecerá aquí."
               />
             </TabsContent>
           </Tabs>

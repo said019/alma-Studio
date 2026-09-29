@@ -231,7 +231,7 @@ const DiscountCodes = () => {
           <AdminPageHeader
             kicker="Más"
             title="Descuentos"
-            subtitle="Cupones que las clientas escriben al pagar: porcentaje o monto fijo, con límites por plan, canal, usos o fecha."
+            subtitle="Cupones que los usuarios escriben al pagar: porcentaje o monto fijo, con límites por plan, canal, usos o fecha."
             actions={<Button onClick={openCreate}><Plus size={16} aria-hidden="true" />Nuevo código</Button>}
           />
 
@@ -245,7 +245,7 @@ const DiscountCodes = () => {
               <EmptyState
                 icon={<TicketPercent size={20} strokeWidth={1.8} />}
                 title="Aún no hay códigos de descuento"
-                description="Son cupones que las clientas escriben al pagar: aplican un porcentaje o un monto fijo. Puedes limitarlos por plan, categoría, canal, número de usos o fecha."
+                description="Son cupones que los usuarios escriben al pagar: aplican un porcentaje o un monto fijo. Puedes limitarlos por plan, categoría, canal, número de usos o fecha."
                 ctaLabel="Crear el primer código"
                 onCta={openCreate}
               />

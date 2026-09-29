@@ -98,7 +98,7 @@ export const VisitAssignDialog = ({ classId, open, onOpenChange, onSuccess }: Pr
     queryKey: ["visit-host-search", debouncedHostSearch],
     enabled: open && !host && debouncedHostSearch.trim().length >= 2,
     queryFn: async () =>
-      (await api.get(`/users?role=client&search=${encodeURIComponent(debouncedHostSearch)}`)).data,
+      (await api.get(`/users?search=${encodeURIComponent(debouncedHostSearch)}`)).data,
   });
   const hostOptions = (Array.isArray(hostsData?.data) ? hostsData!.data : []).map((u: any) => ({
     id: u.id,

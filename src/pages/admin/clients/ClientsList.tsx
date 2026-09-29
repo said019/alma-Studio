@@ -123,7 +123,7 @@ const ClientsList = () => {
   // Clients list
   const { data, isLoading, isError, refetch } = useQuery<{ data: Client[] }>({
     queryKey: ["clients", debouncedSearch],
-    queryFn: async () => (await api.get(`/users?role=client&search=${encodeURIComponent(debouncedSearch)}`)).data,
+    queryFn: async () => (await api.get(`/users?search=${encodeURIComponent(debouncedSearch)}`)).data,
   });
   const clients = Array.isArray(data?.data) ? data.data : [];
 
@@ -152,7 +152,7 @@ const ClientsList = () => {
       api.delete(`/users/${id}`, { data: reason ? { reason } : {} }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["clients"] });
-      toast({ title: "Clienta dada de baja", description: "Se borraron sus datos personales; su historial y sus pagos se conservan." });
+      toast({ title: "Usuario dado de baja", description: "Se borraron sus datos personales; su historial y sus pagos se conservan." });
     },
     onError: (e: any) =>
       toast({ title: "No se pudo eliminar", description: e?.response?.data?.message ?? "Revisa si tiene membresías o reservas activas.", variant: "destructive" }),
@@ -163,7 +163,7 @@ const ClientsList = () => {
       title: `¿Dar de baja a ${c.displayName}?`,
       description: "Se borran sus datos personales y de salud y se cierra su acceso. Sus reservas, órdenes y pagos se conservan sin su nombre. No se puede deshacer.",
       placeholder: "Motivo (opcional): p. ej. lo pidió por WhatsApp",
-      confirmLabel: "Eliminar clienta",
+      confirmLabel: "Eliminar usuario",
       destructive: true,
     });
     if (reason !== null) deleteMutation.mutate({ id: c.id, reason: reason || undefined });
@@ -182,9 +182,11 @@ const ClientsList = () => {
     mutationFn: (d: ManualFormData) => api.post("/admin/clients/manual", d),
     onSuccess: (res) => {
       qc.invalidateQueries({ queryKey: ["clients"] });
-      const msg = res.data?.data?.membershipId
-        ? "Clienta registrada y membresía activada"
-        : "Clienta registrada";
+      setSearch("");
+      setBirthday(null);
+      const msg = res.data?.data?.membership
+        ? "Usuario registrado y membresía activada"
+        : "Usuario registrado";
       toast({ title: msg });
       setManualOpen(false);
       manualForm.reset({ startDate: format(new Date(), "yyyy-MM-dd") });
@@ -209,13 +211,13 @@ const ClientsList = () => {
         <AdminPage>
           <AdminPageHeader
             kicker="Personas"
-            title="Clientas"
+            title="Usuarios"
             actions={
               <>
                 <PersonasTabs />
                 <Button onClick={() => setManualOpen(true)}>
                   <UserPlus size={16} aria-hidden="true" />
-                  Nueva clienta
+                  Nuevo usuario
                 </Button>
               </>
             }
@@ -228,7 +230,7 @@ const ClientsList = () => {
               <Search size={18} aria-hidden="true" className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-muted" />
               <Input id="clients-search" type="search" className="h-12 pl-10" placeholder="Buscar por nombre, email o teléfono" value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
-            <span className="text-sm text-ink-muted"><span className="nums font-extrabold text-ink">{clients.length}</span> clientas registradas</span>
+            <span className="text-sm text-ink-muted"><span className="nums font-extrabold text-ink">{clients.length}</span> usuarios registrados</span>
           </div>
           {birthday === "month" && (
             <Panel className="flex flex-wrap items-center gap-3 px-5 py-3">
@@ -243,7 +245,7 @@ const ClientsList = () => {
             {listIsError ? (
               <div className="px-6">
                 <ErrorState
-                  title="No pudimos cargar a las clientas"
+                  title="No pudimos cargar a los usuarios"
                   onRetry={() => listRefetch()}
                 />
               </div>
@@ -268,11 +270,11 @@ const ClientsList = () => {
               ) : (
                 <EmptyBlock
                   Icon={UsersRound}
-                  title="Aún no hay clientas registradas"
-                  description="Registra a tu primera clienta para llevar su expediente, membresías y reservas."
+                  title="Aún no hay usuarios registrados"
+                  description="Registra a tu primer usuario para llevar su expediente, membresías y reservas."
                   action={
                     <Button size="sm" className={cn(primaryBtnCls, "gap-2")} onClick={() => setManualOpen(true)}>
-                      <UserPlus size={14} /> Nueva clienta
+                      <UserPlus size={14} /> Nuevo usuario
                     </Button>
                   }
                 />
@@ -284,7 +286,7 @@ const ClientsList = () => {
                     <TableHead className="text-ink/55 font-semibold text-xs uppercase tracking-wider">Nombre</TableHead>
                     <TableHead className="text-ink/55 font-semibold text-xs uppercase tracking-wider hidden md:table-cell">Email</TableHead>
                     <TableHead className="text-ink/55 font-semibold text-xs uppercase tracking-wider">Teléfono</TableHead>
-                    <TableHead className="text-ink/55 font-semibold text-xs uppercase tracking-wider hidden lg:table-cell">Clienta desde</TableHead>
+                    <TableHead className="text-ink/55 font-semibold text-xs uppercase tracking-wider hidden lg:table-cell">Usuario desde</TableHead>
                     <TableHead className="w-12" />
                   </TableRow>
                 </TableHeader>
@@ -362,10 +364,10 @@ const ClientsList = () => {
             <SheetHeader>
               <SheetTitle className="font-display text-xl text-ink flex items-center gap-2">
                 <UserPlus size={18} className="text-ink" />
-                Nueva clienta
+                Nuevo usuario
               </SheetTitle>
               <SheetDescription className="text-ink/55">
-                Registro manual. La clienta recibe su contraseña por email.
+                Registro manual. El usuario recibe su contraseña por email.
               </SheetDescription>
             </SheetHeader>
 
@@ -429,7 +431,7 @@ const ClientsList = () => {
                 {plansError ? (
                   <ErrorState
                     title="No pudimos cargar los planes"
-                    description="Puedes registrar a la clienta sin plan y asignarlo después, o reintentar."
+                    description="Puedes registrar al usuario sin plan y asignarlo después, o reintentar."
                     onRetry={() => refetchPlans()}
                   />
                 ) : (
@@ -525,7 +527,7 @@ const ClientsList = () => {
                   Cancelar
                 </Button>
                 <Button type="submit" disabled={manualMutation.isPending} className={cn(primaryBtnCls, "min-w-[140px]")}>
-                  {manualMutation.isPending ? "Registrando…" : hasPlanSelected ? "Registrar + activar plan" : "Registrar clienta"}
+                  {manualMutation.isPending ? "Registrando…" : hasPlanSelected ? "Registrar + activar plan" : "Registrar usuario"}
                 </Button>
               </div>
             </form>

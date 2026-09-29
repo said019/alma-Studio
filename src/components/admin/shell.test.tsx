@@ -29,9 +29,9 @@ beforeEach(() => {
   mockApi.get.mockReset();
   routeApi(mockApi, {
     "/admin/stats": { pendingAlerts: 3, classesToday: 8, activeMembers: 112, monthlyRevenue: 86400 },
-    "/users?role=client&search=cam": { data: [CAMILA] },
-    "/users?role=client&search=zz": { data: [] },
-    "/users?role=client&search=": { data: [] },
+    "/users?search=cam": { data: [CAMILA] },
+    "/users?search=zz": { data: [] },
+    "/users?search=": { data: [] },
   });
 });
 
@@ -65,15 +65,15 @@ describe("marco del panel", () => {
   it("⌘K lleva el foco al buscador", async () => {
     loginAs("admin");
     mount();
-    const combo = await screen.findByRole("combobox", { name: "Buscar clienta" });
+    const combo = await screen.findByRole("combobox", { name: "Buscar usuario" });
     fireEvent.keyDown(window, { key: "k", metaKey: true });
     expect(document.activeElement).toBe(combo);
   });
 
-  it("elegir una clienta en el buscador abre su ficha", async () => {
+  it("elegir un usuario en el buscador abre su ficha", async () => {
     loginAs("admin");
     mount();
-    const combo = await screen.findByRole("combobox", { name: "Buscar clienta" });
+    const combo = await screen.findByRole("combobox", { name: "Buscar usuario" });
     fireEvent.change(combo, { target: { value: "cam" } });
     fireEvent.click(await screen.findByRole("option", { name: /Camila Torres/ }));
     expect(screen.getByTestId("location").textContent).toBe("/admin/clients/u1");
@@ -84,7 +84,7 @@ describe("ClientSearch", () => {
   const renderSearch = (onSelect = vi.fn()) => {
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(<QueryClientProvider client={qc}><ClientSearch onSelect={onSelect} /></QueryClientProvider>);
-    return { onSelect, combo: screen.getByRole("combobox", { name: "Buscar clienta" }) };
+    return { onSelect, combo: screen.getByRole("combobox", { name: "Buscar usuario" }) };
   };
 
   it("con una sola letra no busca", async () => {
@@ -97,7 +97,7 @@ describe("ClientSearch", () => {
   it("codifica acentos y símbolos en la URL", async () => {
     const { combo } = renderSearch();
     fireEvent.change(combo, { target: { value: "ñ&+52" } });
-    await waitFor(() => expect(mockApi.get).toHaveBeenCalledWith("/users?role=client&search=%C3%B1%26%2B52"));
+    await waitFor(() => expect(mockApi.get).toHaveBeenCalledWith("/users?search=%C3%B1%26%2B52"));
   });
 
   it("flecha y Enter eligen; Esc cierra", async () => {

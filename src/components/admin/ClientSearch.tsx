@@ -28,7 +28,7 @@ export const MIN_CHARS = 2;
  */
 export default function ClientSearch({
   onSelect, inputRef, autoFocus, className, shortcutHint = false,
-  placeholder = "Buscar clienta", label = "Buscar clienta",
+  placeholder = "Buscar usuario", label = "Buscar usuario",
 }: ClientSearchProps) {
   const id = useId();
   const listId = `${id}-lista`;
@@ -40,7 +40,7 @@ export default function ClientSearch({
 
   const { data, isFetching, isError, refetch } = useQuery<{ data: ClientHit[] }>({
     queryKey: ["client-search", debounced],
-    queryFn: async () => (await api.get(`/users?role=client&search=${encodeURIComponent(debounced)}`)).data,
+    queryFn: async () => (await api.get(`/users?search=${encodeURIComponent(debounced)}`)).data,
     enabled,
     staleTime: 30_000,
   });
@@ -102,7 +102,7 @@ export default function ClientSearch({
         </kbd>
       )}
       {showList && (
-        <div id={listId} role="listbox" aria-label="Clientas encontradas" className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 overflow-hidden rounded-2xl border border-line bg-surface shadow-lg">
+        <div id={listId} role="listbox" aria-label="Usuarios encontrados" className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 overflow-hidden rounded-2xl border border-line bg-surface shadow-lg">
           {isFetching && hits.length === 0 ? (
             <p className="px-4 py-3 text-sm text-ink-muted">Buscando…</p>
           ) : isError ? (

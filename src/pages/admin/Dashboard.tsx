@@ -272,7 +272,7 @@ const Dashboard = () => {
     {
       label: "Membresías activas",
       value: stats?.activeMembers != null ? String(stats.activeMembers) : "—",
-      hint: expiringCount ? `${expiringCount} ${expiringCount === 1 ? "vence" : "vencen"} en 7 días` : "clientas con paquete vigente",
+      hint: expiringCount ? `${expiringCount} ${expiringCount === 1 ? "vence" : "vencen"} en 7 días` : "usuarios con paquete vigente",
     },
   ];
 
@@ -424,13 +424,13 @@ const Dashboard = () => {
                   ) : recentQ.isError ? (
                     <ErrorState title="No pudimos cargar las membresías" onRetry={() => recentQ.refetch()} />
                   ) : recent.length === 0 ? (
-                    <p className="py-3 text-sm text-ink-muted">Aún no hay membresías recientes. Cuando una clienta compre un paquete aparecerá aquí.</p>
+                    <p className="py-3 text-sm text-ink-muted">Aún no hay membresías recientes. Cuando un usuario compre un paquete aparecerá aquí.</p>
                   ) : (
                     <ul>
                       {recent.map((m) => (
                         <li key={m.id} className="flex items-center gap-2.5 border-t border-line py-2.5 first:border-t-0">
                           <span className="min-w-0 flex-1 leading-tight">
-                            <span className="block truncate text-sm font-bold">{m.userName ?? "Clienta"}</span>
+                            <span className="block truncate text-sm font-bold">{m.userName ?? "Usuario"}</span>
                             <span className="block truncate text-xs text-ink-muted">{m.planName ?? "—"}</span>
                           </span>
                           <MembershipStatus status={m.status} />
@@ -472,8 +472,8 @@ const Dashboard = () => {
                 </div>
               </Panel>
 
-              <Panel aria-label="Clientas por última visita">
-                <PanelHeader title="Clientas por última visita" trailing={<PanelLink to="/admin/reports">Ver en Reportes</PanelLink>} />
+              <Panel aria-label="Usuarios por última visita">
+                <PanelHeader title="Usuarios por última visita" trailing={<PanelLink to="/admin/reports">Ver en Reportes</PanelLink>} />
                 <div className="px-5 pb-5 lg:px-6">
                   {dormantQ.isLoading ? (
                     <SkeletonRow height={140} />

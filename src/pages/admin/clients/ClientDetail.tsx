@@ -472,7 +472,7 @@ const ClientDetail = () => {
             to="/admin/clients"
             className="mb-4 inline-flex items-center gap-1.5 text-xs font-medium uppercase tracking-[0.14em] text-ink/55 no-underline transition-colors hover:text-ink"
           >
-            <ArrowLeft size={13} /> Clientas
+            <ArrowLeft size={13} /> Usuarios
           </Link>
 
           {userError ? (
@@ -495,7 +495,7 @@ const ClientDetail = () => {
                 <div className="mb-7 flex flex-col gap-5 lg:flex-row lg:items-center">
                   <div className="relative shrink-0 self-start">
                     {u?.photoUrl ? (
-                      <ZoomableImage src={u.photoUrl} alt={u.displayName ?? "Cliente"} overlayLabel="Ver" className="h-[88px] w-[88px] overflow-hidden rounded-full" />
+                      <ZoomableImage src={u.photoUrl} alt={u.displayName ?? "Usuario"} overlayLabel="Ver" className="h-[88px] w-[88px] overflow-hidden rounded-full" />
                     ) : (
                       <span className="grid h-[88px] w-[88px] place-items-center rounded-full bg-sunken font-display text-2xl text-ink">
                         {initialsOf(u?.displayName)}
@@ -513,7 +513,7 @@ const ClientDetail = () => {
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="text-[0.75rem] font-bold uppercase tracking-[0.12em] text-ink-muted">
-                      {u?.createdAt ? `Clienta desde ${format(new Date(u.createdAt), "MMMM yyyy", { locale: es })}` : "Clienta"}
+                      {u?.createdAt ? `Usuario desde ${format(new Date(u.createdAt), "MMMM yyyy", { locale: es })}` : "Usuario"}
                     </p>
                     <h1 className="mt-2 break-words font-display text-[1.5rem] font-extrabold uppercase leading-[1.05] lg:text-[1.75rem]">{u?.displayName ?? u?.display_name}</h1>
                     <p className="mt-1.5 text-sm text-ink-muted">{[u?.email, u?.phone].filter(Boolean).join(" · ")}</p>
@@ -586,7 +586,7 @@ const ClientDetail = () => {
                         <h3 className="text-sm font-semibold text-ink">Cuestionario de ingreso</h3>
                         {u?.onboardingCompleted === false ? (
                           <p className="text-sm text-ink/55">
-                            La clienta aún no ha respondido el cuestionario.
+                            El usuario aún no ha respondido el cuestionario.
                           </p>
                         ) : (
                           <div className="space-y-3 text-sm text-ink/70">
@@ -630,7 +630,7 @@ const ClientDetail = () => {
                       <EmptyBlock
                         Icon={CreditCard}
                         title="Sin membresías"
-                        description="Esta clienta aún no tiene un plan. Puedes asignarle uno desde Pagos."
+                        description="Este usuario aún no tiene un plan. Puedes asignarle uno desde Pagos."
                       />
                     </TableCard>
                   ) : (
@@ -685,7 +685,7 @@ const ClientDetail = () => {
                       <EmptyBlock
                         Icon={CalendarDays}
                         title="Sin reservas todavía"
-                        description="Cuando la clienta reserve una clase aparecerá aquí su historial."
+                        description="Cuando el usuario reserve una clase aparecerá aquí su historial."
                       />
                     </TableCard>
                   ) : (
@@ -839,7 +839,7 @@ const ClientDetail = () => {
                     <ErrorState title="No pudimos cargar la responsiva" onRetry={() => refetchWaiver()} />
                   ) : !waiver ? (
                     <div className="rounded-xl border border-line bg-sunken p-6 text-sm text-ink/55">
-                      Esta clienta aún no ha firmado su responsiva. La firmará al reservar su primera clase.
+                      Este usuario aún no ha firmado su responsiva. La firmará al reservar su primera clase.
                     </div>
                   ) : (
                     <div className="space-y-5">
@@ -887,7 +887,7 @@ const ClientDetail = () => {
                           <p className="mb-3 text-xs uppercase tracking-wider text-ink/55">Firma</p>
                           <img
                             src={waiver.signature_data}
-                            alt="Firma de la clienta"
+                            alt="Firma del usuario"
                             className="max-h-32 rounded-lg border border-line bg-canvas p-2"
                           />
                         </div>
@@ -948,7 +948,7 @@ const ClientDetail = () => {
                 <div className="flex items-center justify-between gap-4 rounded-xl border border-line bg-sunken px-4 py-3">
                   <div>
                     <Label htmlFor="mem-unlimited" className="text-sm font-medium text-ink">Clases ilimitadas</Label>
-                    <p className="text-xs text-ink/55">La clienta reserva sin tope de créditos.</p>
+                    <p className="text-xs text-ink/55">El usuario reserva sin tope de créditos.</p>
                   </div>
                   <Switch
                     id="mem-unlimited"
@@ -972,7 +972,7 @@ const ClientDetail = () => {
                     onChange={(e) => setEditCredits(e.target.value)}
                   />
                   <p className="text-xs text-ink/50">
-                    Ajusta los créditos de la clienta (sirve para paquetes por semana o por mes).
+                    Ajusta los créditos del usuario (sirve para paquetes por semana o por mes).
                   </p>
                   {editAbovePlan && (
                     <p className="text-[0.75rem] font-bold text-danger">Queda por encima del plan ({editMem.classLimit} clases).</p>

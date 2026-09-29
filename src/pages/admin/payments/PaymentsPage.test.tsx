@@ -17,7 +17,7 @@ function tabla() {
       { id: "p8", name: "Paquete 8 clases", price: 1450, classLimit: 8, durationDays: 30, classCategory: "studio", isActive: true },
       { id: "pu", name: "Ilimitado mensual", price: 2680, classLimit: null, durationDays: 30, classCategory: "reformer_tower", isActive: true },
     ] },
-    "/users?role=client&search=cam": { data: [CAMILA] },
+    "/users?search=cam": { data: [CAMILA] },
     "/users/u1": { data: CAMILA },
     "/users/zzz": Object.assign(new Error("404"), { response: { status: 404, data: {} } }),
     "/payments": { data: [
@@ -37,14 +37,14 @@ beforeEach(() => {
 afterEach(() => vi.useRealTimers());
 
 describe("Cobros · Cobrar", () => {
-  it("clienta, plan y método en una sola pantalla con el resumen a un lado", async () => {
+  it("usuario, plan y método en una sola pantalla con el resumen a un lado", async () => {
     loginAs("admin");
     renderAdmin(<PaymentsPage />, { route: "/admin/payments" });
     const resumen = await screen.findByRole("complementary", { name: "Resumen de la membresía" });
     const confirmar = within(resumen).getByRole("button", { name: "Confirmar y activar membresía" });
     expect(confirmar).toBeDisabled();
 
-    fireEvent.change(screen.getByRole("combobox", { name: "Buscar clienta para cobrar" }), { target: { value: "cam" } });
+    fireEvent.change(screen.getByRole("combobox", { name: "Buscar usuario para cobrar" }), { target: { value: "cam" } });
     fireEvent.click(await screen.findByRole("option", { name: /Camila Torres/ }));
     fireEvent.click(await screen.findByRole("radio", { name: /Paquete 8 clases/ }));
     fireEvent.click(screen.getByRole("radio", { name: /Tarjeta/ }));
@@ -62,7 +62,7 @@ describe("Cobros · Cobrar", () => {
     loginAs("admin");
     renderAdmin(<PaymentsPage />, { route: "/admin/payments" });
     const resumen = await screen.findByRole("complementary", { name: "Resumen de la membresía" });
-    fireEvent.change(screen.getByRole("combobox", { name: "Buscar clienta para cobrar" }), { target: { value: "cam" } });
+    fireEvent.change(screen.getByRole("combobox", { name: "Buscar usuario para cobrar" }), { target: { value: "cam" } });
     fireEvent.click(await screen.findByRole("option", { name: /Camila Torres/ }));
     fireEvent.click(await screen.findByRole("radio", { name: /Paquete 8 clases/ }));
     fireEvent.change(screen.getByLabelText("Precio cobrado"), { target: { value: "1200" } });
@@ -82,7 +82,7 @@ describe("Cobros · Cobrar", () => {
     loginAs("admin");
     renderAdmin(<PaymentsPage />, { route: "/admin/payments" });
     const resumen = await screen.findByRole("complementary", { name: "Resumen de la membresía" });
-    fireEvent.change(screen.getByRole("combobox", { name: "Buscar clienta para cobrar" }), { target: { value: "cam" } });
+    fireEvent.change(screen.getByRole("combobox", { name: "Buscar usuario para cobrar" }), { target: { value: "cam" } });
     fireEvent.click(await screen.findByRole("option", { name: /Camila Torres/ }));
     fireEvent.click(await screen.findByRole("radio", { name: /Paquete 8 clases/ }));
     fireEvent.change(screen.getByLabelText("Precio cobrado"), { target: { value: "0" } });
@@ -95,7 +95,7 @@ describe("Cobros · Cobrar", () => {
     loginAs("admin");
     renderAdmin(<PaymentsPage />, { route: "/admin/payments" });
     const resumen = await screen.findByRole("complementary", { name: "Resumen de la membresía" });
-    fireEvent.change(screen.getByRole("combobox", { name: "Buscar clienta para cobrar" }), { target: { value: "cam" } });
+    fireEvent.change(screen.getByRole("combobox", { name: "Buscar usuario para cobrar" }), { target: { value: "cam" } });
     fireEvent.click(await screen.findByRole("option", { name: /Camila Torres/ }));
     fireEvent.click(await screen.findByRole("radio", { name: /Paquete 8 clases/ }));
     fireEvent.change(screen.getByLabelText("Referencia de pago (opcional)"), { target: { value: "SPEI 998877" } });
@@ -109,7 +109,7 @@ describe("Cobros · Cobrar", () => {
     loginAs("admin");
     renderAdmin(<PaymentsPage />, { route: "/admin/payments" });
     const resumen = await screen.findByRole("complementary", { name: "Resumen de la membresía" });
-    fireEvent.change(screen.getByRole("combobox", { name: "Buscar clienta para cobrar" }), { target: { value: "cam" } });
+    fireEvent.change(screen.getByRole("combobox", { name: "Buscar usuario para cobrar" }), { target: { value: "cam" } });
     fireEvent.click(await screen.findByRole("option", { name: /Camila Torres/ }));
     fireEvent.click(await screen.findByRole("radio", { name: /Ilimitado apertura/ }));
     expect(screen.getByLabelText("Precio cobrado")).toHaveValue(2300);
@@ -118,7 +118,7 @@ describe("Cobros · Cobrar", () => {
     await waitFor(() => expect(mockApi.post).toHaveBeenCalledWith("/memberships", expect.objectContaining({ planId: "pa", amount: 2300 })));
   });
 
-  it("con ?clienta= llega con la clienta elegida", async () => {
+  it("con ?usuario= llega con el usuario elegida", async () => {
     loginAs("admin");
     renderAdmin(<PaymentsPage />, { route: "/admin/payments?clienta=u1", path: "/admin/payments" });
     const resumen = await screen.findByRole("complementary", { name: "Resumen de la membresía" });
@@ -128,8 +128,8 @@ describe("Cobros · Cobrar", () => {
   it("con un id que no existe lo dice y deja buscar", async () => {
     loginAs("admin");
     renderAdmin(<PaymentsPage />, { route: "/admin/payments?clienta=zzz", path: "/admin/payments" });
-    expect(await screen.findByText("No encontramos a esa clienta. Búscala abajo.")).toBeInTheDocument();
-    expect(screen.getByRole("combobox", { name: "Buscar clienta para cobrar" })).toBeInTheDocument();
+    expect(await screen.findByText("No encontramos a esa usuario. Búscala abajo.")).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Buscar usuario para cobrar" })).toBeInTheDocument();
   });
 
   it("recepción no llega a la pantalla de Cobrar (I3)", async () => {
@@ -137,7 +137,7 @@ describe("Cobros · Cobrar", () => {
     renderAdmin(<PaymentsPage />, { route: "/admin/payments" });
     await waitFor(() => expect(screen.getByTestId("location").textContent).toBe("/app"));
     expect(screen.queryByRole("complementary", { name: "Resumen de la membresía" })).toBeNull();
-    expect(screen.queryByRole("combobox", { name: "Buscar clienta para cobrar" })).toBeNull();
+    expect(screen.queryByRole("combobox", { name: "Buscar usuario para cobrar" })).toBeNull();
   });
 });
 
