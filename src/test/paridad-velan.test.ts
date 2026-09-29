@@ -1,5 +1,5 @@
 // Paridad de vistas con Velan (24 sep 2026).
-// Alma sólo debe exponer las vistas que Velan expone, más las excepciones
+// HIVE sólo debe exponer las vistas que Velan expone, más las excepciones
 // documentadas en src/config/features.ts. Lo demás se apaga, no se borra.
 import { describe, it, expect } from "vitest";
 import fs from "fs";

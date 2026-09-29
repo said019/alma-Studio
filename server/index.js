@@ -61,6 +61,7 @@ import { seedClassTypesIfEmpty, seedPlansIfEmpty } from "./lib/catalogSeed.js";
 import { DEFAULT_NOTIFICATION_TEMPLATES } from "./lib/notificationTemplates.js";
 import { PASS_DEFAULT_TEXTS, LOYALTY_MILESTONES_SEED } from "./lib/passDefaults.js";
 import { passLocationFields } from "./lib/passGeofence.js";
+import { syntheticGuestEmail } from "./lib/syntheticEmail.js";
 import { resolveEffectivePrice } from "./lib/pricing.js";
 import { saleAmountPlan, planMembershipAdjust, cleanPaymentReference, saleStartProblem, saleStartDay, saleAuditAfter, PAYMENT_METHODS, normalizePaymentMethod, PAYMENT_METHOD_INVALID, calcMembershipEndDate } from "./lib/membershipAdmin.js";
 import { cancellationLimitProblem, cancellationQuota, clientCancelDecision, normalizeCancellationSettings, publicBookingPolicy } from "./lib/cancellationPolicy.js";
@@ -339,7 +340,7 @@ async function uploadBufferToDrive(buffer, fileName, mimeType, accessToken) {
   const folderId = getDriveFolderId();
   const metadata = { name: fileName, ...(folderId ? { parents: [folderId] } : {}) };
   // Build multipart body manually
-  const boundary = "alma_boundary_" + Date.now();
+  const boundary = "hive_boundary_" + Date.now();
   const metaPart = Buffer.from(
     `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n`
   );
@@ -5996,7 +5997,7 @@ function buildGoogleWalletSaveUrl({ userId, userName, points, qrCode, membership
   const membershipCategory = hasMembership
     ? normalizeClassCategory(membership.class_category, "all")
     : "all";
-  const membershipCategoryLabel = getAlmaWalletCategoryLabel(membershipCategory);
+  const membershipCategoryLabel = getWalletCategoryLabel(membershipCategory);
   const progressSummary = getWalletProgressSummary(membership);
   const isUnlimited = hasMembership && (membership.class_limit === null || membership.class_limit >= 9999);
   const classLimit = Number(membership?.class_limit ?? 0);
@@ -6507,7 +6508,7 @@ function truncateWalletField(value, max = 26) {
   return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 }
 
-function getAlmaWalletCategoryLabel(category) {
+function getWalletCategoryLabel(category) {
   const normalized = normalizeClassCategory(category, "all");
   if (normalized === "studio") return "Studio";
   if (normalized === "reformer_tower") return "Reformer/Tower";
@@ -7031,7 +7032,7 @@ function triggerWalletPassSync(userId, reason = "wallet_update") {
 //   3. Email               (via emailService imports already present)
 //
 // All helpers are best-effort: never throw upstream, always log on failure.
-// Voz Alma: cercana, casual, te recibe una amiga. Sin em dashes, sin marketing,
+// Voz del estudio: cercana, casual, te recibe una amiga. Sin em dashes, sin marketing,
 // sin emojis decorativos masivos (uno o dos cuando aplica). Con primer nombre.
 
 const phoneE164 = (raw) => {
@@ -7516,20 +7517,8 @@ function isAppleWebPassAvailable() {
  * Apple .pkpass = ZIP containing: pass.json, manifest.json, signature, icon.png, logo.png, strip.png
  */
 // ─── Dynamic strip renderer (branded SVG → PNG via sharp) ─────────
-// Builds a 375×123 strip image: marca "ALMA MOVEMENT" + plan + clases
-// restantes centrados sobre el fondo crema de la marca. Ya no dibuja anillos.
-
-const ALMA_PASS_PALETTE = {
-  // Canónico DESIGN.md — greige + espresso
-  canvas:    "#FAF9F6",  // texto claro sobre espresso
-  inkDeep:   "#241B1A",  // fondo drenched (el momento firma)
-  ink:       "#43392F",  // texto sobre fondo claro
-  oat:       "#E6DAC8",  // reglas decorativas
-  sandstone: "#CBB9A4",  // bordes, elementos terciarios
-  stone:     "#A48D78",  // acento decorativo
-  berry:     "#6E5A46",  // texto secundario (AA)
-  hairline:  "#E0D5C6",  // divisores
-};
+// Builds a 375×123 strip image: fondo cálido con marco de esquinas y el
+// isotipo HIVE al centro. Ya no dibuja anillos ni texto.
 
 function escapeXml(value) {
   return String(value ?? "")
@@ -7539,30 +7528,30 @@ function escapeXml(value) {
     .replace(/"/g, "&quot;");
 }
 
-// Logo real de Alma (versión clara, transparente) como data URI, cacheado.
+// Isotipo HIVE (versión clara, transparente) como data URI, cacheado.
 // Se embebe como <image> en el strip: es imagen, no texto, así que renderiza en
 // el servidor sin depender de fuentes. Devuelve null si no se halla el asset.
-const ALMA_MARK_LIGHT_CACHE = { dataUri: undefined };
-function getAlmaMarkLightDataUri() {
-  if (ALMA_MARK_LIGHT_CACHE.dataUri !== undefined) return ALMA_MARK_LIGHT_CACHE.dataUri;
+const MARK_LIGHT_CACHE = { dataUri: undefined };
+function getMarkLightDataUri() {
+  if (MARK_LIGHT_CACHE.dataUri !== undefined) return MARK_LIGHT_CACHE.dataUri;
   let uri = null;
   try {
     const p = findAssetFile(["alma-mark-light.png", "alma/alma-mark-light.png"]);
     if (p) uri = `data:image/png;base64,${fs.readFileSync(p).toString("base64")}`;
   } catch (e) { console.warn("[wallet] alma-mark-light no disponible:", e.message); }
-  ALMA_MARK_LIGHT_CACHE.dataUri = uri;
+  MARK_LIGHT_CACHE.dataUri = uri;
   return uri;
 }
 
-function buildAlmaStripSvg(ringState, scale = 1, opts = {}) {
+function buildPassStripSvg(ringState, scale = 1, opts = {}) {
   const W = Math.round(375 * scale);
   const H = Math.round(123 * scale);
   const fg = "#FAF9F6"; // Feather White
 
   // Membresía de CLUB EXCLUSIVO: fondo cálido Desert Rock + marco de esquinas +
-  // el LOGO REAL de Alma (imagen embebida, CERO texto → nunca "tofu"). Diseñado
+  // el isotipo HIVE (imagen embebida, CERO texto → nunca "tofu"). Diseñado
   // en viewBox 0 0 375 123; resvg lo escala nítido a W×H.
-  const mark = getAlmaMarkLightDataUri();
+  const mark = getMarkLightDataUri();
 
   // Marco de esquinas (estilo tarjeta de club acuñada).
   const ins = 14, arm = 16;
@@ -7619,24 +7608,6 @@ function buildAlmaStripSvg(ringState, scale = 1, opts = {}) {
 </svg>`;
 }
 
-const ALMA_ICON_PNG_PATH_CACHE = { path: null, dataUri: null };
-function getAlmaIconDataUri() {
-  if (ALMA_ICON_PNG_PATH_CACHE.dataUri) return ALMA_ICON_PNG_PATH_CACHE.dataUri;
-  const candidates = [
-    findAssetFile(["wallet-icon-mixto@3x.png", "wallet-icon-mixto@2x.png", "wallet-icon-mixto.png"]),
-  ].filter(Boolean);
-  for (const p of candidates) {
-    try {
-      const buf = fs.readFileSync(p);
-      const uri = `data:image/png;base64,${buf.toString("base64")}`;
-      ALMA_ICON_PNG_PATH_CACHE.path = p;
-      ALMA_ICON_PNG_PATH_CACHE.dataUri = uri;
-      return uri;
-    } catch (_) { /* try next */ }
-  }
-  return null;
-}
-
 function detectStripMode({ membership }) {
   const hasMembership = !!membership;
   if (!hasMembership) return "welcome";
@@ -7645,8 +7616,8 @@ function detectStripMode({ membership }) {
   return "default";
 }
 
-async function buildAlmaStripPng(ringState, scale = 1, opts = {}) {
-  const svg = buildAlmaStripSvg(ringState, scale, {
+async function buildPassStripPng(ringState, scale = 1, opts = {}) {
+  const svg = buildPassStripSvg(ringState, scale, {
     mode: opts.mode || "default",
     planName: opts.planName || "",
     classesLabel: opts.classesLabel || "",
@@ -7688,7 +7659,7 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
   //   Apple muestra el pase en la lockscreen automáticamente alrededor de esta hora.
   // - Geocerca: `locations` (abajo) para que también aparezca cuando la alumna
   //   esté cerca del estudio, sólo si BUSINESS_LATITUDE/BUSINESS_LONGITUDE existen.
-  const almaRelevantDate = (() => {
+  const membershipRelevantDate = (() => {
     if (hasEventPass) return null;
     if (!nextBooking?.date) return null;
     try {
@@ -7734,14 +7705,14 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
   const membershipCategory = hasMembership
     ? normalizeClassCategory(membership.class_category, "all")
     : "all";
-  const membershipCategoryLabel = getAlmaWalletCategoryLabel(membershipCategory);
+  const membershipCategoryLabel = getWalletCategoryLabel(membershipCategory);
   const progressSummary = getWalletProgressSummary(membership);
   const isUnlimited = hasMembership && (membership.class_limit === null || membership.class_limit >= 9999);
   const isTrialSingleSession = hasMembership && String(membership.repeat_key || "").startsWith("trial_single_session");
   const nonTransferable = hasMembership && parseBooleanFlag(membership.is_non_transferable);
   const nonRepeatable = hasMembership && parseBooleanFlag(membership.is_non_repeatable);
   // Drenched espresso card — brand "firma" for wallet
-  // Tarjeta cálida — 100% paleta oficial Alma (sin espresso añadido).
+  // Tarjeta cálida Desert Rock (colores heredados del pase anterior).
   const passBackground = "rgb(164, 141, 120)";  // Desert Rock #A48D78 — fondo cálido
   const passForeground = "rgb(250, 249, 246)";  // Feather White #FAF9F6 — valores (alto contraste)
   const passAccent = "rgb(230, 218, 200)";      // Creamed Oat #E6DAC8 — labels
@@ -8187,7 +8158,7 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
     ],
     webServiceURL: `${SITE_URL}/api/wallet`,
     authenticationToken: APPLE_AUTH_TOKEN,
-    relevantDate: almaRelevantDate || eventRelevantDate,
+    relevantDate: membershipRelevantDate || eventRelevantDate,
     // Geocerca: el pase aparece en la pantalla de bloqueo cerca del estudio.
     // Para activarla define BUSINESS_LATITUDE y BUSINESS_LONGITUDE (y, opcional,
     // BUSINESS_PASS_RADIUS_M) con las coordenadas de Cuauhtémoc #68, Del Carmen,
@@ -8320,9 +8291,9 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
         : "";
       const stripOpts = { mode: stripMode, planName: stripPlanName, classesLabel: stripClassesLabel };
       const [s1, s2, s3] = await Promise.all([
-        buildAlmaStripPng(null, 1, stripOpts),
-        buildAlmaStripPng(null, 2, stripOpts),
-        buildAlmaStripPng(null, 3, stripOpts),
+        buildPassStripPng(null, 1, stripOpts),
+        buildPassStripPng(null, 2, stripOpts),
+        buildPassStripPng(null, 3, stripOpts),
       ]);
       stripBuffer = s1;
       strip2xBuffer = s2;
@@ -10067,7 +10038,9 @@ async function findOrCreateGuestUser(guestProfile, db = pool) {
   }
   // INSERT defensivo:
   //  - users.email es NOT NULL (schema viejo) — generamos uno sintético
-  //    único por guest_profile.id; nunca se usa para login ni envío real.
+  //    único por guest_profile.id; nunca se usa para login ni envío real, y la
+  //    búsqueda de arriba es por guest_profile_id, no por correo
+  //    (server/lib/syntheticEmail.js).
   //  - Si choca con UNIQUE (típicamente users.phone porque la socia/otra
   //    alumna ya tiene ese teléfono), reintenta sin phone — el phone vive
   //    en guest_profiles, no necesita estar en users para que la reserva
@@ -10075,7 +10048,7 @@ async function findOrCreateGuestUser(guestProfile, db = pool) {
   const realEmail = guestProfile.email && String(guestProfile.email).includes("@")
     ? guestProfile.email
     : null;
-  const syntheticEmail = `guest+${guestProfile.id}@alma.guest`;
+  const syntheticEmail = syntheticGuestEmail(guestProfile.id);
   const emailToUse = realEmail || syntheticEmail;
   try {
     const ins = await db.query(
@@ -11044,13 +11017,13 @@ app.delete("/api/schedules/:id", adminMiddleware, async (req, res) => {
   } catch (err) { return res.status(500).json({ message: "Error interno" }); }
 });
 
-// POST /api/schedules/reset-alma — wipes schedule_slots and seeds 23 canonical Alma slots.
+// POST /api/schedules/reset-template — borra schedule_slots y siembra la plantilla de 23 horarios.
 // Si body.generateClasses === true, también crea las class instances en `classes`
 // para las próximas body.weeksAhead semanas (default 4) usando body.instructorId.
 //
 // Body: { generateClasses?: boolean, weeksAhead?: number,
 //         instructorId?: string, classTypeId?: string, maxCapacity?: number }
-app.post("/api/schedules/reset-alma", adminMiddleware, async (req, res) => {
+app.post("/api/schedules/reset-template", adminMiddleware, async (req, res) => {
   const {
     generateClasses = false,
     weeksAhead = 4,
@@ -11060,7 +11033,7 @@ app.post("/api/schedules/reset-alma", adminMiddleware, async (req, res) => {
   } = req.body || {};
 
   // Canonical slots (day_of_week, time_slot, end_time +55min)
-  const ALMA_SLOTS = [
+  const TEMPLATE_SLOTS = [
     [1, "7:00 am"], [1, "8:00 am"], [1, "7:00 pm"], [1, "8:00 pm"],
     [2, "7:00 am"], [2, "8:00 am"], [2, "7:00 pm"], [2, "8:00 pm"],
     [3, "7:00 am"], [3, "8:00 am"], [3, "7:00 pm"], [3, "8:00 pm"],
@@ -11073,7 +11046,7 @@ app.post("/api/schedules/reset-alma", adminMiddleware, async (req, res) => {
   try {
     await client.query("BEGIN");
     await client.query("DELETE FROM schedule_slots");
-    for (const [dow, ts] of ALMA_SLOTS) {
+    for (const [dow, ts] of TEMPLATE_SLOTS) {
       await client.query(
         `INSERT INTO schedule_slots (time_slot, day_of_week, class_type_name, is_active)
          VALUES ($1, $2, 'Barre', true)`,
@@ -11084,7 +11057,7 @@ app.post("/api/schedules/reset-alma", adminMiddleware, async (req, res) => {
   } catch (err) {
     await client.query("ROLLBACK").catch(() => {});
     client.release();
-    console.error("reset-alma (slots) error:", err);
+    console.error("reset-template (slots) error:", err);
     return res.status(500).json({ message: "Error interno seedeando slots", error: err.message });
   }
   client.release();
@@ -11098,7 +11071,7 @@ app.post("/api/schedules/reset-alma", adminMiddleware, async (req, res) => {
     });
   }
 
-  // Resolver class_type (Barre, único activo para Alma) e instructor.
+  // Resolver class_type (prefiere Barre si existe; si no, el primero activo) e instructor.
   let classTypeId = bodyClassTypeId;
   if (!classTypeId) {
     const ctRes = await pool.query(
@@ -11141,9 +11114,9 @@ app.post("/api/schedules/reset-alma", adminMiddleware, async (req, res) => {
   for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
     // schedule_slots usa 1=Mon..6=Sat; JS Date.getDay() es 0=Sun..6=Sat
     const jsDay = d.getDay();
-    if (jsDay === 0) continue; // Domingo: Alma no opera
+    if (jsDay === 0) continue; // Domingo: la plantilla no tiene horarios
     const slotDay = jsDay; // 1..6 directos
-    const slotsForDay = ALMA_SLOTS.filter(([dw]) => dw === slotDay);
+    const slotsForDay = TEMPLATE_SLOTS.filter(([dw]) => dw === slotDay);
     const dateStr = toDbDateString(d);
     for (const [, timeSlot] of slotsForDay) {
       const startTime = parseTimeSlotTo24Hour(timeSlot);
@@ -17905,7 +17878,7 @@ async function bootServer() {
   // Initialize Google Wallet loyalty class if configured
   ensureGoogleWalletClass().catch(() => { });
   const server = app.listen(PORT, () => {
-    console.log(`🚀 Alma API + Frontend → http://localhost:${PORT}`);
+    console.log(`🚀 HIVE API + Frontend → http://localhost:${PORT}`);
   });
   // Timeouts amplios para soportar la subida resumible de archivos grandes
   // (chunks proxeados a Google Drive). Si no los subimos, Node 18+

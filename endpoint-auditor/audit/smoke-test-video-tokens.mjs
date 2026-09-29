@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 import crypto from "node:crypto";
 
-const SECRET = "test_secret_alma";
+const SECRET = "test_secret_hive";
 
 // Re-implementation matching what server/index.js will export.
 // If signStreamToken/verifyStreamToken in server/index.js diverges, copy here too.

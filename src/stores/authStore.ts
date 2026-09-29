@@ -5,7 +5,7 @@ import type { User, LoginCredentials, RegisterData, AuthResponse } from "@/types
 
 /* ── DEV-only bypass: alumna demo sin backend ──
    Activado solo en `import.meta.env.DEV`. En producción no existe.        */
-const DEMO_EMAIL = "alumna@alma.test";
+const DEMO_EMAIL = "alumna@hive.test";
 const DEMO_TOKEN_PREFIX = "dev-demo-";
 const isDevDemoToken = (t: string | null) => Boolean(t && t.startsWith(DEMO_TOKEN_PREFIX));
 

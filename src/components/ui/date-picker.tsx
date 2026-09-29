@@ -1,5 +1,5 @@
 /**
- * Styled date picker for the Alma dark palette.
+ * Styled date picker del panel.
  * Month-grid calendar styled with magenta/lime/violet.
  * Accepts and emits "YYYY-MM-DD" strings (same as <input type="date">).
  */

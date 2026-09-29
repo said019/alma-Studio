@@ -10,7 +10,7 @@ export const DB  = process.env.DATABASE_URL || "postgres://alma:alma@127.0.0.1:5
 // hacia fallar la suite en una base limpia — y volvia a meter la contrasena
 // literal en el repositorio, justo lo que seguridad.test.mjs prohibe.
 export const ADMIN = {
-  email: process.env.QA_ADMIN_EMAIL || "qa-admin@alma.test",
+  email: process.env.QA_ADMIN_EMAIL || "qa-admin@hive.test",
   password: process.env.QA_ADMIN_PASSWORD || `Qa${Math.random().toString(36).slice(2, 10)}A1!`,
 };
 

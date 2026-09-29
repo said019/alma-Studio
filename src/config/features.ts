@@ -2,7 +2,7 @@
  * Funciones ocultas — paridad con Velan (24 sep 2026)
  * ===================================================
  *
- * Alma tiene vistas que el proyecto Velan no expone. En vez de borrarlas, se
+ * HIVE tiene vistas que el proyecto Velan no expone. En vez de borrarlas, se
  * apagan desde aquí: el código, las rutas y los endpoints siguen enteros, y
  * volver a encender una función es cambiar su `false` por `true` y compilar.
  *
@@ -15,7 +15,7 @@
  * otorgan al vender un paquete) se rompe por apagar la vista.
  *
  * Lo que se dejó encendido a propósito, aunque Velan no lo tenga:
- *   - `/app/profile/responsiva`: el backend de Alma bloquea la primera reserva
+ *   - `/app/profile/responsiva`: el backend bloquea la primera reserva
  *     con WAIVER_REQUIRED. Sin esta vista, ninguna clienta podría reservar.
  *   - `/admin/pasar-lista`: es el equivalente de `/admin/checkin` de Velan.
  *   - `/admin/class-generator` y `/admin/class-types`: son el destino real de

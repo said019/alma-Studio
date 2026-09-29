@@ -1,5 +1,5 @@
 /**
- * Styled time picker for the Alma cream palette.
+ * Styled time picker del panel.
  * Renders a clean HH:MM selector with +/- controls.
  * Accepts and emits "HH:MM" strings (same as <input type="time">).
  */

@@ -11,7 +11,7 @@ export const CLASS_PALETTE = [
 
 export const DEFAULT_CLASS_COLOR = COLOR.inkMuted;
 
-/* Colores guardados por versiones anteriores (Alma y el negocio previo). */
+/* Colores guardados en la base por versiones anteriores de la marca. */
 const LEGACY_COLOR_MAP: Record<string, string> = {
   "#cbb9a4": COLOR.lineStrong, // Arena
   "#a48d78": COLOR.lineStrong, // Taupe
