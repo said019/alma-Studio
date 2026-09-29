@@ -25,13 +25,12 @@ describeZone(ZONA, {
 
 describe("textos de la zona", () => {
   it("no quedan textos Alma, salvo la versión histórica de la responsiva", () => {
-    const PERMITIDOS = [/paleta Alma/];
     // responsivaContent.ts conserva la v1 (Alma Movement) tal como se firmó: una
     // responsiva firmada vale con el texto de su versión (auditoría 2026-09-27, punto 7).
     const LEGALES = ["src/components/app/responsivaContent.ts"];
     const malos = ZONA.filter((f) => !LEGALES.includes(f)).flatMap((f) =>
       read(f).split("\n").map((l, i) => [l, i + 1] as const)
-        .filter(([l]) => /\bAlma\b/.test(l) && !PERMITIDOS.some((re) => re.test(l)))
+        .filter(([l]) => /\bAlma\b/.test(l))
         .map(([, n]) => `${f}:${n}`));
     expect(malos).toEqual([]);
   });

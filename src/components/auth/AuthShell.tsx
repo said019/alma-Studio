@@ -179,8 +179,8 @@ export const AuthShell = ({
           </div>
 
           <div className="hidden lg:flex items-center justify-between text-[0.75rem] uppercase tracking-[0.22em] text-ink-muted">
-            <span>Move with intention</span>
-            <span>Juriquilla, Querétaro, MX</span>
+            <span>Pilates Reformer</span>
+            <span>Coyoacán, CDMX</span>
           </div>
         </div>
       </aside>

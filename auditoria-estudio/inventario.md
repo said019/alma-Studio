@@ -1,6 +1,6 @@
-# Inventario — Alma Movement
+# Inventario — HIVE Pilates Studio
 
-**Proyecto:** `/Users/saidromero/Alma Studio/alma-Studio` · producto **Alma Movement** (estudio de pilates, Juriquilla, Qro.)
+**Proyecto:** `/Users/saidromero/Alma Studio/alma-Studio` · producto **HIVE Pilates Studio** (estudio de Pilates, Coyoacán, CDMX; el corte es anterior al cambio de marca)
 **Corte:** 8 sep 2026 · commit `b4de7dc` (`main`, árbol limpio)
 **Modo:** auditoría sobre código + sistema levantado en entorno desechable. **No se tocó producción.**
 

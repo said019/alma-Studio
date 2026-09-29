@@ -46,7 +46,7 @@ propósito, porque hay lógica interna que depende de ellos — por ejemplo, los
 puntos de lealtad se otorgan al vender un paquete aunque la vista de lealtad
 esté apagada. Apagar el backend habría roto ventas.
 
-## Vistas que Velan tiene y Alma no
+## Vistas que Velan tiene y HIVE no
 
 No se construyeron; sólo se anotan por si algún día hacen falta:
 `/admin/audit` (bitácora), `/staff`, `/staff/instructor`, `/staff/reception`,

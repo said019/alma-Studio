@@ -71,9 +71,9 @@ const GenerateClasses = () => {
   });
   const instructors = Array.isArray(instructorsQuery.data?.data) ? instructorsQuery.data.data : [];
 
-  const resetAlmaMutation = useMutation({
+  const resetTemplateMutation = useMutation({
     mutationFn: (params: { generate: boolean; instructorId?: string; weeks?: number }) =>
-      api.post("/schedules/reset-alma", {
+      api.post("/schedules/reset-template", {
         generateClasses: params.generate,
         weeksAhead: params.weeks,
         instructorId: params.instructorId,
@@ -145,7 +145,7 @@ const GenerateClasses = () => {
       description: `Se crearán hasta ${totalSlots} clases (${presetWeeks} ${presetWeeks === 1 ? "semana" : "semanas"} por 23 horarios) con la instructora seleccionada. Las clases que ya existan se omiten.`,
       confirmLabel: "Aplicar y generar",
     });
-    if (ok) resetAlmaMutation.mutate({ generate: true, instructorId: presetInstructorId, weeks: presetWeeks });
+    if (ok) resetTemplateMutation.mutate({ generate: true, instructorId: presetInstructorId, weeks: presetWeeks });
   };
 
   const handlePresetTemplateOnly = async () => {
@@ -154,7 +154,7 @@ const GenerateClasses = () => {
       description: "Se guarda la plantilla de 23 horarios semanales sin crear clases reales en el calendario.",
       confirmLabel: "Guardar plantilla",
     });
-    if (ok) resetAlmaMutation.mutate({ generate: false });
+    if (ok) resetTemplateMutation.mutate({ generate: false });
   };
 
   const toggleDay = (v: number) => {
@@ -244,9 +244,9 @@ const GenerateClasses = () => {
                   <div className="flex flex-wrap gap-2 pt-1">
                     <Button
                       onClick={handlePresetGenerate}
-                      disabled={resetAlmaMutation.isPending || !presetInstructorId}
+                      disabled={resetTemplateMutation.isPending || !presetInstructorId}
                     >
-                      {resetAlmaMutation.isPending ? (
+                      {resetTemplateMutation.isPending ? (
                         <Loader2 size={14} className="mr-2 animate-spin" />
                       ) : (
                         <CalendarDays size={14} className="mr-2" />
@@ -256,7 +256,7 @@ const GenerateClasses = () => {
                     {FEATURES.scheduleTemplates && (
                       <Button
                         onClick={handlePresetTemplateOnly}
-                        disabled={resetAlmaMutation.isPending}
+                        disabled={resetTemplateMutation.isPending}
                         variant="outline"
                         className="border-line-strong/70 text-ink"
                       >

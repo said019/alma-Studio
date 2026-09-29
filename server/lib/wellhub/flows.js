@@ -10,9 +10,12 @@ import {
   confirmWellhubBooking, rejectWellhubBooking, validateWellhubVisit,
 } from "./api.js";
 import { recordAuditBestEffort } from "../audit.js";
+import { syntheticPartnerEmail } from "../syntheticEmail.js";
 
 const CHANNEL = "wellhub";
 
+// Se busca SÓLO por wellhub_id; el correo sintético (server/lib/syntheticEmail.js)
+// sólo se usa al crear la cuenta.
 export async function findOrCreatePartnerUser(pool, payload) {
   const wid = extractWellhubUserId(payload);
   if (!wid) return null;
@@ -20,7 +23,7 @@ export async function findOrCreatePartnerUser(pool, payload) {
   if (existing.rows.length) return existing.rows[0];
   const u = payload?.event_data?.user || payload?.user || {};
   const name = u.name || u.display_name || "Socio Wellhub";
-  const email = u.email && String(u.email).includes("@") ? u.email : `wellhub+${wid}@alma.partner`;
+  const email = u.email && String(u.email).includes("@") ? u.email : syntheticPartnerEmail(wid);
   const phone = u.phone || null;
   const plan = u.plan || u.plan_name || null;
   try {
@@ -35,7 +38,7 @@ export async function findOrCreatePartnerUser(pool, payload) {
       const ins2 = await pool.query(
         `INSERT INTO users (display_name, email, phone, role, source, wellhub_id, accepts_terms, password_hash)
          VALUES ($1,$2,NULL,'client','wellhub',$3,true,NULL) RETURNING *`,
-        [name, `wellhub+${wid}@alma.partner`, String(wid)],
+        [name, syntheticPartnerEmail(wid), String(wid)],
       );
       return ins2.rows[0];
     }

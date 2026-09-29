@@ -1,6 +1,6 @@
 # Deploy a Railway
 
-Guía paso a paso para desplegar Alma Movement en Railway con Postgres dedicado.
+Guía paso a paso para desplegar HIVE Pilates Studio en Railway con Postgres dedicado.
 
 El stack es **un solo servicio Node** que sirve API (`/api/*`) y frontend buildado (`/`). No es Supabase: la BD es Postgres directo via `pg`.
 
@@ -9,14 +9,14 @@ El stack es **un solo servicio Node** que sirve API (`/api/*`) y frontend builda
 ## 0. Requisitos previos
 
 - Cuenta en [railway.app](https://railway.app).
-- Repo en GitHub conectado: `said019/alma-movement` (rama `main`).
+- Repo en GitHub conectado: `said019/alma-Studio` (rama `main`; el nombre técnico del repo no cambió con el rebrand).
 - `psql` instalado localmente (`brew install postgresql` en mac) o **Railway CLI** (`npm i -g @railway/cli`).
 
 ---
 
 ## 1. Crear el proyecto y conectar el repo
 
-1. https://railway.app/new → **Deploy from GitHub repo** → autoriza GitHub si no lo has hecho → escoge `said019/alma-movement`.
+1. https://railway.app/new → **Deploy from GitHub repo** → autoriza GitHub si no lo has hecho → escoge `said019/alma-Studio`.
 2. Railway lee `nixpacks.toml` y empieza un build automático. La primera build **va a fallar** porque falta `DATABASE_URL`. Es normal, sigue.
 
 ## 2. Provisionar Postgres
@@ -35,18 +35,23 @@ En el servicio web → **Variables**, copia/pega este bloque (ajusta `JWT_SECRET
 # ── Obligatorias ─────────────────────────────────────────────
 NODE_ENV=production
 JWT_SECRET=<generar con: openssl rand -hex 32>
-SITE_URL=https://alma-movement.up.railway.app
-APP_URL=https://alma-movement.up.railway.app
-CORS_ALLOWED_ORIGINS=https://alma-movement.up.railway.app
+SITE_URL=https://<tu-servicio>.up.railway.app
+APP_URL=https://<tu-servicio>.up.railway.app
+CORS_ALLOWED_ORIGINS=https://<tu-servicio>.up.railway.app
+
+# ── Cuenta de administración ─────────────────────────────────
+# Se crea al arrancar sólo si no existe (nunca se reescribe su contraseña).
+# ADMIN_EMAIL=<correo de la dueña>      # sin esto: admin@almamovement.mx
+# ADMIN_PASSWORD=<mín. 8, una mayúscula y un número>
 
 # ── Email (Resend) — opcional pero recomendado ───────────────
 # RESEND_API_KEY=re_xxx
-# EMAIL_FROM=hola@almamovement.mx
+# EMAIL_FROM=<remitente verificado en Resend>
 
 # ── WhatsApp (Evolution API) — opcional ──────────────────────
 # EVOLUTION_API_URL=https://evo.example.com
 # EVOLUTION_API_KEY=xxx
-# EVOLUTION_INSTANCE_NAME=alma
+# EVOLUTION_INSTANCE_NAME=alma-movement   # nombre técnico de la instancia ya vinculada
 # EVOLUTION_SEND_DELAY_MS=700
 
 # ── Google Drive (videos) — opcional ─────────────────────────
@@ -62,13 +67,17 @@ CORS_ALLOWED_ORIGINS=https://alma-movement.up.railway.app
 
 # ── Apple Wallet — opcional, requiere certs Apple Developer ──
 # APPLE_TEAM_ID=ABCDE12345
-# APPLE_PASS_TYPE_ID=pass.com.alma.club
+# APPLE_PASS_TYPE_ID=<Pass Type ID del certificado>
 # APPLE_KEY_ID=XXXXXXXXXX
 # APPLE_SIGNER_CERT_BASE64=<base64 del .pem del certificado>
 # APPLE_SIGNER_KEY_BASE64=<base64 del .pem de la private key>
 # APPLE_WWDR_CERT_BASE64=<base64 del .pem del WWDR>
 # APPLE_CERT_PASSWORD=<password del cert si tiene>
 # APPLE_AUTH_TOKEN=<openssl rand -hex 32>
+# Geocerca del pase (sin esto el pase sale sin aviso de cercanía):
+# BUSINESS_LATITUDE=<latitud de Cuauhtémoc #68, Coyoacán>
+# BUSINESS_LONGITUDE=<longitud>
+# BUSINESS_PASS_RADIUS_M=150
 ```
 
 **Notas**:
@@ -91,12 +100,13 @@ El proyecto tiene dos formas de aplicar el esquema. **Usa la opción A (recomend
 ```bash
 npm i -g @railway/cli
 railway login
-railway link              # selecciona tu proyecto Alma
+railway link              # selecciona el proyecto del estudio
 railway service           # selecciona "Postgres"
 railway connect           # abre psql conectado a la BD
 # Dentro de psql:
 \i supabase/migrations/schema_complete.sql
-\i supabase/migrations/20260506_alma_progress_rings.sql
+\i supabase/migrations/20260607_drop_rings.sql
+\i supabase/migrations/20260908_fix_doble_descuento_y_contador.sql
 \q
 ```
 
@@ -108,7 +118,8 @@ railway connect           # abre psql conectado a la BD
 ```bash
 export DB="postgres://...railway.app:..."
 psql "$DB" -f supabase/migrations/schema_complete.sql
-psql "$DB" -f supabase/migrations/20260506_alma_progress_rings.sql
+psql "$DB" -f supabase/migrations/20260607_drop_rings.sql
+psql "$DB" -f supabase/migrations/20260908_fix_doble_descuento_y_contador.sql
 ```
 
 ### Orden de migraciones
@@ -116,15 +127,18 @@ psql "$DB" -f supabase/migrations/20260506_alma_progress_rings.sql
 | # | Archivo | Necesario | Notas |
 |---|---|---|---|
 | 1 | `schema_complete.sql` | **Sí** | 45 tablas, idempotente, todos los seeds básicos |
-| 2 | `20260506_alma_progress_rings.sql` | **Sí** | Tablas de anillos Alma, en su mayoría idempotente |
-| 3 | `20260226_fix_plans_real_prices.sql` | Opcional | Reemplaza precios de planes con los reales de los flyers (no idempotente, NO correr dos veces, hace DELETE + INSERT) |
+| 2 | `20260607_drop_rings.sql` | **Sí** | Quita la gamificación de anillos (idempotente) |
+| 3 | `20260908_fix_doble_descuento_y_contador.sql` | **Sí** | Auditoría 2026-09-08: doble descuento de créditos (idempotente) |
+| - | `20260226_fix_plans_real_prices.sql` | **No correr** | Catálogo de un negocio anterior: desactiva todos los paquetes e inserta otros. El catálogo se captura en el panel |
 | - | `20260225002519_*.sql` | **No correr** | Esquema original Lovable, ya consolidado en `schema_complete.sql` |
 | - | `20260225_seed_classes_schedule_packages.sql` | **No correr** | Archivo vacío |
 | - | `20260226_events_module.sql` | **No correr** | Ya consolidado en `schema_complete.sql` |
 
+Además, `server/index.js` (`ensureSchema`) crea y ajusta columnas al arrancar, y siembra el catálogo inicial (`server/lib/catalog.js`) sólo si las tablas de tipos de clase y paquetes están vacías.
+
 ### Admin user
 
-El server siembra automáticamente `admin@almamovement.mx / AlmaBarre2026!` en cada arranque (función al inicio de `server/index.js`). No necesitas crearlo manualmente.
+El server ya no siembra una contraseña por defecto. Al arrancar crea la cuenta de administración **sólo si no existe** y está `ADMIN_PASSWORD` (sección 3); el correo es `ADMIN_EMAIL` o, sin él, `admin@almamovement.mx`. Si la cuenta ya existe no se toca su contraseña.
 
 ## 5. Re-deploy y verificar
 
@@ -132,16 +146,16 @@ Railway redeploya automático al actualizar variables. Cuando termine:
 
 ```bash
 # Healthcheck
-curl https://alma-movement.up.railway.app/api/health
+curl https://<tu-servicio>.up.railway.app/api/health
 # Debería devolver {"status":"ok","db":"ok",...}
 
 # Landing
-open https://alma-movement.up.railway.app/
+open https://<tu-servicio>.up.railway.app/
 
 # Admin login
-# https://alma-movement.up.railway.app/auth/login
-# email: admin@almamovement.mx
-# pass: AlmaBarre2026!
+# https://<tu-servicio>.up.railway.app/auth/login
+# email: ADMIN_EMAIL (o admin@almamovement.mx)
+# pass: la de ADMIN_PASSWORD
 # → debería redirigir a /admin/dashboard
 ```
 
@@ -149,17 +163,17 @@ Si `/api/health` devuelve `db: "error"`, falta correr migraciones o `DATABASE_UR
 
 ## 6. Dominio custom (opcional, cuando estés listo)
 
-1. Servicio web → **Settings** → **Domains** → **Custom Domain** → escribe `almamovement.mx` (y opcional `www.almamovement.mx`).
+1. Servicio web → **Settings** → **Domains** → **Custom Domain** → escribe el dominio del sitio. Hoy es `www.almamovement.com.mx` (y `almamovement.com.mx`).
 2. Railway te muestra el CNAME para apuntar en tu DNS (Cloudflare, Namecheap, etc.).
 3. Una vez verificado, **actualiza** las env vars:
-   - `SITE_URL=https://almamovement.mx`
-   - `APP_URL=https://almamovement.mx`
-   - `CORS_ALLOWED_ORIGINS=https://almamovement.mx,https://www.almamovement.mx,https://alma-movement.up.railway.app`
+   - `SITE_URL=https://www.almamovement.com.mx`
+   - `APP_URL=https://www.almamovement.com.mx`
+   - `CORS_ALLOWED_ORIGINS=https://www.almamovement.com.mx,https://almamovement.com.mx,https://<tu-servicio>.up.railway.app`
 4. Re-deploy.
 
 ## 7. Apple Wallet y Google Wallet en producción
 
-Los assets de marca (ícono K, wordmark) ya están en `wallet-assets/apple-pass/` y `public/`, viajan en el repo. Sólo te falta:
+Los assets de marca del pase (isotipo HIVE, logos e íconos) están en `public/` y viajan en el repo; se regeneran con `npm run brand:assets`. Sólo te falta:
 
 ### Apple Wallet (.pkpass real)
 
@@ -190,31 +204,31 @@ Sin certs, el server cae a "web pass" (página HTML imprimible). Para `.pkpass` 
 | CORS bloqueado en frontend | Dominio no en `CORS_ALLOWED_ORIGINS` | Agrégalo, redeploy |
 | `JWT_SECRET` inseguro / login random falla | Secret distinto en cada arranque | Setear `JWT_SECRET` fijo en Railway |
 | Frontend abre sin estilos | Build no terminó | Esperar build completo, revisar logs |
-| Login `AlmaBarre2026!` no funciona | El seed no corrió porque el server no arrancó | Resolver causa anterior, reiniciar |
+| No existe la cuenta admin | Falta `ADMIN_PASSWORD` o es débil (ver logs de arranque) | Definirla y reiniciar |
 
 ## 9. Operación
 
 - **Logs**: pestaña **Deployments** → click en el deploy activo → tab **Logs**.
 - **Reiniciar**: Settings → Restart, o redeploya con un commit vacío.
 - **Migrar**: cualquier nuevo SQL agrégalo a `supabase/migrations/`, corre con `railway connect` + `\i ruta.sql`.
-- **Seed manual**: el admin se siembra solo. Para alumnas de prueba, usa `/auth/register` desde el navegador.
+- **Seed manual**: el admin se crea solo con `ADMIN_PASSWORD`. Para alumnas de prueba, usa `/auth/register` desde el navegador.
 - **Backup**: Railway Postgres tiene snapshots automáticos en planes pagos. Para Hobby, exporta:
   ```bash
-  pg_dump "$DATABASE_PUBLIC_URL" -Fc -f alma-$(date +%F).dump
+  pg_dump "$DATABASE_PUBLIC_URL" -Fc -f hive-$(date +%F).dump
   ```
 
 ## 10. Checklist de smoke test post-deploy
 
 - [ ] `/api/health` → 200, `db: "ok"`
-- [ ] `/` → landing carga, ícono K visible en nav
+- [ ] `/` → landing carga, hexágono HIVE visible en el menú
 - [ ] `/auth/login` → form responde
 - [ ] Login con admin → `/admin/dashboard`
 - [ ] Logout → `/auth/login`
 - [ ] Registro de alumna nueva → `/app`
-- [ ] `/app/wallet` → pase con anillos visibles
+- [ ] `/app/wallet` → pase con el isotipo HIVE
 - [ ] `/app/classes` → calendario semanal
-- [ ] PWA: en móvil, "Add to Home Screen" → ícono K instalado, theme berry
-- [ ] OG image: paste de la URL en WhatsApp → preview con wordmark ALMA studio
+- [ ] PWA: en móvil, "Add to Home Screen" → ícono HIVE instalado, nombre "HIVE"
+- [ ] OG image: paste de la URL en WhatsApp → preview con el hexágono HIVE
 
 ---
 

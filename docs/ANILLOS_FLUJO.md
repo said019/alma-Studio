@@ -1,10 +1,12 @@
-# Alma Movement - Flujo de Anillos de Progreso
+# Flujo de Anillos de Progreso
+
+> **Estado:** documento de diseño histórico. La gamificación de anillos se eliminó del producto (`supabase/migrations/20260607_drop_rings.sql`); se conserva como referencia por si el estudio quiere retomarla.
 
 ## Objetivo
 
-Los anillos convierten la asistencia y participacion de cada alumna en una meta visual semanal. La idea es que la alumna sienta que esta cerrando ciclos, igual que en los relojes de ejercicio, pero adaptado a la experiencia de Alma Movement.
+Los anillos convierten la asistencia y participacion de cada alumna en una meta visual semanal. La idea es que la alumna sienta que esta cerrando ciclos, igual que en los relojes de ejercicio, pero adaptado a la experiencia del estudio.
 
-El usuario no define sus anillos manualmente. Alma define las metas desde cada plan, y el sistema calcula el avance con base en reservas, check-ins y acciones de comunidad.
+El usuario no define sus anillos manualmente. El estudio define las metas desde cada plan, y el sistema calcula el avance con base en reservas, check-ins y acciones de comunidad.
 
 ## Los 3 Anillos
 
@@ -24,7 +26,7 @@ Constancia: 2 / 3 clases esta semana
 
 Mide clases intensas, retos o sesiones que representan mayor compromiso.
 
-Se suma cuando la clase tomada tiene intensidad media/alta o cuando Alma decida marcar una actividad como reto.
+Se suma cuando la clase tomada tiene intensidad media/alta o cuando el estudio decida marcar una actividad como reto.
 
 Ejemplo:
 
@@ -34,13 +36,13 @@ Esfuerzo: 1 / 2 retos esta semana
 
 ### 3. Conexion
 
-Mide participacion con la comunidad Alma.
+Mide participacion con la comunidad del estudio.
 
 Puede crecer por acciones como:
 
 - Llevar una invitada.
 - Asistir a un evento especial.
-- Subir historia etiquetando a Alma.
+- Subir historia etiquetando al estudio.
 - Participar en un reto de comunidad.
 - Completar una dinamica interna del studio.
 
@@ -76,7 +78,7 @@ La regla base es:
 
 - Constancia: clases mensuales divididas entre 4 semanas.
 - Esfuerzo: aproximadamente 60% de la meta de constancia.
-- Conexion: puntos de comunidad definidos por Alma.
+- Conexion: puntos de comunidad definidos por el estudio.
 
 ## Flujo de la Alumna
 
@@ -98,7 +100,7 @@ Cuando los 3 anillos se cierran, el sistema marca:
 reward_unlocked = true
 ```
 
-Alma puede usar esto para entregar recompensas como:
+El estudio puede usar esto para entregar recompensas como:
 
 - Clase extra.
 - Descuento.
@@ -292,4 +294,4 @@ La lectura importante para la alumna debe ser:
 - Crear una pantalla admin para registrar eventos de comunidad.
 - Procesar `wallet_update_queue` para actualizar Apple/Google Wallet automaticamente.
 - Agregar vista de historial semanal en perfil de alumna.
-- Definir recompensas reales por plan con Alma.
+- Definir recompensas reales por plan con el estudio.

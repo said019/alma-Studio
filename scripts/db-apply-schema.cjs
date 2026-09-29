@@ -1,4 +1,4 @@
-// Aplica el esquema de Alma Movement a la BD local embebida.
+// Aplica el esquema de HIVE Pilates Studio a la BD local embebida (scripts/db-local.cjs).
 const { Client } = require("pg");
 const fs = require("fs");
 const path = require("path");

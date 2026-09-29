@@ -75,9 +75,10 @@ test("volver a firmar deja la versión vigente", async () => {
   assert.equal(r.body.data.waiver_version, "v2");
 });
 
-test("el pase se descarga como hive-pass.pkpass y los textos legales por defecto ya no dicen Alma", () => {
+test("los pases se descargan como hive-pass.pkpass y hive-event-pass.pkpass, y los textos legales por defecto ya no dicen Alma", () => {
   assert.match(SRC, /filename="hive-pass\.pkpass"/);
-  assert.ok(!/alma-pass\.pkpass/.test(SRC));
+  assert.match(SRC, /filename="hive-event-pass\.pkpass"/);
+  assert.ok(!/alma-(event-)?pass\.pkpass/.test(SRC));
   const inicio = SRC.indexOf("const DEFAULT_POLICIES_SETTINGS");
   const defaults = SRC.slice(inicio, SRC.indexOf("};", inicio));
   assert.ok(inicio > 0);

@@ -1,6 +1,6 @@
 # Wallet Assets — Certificados Apple Wallet
 
-Esta carpeta contiene los certificados para generar pases `.pkpass` reales de Apple Wallet.
+Esta carpeta contiene los certificados para generar pases `.pkpass` reales de Apple Wallet de HIVE Pilates Studio. Las imágenes del pase se leen de `public/` y se generan con `npm run brand:assets`.
 
 > ⚠️ **NUNCA subas estos archivos a Git.** Están protegidos por `.gitignore`.
 
@@ -20,7 +20,7 @@ Coloca estos archivos en `wallet-assets/apple-pass/`:
 
 1. Ve a https://developer.apple.com/account
 2. Certificates, Identifiers & Profiles → Pass Type IDs
-3. Crea un Pass Type ID (ej: `pass.com.almamovement.club`)
+3. Crea un Pass Type ID (ej: `pass.com.almamovement.club`, en el dominio actual del sitio). Si ya hay uno en uso, no lo cambies: los pases emitidos y los dispositivos registrados dependen de él.
 4. Crea un certificado para ese Pass Type ID
 5. Descarga el `.cer` y haz doble clic para instalarlo en Keychain
 
