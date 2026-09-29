@@ -1,4 +1,6 @@
-# Alma Movement — Backlog Funcional Priorizado
+# HIVE Pilates Studio — Backlog Funcional Priorizado
+
+> **Nota (cambio de marca, sep 2026):** este documento se escribió para el estudio anterior. El catálogo y las reglas que describe corresponden al catálogo inicial que siembra una instalación nueva (`server/lib/catalog.js`); el catálogo real de HIVE Pilates Studio se captura en el panel. Datos del estudio: `src/lib/studio.ts`. Datos bancarios: *Configuración → Pagos* en el panel.
 
 > Documento de referencia: especificaciones de servicio, catálogo de precios, reglas operativas y automatizaciones deseadas.
 > Última actualización: 2026-06-06
@@ -8,7 +10,7 @@
 
 ## 1. Introducción y contexto
 
-**Alma Movement** es un estudio de Pilates premium en Juriquilla, Querétaro, que requiere un ecosistema digital integrado para:
+**HIVE Pilates Studio** es un estudio de Pilates Reformer en Coyoacán, CDMX, que requiere un ecosistema digital integrado para:
 
 - Gestionar reservas en línea (4 disciplinas: Reformer, Tower, Mat, Barre, Sculpt)
 - Procesar pagos (online, transferencia bancaria, efectivo) con validación manual de comprobantes
@@ -77,7 +79,7 @@ Funcionalidad core sin la cual el producto no es viable.
 | **PC-5** | Cancelar reserva | Permitir cancelación si >12 horas antes de inicio. Cambiar BookingStatus a CANCELLED. Validar con modal de confirmación. | PC-3 | Not started |
 | **PC-6** | Mi perfil | Nombre, email, teléfono, preferencias. Mostrar avatar placeholder (iniciales). Botón editar datos. | PC-1 | Not started |
 | **PC-7** | Historial de paquetes | Listar paquetes comprados (PackageKind, sesiones usadas/disponibles, fecha vencimiento, estado). | — | Not started |
-| **PC-8** | Información de studio | Ubicación (Calle Acueducto 513), teléfono (7721119216), horarios, reglas del estudio (10 min antes, calcetines, silencio, lesiones). Link WhatsApp directo. | — | Not started |
+| **PC-8** | Información de studio | Ubicación (Cuauhtémoc #68, Del Carmen, Coyoacán, C.P. 04100, CDMX), teléfono (pendiente), horarios, reglas del estudio (10 min antes, calcetines, silencio, lesiones). Link WhatsApp directo cuando haya número. | — | Not started |
 
 #### (B) Panel Admin — MUST HAVE
 
@@ -106,7 +108,7 @@ Funcionalidad muy importante, diferenciadora, pero no bloqueadora de MVP.
 | **PC-10** | Recordatorios automáticos (Email) | 24h antes de clase: email con detalles, link a "Ver reserva", botón "Cancelar". Nombre de instructora, ubicación, reglas. | PC-3, integraciones | Not started |
 | **PC-11** | Sistema de lealtad (puntos/sellos) | Contador visual de "constancia" (ej: sello por cada clase asistida). Mostrar progreso hacia logro (ej: 8 sellos = acceso a clase privada). Basado en ATTENDED bookings. | PC-4 | Not started |
 | **PC-12** | Comprar paquete en línea | Catálogo de paquetes con descripción, precio, vigencia. Seleccionar → checkout → pago. Integración con pasarela (Stripe/Conekta/Mercado Pago). | — | Not started |
-| **PC-13** | Pago por transferencia (cliente) | Opción "Pagar por transferencia" → mostrar CLABE + banco (Banorte, Estefanía Torres). Alumna sube comprobante, app registra PaymentStatus=AWAITING_PROOF. | PC-12, PA-7 | Not started |
+| **PC-13** | Pago por transferencia (cliente) | Opción "Pagar por transferencia" → mostrar CLABE + banco + titular (los captura el estudio en el panel). Alumna sube comprobante, app registra PaymentStatus=AWAITING_PROOF. | PC-12, PA-7 | Not started |
 | **PC-14** | Pago en efectivo (registro) | Opción "Pago en efectivo" → crear reserva con PaymentStatus=PENDING. Nota: "Completa pago en studio". | PC-12 | Not started |
 | **PC-15** | Confirmación de pago | Una vez PaymentStatus=CONFIRMED (por admin o pasarela), notificar a clienta con email/WhatsApp. Mostrar "Paquete activado" en app. | PC-12, PC-13, PC-14 | Not started |
 | **PC-16** | Renovación automática de paquete | Si paquete vence en 3 días y alumna ya compró 3+ veces, sugerir renovación con descuento (TBD) o recordar mediante email/WhatsApp. | PC-11, PC-12 | Not started |
@@ -176,7 +178,7 @@ Las siguientes credenciales y datos van en archivo `.env` o sistema de secrets:
 # TRANSFERENCIA BANCARIA (datos sensibles — NUNCA en .env público)
 BANK_TARJETA=«TARJETA — configurar en panel admin / privado»
 BANK_CLABE=«CLABE — configurar en panel admin / privado»
-BANK_NOMBRE=Banorte
+BANK_NOMBRE=«Banco — configurar en panel admin / privado»
 BANK_TITULAR=«Titular — configurar en privado»
 
 # PASARELA DE PAGO
@@ -184,13 +186,13 @@ PAYMENT_GATEWAY_API_KEY=xxx
 PAYMENT_GATEWAY_SECRET=xxx
 
 # WHATSAPP BUSINESS API
-WHATSAPP_PHONE_NUMBER=+527721119216 (TBD confirmación)
+WHATSAPP_PHONE_NUMBER=«número del estudio — pendiente»
 WHATSAPP_BUSINESS_ACCOUNT_ID=xxx
 WHATSAPP_ACCESS_TOKEN=xxx
 
 # EMAIL
 EMAIL_SERVICE_API_KEY=xxx
-EMAIL_FROM_ADDRESS=noreply@movementalma.com (TBD)
+EMAIL_FROM_ADDRESS=«remitente del estudio — pendiente»
 
 # BASE DE DATOS
 DATABASE_URL=xxx (con credenciales)
@@ -291,8 +293,8 @@ QR_ERROR_CORRECTION=H
 | **¿Hay instructoras existentes?** | Alto — necesario para crear clases, mostrar perfil | Obtener listado: nombre, especialidades, foto, horarios disponibles |
 | **¿Precios finales confirmados?** | Medio — catálogo ya documentado, pero ¿cambios? | Validar tabla de precios; ¿aplican descuentos adicionales? |
 | **¿Pasarela de pago elegida?** | Alto — arquitectura de backend depende | ¿Stripe, Conekta o Mercado Pago? ¿Ya tiene contrato? |
-| **¿WhatsApp número oficial?** | Alto — integración, branding | ¿Es 7721119216 el número WhatsApp Business? |
-| **¿Email oficial del estudio?** | Medio — para confirmaciones y soporte | Propuesta: contacto@movementalma.com o similar (TBD) |
+| **¿WhatsApp número oficial?** | Alto — integración, branding | Pendiente: el estudio aún no comparte número. |
+| **¿Email oficial del estudio?** | Medio — para confirmaciones y soporte | Pendiente de definir con el estudio. |
 | **¿Datos de logo/colores finales?** | Medio — ya hay BRAND.md, pero necesita asset kit | Obtener logo, paleta oficial, tipografías licenciadas |
 | **¿Seguro médico o exoneración requerida?** | Bajo (pero legal) | ¿Necesita términos de aceptación de riesgo en registro? |
 | **¿Política de reembolso más allá de no-show?** | Medio — regla de negocio | ¿Enfermedad/lesión: permite reembolso o crédito? |
@@ -357,9 +359,9 @@ QR_ERROR_CORRECTION=H
 
 | Tipo | Composición | Precio (MXN) | Vigencia |
 |---|---|---|---|
-| ALMA_BALANCE | 4 Studio + 4 Reformer/Tower (8 sesiones) | $1,500 | 30 días |
-| ALMA_FUSION | 6 Studio + 6 Reformer/Tower (12 sesiones) | $2,200 | 30 días |
-| ALMA_EXPERIENCE | 8 Studio + 8 Reformer/Tower (16 sesiones) | $2,800 | 45 días |
+| BALANCE | 4 Studio + 4 Reformer/Tower (8 sesiones) | $1,500 | 30 días |
+| FUSION | 6 Studio + 6 Reformer/Tower (12 sesiones) | $2,200 | 30 días |
+| EXPERIENCE | 8 Studio + 8 Reformer/Tower (16 sesiones) | $2,800 | 45 días |
 
 ### Paquetes Premium & AM_CLUB
 
@@ -367,14 +369,14 @@ QR_ERROR_CORRECTION=H
 |---|---|---|---|
 | AM_CLUB (Studio) | 8 sesiones (solo 7am–10am) | $1,300 | 30 días |
 | AM_CLUB (Reformer & Tower) | 8 sesiones (solo 7am–10am) | $1,600 | 30 días |
-| ALMA_UNLIMITED (promo) | Todo: Reformer+Tower+Mat+Barre+Sculpt | $3,500 | 30 días |
-| ALMA_UNLIMITED (regular) | Todo: Reformer+Tower+Mat+Barre+Sculpt | $3,900 | 30 días |
+| UNLIMITED_ALL (promo) | Todo: Reformer+Tower+Mat+Barre+Sculpt | $3,500 | 30 días |
+| UNLIMITED_ALL (regular) | Todo: Reformer+Tower+Mat+Barre+Sculpt | $3,900 | 30 días |
 
 ---
 
 ## 10. Resumen ejecutivo
 
-**Producto:** Plataforma digital integrada (Portal Clienta + Panel Admin) para gestionar el ciclo completo de reservas, pagos, asistencia y lealtad de Alma Movement.
+**Producto:** Plataforma digital integrada (Portal Clienta + Panel Admin) para gestionar el ciclo completo de reservas, pagos, asistencia y lealtad de HIVE Pilates Studio.
 
 **Scope MVP (4 semanas):** Autenticación, catálogo de clases, reserva/cancelación, historial, check-in manual, validación de pagos por transferencia, información del estudio.
 

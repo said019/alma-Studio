@@ -1,4 +1,6 @@
-# Alma Movement — Modelo de Datos (DATA-MODEL)
+# HIVE Pilates Studio — Modelo de Datos (DATA-MODEL)
+
+> **Nota (cambio de marca, sep 2026):** este documento se escribió para el estudio anterior. El catálogo y las reglas que describe corresponden al catálogo inicial que siembra una instalación nueva (`server/lib/catalog.js`); el catálogo real de HIVE Pilates Studio se captura en el panel. Datos del estudio: `src/lib/studio.ts`. Datos bancarios: *Configuración → Pagos* en el panel.
 
 > Documento técnico de referencia. Fecha: 2026-06-06.
 > Fuente de verdad: especificaciones del cliente + glosario canónico.
@@ -262,7 +264,7 @@ Catálogo maestro de paquetes disponibles para la venta. Define las reglas comer
 | Campo | Tipo | Notas |
 |---|---|---|
 | `id` | UUID | PK |
-| `name` | VARCHAR(100) | Nombre comercial (ej. "ALMA BALANCE") |
+| `name` | VARCHAR(100) | Nombre comercial (ej. "BALANCE") |
 | `kind` | `PackageKind` | SINGLE / PACK / UNLIMITED / INTRO / MIXED / AM_CLUB |
 | `discipline_group` | `DisciplineGroup` | Grupo de disciplinas válidas para este paquete |
 | `sessions_studio` | SMALLINT | Sesiones Studio incluidas (NULL si UNLIMITED o no aplica) |
@@ -289,19 +291,19 @@ Catálogo maestro de paquetes disponibles para la venta. Define las reglas comer
 | Ilimitado Reformer/Tower | UNLIMITED | REFORMER_TOWER | — | ∞ | $2,900 | 30 días |
 | Promo Apertura Ilimitado R/T | UNLIMITED | REFORMER_TOWER | — | ∞ | $2,500 | 30 días |
 | Clase Única Studio | SINGLE | STUDIO | 1 | — | $240 | 30 días |
-| Alma Studio Intro | INTRO | STUDIO | 1 | — | $150 | 7 días |
+| Studio Intro | INTRO | STUDIO | 1 | — | $150 | 7 días |
 | 4 Sesiones Studio | PACK | STUDIO | 4 | — | $900 | 30 días |
 | 8 Sesiones Studio | PACK | STUDIO | 8 | — | $1,700 | 30 días |
 | 12 Sesiones Studio | PACK | STUDIO | 12 | — | $2,150 | 45 días |
 | Studio Ilimitado | UNLIMITED | STUDIO | ∞ | — | $2,700 | 30 días |
 | Studio Ilimitado Promo | UNLIMITED | STUDIO | ∞ | — | $2,300 | 30 días |
-| Alma Balance | MIXED | ALL | 4 | 4 | $1,500 | 30 días |
-| Alma Fusion | MIXED | ALL | 6 | 6 | $2,200 | 30 días |
-| Alma Experience | MIXED | ALL | 8 | 8 | $2,800 | 45 días |
+| Balance | MIXED | ALL | 4 | 4 | $1,500 | 30 días |
+| Fusion | MIXED | ALL | 6 | 6 | $2,200 | 30 días |
+| Experience | MIXED | ALL | 8 | 8 | $2,800 | 45 días |
 | AM Club Studio | AM_CLUB | STUDIO | 8 | — | $1,300 | 30 días |
 | AM Club Reformer & Tower | AM_CLUB | REFORMER_TOWER | — | 8 | $1,600 | 30 días |
-| Alma Unlimited (Todo) Promo | UNLIMITED | ALL | ∞ | ∞ | $3,500 | 30 días |
-| Alma Unlimited (Todo) Regular | UNLIMITED | ALL | ∞ | ∞ | $3,900 | 30 días |
+| Unlimited (Todo) Promo | UNLIMITED | ALL | ∞ | ∞ | $3,500 | 30 días |
+| Unlimited (Todo) Regular | UNLIMITED | ALL | ∞ | ∞ | $3,900 | 30 días |
 
 ---
 
@@ -491,10 +493,10 @@ Configuración global del estudio. Tabla de una sola fila (singleton) que centra
 | Campo | Tipo | Notas |
 |---|---|---|
 | `id` | UUID | PK (siempre la misma fila) |
-| `studio_name` | VARCHAR(100) | "Alma Movement" |
-| `address` | TEXT | Plaza Arce, Calle Acueducto de Querétaro 513, Jurica Acueducto, 76230 Juriquilla, Qro. |
-| `phone_whatsapp` | VARCHAR(20) | 7721119216 |
-| `instagram_handle` | VARCHAR(60) | @movementalma |
+| `studio_name` | VARCHAR(100) | "HIVE Pilates Studio" |
+| `address` | TEXT | Cuauhtémoc #68, Del Carmen, Coyoacán, C.P. 04100, CDMX |
+| `phone_whatsapp` | VARCHAR(20) | Pendiente (el estudio aún no comparte número) |
+| `instagram_handle` | VARCHAR(60) | @hive.pilates |
 | `cancellation_window_hours` | SMALLINT | 12 (horas mínimas para cancelar sin penalización) |
 | `no_show_loyalty_threshold` | SMALLINT | 5 (no-shows acumulados para aplicar penalización de lealtad) |
 | `loyalty_penalty_points` | SMALLINT | TBD — puntos que se descuentan al alcanzar el umbral |

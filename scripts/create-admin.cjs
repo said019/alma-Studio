@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /* eslint-disable no-console */
 /**
- * Crea o promueve un usuario a super_admin en la BD de Alma.
+ * Crea o promueve un usuario a super_admin en la BD de HIVE Pilates Studio.
  *
  *   DATABASE_URL=postgres://... node scripts/create-admin.js \
  *     [email] [password] ["Display Name"]

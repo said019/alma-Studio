@@ -1,21 +1,21 @@
-# Configuración de Wallet Passes en Railway (Alma)
+# Configuración de Wallet Passes en Railway (HIVE Pilates Studio)
 
 Guía exacta para que los pases de Apple Wallet y Google Wallet **se generen y se actualicen** en producción. Hecha tras auditar el código (`server/index.js`).
 
-> **Contexto:** reusas un mismo issuer de Google y un mismo setup de Apple en todas tus marcas, diferenciando por nombre y diseño. Eso es válido. La clase de Google de Alma ya es única en el código (`{ISSUER_ID}.alma_loyalty_v1`), así que **no choca** con Catarsis. Solo hay que poner los valores correctos.
+> **Contexto:** reusas un mismo issuer de Google y un mismo setup de Apple en todas tus marcas, diferenciando por nombre y diseño. Eso es válido. La clase de Google de este estudio ya es única en el código (`{ISSUER_ID}.alma_loyalty_v1`, id técnico heredado que no se cambia porque los pases guardados apuntan a esa clase), así que **no choca** con Catarsis. Solo hay que poner los valores correctos.
 
 ---
 
 ## 1. Google Wallet
 
-### Variables que SÍ debes tener (Alma)
+### Variables que SÍ debes tener (HIVE)
 
-| Variable | Valor para Alma | Notas |
+| Variable | Valor para HIVE | Notas |
 |---|---|---|
 | `GOOGLE_ISSUER_ID` | `3388000000023035846` | El mismo issuer que reusas. ✓ |
 | `GOOGLE_SA_KEY_JSON_BASE64` | *(base64 del JSON de la service account)* | **Método recomendado.** Ver abajo. |
-| `GOOGLE_ISSUER_NAME` | `Alma Movement` | O **bórrala** (default ya es "Alma Movement"). |
-| `GOOGLE_PROGRAM_NAME` | `Alma Club` | O **bórrala** (default ya es "Alma Club"). |
+| `GOOGLE_ISSUER_NAME` | `HIVE Pilates Studio` | O **bórrala** (default ya es "HIVE Pilates Studio"). Si en Railway sigue con el nombre anterior, cámbiala. |
+| `GOOGLE_PROGRAM_NAME` | `HIVE Club` | O **bórrala** (default ya es "HIVE Club"). Si en Railway sigue con el nombre anterior, cámbiala. |
 | `GOOGLE_HEX_BACKGROUND_COLOR` | `#241B1A` | Café oscuro de marca. O bórrala para usar claro. |
 
 ### La service account (lo crítico)
@@ -87,7 +87,17 @@ base64 -i wwdr.pem       | pbcopy   # → APPLE_WWDR_CERT_BASE64
 base64 -i AuthKey_XXXXXXXXXX.p8 | pbcopy   # → APPLE_APNS_KEY_BASE64
 ```
 
-> Reusar el mismo Pass Type ID + certificado entre marcas es válido: el diseño/branding de Alma vive en el `pass.json` que el código genera, y el número de serie es único por clienta (`alma_<userId>`).
+> Reusar el mismo Pass Type ID + certificado entre marcas es válido: el diseño/branding de HIVE vive en el `pass.json` que el código genera, y el número de serie es único por clienta (`alma_<userId>`, prefijo técnico heredado: los dispositivos ya registrados lo usan, no se cambia).
+
+### Geocerca (opcional)
+
+| Variable | Qué es |
+|---|---|
+| `BUSINESS_LATITUDE` | Latitud del estudio (Cuauhtémoc #68, Del Carmen, Coyoacán), grados decimales |
+| `BUSINESS_LONGITUDE` | Longitud del estudio, grados decimales |
+| `BUSINESS_PASS_RADIUS_M` | Radio en metros (150 si no se define) |
+
+Sin las dos coordenadas el pase se genera sin `locations` ni aviso de cercanía (`server/lib/passGeofence.js`).
 
 ---
 
@@ -109,7 +119,7 @@ Cuando ambos den verde, genera un pase de prueba desde la app y confirma que se 
 
 ## Resumen de acciones
 
-1. **Google:** deja SOLO `GOOGLE_ISSUER_ID` + `GOOGLE_SA_KEY_JSON_BASE64` (de la SA que YA funciona con ese issuer). Pon branding Alma o bórralo. Borra `GOOGLE_SA_EMAIL`, `GOOGLE_SA_PRIVATE_KEY`, `GOOGLE_SERVICE_ACCOUNT_JSON`.
+1. **Google:** deja SOLO `GOOGLE_ISSUER_ID` + `GOOGLE_SA_KEY_JSON_BASE64` (de la SA que YA funciona con ese issuer). Pon branding HIVE o bórralo. Borra `GOOGLE_SA_EMAIL`, `GOOGLE_SA_PRIVATE_KEY`, `GOOGLE_SERVICE_ACCOUNT_JSON`.
 2. **Apple:** agrega las **3 variables de firma** que faltan (`APPLE_SIGNER_CERT_BASE64`, `APPLE_SIGNER_KEY_BASE64`, `APPLE_WWDR_CERT_BASE64`) además de las de APNs.
 3. **Verifica** con los dos endpoints de diagnóstico.
 4. **Rota** las llaves que pegaste en el chat por seguridad.

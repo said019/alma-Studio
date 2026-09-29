@@ -1,4 +1,6 @@
-// Lanzador PERSISTENTE de PostgreSQL embebido para desarrollo local de Alma Movement.
+// Lanzador PERSISTENTE de PostgreSQL embebido para desarrollo local de HIVE Pilates Studio.
+// Usuario, contraseña y base se llaman "alma": son los del cluster que ya existe
+// en .pgdata/ (y los de DATABASE_URL en .env). Cambiarlos obliga a recrearlo.
 // Mantiene el proceso vivo. Detener: matar el proceso (Ctrl-C / TaskStop).
 const EmbeddedPostgres = require("embedded-postgres").default || require("embedded-postgres");
 const path = require("path");

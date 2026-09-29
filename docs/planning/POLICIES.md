@@ -1,4 +1,6 @@
-# Alma Movement — Políticas Operativas y de Pagos
+# HIVE Pilates Studio — Políticas Operativas y de Pagos
+
+> **Nota (cambio de marca, sep 2026):** este documento se escribió para el estudio anterior. El catálogo y las reglas que describe corresponden al catálogo inicial que siembra una instalación nueva (`server/lib/catalog.js`); el catálogo real de HIVE Pilates Studio se captura en el panel. Datos del estudio: `src/lib/studio.ts`. Datos bancarios: *Configuración → Pagos* en el panel.
 
 > Documento vivo. Fuente de verdad para reglas de negocio del estudio, flujos de pago y comportamiento del sistema.
 > Última actualización: 2026-06-06
@@ -169,8 +171,8 @@ El sistema soporta tres `PaymentMethod`:
 
 ```
 # NUNCA commitear estos valores — referenciar via variables de entorno
-BANK_NAME=Banorte
-ACCOUNT_HOLDER=Estefania Torres Lanzagorta
+BANK_NAME=«Banco — configurar en panel admin / privado»
+ACCOUNT_HOLDER=«Titular — configurar en panel admin / privado»
 CARD_NUMBER=«TARJETA — configurar en panel admin / privado»
 CLABE=«CLABE — configurar en panel admin / privado»
 ```
@@ -186,7 +188,7 @@ PASO 1 — Seleccion de paquete
   Usuaria elige paquete en la app y selecciona PaymentMethod: TRANSFER
   Sistema crea registro de pago con PaymentStatus: PENDING
   App muestra datos bancarios (banco + titular + ultimos digitos)
-  App genera referencia unica de pago (ej.: "ALMA-2026-00342")
+  App genera referencia unica de pago (ej.: "HIVE-2026-00342")
 
 PASO 2 — Realizacion de la transferencia
   Usuaria realiza la transferencia desde su banco
@@ -248,13 +250,13 @@ PASO 5 — Notificacion a la usuaria
 
 | `PackageKind` | Vigencia | Ejemplo de paquete |
 |---|---|---|
-| `INTRO` | **7 dias** | Alma Studio Intro |
+| `INTRO` | **7 dias** | Studio Intro |
 | `SINGLE` | 30 dias | Clase Unica Reformer/Tower, Clase Unica Studio |
 | `PACK` (4 y 8 sesiones) | 30 dias | 4 Sesiones, 8 Sesiones |
 | `PACK` (12 sesiones) | **45 dias** | 12 Sesiones Reformer/Tower, 12 Sesiones Studio |
 | `UNLIMITED` | 30 dias | Ilimitado Reformer/Tower, Studio Ilimitado |
-| `MIXED` — `ALMA_BALANCE`, `ALMA_FUSION` | 30 dias | Alma Balance, Alma Fusion |
-| `MIXED` — `ALMA_EXPERIENCE` | **45 dias** | Alma Experience |
+| `MIXED` — `BALANCE`, `FUSION` | 30 dias | Balance, Fusion |
+| `MIXED` — `EXPERIENCE` | **45 dias** | Experience |
 | `AM_CLUB` | 30 dias | AM Club Studio, AM Club Reformer & Tower |
 
 > La vigencia inicia en la fecha de `PaymentStatus: CONFIRMED`, no en la fecha de primera clase.
@@ -284,4 +286,4 @@ Los siguientes puntos no estan definidos en la fuente de verdad y **requieren co
 
 ---
 
-*Documento generado para uso interno del equipo de Alma Movement. No distribuir publicamente sin revision del area de negocio.*
+*Documento generado para uso interno del equipo de HIVE Pilates Studio. No distribuir publicamente sin revision del area de negocio.*

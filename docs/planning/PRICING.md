@@ -1,4 +1,6 @@
-# Alma Movement — Catálogo de Precios y Membresías
+# HIVE Pilates Studio — Catálogo de Precios y Membresías
+
+> **Nota (cambio de marca, sep 2026):** este documento se escribió para el estudio anterior. El catálogo y las reglas que describe corresponden al catálogo inicial que siembra una instalación nueva (`server/lib/catalog.js`); el catálogo real de HIVE Pilates Studio se captura en el panel. Datos del estudio: `src/lib/studio.ts`. Datos bancarios: *Configuración → Pagos* en el panel.
 
 > Documento vivo. Fuente de verdad para pricing, catálogo de paquetes y reglas de vigencia.
 > Última actualización: 2026-06-06
@@ -63,7 +65,7 @@
 | Regla | Valor |
 |---|---|
 | Vigencia por defecto | 30 días a partir de la fecha de compra |
-| Vigencia extendida (PACK_12 y ALMA EXPERIENCE) | 45 días |
+| Vigencia extendida (PACK_12 y EXPERIENCE) | 45 días |
 | Vigencia INTRO | 7 días |
 | Ventana de cancelación sin penalización | Mínimo 12 horas antes del inicio de la clase |
 | No-show | La sesión se descuenta del paquete; no reembolsable |
@@ -102,7 +104,7 @@ Las sesiones de esta sección pueden usarse en clases de tipo `MAT`, `BARRE` o `
 
 | Nombre del paquete | `PackageKind` | Sesiones | Precio (MXN) | Vigencia (días) | Restricciones | Promo apertura |
 |---|---|---|---|---|---|---|
-| Alma Studio Intro | `INTRO` | 1 | $150 | 7 | Solo usuarios nuevos (primer acceso al estudio) | No |
+| Studio Intro | `INTRO` | 1 | $150 | 7 | Solo usuarios nuevos (primer acceso al estudio) | No |
 | Clase Única Studio | `SINGLE` | 1 | $240 | 30 | — | No |
 | 4 Sesiones Studio | `PACK` | 4 | $900 | 30 | — | No |
 | 8 Sesiones Studio | `PACK` | 8 | $1,700 | 30 | — | No |
@@ -112,7 +114,7 @@ Las sesiones de esta sección pueden usarse en clases de tipo `MAT`, `BARRE` o `
 
 ### Notas de sección
 
-- El paquete `INTRO` (`Alma Studio Intro`) **solo puede adquirirse una vez por usuario** y tiene vigencia reducida de **7 días**.
+- El paquete `INTRO` (`Studio Intro`) **solo puede adquirirse una vez por usuario** y tiene vigencia reducida de **7 días**.
 - El paquete de 12 sesiones tiene vigencia extendida de **45 días**.
 - La promo de apertura Studio Ilimitado representa un descuento de **$400 MXN** respecto al precio regular.
 
@@ -126,13 +128,13 @@ Combinan sesiones de `STUDIO` y `REFORMER_TOWER` en un solo paquete. Las sesione
 
 | Nombre del paquete | `PackageKind` | Sesiones Studio | Sesiones Reformer/Tower | Total sesiones | Precio (MXN) | Vigencia (días) | Restricciones | Promo apertura |
 |---|---|---|---|---|---|---|---|---|
-| Alma Balance | `MIXED` | 4 | 4 | 8 | $1,500 | 30 | — | No |
-| Alma Fusion | `MIXED` | 6 | 6 | 12 | $2,200 | 30 | — | No |
-| Alma Experience | `MIXED` | 8 | 8 | 16 | $2,800 | 45 | — | No |
+| Balance | `MIXED` | 4 | 4 | 8 | $1,500 | 30 | — | No |
+| Fusion | `MIXED` | 6 | 6 | 12 | $2,200 | 30 | — | No |
+| Experience | `MIXED` | 8 | 8 | 16 | $2,800 | 45 | — | No |
 
 ### Notas de sección
 
-- **Alma Experience** tiene vigencia extendida de **45 días** para reflejar el volumen de 16 sesiones.
+- **Experience** tiene vigencia extendida de **45 días** para reflejar el volumen de 16 sesiones.
 - Las sesiones de cada bloque no son intercambiables entre grupos: las 4/6/8 sesiones Studio no pueden usarse en Reformer/Tower y viceversa.
 
 ---
@@ -145,14 +147,14 @@ Esta sección incluye paquetes con restricciones de horario o de grupo de discip
 |---|---|---|---|---|---|---|---|
 | AM Club Studio | `AM_CLUB` | `STUDIO` | 8 | $1,300 | 30 | Solo horario matutino 7:00am–10:00am | No |
 | AM Club Reformer & Tower | `AM_CLUB` | `REFORMER_TOWER` | 8 | $1,600 | 30 | Solo horario matutino 7:00am–10:00am | No |
-| Alma Unlimited (promo apertura) | `UNLIMITED` | `ALL` | Ilimitadas | $3,500 | 30 | Precio de lanzamiento — Reformer+Tower+Mat+Barre+Sculpt | **Sí** |
-| Alma Unlimited (precio regular) | `UNLIMITED` | `ALL` | Ilimitadas | $3,900 | 30 | Reformer+Tower+Mat+Barre+Sculpt | No |
+| Unlimited (promo apertura) | `UNLIMITED` | `ALL` | Ilimitadas | $3,500 | 30 | Precio de lanzamiento — Reformer+Tower+Mat+Barre+Sculpt | **Sí** |
+| Unlimited (precio regular) | `UNLIMITED` | `ALL` | Ilimitadas | $3,900 | 30 | Reformer+Tower+Mat+Barre+Sculpt | No |
 
 ### Notas de sección
 
 - Los paquetes `AM_CLUB` solo permiten reservar clases programadas entre las **7:00am y las 10:00am**. No son válidos para clases vespertinas (5:00pm–8:00pm).
-- **Alma Unlimited** es el único paquete con `DisciplineGroup = ALL`: acceso irrestricto a todas las disciplinas del estudio.
-- La diferencia entre precio promo y regular de Alma Unlimited es **$400 MXN**.
+- **Unlimited** es el único paquete con `DisciplineGroup = ALL`: acceso irrestricto a todas las disciplinas del estudio.
+- La diferencia entre precio promo y regular de Unlimited es **$400 MXN**.
 
 ---
 
@@ -177,7 +179,7 @@ La tabla siguiente permite comparar todos los paquetes activos por precio y cost
 
 | Paquete | Sesiones | Precio MXN | Costo por sesión (MXN) | Vigencia |
 |---|---|---|---|---|
-| Alma Studio Intro | 1 | $150 | $150.00 | 7 días |
+| Studio Intro | 1 | $150 | $150.00 | 7 días |
 | Clase Única | 1 | $240 | $240.00 | 30 días |
 | 4 Sesiones | 4 | $900 | $225.00 | 30 días |
 | 8 Sesiones | 8 | $1,700 | $212.50 | 30 días |
@@ -189,9 +191,9 @@ La tabla siguiente permite comparar todos los paquetes activos por precio y cost
 
 | Paquete | Total sesiones | Precio MXN | Costo por sesión (MXN) | Vigencia |
 |---|---|---|---|---|
-| Alma Balance | 8 | $1,500 | $187.50 | 30 días |
-| Alma Fusion | 12 | $2,200 | $183.33 | 30 días |
-| Alma Experience | 16 | $2,800 | $175.00 | 45 días |
+| Balance | 8 | $1,500 | $187.50 | 30 días |
+| Fusion | 12 | $2,200 | $183.33 | 30 días |
+| Experience | 16 | $2,800 | $175.00 | 45 días |
 
 ### Premium / Especiales
 
@@ -199,8 +201,8 @@ La tabla siguiente permite comparar todos los paquetes activos por precio y cost
 |---|---|---|---|---|
 | AM Club Studio | 8 | $1,300 | 30 días | Solo matutino 7:00am–10:00am |
 | AM Club Reformer & Tower | 8 | $1,600 | 30 días | Solo matutino 7:00am–10:00am |
-| Alma Unlimited (promo) | Ilimitadas | $3,500 | 30 días | Todas las disciplinas |
-| Alma Unlimited (regular) | Ilimitadas | $3,900 | 30 días | Todas las disciplinas |
+| Unlimited (promo) | Ilimitadas | $3,500 | 30 días | Todas las disciplinas |
+| Unlimited (regular) | Ilimitadas | $3,900 | 30 días | Todas las disciplinas |
 
 ---
 
@@ -213,9 +215,9 @@ La tabla siguiente permite comparar todos los paquetes activos por precio y cost
 
 | Duración | Paquetes |
 |---|---|
-| 7 días | `INTRO` (Alma Studio Intro) |
+| 7 días | `INTRO` (Studio Intro) |
 | 30 días | Todos los demás, salvo excepciones |
-| 45 días | 12 Sesiones Reformer/Tower · 12 Sesiones Studio · Alma Experience |
+| 45 días | 12 Sesiones Reformer/Tower · 12 Sesiones Studio · Experience |
 
 - Las sesiones no utilizadas al vencer la vigencia **no son reembolsables ni transferibles** (requiere confirmación del cliente si se contempla alguna excepción).
 
@@ -229,15 +231,15 @@ La tabla siguiente permite comparar todos los paquetes activos por precio y cost
 
 | Restricción | Paquetes afectados |
 |---|---|
-| Solo usuarios nuevos (un solo uso por cuenta) | Alma Studio Intro (`INTRO`) |
+| Solo usuarios nuevos (un solo uso por cuenta) | Studio Intro (`INTRO`) |
 | Solo horario matutino 7:00am–10:00am | AM Club Studio · AM Club Reformer & Tower |
-| Precio de lanzamiento (disponible durante promo de apertura) | Promo Apertura Ilimitado Reformer/Tower · Studio Ilimitado Promo · Alma Unlimited (promo) |
+| Precio de lanzamiento (disponible durante promo de apertura) | Promo Apertura Ilimitado Reformer/Tower · Studio Ilimitado Promo · Unlimited (promo) |
 
 ### 8.4 Métodos de pago aceptados
 
 `ONLINE` · `TRANSFER` · `CASH`
 
-> Los datos bancarios para pagos por `TRANSFER` (Banorte, titular: Estefanía Torres Lanzagorta) son **datos sensibles** y deben almacenarse exclusivamente en variables de entorno o configuración privada. No deben exponerse en repositorios públicos ni en la interfaz de usuario de forma abierta. El cliente adjunta comprobante; la validación es manual y lleva el pago a estado `CONFIRMED`.
+> Los datos bancarios para pagos por `TRANSFER` (banco y titular, capturados en el panel) son **datos sensibles** y deben almacenarse exclusivamente en variables de entorno o configuración privada. No deben exponerse en repositorios públicos ni en la interfaz de usuario de forma abierta. El cliente adjunta comprobante; la validación es manual y lleva el pago a estado `CONFIRMED`.
 
 ### 8.5 Reglas del estudio (a mostrar en la app)
 

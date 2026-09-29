@@ -1,4 +1,6 @@
-# Alma Movement — Operations Reference
+# HIVE Pilates Studio — Operations Reference
+
+> **Nota (cambio de marca, sep 2026):** este documento se escribió para el estudio anterior. El catálogo y las reglas que describe corresponden al catálogo inicial que siembra una instalación nueva (`server/lib/catalog.js`); el catálogo real de HIVE Pilates Studio se captura en el panel. Datos del estudio: `src/lib/studio.ts`. Datos bancarios: *Configuración → Pagos* en el panel.
 
 > Documento operativo del estudio. Base para configuración de plataforma, atención al cliente y operación diaria.
 > Última actualización: 2026-06-06
@@ -9,17 +11,17 @@
 
 | Campo | Detalle |
 |---|---|
-| Nombre del estudio | Alma Movement |
+| Nombre del estudio | HIVE Pilates Studio |
 | Disciplina principal | Pilates (Reformer, Tower, Mat) + Barre + Sculpt |
 | Segmento | Boutique premium — "lujo accesible" |
-| Ubicación | Plaza Arce, Calle Acueducto de Querétaro 513, Jurica Acueducto, 76230 Juriquilla, Qro., México |
-| Teléfono / WhatsApp | 7721119216 |
-| Instagram | @movementalma |
+| Ubicación | Cuauhtémoc #68, Del Carmen, Coyoacán, C.P. 04100, CDMX, México |
+| Teléfono / WhatsApp | Pendiente (el estudio aún no comparte número) |
+| Instagram | @hive.pilates |
 | Correo de operaciones | TBD / requiere confirmación del cliente |
 
 ### 1.1 Canal WhatsApp
 
-El número 7721119216 debe integrarse con enlace directo de WhatsApp en todos los puntos de contacto digital (plataforma, correos automáticos, confirmaciones de reserva).
+Cuando el estudio comparta su número, debe integrarse con enlace directo de WhatsApp en todos los puntos de contacto digital (plataforma, correos automáticos, confirmaciones de reserva). Se captura en `src/lib/studio.ts`.
 
 ---
 
@@ -155,8 +157,8 @@ PackageKind : SINGLE | PACK | UNLIMITED | INTRO | MIXED | AM_CLUB
 |---|---|
 | Vigencia estándar | 30 días a partir de la compra |
 | PACK de 12 sesiones (Reformer/Tower o Studio) | 45 días |
-| ALMA EXPERIENCE (paquete mixto) | 45 días |
-| INTRO (`ALMA STUDIO INTRO`) | 7 días |
+| EXPERIENCE (paquete mixto) | 45 días |
+| INTRO (`STUDIO INTRO`) | 7 días |
 
 ### 6.3 Paquetes Reformer / Tower (`DisciplineGroup: REFORMER_TOWER`)
 
@@ -166,14 +168,14 @@ PackageKind : SINGLE | PACK | UNLIMITED | INTRO | MIXED | AM_CLUB
 | 4 Sesiones Reformer/Tower | `PACK` | 4 | $920 | 30 días | "1 vez por semana" |
 | 8 Sesiones Reformer/Tower | `PACK` | 8 | $1,760 | 30 días | "Alumnas constantes" |
 | 12 Sesiones Reformer/Tower | `PACK` | 12 | $2,280 | 45 días | "Transformación y constancia" |
-| Ilimitado Reformer/Tower | `UNLIMITED` | Ilimitado | $2,900 | 30 días | "Experiencia premium Alma" |
+| Ilimitado Reformer/Tower | `UNLIMITED` | Ilimitado | $2,900 | 30 días | "Experiencia premium" |
 | Promo Apertura Ilimitado R+T | `UNLIMITED` | Ilimitado | $2,500 | 30 días | Precio promocional de apertura |
 
 ### 6.4 Paquetes Studio — Mat, Barre, Sculpt (`DisciplineGroup: STUDIO`)
 
 | Nombre | PackageKind | Sesiones | Precio MXN | Vigencia | Nota |
 |---|---|---|---|---|---|
-| Alma Studio Intro | `INTRO` | 1 | $150 | 7 días | Solo nuevos usuarios — clase muestra |
+| Studio Intro | `INTRO` | 1 | $150 | 7 días | Solo nuevos usuarios — clase muestra |
 | Clase Única Studio | `SINGLE` | 1 | $240 | 30 días | — |
 | 4 Sesiones Studio | `PACK` | 4 | $900 | 30 días | — |
 | 8 Sesiones Studio | `PACK` | 8 | $1,700 | 30 días | — |
@@ -185,9 +187,9 @@ PackageKind : SINGLE | PACK | UNLIMITED | INTRO | MIXED | AM_CLUB
 
 | Nombre | Sesiones Studio | Sesiones R/T | Total sesiones | Precio MXN | Vigencia |
 |---|---|---|---|---|---|
-| Alma Balance | 4 | 4 | 8 | $1,500 | 30 días |
-| Alma Fusion | 6 | 6 | 12 | $2,200 | 30 días |
-| Alma Experience | 8 | 8 | 16 | $2,800 | 45 días |
+| Balance | 4 | 4 | 8 | $1,500 | 30 días |
+| Fusion | 6 | 6 | 12 | $2,200 | 30 días |
+| Experience | 8 | 8 | 16 | $2,800 | 45 días |
 
 ### 6.6 Paquetes AM Club — Solo Matutino (`PackageKind: AM_CLUB`)
 
@@ -200,11 +202,11 @@ Válidos exclusivamente en clases del bloque matutino 7:00 am – 10:00 am.
 
 > Nota: el bloque AM Club se define como 7:00 am – 10:00 am. Verificar si las clases de las 6:00 am quedan incluidas o excluidas en este beneficio. Requiere confirmación del cliente.
 
-### 6.7 Paquete Alma Unlimited (`DisciplineGroup: ALL`)
+### 6.7 Paquete Unlimited (`DisciplineGroup: ALL`)
 
 | Nombre | Disciplinas | Precio regular MXN | Precio promo apertura MXN | Vigencia |
 |---|---|---|---|---|
-| Alma Unlimited | ALL (Reformer + Tower + Mat + Barre + Sculpt) | $3,900 | $3,500 | 30 días |
+| Unlimited | ALL (Reformer + Tower + Mat + Barre + Sculpt) | $3,900 | $3,500 | 30 días |
 
 ---
 
@@ -254,4 +256,4 @@ Los siguientes datos no están definidos en la fuente de verdad del cliente y de
 9. **Tiempo de anticipación para recordatorios:** ¿con cuántas horas de anticipación se envían los recordatorios de clase (p. ej. 24h y 1h antes)?
 10. **Días de operación de instructores:** ¿los instructores tienen horarios fijos asignados por disciplina? ¿La plataforma debe gestionar perfiles de instructores?
 11. **Pasarela de pago en línea:** ¿qué proveedor se utilizará para `PaymentMethod: ONLINE` (Stripe, Conekta, Clip, MercadoPago, otro)?
-12. **Vigencia de promociones de apertura:** ¿hasta qué fecha están disponibles los precios de promo apertura (Ilimitado R+T $2,500; Studio Ilimitado Promo $2,300; Alma Unlimited promo $3,500)?
+12. **Vigencia de promociones de apertura:** ¿hasta qué fecha están disponibles los precios de promo apertura (Ilimitado R+T $2,500; Studio Ilimitado Promo $2,300; Unlimited promo $3,500)?
