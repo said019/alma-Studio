@@ -8633,7 +8633,7 @@ app.get("/api/wallet/events/apple/pkpass", authMiddleware, async (req, res) => {
         activeEventPass,
       });
       res.setHeader("Content-Type", "application/vnd.apple.pkpass");
-      res.setHeader("Content-Disposition", `attachment; filename="alma-event-pass.pkpass"`);
+      res.setHeader("Content-Disposition", `attachment; filename="hive-event-pass.pkpass"`);
       res.setHeader("Content-Length", pkpassBuffer.length);
       return res.send(pkpassBuffer);
     }

@@ -1,7 +1,7 @@
 {
-  "name": "Alma Movement",
-  "short_name": "Alma",
-  "description": "Reserva tus clases de Pilates en Juriquilla, Querétaro.",
+  "name": "HIVE Pilates Studio",
+  "short_name": "HIVE",
+  "description": "Reserva tus clases en HIVE Pilates Studio, Coyoacán, CDMX.",
   "start_url": "/app",
   "scope": "/",
   "display": "standalone",

@@ -52,6 +52,12 @@ export function buildLineItem(plan, totalAmount) {
   };
 }
 
+/** Lo que la clienta ve en su estado de cuenta (Stripe corta en 22 caracteres). */
+export const DEFAULT_STATEMENT_DESCRIPTOR = "HIVE PILATES STUDIO";
+export function statementDescriptor(env = process.env) {
+  return (env.STRIPE_STATEMENT_DESCRIPTOR ?? DEFAULT_STATEMENT_DESCRIPTOR).slice(0, 22);
+}
+
 export function buildIdempotencyKey(orderId) {
   return `checkout-session-${orderId}`;
 }
@@ -94,7 +100,7 @@ export async function createOrGetStripeCustomer(pool, userId) {
 export async function createCheckoutSession(pool, { order, plan, totalAmount, customerId }) {
   const stripe = getStripe();
   const appUrl = (process.env.APP_URL ?? process.env.SITE_URL ?? "http://localhost:5173").replace(/\/+$/, "");
-  const descriptor = (process.env.STRIPE_STATEMENT_DESCRIPTOR ?? "ALMA MOVEMENT").slice(0, 22);
+  const descriptor = statementDescriptor();
 
   const session = await stripe.checkout.sessions.create(
     {
