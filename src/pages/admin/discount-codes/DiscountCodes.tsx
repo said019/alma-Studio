@@ -23,7 +23,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { Copy, MoreHorizontal, Plus, TicketPercent } from "lucide-react";
-import { usageInfo } from "./discount-helpers";
+import { couponStatus, usageInfo } from "./discount-helpers";
 
 const nullableInt = z.preprocess(
   (v) => (v === "" || v === undefined || v === null ? null : Number(v)),
@@ -52,6 +52,8 @@ const codeSchema = z.object({
   channel: z.enum(["all", "membership", "pos", "event"]).default("all"),
   expiresAt: z.string().optional(),
   isActive: z.boolean().default(true),
+}).refine((d) => d.discountType !== "percent" || d.discountValue <= 100, {
+  message: "El porcentaje no puede superar 100.", path: ["discountValue"],
 });
 
 type CodeFormData = z.infer<typeof codeSchema>;
@@ -101,6 +103,8 @@ const DiscountCodes = () => {
   const qc = useQueryClient();
   const { confirm, dialog } = useConfirm();
   const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [editing, setEditing] = useState<DiscountCode | null>(null);
 
   const { data, isLoading, isError, refetch } = useQuery<{ data: any[] }>({
@@ -108,6 +112,10 @@ const DiscountCodes = () => {
     queryFn: async () => (await api.get("/discount-codes")).data,
   });
   const codes = Array.isArray(data?.data) ? data.data.map(normalizeCode) : [];
+  const visibleCodes = codes.filter((c) =>
+    c.code.toLowerCase().includes(search.trim().toLowerCase()) &&
+    (statusFilter === "all" || couponStatus(c) === statusFilter));
+  const activeCount = codes.filter((c) => couponStatus(c) === "Activo").length;
 
   const { data: plansData } = useQuery<{ data: { id: string; name: string }[] }>({
     queryKey: ["plans"],
@@ -230,11 +238,30 @@ const DiscountCodes = () => {
         <AdminPage>
           <AdminPageHeader
             kicker="Más"
-            title="Descuentos"
+            title="Cupones"
             subtitle="Cupones que los usuarios escriben al pagar: porcentaje o monto fijo, con límites por plan, canal, usos o fecha."
-            actions={<Button onClick={openCreate}><Plus size={16} aria-hidden="true" />Nuevo código</Button>}
+            actions={<Button onClick={openCreate}><Plus size={16} aria-hidden="true" />Nuevo cupón</Button>}
           />
 
+          {!isError && !isLoading && codes.length > 0 && (
+            <div className="space-y-4">
+              <div className="grid gap-3 sm:grid-cols-3">
+                {[["Activos", activeCount], ["Por revisar", codes.length - activeCount], ["Usos confirmados", codes.reduce((total, c) => total + c.usesCount, 0)]].map(([label, value]) => (
+                  <Panel key={label} className="p-4"><p className="text-sm text-muted-foreground">{label}</p><p className="nums text-2xl font-bold">{value}</p></Panel>
+                ))}
+              </div>
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <Input aria-label="Buscar cupón" placeholder="Buscar por código…" value={search} onChange={(e) => setSearch(e.target.value)} />
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="sm:w-48" aria-label="Estado del cupón"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los estados</SelectItem>
+                    {["Activo", "Inactivo", "Vencido", "Agotado"].map((state) => <SelectItem key={state} value={state}>{state}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
           {isError ? (
             <ErrorState
               description="No pudimos cargar los códigos de descuento. Revisa tu conexión y vuelve a intentarlo."
@@ -270,7 +297,7 @@ const DiscountCodes = () => {
                     ? Array(4).fill(0).map((_, i) => (
                       <TableRow key={i}>{Array(8).fill(0).map((_, j) => <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>)}</TableRow>
                     ))
-                    : codes.map((c) => (
+                    : visibleCodes.map((c) => (
                       <TableRow key={c.id}>
                         <TableCell>
                           <span className="inline-flex items-center gap-1.5">
@@ -315,7 +342,7 @@ const DiscountCodes = () => {
                           })()}
                         </TableCell>
                         <TableCell className="nums text-sm text-ink/70">{c.expiresAt ? formatDate(c.expiresAt) : "—"}</TableCell>
-                        <TableCell>{c.isActive ? <StatusDot tone="success">Activo</StatusDot> : <StatusDot tone="muted">Inactivo</StatusDot>}</TableCell>
+                        <TableCell><StatusDot tone={couponStatus(c) === "Activo" ? "success" : "muted"}>{couponStatus(c)}</StatusDot></TableCell>
                         <TableCell>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" aria-label={`Acciones de ${c.code}`}><MoreHorizontal size={14} /></Button></DropdownMenuTrigger>
@@ -327,6 +354,9 @@ const DiscountCodes = () => {
                         </TableCell>
                       </TableRow>
                     ))}
+                  {!isLoading && codes.length > 0 && visibleCodes.length === 0 && (
+                    <TableRow><TableCell colSpan={8} className="py-10 text-center">No hay cupones que coincidan con la búsqueda.</TableCell></TableRow>
+                  )}
                 </TableBody>
               </Table>
             </Panel>
@@ -340,9 +370,9 @@ const DiscountCodes = () => {
             if (!next) setEditing(null);
           }}
         >
-          <DialogContent className="max-w-md border-line bg-canvas">
+          <DialogContent className="max-h-[90dvh] overflow-y-auto max-w-md border-line bg-canvas">
             <DialogHeader>
-              <DialogTitle className="font-display text-ink">{editing ? "Editar código" : "Nuevo código"}</DialogTitle>
+              <DialogTitle className="font-display text-ink">{editing ? "Editar cupón" : "Nuevo cupón"}</DialogTitle>
             </DialogHeader>
             <form
               noValidate
@@ -410,6 +440,11 @@ const DiscountCodes = () => {
               </div>
               <div className="space-y-1"><Label>Fecha de expiración</Label><Input type="datetime-local" className="nums" {...form.register("expiresAt")} /></div>
               <div className="flex items-center gap-3"><Switch checked={form.watch("isActive")} onCheckedChange={(v) => form.setValue("isActive", v)} /><Label>Activo</Label></div>
+              {Object.values(form.formState.errors).length > 0 && (
+                <div role="alert" className="text-sm text-destructive">
+                  {Object.entries(form.formState.errors).map(([field, error]) => <p key={field}>{error.message}</p>)}
+                </div>
+              )}
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
                 <Button type="submit" disabled={isSaving}>{isSaving ? "Guardando..." : editing ? "Actualizar" : "Crear"}</Button>

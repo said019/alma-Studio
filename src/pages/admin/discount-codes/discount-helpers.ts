@@ -9,3 +9,16 @@ export function usageInfo(usesCount: number, maxUses: number | null | undefined)
     exhausted,
   };
 }
+
+/** Estado operativo: un cupón habilitado puede haber vencido o agotado su cupo. */
+export function couponStatus(coupon: {
+  isActive: boolean;
+  expiresAt?: string | null;
+  usesCount: number;
+  maxUses?: number | null;
+}, now = Date.now()) {
+  if (!coupon.isActive) return "Inactivo";
+  if (coupon.expiresAt && new Date(coupon.expiresAt).getTime() <= now) return "Vencido";
+  if (usageInfo(coupon.usesCount, coupon.maxUses).exhausted) return "Agotado";
+  return "Activo";
+}

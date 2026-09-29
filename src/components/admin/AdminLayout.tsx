@@ -42,7 +42,7 @@ const NAV_GROUPS = [
       { path: "/admin/pos", label: "Tienda", icon: ShoppingCart, feature: "pos" },
       { path: "/admin/reports", label: "Reportes", icon: BarChart2, ownerOnly: true },
       { path: "/admin/loyalty", label: "Lealtad", icon: Award, feature: "loyalty" },
-      { path: "/admin/discount-codes", label: "Descuentos", icon: Percent },
+      { path: "/admin/discount-codes", label: "Cupones", icon: Percent },
     ],
   },
   {
