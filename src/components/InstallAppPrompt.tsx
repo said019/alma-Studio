@@ -198,7 +198,7 @@ export function InstallAppPrompt({ force, onClose }: InstallAppPromptProps) {
                   text={
                     <>
                       Abre{" "}
-                      <strong className="text-foreground">almamovement.com.mx</strong> desde tu celular
+                      <strong className="text-foreground">hivestudio.com.mx</strong> desde tu celular
                     </>
                   }
                 />

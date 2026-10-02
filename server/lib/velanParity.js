@@ -105,7 +105,7 @@ export function registerVelanParity(app, deps) {
     if(!key)return res.json({data:{...base,ready:false,apiReachable:false}});
     try {
       const [account,endpoints,last]=await Promise.all([getStripe().accounts.retrieve(),getStripe().webhookEndpoints.list({limit:100}),pool.query("SELECT processed_at FROM stripe_webhook_events ORDER BY processed_at DESC LIMIT 1")]);
-      const origin=(process.env.APP_URL||process.env.SITE_URL||"https://www.almamovement.com.mx").replace(/\/$/,"");
+      const origin=(process.env.APP_URL||process.env.SITE_URL||"https://hivestudio.com.mx").replace(/\/$/,"");
       const endpoint=endpoints.data.find(e=>e.url.replace(/\/$/,"")===`${origin}/api/stripe/webhook`);
       const missingEvents=['checkout.session.completed','checkout.session.expired'].filter(e=>!endpoint?.enabled_events?.includes(e)&&!endpoint?.enabled_events?.includes('*'));
       res.json({data:{...base,apiReachable:true,chargesEnabled:account.charges_enabled,webhookRegistered:Boolean(endpoint),webhookEnabled:endpoint?.status==='enabled',missingEvents,lastProcessedAt:last.rows[0]?.processed_at??null,ready:Boolean(base.webhookSecretConfigured&&endpoint?.status==='enabled'&&!missingEvents.length&&(base.mode==='test'||account.charges_enabled))}});

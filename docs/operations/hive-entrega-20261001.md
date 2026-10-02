@@ -31,7 +31,7 @@ Las restricciones se comprueban en servidor y base de datos, incluyendo solicitu
 
 ## Límites operativos y aplicación
 
-Se añadió el formulario integrado de Mercado Pago basado en la última experiencia de Bao, con sincronización y webhook firmado, validación de cuenta/importe y activación transaccional. Falta confirmar la cuenta receptora y conectar sus credenciales para habilitarlo. Los enlaces del plan anual conservan verificación administrativa; abrirlos no confirma el pago y el sistema no ejecuta sus cargos recurrentes. Consulta [configuración de Mercado Pago](./hive-mercadopago.md).
+Se añadió el formulario integrado de Mercado Pago basado en la última experiencia de Bao, con sincronización y webhook firmado, validación de cuenta/importe y activación transaccional. La cuenta receptora será la propia de HIVE, confirmado por el usuario; falta conectar sus credenciales para habilitarlo. Los enlaces del plan anual conservan verificación administrativa; abrirlos no confirma el pago y el sistema no ejecuta sus cargos recurrentes. Consulta [configuración de Mercado Pago](./hive-mercadopago.md).
 
 Para instalaciones existentes, la estructura se prepara al iniciar la app. La reconciliación del catálogo requiere ejecutar primero la simulación y después `scripts/sync-hive-conditions.mjs --apply` contra la base elegida. Preserva los identificadores e historial, retira los productos anteriores reconocidos y conserva planes personalizados ajenos al catálogo. Los datos bancarios proporcionados se aplican una sola vez al arrancar la nueva versión, guardando la configuración anterior en la base.
 
@@ -61,5 +61,5 @@ El smoke HTTP del servidor completo (`server/tests/hive-mercadopago-http.smoke.m
 - Reconciliación aplicada: 8 planes actualizados, Promo estudiante creada, Clase muestra y Mes de 12 a 4 retirados; historial e identificadores conservados.
 - Nueve planes activos verificados tanto en PostgreSQL como en el sitio público, con precios y condiciones del material entregado.
 - Healthcheck HTTP200, base conectada, zona America/Mexico_City; PDF original accesible HTTP200.
-- Readiness Mercado Pago HTTP200 con `ready:false`: falta confirmar cuenta receptora y configurar sus credenciales. No se activaron cobros integrados ni se copiaron claves de Bao. Transferencia, efectivo y contratación anual por enlaces conservan sus flujos.
+- Readiness Mercado Pago HTTP200 con `ready:false`: la cuenta propia de HIVE está confirmada; falta configurar sus credenciales. No se activaron cobros integrados ni se copiaron claves de Bao. Transferencia, efectivo y contratación anual por enlaces conservan sus flujos.
 - El smoke adicional usa las reglas reales del catálogo para comprobar 60 días naturales inclusivos (fin menos inicio = 59).

@@ -47,7 +47,7 @@ describe("sin Alma Movement, Juriquilla ni Querétaro en lo que ven los usuarios
     for (const t of ["Juriquilla, Querétaro, MX", "Queretaro", "76230 Juriquilla, Qro.", "Alma Movement", "ALMA MOVEMENT"]) {
       expect(PROHIBIDO.test(t), t).toBe(true);
     }
-    // El dominio real del sitio y palabras como "almacenamiento" no cuentan.
+    // El dominio histórico y palabras como "almacenamiento" no cuentan.
     for (const t of ["almamovement.com.mx", "Almacenamiento local", "HIVE Pilates Studio, Coyoacán, CDMX"]) {
       expect(PROHIBIDO.test(t), t).toBe(false);
     }

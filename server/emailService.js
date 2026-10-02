@@ -20,7 +20,7 @@ const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KE
 
 // Remitente. Configurable por env; el buzón y el dominio son los verificados en Resend.
 const FROM_EMAIL = process.env.EMAIL_FROM || "HIVE Pilates Studio <noreply@agendafull.com.mx>";
-const SITE_URL = (process.env.SITE_URL || "https://www.almamovement.com.mx").replace(/\/+$/, "");
+const SITE_URL = (process.env.SITE_URL || process.env.APP_URL || "https://hivestudio.com.mx").replace(/\/+$/, "");
 const SITE_LABEL = SITE_URL.replace(/^https?:\/\//, "");
 // Isotipo terracota sobre transparente, a 3× (lo genera scripts/brand-assets.mjs).
 const LOGO_URL = `${SITE_URL}/email/hive-mark.png`;

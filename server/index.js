@@ -109,7 +109,7 @@ const app = express();
 const PORT = process.env.PORT || 8080;
 const JWT_SECRET = process.env.JWT_SECRET || "dev_alma_secret_change_me";
 
-const APP_PUBLIC_URL = String(process.env.APP_URL || process.env.SITE_URL || "https://www.almamovement.com.mx").replace(/\/+$/, "");
+const APP_PUBLIC_URL = String(process.env.APP_URL || process.env.SITE_URL || "https://hivestudio.com.mx").replace(/\/+$/, "");
 
 // ─── Evolution API (WhatsApp) config ────────────────────────────────────────
 const EVOLUTION_API_URL = process.env.EVOLUTION_API_URL || "";
@@ -1968,6 +1968,8 @@ async function ensureSchema() {
 const CORS_ALLOWED_ORIGINS = String(
   process.env.CORS_ALLOWED_ORIGINS ||
   [
+    "https://hivestudio.com.mx",
+    "https://www.hivestudio.com.mx",
     "https://alma-movement.com.mx",
     "https://www.alma-movement.com.mx",
     "https://almamovement.com.mx",
@@ -6011,7 +6013,7 @@ app.post("/api/loyalty/redeem", authMiddleware, async (req, res) => {
 
 // ─── Google Wallet helpers ──────────────────────────────────────────────────
 
-const SITE_URL = process.env.SITE_URL || "https://www.almamovement.com.mx";
+const SITE_URL = String(process.env.SITE_URL || APP_PUBLIC_URL).replace(/\/+$/, "");
 const GW_ISSUER_ID = process.env.GOOGLE_ISSUER_ID || "";
 const GW_ISSUER_NAME = process.env.GOOGLE_ISSUER_NAME || PASS_DEFAULT_TEXTS.issuerName;
 const GW_PROGRAM_NAME = process.env.GOOGLE_PROGRAM_NAME || PASS_DEFAULT_TEXTS.programName;
@@ -6483,7 +6485,7 @@ function buildGoogleWalletSaveUrl({ userId, userName, points, qrCode, membership
   const payload = {
     iss: GW_SA_EMAIL,
     aud: "google",
-    origins: [SITE_URL],
+    origins: [...new Set([SITE_URL, APP_PUBLIC_URL, ...CORS_ALLOWED_ORIGINS])],
     typ: "savetowallet",
     payload: {
       loyaltyObjects: [loyaltyObject],
@@ -13001,7 +13003,7 @@ app.post("/api/admin/whatsapp-templates/test-send", adminMiddleware, async (req,
       startDate: "1 mayo", endDate: "31 mayo",
       expiresAt: "31 mayo",
       reason: "comprobante ilegible",
-      link: "https://www.almamovement.com.mx/test",
+      link: `${APP_PUBLIC_URL}/test`,
       creditRestored: "Sí",
       ...(vars || {}),
     };
@@ -13322,7 +13324,7 @@ app.get("/api/evolution/status", adminMiddleware, async (req, res) => {
 // Idempotente — se puede llamar las veces que quieras. Evolution v2 espera
 // POST /webhook/set/:instance con body { webhook: { url, events, enabled } }.
 async function configureEvolutionWebhook() {
-  const webhookUrl = (process.env.SITE_URL || "https://www.almamovement.com.mx").replace(/\/$/, "") + "/api/webhook/evolution";
+  const webhookUrl = SITE_URL.replace(/\/$/, "") + "/api/webhook/evolution";
   try {
     await evolutionApi.post(`/webhook/set/${EVOLUTION_INSTANCE}`, {
       webhook: {

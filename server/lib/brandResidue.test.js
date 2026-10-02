@@ -1,8 +1,8 @@
 // Guardia de marca: los mensajes salientes que no son correo (plantillas de
 // WhatsApp, los textos por defecto del pase de wallet y la responsiva vigente)
 // no deben mencionar "Alma" ni "Alma Movement". La única excepción permitida
-// es el dominio real del sitio (almamovement.com.mx), que sí se queda: es la
-// URL pública del estudio, no la marca anterior.
+// es el dominio histórico (almamovement.com.mx), conservado en enlaces previos
+// por compatibilidad; los enlaces nuevos usan hivestudio.com.mx.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { DEFAULT_NOTIFICATION_TEMPLATES } from "./notificationTemplates.js";

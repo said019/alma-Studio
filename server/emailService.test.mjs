@@ -5,11 +5,11 @@ import { EMAIL_SAMPLES } from "./emailSamples.mjs";
 
 // Valores por defecto: sin remitente, sitio, número ni llave de Resend en el
 // entorno. Las pruebas sólo usan los render; ninguna envía correos.
-for (const k of ["EMAIL_FROM", "SITE_URL", "RESEND_API_KEY", "STUDIO_PHONE", "EMAIL_BCC"]) delete process.env[k];
+for (const k of ["EMAIL_FROM", "SITE_URL", "APP_URL", "RESEND_API_KEY", "STUDIO_PHONE", "EMAIL_BCC"]) delete process.env[k];
 const mail = await import("./emailService.js");
 
 const DEFAULT_FROM = "HIVE Pilates Studio <noreply@agendafull.com.mx>";
-const LOGO = "https://www.almamovement.com.mx/email/hive-mark.png";
+const LOGO = "https://hivestudio.com.mx/email/hive-mark.png";
 const FORBIDDEN = [/Alma/, /alma-movement/i, /Move with intention/i, /Juriquilla/i];
 
 const render = (s) => mail[s.render](s.opts);
@@ -35,7 +35,7 @@ test("hay un ejemplo por cada uno de los 8 correos", () => {
 
 test("remitente y sitio por defecto", () => {
   assert.equal(mail.FROM_EMAIL, DEFAULT_FROM);
-  assert.equal(mail.SITE_URL, "https://www.almamovement.com.mx");
+  assert.equal(mail.SITE_URL, "https://hivestudio.com.mx");
   assert.equal(mail.LOGO_URL, LOGO);
 });
 
@@ -52,7 +52,7 @@ for (const s of EMAIL_SAMPLES) {
     assert.match(text, /MOVIMIENTO · BIENESTAR · COMUNIDAD/);
     assert.ok(text.includes("Cuauhtémoc #68, Del Carmen, Coyoacán, C.P. 04100, CDMX"), "falta la dirección");
     assert.ok(text.includes(`© ${new Date().getFullYear()} HIVE Pilates Studio`), "falta el ©");
-    assert.ok(text.includes("www.almamovement.com.mx"), "el enlace del sitio muestra el dominio real");
+    assert.ok(text.includes("hivestudio.com.mx"), "el enlace del sitio muestra el dominio real");
   });
 
   test(`${s.id}: sin rastro de la marca anterior`, () => {
@@ -144,7 +144,7 @@ test("contacto honesto: Instagram sin número del estudio, WhatsApp con STUDIO_P
 test("recuperar contraseña: botón y enlace de respaldo con el token", () => {
   const s = EMAIL_SAMPLES.find((x) => x.id === "6-recuperar-contrasena");
   const { html } = render(s);
-  const url = "https://www.almamovement.com.mx/auth/reset-password?token=muestra-7f3a9c2e";
+  const url = "https://hivestudio.com.mx/auth/reset-password?token=muestra-7f3a9c2e";
   assert.equal(count(html, new RegExp(`href="${url.replace(/[.?]/g, "\\$&")}"`, "g")), 2);
   assert.ok(visibleText(html).includes("Restablecer mi contraseña"));
   assert.ok(visibleText(html).includes("El enlace expira en 2 horas."));

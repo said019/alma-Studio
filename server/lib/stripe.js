@@ -99,7 +99,7 @@ export async function createOrGetStripeCustomer(pool, userId) {
 // ── Stateful: Create Checkout Session ──────────────────────────────────────
 export async function createCheckoutSession(pool, { order, plan, totalAmount, customerId }) {
   const stripe = getStripe();
-  const appUrl = (process.env.APP_URL ?? process.env.SITE_URL ?? "http://localhost:5173").replace(/\/+$/, "");
+  const appUrl = (process.env.APP_URL ?? process.env.SITE_URL ?? "https://hivestudio.com.mx").replace(/\/+$/, "");
   const descriptor = statementDescriptor();
 
   const session = await stripe.checkout.sessions.create(

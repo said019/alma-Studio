@@ -50,7 +50,7 @@ const SAMPLE_VARS: Record<string, string | number> = {
   plan: "Reformer 4 clases por semana",
   expiresAt: "31 mayo",
   reason: "comprobante ilegible",
-  link: "https://www.almamovement.com.mx/r/xyz",
+  link: "https://hivestudio.com.mx/r/xyz",
   creditRestored: "Sí",
   classesThisWeek: 1,
   weekGoal: 4,
