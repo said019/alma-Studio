@@ -46,7 +46,7 @@ export function userAnonymizationValues(userId, actorId) {
   };
 }
 
-export const WAIVER_ANON_VALUES = Object.freeze({ full_name: ANON_NAME, phone: null, email: null, signature_data: null });
+export const WAIVER_ANON_VALUES = Object.freeze({ full_name: ANON_NAME, phone: null, email: null, signature_data: null, intake_data: {} });
 export const GUEST_ANON_VALUES = Object.freeze({
   display_name: ANON_GUEST_NAME, phone: null, email: null, date_of_birth: null, has_injury: null,
   injury_details: null, practiced_barre_before: null, emergency_contact_name: null, emergency_contact_phone: null,

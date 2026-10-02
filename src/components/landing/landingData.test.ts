@@ -15,8 +15,8 @@ describe("destinos según la sesión", () => {
     expect(accountLink(client, false)).toEqual({ to: "/auth/login", label: "Entrar" });
   });
   it("portada: registro con regreso a comprar; usuario a comprar; staff al panel", () => {
-    expect(heroCta(null, false)).toEqual({ to: "/auth/register?returnUrl=%2Fapp%2Fcheckout", label: "Reserva tu clase muestra" });
-    expect(heroCta(client, true)).toEqual({ to: "/app/checkout", label: "Reserva tu clase muestra" });
+    expect(heroCta(null, false)).toEqual({ to: "/auth/register?returnUrl=%2Fapp%2Fcheckout", label: "Reserva tu primera clase" });
+    expect(heroCta(client, true)).toEqual({ to: "/app/checkout", label: "Reserva tu primera clase" });
     expect(heroCta(staff, true)).toEqual({ to: "/admin/dashboard", label: "Ir al panel" });
   });
 });

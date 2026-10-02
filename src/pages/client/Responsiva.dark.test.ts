@@ -15,8 +15,8 @@ const dialog = read("src/components/app/ResponsivaDialog.tsx");
 const signaturePad = read("src/components/app/SignaturePad.tsx");
 
 describe("Responsiva, firma y consentimiento en oscuro (Tarea 12a)", () => {
-  it('el toast de bienvenida dice "¡Bienvenida a HIVE!"', () => {
-    expect(dialog).toMatch(/¡Bienvenida a HIVE!/);
+  it('el toast de bienvenida dice "¡Te damos la bienvenida a HIVE!"', () => {
+    expect(dialog).toMatch(/¡Te damos la bienvenida a HIVE!/);
     expect(dialog).not.toMatch(/Alma Movement/);
   });
 

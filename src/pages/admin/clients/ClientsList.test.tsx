@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from "vitest";
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 
+vi.mock("@/components/app/SignaturePad", () => ({ SignaturePad: () => <div aria-label="Firma manuscrita" /> }));
 vi.mock("@/lib/api", () => ({ default: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() } }));
 const toastSpy = vi.fn();
 vi.mock("@/hooks/use-toast", () => ({ useToast: () => ({ toast: toastSpy }), toast: (...a: unknown[]) => toastSpy(...a) }));
@@ -8,7 +9,7 @@ import api from "@/lib/api";
 import ClientsList from "./ClientsList";
 import { loginAs, renderAdmin, routeApi } from "@/test/admin-harness";
 
-const mockApi = api as unknown as { get: Mock; put: Mock; delete: Mock };
+const mockApi = api as unknown as { get: Mock; post: Mock; put: Mock; delete: Mock };
 const CAMILA = { id: "u1", displayName: "Camila Torres", email: "camila@correo.com", phone: "5512345678", role: "client", createdAt: "2026-03-10T00:00:00" };
 const FER = { id: "u2", displayName: "Fernanda Ortiz", email: "fer@correo.com", phone: null, role: "client", createdAt: "2026-05-02T00:00:00" };
 
@@ -18,6 +19,7 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date(2026, 8, 25, 10, 40));
   mockApi.get.mockReset();
+  mockApi.post.mockReset();
   mockApi.put.mockReset().mockResolvedValue({ data: {} });
   mockApi.delete.mockReset();
   toastSpy.mockReset();
@@ -40,6 +42,20 @@ describe("Personas · Usuarios", () => {
     expect(screen.getByRole("link", { name: "WhatsApp a Camila Torres" })).toHaveAttribute("href", "https://wa.me/525512345678");
     expect(screen.queryByRole("link", { name: "WhatsApp a Fernanda Ortiz" })).toBeNull();
     expect(screen.getByText((_, el) => el?.textContent === "2 usuarios registrados")).toBeInTheDocument();
+  });
+
+  it("el alta manual crea la cuenta y solicita firma antes de ofrecer una venta", async () => {
+    mockApi.post.mockResolvedValueOnce({ data: { data: { user: CAMILA } } });
+    renderAdmin(<ClientsList />, { route: "/admin/clients" });
+    fireEvent.click(screen.getByRole("button", { name: /Nuevo usuario/ }));
+    fireEvent.change(screen.getByPlaceholderText("Ana García"), { target: { value: "Camila Torres" } });
+    fireEvent.change(screen.getByPlaceholderText("ana@email.com"), { target: { value: "camila@correo.com" } });
+    expect(screen.queryByText("Membresía (opcional)")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Registrar y solicitar firma" }));
+    await waitFor(() => expect(mockApi.post).toHaveBeenCalledWith("/admin/clients/manual", expect.objectContaining({ displayName: "Camila Torres" })));
+    expect(mockApi.post.mock.calls[0][1]).not.toHaveProperty("planId");
+    expect(await screen.findByText("HIVE Pilates Studio — Carta de Consentimiento Informado y Responsiva")).toBeInTheDocument();
+    expect(screen.getByLabelText("Nombre completo *")).toHaveValue("Camila Torres");
   });
 
   it("muestra también una cuenta administradora en Usuarios", async () => {

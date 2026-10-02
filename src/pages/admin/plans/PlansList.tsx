@@ -1,3 +1,4 @@
+import { DEFAULT_PLAN_RULES, normalizePlanRules, planConditions } from "@/lib/planConditions";
 import { ReorderPlans } from "@/components/admin/ReorderPlans";
 import { useState, type ReactNode } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -39,15 +40,18 @@ const CATEGORIES = [
 
 type CategoryValue = (typeof CATEGORIES)[number]["value"];
 
-const planSchema = z.object({
+const nullablePositive = z.preprocess(v => v === "" || v == null ? null : Number(v), z.number().int().positive().nullable());
+const nullableTime = z.preprocess(v => v === "" ? null : v, z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Hora inválida").nullable());
+const nullableUrl = z.preprocess(v => v === "" ? null : v, z.string().url("Enlace inválido").refine(v => v.startsWith("https://"), "Usa HTTPS").nullable());
+export const planSchema = z.object({
   name: z.string().min(1, "Nombre requerido"),
   description: z.string().optional(),
   price: z.coerce.number().min(0),
   currency: z.string().default("MXN"),
-  durationDays: z.coerce.number().min(1),
-  classLimit: z.preprocess((v) => (v === "" || v === null || v === undefined ? null : Number(v)), z.number().nullable()),
+  durationDays: z.coerce.number().int().min(1),
+  classLimit: z.preprocess((v) => (v === "" || v === null || v === undefined ? null : Number(v)), z.number().int().positive().nullable()),
   classCategory: z.enum(["studio", "reformer_tower", "mixto", "all"]).default("studio"),
-  openingPrice: z.preprocess((v) => (v === "" || v == null ? null : Number(v)), z.number().nullable()),
+  openingPrice: z.preprocess((v) => (v === "" || v == null ? null : Number(v)), z.number().nonnegative().nullable()),
   morningOnly: z.boolean().default(false),
   afternoonOnly: z.boolean().default(false),
   personalOnly: z.boolean().default(false),
@@ -58,6 +62,18 @@ const planSchema = z.object({
   repeatKey: z.string().optional(),
   sortOrder: z.coerce.number().default(0),
   isVisitPack: z.boolean().default(false),
+  rules: z.object({
+    daily_class_limit: nullablePositive,
+    allowed_weekdays: z.array(z.number().int().min(0).max(6)).min(1, "Selecciona al menos un día"),
+    booking_start_time: nullableTime, booking_end_time: nullableTime,
+    requires_student_id: z.boolean(), guest_passes: z.coerce.number().int().min(0),
+    guest_pass_period: z.enum(["membership", "month"]),
+    complimentary_coffee_per_day: z.coerce.number().int().min(0),
+    billing_period: z.enum(["one_time", "month"]), commitment_months: z.coerce.number().int().min(0),
+    auto_renew: z.boolean(), payment_url: nullableUrl, opening_payment_url: nullableUrl,
+    transferable: z.boolean(), extendable: z.boolean(),
+  }).refine(r => (!r.booking_start_time && !r.booking_end_time) || (r.booking_start_time && r.booking_end_time && r.booking_start_time < r.booking_end_time), { message: "Define ambas horas y un fin posterior al inicio", path: ["booking_end_time"] })
+    .refine(r => r.billing_period === "month" || (!r.auto_renew && !r.commitment_months), { message: "El compromiso y la renovación requieren pago mensual", path: ["billing_period"] }),
 });
 
 type PlanFormData = z.infer<typeof planSchema>;
@@ -69,6 +85,7 @@ interface Plan extends PlanFormData {
 
 function normalizePlanRow(row: any): Plan {
   return {
+    rules: normalizePlanRules({ ...row?.rules, transferable: false, extendable: false }),
     id: String(row?.id ?? ""),
     name: String(row?.name ?? ""),
     description: String(row?.description ?? ""),
@@ -103,14 +120,17 @@ const EMPTY: PlanFormData = {
   name: "", description: "", price: 0, currency: "MXN",
   durationDays: 30, classLimit: null, classCategory: "studio",
   openingPrice: null, morningOnly: false, afternoonOnly: false, personalOnly: false,
-  features: "", isActive: true, isNonTransferable: false, isNonRepeatable: false, repeatKey: "",
+  features: "", isActive: true, isNonTransferable: true, isNonRepeatable: false, repeatKey: "",
   sortOrder: 0,
   isVisitPack: false,
+  rules: DEFAULT_PLAN_RULES,
 };
 
 function serializePlan(d: PlanFormData) {
   return {
     ...d,
+    isNonTransferable: true,
+    rules: { ...d.rules, transferable: false, extendable: false },
     repeatKey: d.isNonRepeatable ? (d.repeatKey?.trim() || null) : null,
     opening_price: d.openingPrice,
     morning_only: !!d.morningOnly,
@@ -170,7 +190,7 @@ const SwitchRow = ({
       <Label>{label}</Label>
       {help && <FieldHelp>{help}</FieldHelp>}
     </div>
-    <Switch checked={checked} onCheckedChange={onCheckedChange} />
+    <Switch aria-label={label} checked={checked} onCheckedChange={onCheckedChange} />
   </div>
 );
 
@@ -183,7 +203,7 @@ function PlanCard({ p, onEdit, onToggleActive, onDelete }: {
     p.isNonTransferable && "No transferible",
     p.isNonRepeatable && "No repetible",
     p.morningOnly && "Sólo mañanas",
-    p.afternoonOnly && "De 12:00 a 16:00",
+    ...planConditions(p),
     p.personalOnly && "Sesión individual",
     p.isVisitPack && "Paquete de visitas",
   ].filter(Boolean) as string[];
@@ -211,7 +231,7 @@ function PlanCard({ p, onEdit, onToggleActive, onDelete }: {
         {p.openingPrice != null && <span className="nums text-[0.75rem] font-bold text-ink-muted">Apertura {formatMXN(Number(p.openingPrice))}</span>}
       </div>
       <p className="text-[13px] text-ink-muted">
-        {p.classLimit == null ? "Ilimitado" : `${p.classLimit} ${p.classLimit === 1 ? "clase" : "clases"}`} · {p.durationDays} días
+        {p.classLimit == null ? (p.rules.daily_class_limit ? `${p.rules.daily_class_limit} ${p.rules.daily_class_limit === 1 ? "sesión" : "sesiones"}/día` : "Ilimitado") : `${p.classLimit} ${p.classLimit === 1 ? "clase" : "clases"}`} · {p.durationDays} días
       </p>
       <div className="flex min-h-[24px] flex-wrap gap-1.5">
         {rules.map((r) => <span key={r} className="rounded-full border border-line px-2.5 py-0.5 text-[0.75rem] font-bold text-ink-muted">{r}</span>)}
@@ -292,7 +312,7 @@ const PlansList = () => {
           <AdminPageHeader
             kicker="Más"
             title="Planes"
-            subtitle="Los paquetes que vendes. Los cambios aplican a ventas nuevas; lo ya vendido no se toca."
+            subtitle="Configura precios, vigencias, beneficios y restricciones. Las condiciones de reserva también aplican a membresías vigentes."
             actions={<><ReorderPlans plans={plans} /><Button onClick={openCreate}><Plus size={16} aria-hidden="true" />Nuevo plan</Button></>}
           />
 
@@ -374,14 +394,14 @@ const PlansList = () => {
             <SheetHeader>
               <SheetTitle className="font-display text-ink">{editing ? "Editar plan" : "Nuevo plan"}</SheetTitle>
               <SheetDescription className="text-ink/55">
-                {editing ? "Los cambios aplican a ventas nuevas; las membresías ya vendidas no se tocan." : "Define qué incluye el paquete y cómo se vende."}
+                {editing ? "Los precios nuevos aplican a compras futuras. Las reglas de reserva también cambian para las membresías vigentes." : "Define qué incluye el paquete y cómo se vende."}
               </SheetDescription>
             </SheetHeader>
             <form onSubmit={form.handleSubmit(onSubmit)} className="mt-6 space-y-8 pb-4">
               <FormSection title="Esencial">
                 <div className="space-y-1">
-                  <Label>Nombre</Label>
-                  <Input {...form.register("name")} />
+                  <Label htmlFor="plan-name">Nombre</Label>
+                  <Input id="plan-name" {...form.register("name")} />
                   {form.formState.errors.name && <p className="text-xs text-destructive">{form.formState.errors.name.message}</p>}
                 </div>
                 <div className="space-y-1">
@@ -390,12 +410,12 @@ const PlansList = () => {
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <Label>Precio (MXN)</Label>
-                    <Input type="number" className="nums" {...form.register("price")} />
+                    <Label htmlFor="plan-price">Precio (MXN)</Label>
+                    <Input id="plan-price" type="number" className="nums" {...form.register("price")} />
                   </div>
                   <div className="space-y-1">
-                    <Label>Duración (días)</Label>
-                    <Input type="number" className="nums" {...form.register("durationDays")} />
+                    <Label htmlFor="plan-duration">Duración (días)</Label>
+                    <Input id="plan-duration" type="number" className="nums" {...form.register("durationDays")} />
                   </div>
                 </div>
                 <div className="space-y-1">
@@ -433,12 +453,7 @@ const PlansList = () => {
                   <Input type="number" className="nums" placeholder="Vacío = ilimitado" {...form.register("classLimit")} />
                   <FieldHelp>Cuántas clases incluye durante la vigencia. Déjalo vacío para clases ilimitadas.</FieldHelp>
                 </div>
-                <SwitchRow
-                  label="No transferible"
-                  help="Solo la titular puede usar las clases de este plan."
-                  checked={form.watch("isNonTransferable")}
-                  onCheckedChange={(v) => form.setValue("isNonTransferable", v)}
-                />
+                <FieldHelp>Todos los planes HIVE son personales e intransferibles y no permiten extensión de vigencia. Los guest pass son beneficios independientes para invitadas.</FieldHelp>
                 <SwitchRow
                   label="No repetible"
                   help="Cada usuario puede comprar este plan una sola vez."
@@ -446,8 +461,8 @@ const PlansList = () => {
                   onCheckedChange={(v) => form.setValue("isNonRepeatable", v)}
                 />
                 <SwitchRow
-                  label="Solo de 12 a 4"
-                  help="Inicio de clase entre las 12:00 y las 16:00, hora de Ciudad de México."
+                  label="Horario especial HIVE (11 a 16, lunes a viernes)"
+                  help="Inicio de clase entre las 11:00 y las 16:00, de lunes a viernes, hora de Ciudad de México."
                   checked={form.watch("afternoonOnly")}
                   onCheckedChange={(v) => { form.setValue("afternoonOnly", v); if (v) form.setValue("morningOnly", false); }}
                 />
@@ -465,6 +480,34 @@ const PlansList = () => {
                 />
               </FormSection>
 
+              <FormSection title="Disponibilidad y límites diarios">
+                <Label htmlFor="daily-limit">Sesiones máximas por día</Label>
+                <Input id="daily-limit" type="number" min={1} placeholder="Vacío = sin límite diario" {...form.register("rules.daily_class_limit")} />
+                <FieldHelp>El límite total y el límite diario se aplican juntos. Mensual HIVE: 1; anual HIVE: 2.</FieldHelp>
+                <fieldset><legend className="mb-2 text-sm font-medium">Días permitidos</legend><div className="flex flex-wrap gap-3">
+                  {[[1,"Lun"],[2,"Mar"],[3,"Mié"],[4,"Jue"],[5,"Vie"],[6,"Sáb"],[0,"Dom"]].map(([day, label]) => <label key={day} className="flex items-center gap-1 text-sm"><input type="checkbox" checked={form.watch("rules.allowed_weekdays").includes(Number(day))} onChange={e => { const days = form.getValues("rules.allowed_weekdays"); form.setValue("rules.allowed_weekdays", e.target.checked ? [...days, Number(day)] : days.filter(d => d !== Number(day)), { shouldValidate: true }); }} />{label}</label>)}
+                </div></fieldset>
+                <div className="grid grid-cols-2 gap-3">
+                  <div><Label htmlFor="start-time">Desde (CDMX)</Label><Input id="start-time" type="time" {...form.register("rules.booking_start_time")} /></div>
+                  <div><Label htmlFor="end-time">Hasta (CDMX)</Label><Input id="end-time" type="time" {...form.register("rules.booking_end_time")} /></div>
+                </div>
+                <FieldHelp>Se valida la hora de inicio de la clase. Deja ambas horas vacías para cualquier horario. Las restricciones de horario anteriores también se aplican.</FieldHelp>
+                <SwitchRow label="Credencial de estudiante vigente" help="Requiere verificación por el equipo antes de usar el plan." checked={form.watch("rules.requires_student_id")} onCheckedChange={v => form.setValue("rules.requires_student_id", v)} />
+              </FormSection>
+              <FormSection title="Beneficios incluidos">
+                <Label htmlFor="guest-passes">Guest pass incluidos</Label><Input id="guest-passes" type="number" min={0} {...form.register("rules.guest_passes")} />
+                <Label htmlFor="guest-period">Periodo de guest pass</Label><select id="guest-period" className="w-full rounded-md border border-line bg-surface p-2" {...form.register("rules.guest_pass_period")}><option value="membership">Por vigencia</option><option value="month">Por mes</option></select>
+                <Label htmlFor="coffee">Cafés regulares de cortesía por día</Label><Input id="coffee" type="number" min={0} {...form.register("rules.complimentary_coffee_per_day")} />
+              </FormSection>
+              <FormSection title="Cobro y compromiso">
+                <Label htmlFor="billing-period">Periodicidad de pago</Label><select id="billing-period" className="w-full rounded-md border border-line bg-surface p-2" {...form.register("rules.billing_period")}><option value="one_time">Pago único</option><option value="month">Pago mensual</option></select>
+                <Label htmlFor="commitment">Compromiso mínimo (meses)</Label><Input id="commitment" type="number" min={0} {...form.register("rules.commitment_months")} />
+                <FieldHelp>0 = sin compromiso. El plan anual de HIVE tiene compromiso de 12 meses y precio por mensualidad; la duración indica la vigencia de cada periodo pagado.</FieldHelp>
+                <SwitchRow label="Renovación mensual prevista" help="Esta opción describe el plan; no activa cargos automáticos. La suscripción debe contratarse y confirmarse con el proveedor." checked={form.watch("rules.auto_renew")} onCheckedChange={v => form.setValue("rules.auto_renew", v)} />
+                <Label htmlFor="payment-url">Enlace de pago regular</Label><Input id="payment-url" type="url" placeholder="https://mpago.la/..." {...form.register("rules.payment_url")} />
+                <Label htmlFor="opening-payment-url">Enlace de pago de apertura</Label><Input id="opening-payment-url" type="url" placeholder="https://mpago.la/..." {...form.register("rules.opening_payment_url")} />
+                <FieldHelp>Enlaces HTTPS del proveedor de pago. Confirma que el importe y la periodicidad coincidan con este plan.</FieldHelp>
+              </FormSection>
               <FormSection title="Avanzado">
                 <SwitchRow
                   label="Paquete de visitas (invitadas)"
@@ -484,10 +527,11 @@ const PlansList = () => {
                 <div className="space-y-1">
                   <Label>Precio de apertura</Label>
                   <Input type="number" min={0} className="nums" {...form.register("openingPrice")} />
-                  <FieldHelp>Precio promocional que se muestra en la página de precios. Déjalo vacío si no aplica.</FieldHelp>
+                  <FieldHelp>Precio promocional de venta. Déjalo vacío si no aplica. La promoción se cobra cuando el periodo de apertura del estudio está activo.</FieldHelp>
                 </div>
               </FormSection>
 
+              {Object.keys(form.formState.errors).length > 0 && <div role="alert" className="space-y-1 text-sm text-destructive"><p>Revisa los campos: usa importes no negativos, límites enteros positivos, días y horarios válidos, enlaces HTTPS y pago mensual para renovación o compromiso.</p>{Object.values(form.formState.errors.rules ?? {}).map((error, index) => error && typeof error === "object" && "message" in error ? <p key={index}>{String(error.message)}</p> : null)}</div>}
               <SheetFooter className="gap-2 border-t border-line pt-4">
                 <Button type="button" variant="outline" onClick={closeSheet}>Cancelar</Button>
                 <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>

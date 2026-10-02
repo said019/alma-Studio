@@ -1,3 +1,4 @@
+import { planConditions, type PlanRules } from "@/lib/planConditions";
 import { addDays, format, startOfWeek } from "date-fns";
 
 /* ── Sesión ─────────────────────────────────────────────────────────── */
@@ -11,9 +12,9 @@ export function accountLink(user: SessionUser, isAuthenticated: boolean): { to: 
 }
 
 export function heroCta(user: SessionUser, isAuthenticated: boolean): { to: string; label: string } {
-  if (!isAuthenticated || !user) return { to: `/auth/register?returnUrl=${encodeURIComponent("/app/checkout")}`, label: "Reserva tu clase muestra" };
+  if (!isAuthenticated || !user) return { to: `/auth/register?returnUrl=${encodeURIComponent("/app/checkout")}`, label: "Reserva tu primera clase" };
   if (isStaff(user)) return { to: "/admin/dashboard", label: "Ir al panel" };
-  return { to: "/app/checkout", label: "Reserva tu clase muestra" };
+  return { to: "/app/checkout", label: "Reserva tu primera clase" };
 }
 
 /* ── Clases ─────────────────────────────────────────────────────────── */
@@ -96,12 +97,14 @@ export function availability(c: Pick<LandingClass, "remaining" | "capacity">): A
 
 /* ── Paquetes ───────────────────────────────────────────────────────── */
 export type PlanRow = {
+  rules?: Partial<PlanRules>; personal_only?: boolean; personalOnly?: boolean; afternoon_only?: boolean; afternoonOnly?: boolean;
   id: string; name: string; description?: string | null; price: number | string;
   effectivePrice?: number | string; effective_price?: number | string; openingActive?: boolean; opening_active?: boolean;
   classLimit?: number | null; class_limit?: number | null; durationDays?: number | null; duration_days?: number | null;
   isNonRepeatable?: boolean; is_non_repeatable?: boolean; sortOrder?: number | null; sort_order?: number | null;
 };
 export type LandingPlan = {
+  conditions?: string[]; billingPeriod?: string;
   id: string; name: string; description: string | null; price: number; finalPrice: number; opening: boolean;
   classLimit: number | null; perClass: number | null; durationDays: number | null; nonRepeatable: boolean;
 };
@@ -115,6 +118,7 @@ export function toLandingPlan(p: PlanRow): LandingPlan {
   // Como en Checkout: 900 clases o más es ilimitado, y ahí no hay precio por clase.
   const perClass = classLimit != null && classLimit > 1 && classLimit < 900 ? Math.round(finalPrice / classLimit) : null;
   return {
+    conditions: planConditions(p), billingPeriod: p.rules?.billing_period,
     id: p.id, name: p.name, description: p.description ?? null, price, finalPrice, opening, classLimit, perClass,
     durationDays: p.durationDays ?? p.duration_days ?? null,
     nonRepeatable: Boolean(p.isNonRepeatable ?? p.is_non_repeatable),

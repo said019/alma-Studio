@@ -2,8 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { isWithinAfternoonWindow, membershipAllowsSession, purchaseCredits } from './bookingRules.js';
 
-test('franja de 12 a 4 usa inicio y hora de México, incluidos los límites', () => {
-  for(const [time,expected] of [['11:59',false],['12:00',true],['15:59',true],['16:00',true],['16:01',false],['17:00',false]]) {
+test('franja de 11 a 4 usa inicio y hora de México, incluidos los límites', () => {
+  for(const [time,expected] of [['10:59',false],['11:00',true],['11:59',true],['12:00',true],['15:59',true],['16:00',true],['16:01',false],['17:00',false]]) {
     assert.equal(isWithinAfternoonWindow(`2026-09-29T${time}:00-06:00`),expected,time);
   }
   assert.equal(isWithinAfternoonWindow('invalid'),false);
@@ -23,4 +23,11 @@ test('mensual ilimitado sigue ilimitado tras comprar o renovar, aun con crédito
   assert.equal(purchaseCredits(null,7),null);
   assert.equal(purchaseCredits(4),4);
   assert.equal(purchaseCredits(10,2),12);
+});
+test('compatibilidad legacy: grupo con cupo1 no se convierte en personalizado retroactivamente',()=>{
+ const start='2026-10-02T12:00:00-06:00';
+ assert.equal(membershipAllowsSession({rules:{}},start,1),true);
+ assert.equal(membershipAllowsSession({rules:{extendable:false}},start,1),false);
+ assert.equal(membershipAllowsSession({rules:{},personal_only:true},start,4),false);
+ assert.equal(membershipAllowsSession({rules:{},personal_only:true},start,1),true);
 });

@@ -12,12 +12,13 @@ describe("datos del estudio (HIVE)", () => {
     expect(STUDIO.address).toBe("Cuauhtémoc #68, Del Carmen, Coyoacán, C.P. 04100, CDMX");
     expect(STUDIO.mapsUrl).toBe("https://maps.app.goo.gl/6KvMNWPZk35siB4fA");
     expect(STUDIO.instagram).toBe("hive.pilates");
-    expect(STUDIO.hours).toBe("6 AM a 9 PM");
+    expect(STUDIO.hours).toContain("Lun–vie: 6–10 am y 5–8 pm");
     expect(instagramUrl).toBe("https://www.instagram.com/hive.pilates");
   });
-  it("sin número de WhatsApp no hay liga", () => {
-    expect(STUDIO.whatsapp).toBeNull();
-    expect(whatsappUrl("Hola")).toBeNull();
+  it("usa el WhatsApp confirmado por HIVE", () => {
+    expect(STUDIO.whatsapp).toBe("525559449611");
+    expect(whatsappUrl("Hola HIVE")).toBe("https://wa.me/525559449611?text=Hola%20HIVE");
+    expect(STUDIO.clabe).toBe("722969020124160665");
   });
   it("no quedan datos de Alma", () => {
     const src = read("src/lib/studio.ts");

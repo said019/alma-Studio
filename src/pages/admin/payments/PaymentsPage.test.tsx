@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from "vitest";
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 
+vi.mock("@/components/app/SignaturePad", () => ({ SignaturePad: () => <div aria-label="Firma manuscrita" /> }));
 vi.mock("@/lib/api", () => ({ default: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() } }));
 import api from "@/lib/api";
 import PaymentsPage from "./PaymentsPage";
@@ -116,6 +117,20 @@ describe("Cobros · Cobrar", () => {
     expect(screen.queryByLabelText("Motivo (obligatorio)")).toBeNull();
     fireEvent.click(within(resumen).getByRole("button", { name: "Confirmar y activar membresía" }));
     await waitFor(() => expect(mockApi.post).toHaveBeenCalledWith("/memberships", expect.objectContaining({ planId: "pa", amount: 2300 })));
+  });
+
+  it("solicita la firma presencial si falta responsiva antes de vender", async () => {
+    mockApi.post.mockRejectedValueOnce({ response: { status: 403, data: { code: "WAIVER_REQUIRED", message: "Firma requerida" } } });
+    loginAs("admin");
+    renderAdmin(<PaymentsPage />, { route: "/admin/payments?clienta=u1", path: "/admin/payments" });
+    const resumen = await screen.findByRole("complementary", { name: "Resumen de la membresía" });
+    await within(resumen).findByText("Camila Torres");
+    fireEvent.click(await screen.findByRole("radio", { name: /Paquete 8 clases/ }));
+    fireEvent.click(within(resumen).getByRole("button", { name: "Confirmar y activar membresía" }));
+    expect(await screen.findByText("HIVE Pilates Studio — Carta de Consentimiento Informado y Responsiva")).toBeInTheDocument();
+    expect(screen.getByLabelText("Nombre completo *")).toHaveValue("Camila Torres");
+    expect(screen.getByRole("button", { name: "Firmar y continuar" })).toBeDisabled();
+    expect(mockApi.post).toHaveBeenCalledTimes(1);
   });
 
   it("con ?usuario= llega con el usuario elegida", async () => {

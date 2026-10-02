@@ -31,11 +31,11 @@ export async function seedPlansIfEmpty(pool, plans) {
       `INSERT INTO plans
          (name, description, price, opening_price, currency, duration_days, class_limit,
           class_category, morning_only, is_non_repeatable, repeat_key, is_non_transferable,
-          is_active, sort_order, studio_credits, rt_credits, afternoon_only, personal_only)
-       VALUES ($1,$2,$3,$4,'MXN',$5,$6,$7,$8,$9,$10,false,true,$11,$12,$13,$14,$15)`,
+          is_active, sort_order, studio_credits, rt_credits, afternoon_only, personal_only, rules)
+       VALUES ($1,$2,$3,$4,'MXN',$5,$6,$7,$8,$9,$10,true,true,$11,$12,$13,$14,$15,$16::jsonb)`,
       [p.name, p.description, p.price, p.opening_price, p.duration_days,
        p.class_limit, p.class_category, p.morning_only, p.is_non_repeatable,
-       p.repeat_key, p.sort_order, p.studio_credits ?? null, p.rt_credits ?? null, p.afternoon_only ?? false, p.personal_only ?? false]
+       p.repeat_key, p.sort_order, p.studio_credits ?? null, p.rt_credits ?? null, p.afternoon_only ?? false, p.personal_only ?? false, JSON.stringify(p.rules ?? {})]
     );
   }
   return plans.length;

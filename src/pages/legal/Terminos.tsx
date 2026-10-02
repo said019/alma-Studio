@@ -8,7 +8,7 @@ import LegalLayout, { LegalContact, LegalH2, LegalUpdated } from "./LegalLayout"
 // Texto versionado en el código: el de policies_settings ya no se muestra. Las
 // reglas de cancelación viven en /legal/cancelacion (una sola política).
 // PENDIENTE: revisión de un abogado antes de darlo por definitivo.
-export const TERMINOS_ACTUALIZADOS = "28 de septiembre de 2026";
+export const TERMINOS_ACTUALIZADOS = "1 de octubre de 2026";
 
 const fuerte = "font-semibold";
 const liga = "font-medium underline underline-offset-2";
@@ -48,7 +48,7 @@ const Terminos = () => (
       <LegalH2>3. Paquetes y pagos</LegalH2>
       <ul className="list-disc pl-6 space-y-2">
         <li>Los precios están en pesos mexicanos (MXN).</li>
-        <li>Cada paquete indica al comprarlo su número de clases y su vigencia. Las clases que no uses dentro de la vigencia se pierden.</li>
+        <li>Los paquetes y clases tienen una vigencia de 30 días naturales desde la compra, excepto el paquete de 20 clases, con 60 días naturales. La vigencia no se extiende y las clases no pueden utilizarse una vez vencidas.</li>
         <li>Los paquetes son personales: no se transfieren a otra persona.</li>
         <li>Puedes pagar en el estudio (efectivo, transferencia o terminal) o en línea cuando la app lo ofrezca. Los datos para transferir se muestran al pagar.</li>
         <li>Los paquetes no son reembolsables, salvo en los casos que el estudio apruebe. Si el estudio aprueba un reembolso total o parcial, lo registra y ajusta las clases de tu paquete.</li>
@@ -56,7 +56,7 @@ const Terminos = () => (
 
       <LegalH2>4. Reservaciones y lista de espera</LegalH2>
       <ul className="list-disc pl-6 space-y-2">
-        <li>Todas las clases se reservan en la app. El cupo de cada clase es el que muestra la app.</li>
+        <li>Puedes reservar en la app o directamente en el estudio. El cupo de cada clase es el que muestra la app.</li>
         <li>Las reservas desde la app cierran 2 horas antes del inicio de la clase.</li>
         <li>Si la clase está llena puedes entrar a la lista de espera. Si se libera un lugar hasta 2 horas antes, quedas inscrita sola, por orden de llegada, y se usa una clase de tu paquete.</li>
       </ul>
@@ -70,12 +70,12 @@ const Terminos = () => (
       <LegalH2>6. Puntualidad</LegalH2>
       <ul className="list-disc pl-6 space-y-2">
         <li>Llega 10 minutos antes de tu clase.</li>
-        <li>Una vez iniciada la sesión no se permite el acceso, por seguridad y por respeto al grupo. Esa clase cuenta como usada.</li>
+        <li>La puerta se cierra 5 minutos después del inicio de la clase, por seguridad y por respeto al grupo. Después de ese plazo no se permite el acceso. Esa clase cuenta como usada.</li>
       </ul>
 
       <LegalH2>7. Salud y responsabilidad</LegalH2>
       <ul className="list-disc pl-6 space-y-2">
-        <li>Antes de tu primera clase firmas en la app la responsiva y consentimiento informado.</li>
+        <li>Al momento de la inscripción o compra de clase firmas en la app la responsiva y consentimiento informado.</li>
         <li>Avísanos de cualquier lesión, condición médica o embarazo antes de tu clase, para cuidarte durante la práctica.</li>
         <li>El estudio no se hace responsable por lesiones derivadas de condiciones de salud que no nos informaste.</li>
         <li>Te recomendamos consultar a tu médico antes de empezar un programa de ejercicio.</li>
@@ -99,6 +99,8 @@ const Terminos = () => (
         <li>No toleramos ningún tipo de discriminación, acoso o conducta inapropiada.</li>
         <li>El estudio puede negar el servicio a quien no respete estas reglas.</li>
       </ul>
+
+      <p><Link to="/legal/informacion#reglamento" className={liga} style={{ color: COLOR.ink }}>Consultar el reglamento completo del estudio</Link>.</p>
 
       <LegalH2>10. Uso de imagen</LegalH2>
       <p>

@@ -19,7 +19,7 @@ export type BookingPolicy = {
 };
 
 export const DEFAULT_BOOKING_POLICY: BookingPolicy = {
-  cancellationLimit: 2,
+  cancellationLimit: 0,
   cancelWindowHours: 12,
   bookingLeadHours: 2,
   waitlistCutoffHours: 2,

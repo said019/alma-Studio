@@ -62,13 +62,13 @@ describe("clases y coaches", () => {
 });
 
 describe("contacto", () => {
-  it("dirección con Cómo llegar, horario, Instagram y política; sin WhatsApp sin número", () => {
+  it("dirección con Cómo llegar, horario, Instagram y política; WhatsApp confirmado", () => {
     renderPage(<Contact />, "/");
     expect(screen.getByText("Cuauhtémoc #68, Del Carmen")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Cómo llegar/ })).toHaveAttribute("href", "https://maps.app.goo.gl/6KvMNWPZk35siB4fA");
-    expect(screen.getByText("6 AM a 9 PM")).toBeInTheDocument();
+    expect(screen.getByText(/Lun–vie: 6–10 am y 5–8 pm/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /@hive\.pilates/ })).toHaveAttribute("href", "https://www.instagram.com/hive.pilates");
     expect(screen.getByRole("link", { name: /Ver política/ })).toHaveAttribute("href", "/legal/cancelacion");
-    expect(screen.queryByText(/WhatsApp/)).toBeNull();
+    expect(screen.getByRole("link", { name: /WhatsApp/ })).toHaveAttribute("href", "https://wa.me/525559449611?text=Hola%2C%20quiero%20conocer%20HIVE.");
   });
 });

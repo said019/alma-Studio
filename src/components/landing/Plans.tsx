@@ -10,6 +10,7 @@ function Price({ p, big }: { p: LandingPlan; big?: boolean }) {
     <div className="text-right">
       {p.opening && (p.finalPrice < p.price ? <s className="block text-[0.75rem] text-ink-muted">{money(p.price)}</s> : <span className="block text-[0.75rem] text-ink-muted">Normal {money(p.price)}</span>)}
       <span className={"font-display font-extrabold text-ink " + (big ? "text-[1.4rem]" : "text-[1.1rem]")}>{money(p.finalPrice)}</span>
+      {p.billingPeriod === "month" && <span className="block text-xs text-ink-muted">por mes</span>}
     </div>
   );
 }
@@ -47,6 +48,8 @@ export function Plans({ trial, plans, loading, error, onRetry }: Props) {
                 <div>
                   <p className="text-[0.95rem] font-bold text-ink">{trial.name}</p>
                   <p className="text-[0.8rem] text-ink-muted">Tu primera vez en HIVE</p>
+                  {trial.durationDays != null && <p className="text-[0.8rem] text-ink-muted">{trial.durationDays} días naturales desde la compra</p>}
+                  {trial.conditions?.map(condition => <p key={condition} className="text-[0.8rem] text-ink-muted">{condition}</p>)}
                 </div>
                 <Price p={trial} big />
               </div>
@@ -56,7 +59,9 @@ export function Plans({ trial, plans, loading, error, onRetry }: Props) {
               {plans.map((p) => (
                 <li key={p.id} className="flex items-center justify-between gap-3 border-t border-line py-3">
                   <div className="min-w-0">
-                    <p className="truncate text-[0.95rem] font-bold text-ink">{p.name}</p>
+                    <p className="text-[0.95rem] font-bold text-ink">{p.name}</p>
+                    {p.durationDays != null && <p className="text-[0.8rem] text-ink-muted">{p.durationDays} días naturales desde la compra</p>}
+                    {p.conditions?.map(condition => <p key={condition} className="text-[0.8rem] text-ink-muted">{condition}</p>)}
                     {p.perClass != null && <p className="text-[0.8rem] text-ink-muted">{money(p.perClass)} por clase</p>}
                   </div>
                   <Price p={p} />

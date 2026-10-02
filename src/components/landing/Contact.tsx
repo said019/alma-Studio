@@ -29,7 +29,7 @@ export function Contact() {
             <span className={ICON} aria-hidden="true"><Clock size={18} /></span>
             <div>
               <p className="text-[0.9rem] font-bold text-ink">{STUDIO.hours}</p>
-              <p className="text-[0.85rem] text-ink-muted">Clases L–V mañana y tarde; sábado y domingo por la mañana.</p>
+              <p className="text-[0.85rem] text-ink-muted">Horario especial: {STUDIO.specialHours}.</p>
             </div>
           </li>
           <li className={CARD}>

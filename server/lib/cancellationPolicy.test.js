@@ -5,12 +5,12 @@ import {
   ALREADY_PROMOTED_MESSAGE,
 } from "./cancellationPolicy.js";
 
-test("la cuota arranca en 2 y 0 es sin límite", () => {
-  assert.deepEqual(normalizeCancellationSettings(null), { max_cancellations: 2 });
+test("la cuota arranca sin límite y 0 es sin límite", () => {
+  assert.deepEqual(normalizeCancellationSettings(null), { max_cancellations: 0 });
   assert.deepEqual(normalizeCancellationSettings({ max_cancellations: 0 }), { max_cancellations: 0 });
   assert.deepEqual(normalizeCancellationSettings({ max_cancellations: 5 }), { max_cancellations: 5 });
-  assert.deepEqual(normalizeCancellationSettings({ max_cancellations: "5" }), { max_cancellations: 2 });
-  assert.deepEqual(normalizeCancellationSettings({ max_cancellations: 99 }), { max_cancellations: 2 });
+  assert.deepEqual(normalizeCancellationSettings({ max_cancellations: "5" }), { max_cancellations: 0 });
+  assert.deepEqual(normalizeCancellationSettings({ max_cancellations: 99 }), { max_cancellations: 0 });
 });
 
 test("cuota válida: entero de 0 a 20", () => {
@@ -64,7 +64,7 @@ test("?expect=waitlist con la reserva ya subida: 409 ALREADY_PROMOTED y no se ca
 
 test("política pública: cuota, ventana real, cierres y faltas", () => {
   assert.deepEqual(publicBookingPolicy({ settings: null, loyalty: {}, bookingLeadHours: 2 }), {
-    cancellationLimit: 2, cancelWindowHours: 12, bookingLeadHours: 2, waitlistCutoffHours: 2, faltasEnabled: true, faltasThreshold: 5,
+    cancellationLimit: 0, cancelWindowHours: 12, bookingLeadHours: 2, waitlistCutoffHours: 2, faltasEnabled: true, faltasThreshold: 5,
   });
   const p = publicBookingPolicy({
     settings: { max_cancellations: 0 },

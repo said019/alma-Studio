@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { RESPONSIVA_PDF_URL } from "@/components/app/responsivaContent";
 import api from "@/lib/api";
 import {
   Dialog,
@@ -391,11 +392,13 @@ export const VisitAssignDialog = ({ classId, open, onOpenChange, onSuccess }: Pr
 
             <div className="flex items-start justify-between gap-3 border-t border-line pt-3">
               <Label className="text-xs">
-                Confirmo que la visitante leyó y aceptó los términos y riesgos de la clase.
+                Confirmo que la visitante leyó y firmó presencialmente el consentimiento informado y la responsiva original de HIVE. El estudio conserva el documento firmado.
               </Label>
-              <Switch checked={waiver} onCheckedChange={setWaiver} />
+              <Switch aria-label="Responsiva firmada presencialmente" checked={waiver} onCheckedChange={setWaiver} />
             </div>
           </div>
+
+          <a href={RESPONSIVA_PDF_URL} target="_blank" rel="noopener noreferrer" className="text-sm underline">Abrir responsiva original para firma presencial (PDF)</a>
 
           {/* Venta — solo si NO tiene pack propio y NO viene con anfitriona.
               Si la anfitriona NO tiene créditos en su pack, el backend usará

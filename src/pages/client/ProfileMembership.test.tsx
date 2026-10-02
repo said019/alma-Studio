@@ -52,3 +52,16 @@ describe("Mi membresía · Cancelaciones con la política real", () => {
     expect(await screen.findByText("Ya usaste tus 2 cancelaciones de este paquete.")).toBeInTheDocument();
   });
 });
+
+it('lee fechas y créditos camelCase entregados por la API', async () => {
+  montar();
+  expect(await screen.findByText('3 de 8 usadas')).toBeInTheDocument();
+  expect(screen.queryByText('Sin fecha')).not.toBeInTheDocument();
+});
+it('muestra cupo diario y compromiso anual en vez de créditos ilimitados', async () => {
+  montar({...MEMBRESIA, classLimit:null,classesRemaining:null,rules:{daily_class_limit:2,commitment_months:12,billing_period:'month',guest_passes:2,guest_pass_period:'month'}});
+  expect(await screen.findByText('Compromiso de 12 meses')).toBeInTheDocument();
+  expect(screen.getByText('máximo por día')).toBeInTheDocument();
+  expect(screen.queryByText('Ilimitado')).not.toBeInTheDocument();
+  expect(screen.queryByText('∞')).not.toBeInTheDocument();
+});

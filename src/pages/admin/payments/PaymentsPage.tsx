@@ -2,6 +2,7 @@ import { useEffect, useState, useRef, type ReactNode } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format, addDays } from "date-fns";
 import { es } from "date-fns/locale";
+import { ResponsivaDialog } from "@/components/app/ResponsivaDialog";
 import api from "@/lib/api";
 import { AuthGuard } from "@/components/admin/AuthGuard";
 import AdminLayout from "@/components/admin/AdminLayout";
@@ -78,6 +79,7 @@ function CashAssignment() {
   const { toast } = useToast();
   const qc = useQueryClient();
   const [clientParam, setClientParam] = useSearchParamState("clienta");
+  const [waiverOpen, setWaiverOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<SelectedUser | null>(null);
   const [selectedPlan, setSelectedPlan] = useState<SelectedPlan | null>(null);
   const [paymentMethod, setPaymentMethod] = useState("cash");
@@ -151,8 +153,14 @@ function CashAssignment() {
       setReason("");
       setClientParam(null);
     },
-    onError: (e: any) =>
-      toast({ title: e?.response?.data?.message ?? "Error al asignar", variant: "destructive" }),
+    onError: (e: any) => {
+      if (e?.response?.data?.code === "WAIVER_REQUIRED") {
+        setWaiverOpen(true);
+        toast({ title: "Firma requerida antes de comprar", description: "Entrega el dispositivo al usuario para que lea y firme su responsiva. Después podrás confirmar el cobro." });
+        return;
+      }
+      toast({ title: e?.response?.data?.message ?? "Error al asignar", variant: "destructive" });
+    },
   });
 
   const today = new Date();
@@ -320,6 +328,7 @@ function CashAssignment() {
         </Button>
         <p className="mt-1.5 text-center text-[0.75rem] text-ink-muted">La membresía se activa hoy y el usuario recibe su confirmación.</p>
       </aside>
+      {selectedUser && <ResponsivaDialog key={selectedUser.id} userId={selectedUser.id} open={waiverOpen} onClose={() => setWaiverOpen(false)} onSigned={() => setWaiverOpen(false)} defaultName={selectedUser.displayName} defaultEmail={selectedUser.email ?? ""} defaultPhone={selectedUser.phone ?? ""} />}
     </div>
   );
 }

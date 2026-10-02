@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { QueryClient } from "@tanstack/react-query";
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import api from "@/lib/api";
 import ProfileEdit from "./ProfileEdit";
@@ -77,6 +78,18 @@ describe("Perfil · consentimiento para datos de salud (P1-10)", () => {
     vi.mocked(api.delete).mockResolvedValue({ data: { user: { ...U, healthNotes: null } } } as never);
     fireEvent.click(screen.getByRole("button", { name: "Sí, retirar y borrar" }));
     await waitFor(() => expect(api.delete).toHaveBeenCalledWith("/me/health-consent"));
+  });
+
+  it("al revocar invalida la responsiva para no mostrar los datos médicos anteriores", async () => {
+    const invalidate = vi.spyOn(QueryClient.prototype, "invalidateQueries");
+    try {
+      montar({ ...U, healthConsentVersion: "2026-09-28", healthConsentAt: "2026-09-20T16:00:00Z" });
+      fireEvent.click(await screen.findByRole("button", { name: "Retirar mi consentimiento" }));
+      vi.mocked(api.delete).mockResolvedValue({ data: { user: U } } as never);
+      fireEvent.click(screen.getByRole("button", { name: "Sí, retirar y borrar" }));
+      await waitFor(() => expect(invalidate).toHaveBeenCalledWith({ queryKey: ["my-waiver"] }));
+      expect(useAuthStore.getState().user?.healthConsentVersion).toBeNull();
+    } finally { invalidate.mockRestore(); }
   });
 
   // Marcar la casilla sin editar las notas (p. ej. notas ya guardadas de

@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { CATALOG_PLANS } from '../server/lib/catalog.js';
-const marker = 'hive_catalog_20260929';
+const marker = 'hive_catalog_20261001';
 const client = new pg.Client({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
 await client.connect();
 try {
@@ -44,18 +44,18 @@ try {
       for(const p of CATALOG_PLANS) {
         await client.query(`INSERT INTO plans
           (name,description,price,opening_price,currency,duration_days,class_limit,class_category,
-           morning_only,afternoon_only,personal_only,is_non_repeatable,repeat_key,is_active,sort_order)
-          VALUES ($1,$2,$3,$4,'MXN',$5,$6,$7,false,$8,$9,$10,$11,true,$12)`,
+           morning_only,afternoon_only,personal_only,is_non_repeatable,repeat_key,is_active,sort_order,rules,is_non_transferable)
+          VALUES ($1,$2,$3,$4,'MXN',$5,$6,$7,false,$8,$9,$10,$11,true,$12,$13::jsonb,true)`,
           [p.name,p.description,p.price,p.opening_price,p.duration_days,p.class_limit,p.class_category,
-            p.afternoon_only,p.personal_only,p.is_non_repeatable,p.repeat_key,p.sort_order]);
+            p.afternoon_only,p.personal_only,p.is_non_repeatable,p.repeat_key,p.sort_order,JSON.stringify(p.rules)]);
       }
       await client.query(`INSERT INTO settings(key,value) VALUES('general_settings','{"opening_pricing_active":true}'::jsonb)
         ON CONFLICT(key) DO UPDATE SET value=COALESCE(settings.value,'{}'::jsonb)||EXCLUDED.value,updated_at=NOW()`);
       const active=(await client.query('SELECT name,price,opening_price,duration_days,class_limit,afternoon_only,personal_only FROM plans WHERE is_active=true ORDER BY sort_order')).rows;
-      if(active.length!==10)throw new Error('Se esperaban diez planes activos');
+      if(active.length!==CATALOG_PLANS.length)throw new Error('Número inesperado de planes activos');
       for(const [i,p] of active.entries()) {
         const wanted=CATALOG_PLANS[i];
-        if(p.name!==wanted.name||Number(p.price)!==wanted.price||Number(p.opening_price)!==wanted.opening_price||p.duration_days!==30||p.class_limit!==wanted.class_limit)throw new Error('Catálogo no coincide');
+        if(p.name!==wanted.name||Number(p.price)!==wanted.price||(p.opening_price == null ? null : Number(p.opening_price))!==wanted.opening_price||p.duration_days!==wanted.duration_days||p.class_limit!==wanted.class_limit)throw new Error('Catálogo no coincide');
       }
       await client.query('INSERT INTO settings(key,value) VALUES($1,$2::jsonb)',[marker,JSON.stringify({appliedAt:new Date().toISOString(),deleted,archived})]);
       await client.query('COMMIT');

@@ -7,7 +7,7 @@ import LegalLayout, { LegalContact, LegalH2, LegalSkeleton, LegalUpdated } from 
 // con el mismo texto que el detalle de clase y el diálogo de cancelar
 // (src/lib/booking-policy.ts): una sola política. El texto de policies_settings
 // ya no se muestra. PENDIENTE: revisión de un abogado.
-export const CANCELACION_ACTUALIZADA = "28 de septiembre de 2026";
+export const CANCELACION_ACTUALIZADA = "1 de octubre de 2026";
 
 const Cancelacion = () => {
   const { policy, isLoading } = useBookingPolicy();
@@ -35,7 +35,7 @@ const Cancelacion = () => {
           <ul aria-label="Reglas de cancelación" className="list-disc pl-6 space-y-2">
             {cancellationRules(policy).map((regla) => <li key={regla}>{regla}</li>)}
           </ul>
-          <p>En la app ves cuántas cancelaciones te quedan en tu paquete: en el detalle de cada clase y al cancelar.</p>
+          {policy.cancellationLimit > 0 && <p>En la app ves cuántas cancelaciones te quedan en tu paquete: en el detalle de cada clase y al cancelar.</p>}
 
           <LegalH2>2. Lista de espera</LegalH2>
           <p>{waitlistRule(policy)}</p>
@@ -54,12 +54,12 @@ const Cancelacion = () => {
           <p>Para cambiar de horario, cancela tu reserva y reserva la nueva clase. Aplican las reglas de arriba y el cupo disponible.</p>
 
           <LegalH2>6. Puntualidad</LegalH2>
-          <p>Llega 10 minutos antes. Una vez iniciada la clase no se permite el acceso, por seguridad y por respeto al grupo; esa clase cuenta como usada.</p>
+          <p>Llega 10 minutos antes. La puerta se cierra 5 minutos después del inicio de la clase; después de ese plazo no se permite el acceso y la clase cuenta como usada.</p>
 
           <LegalH2>7. Paquetes y excepciones</LegalH2>
           <ul className="list-disc pl-6 space-y-2">
             <li>Los paquetes no son reembolsables, salvo en los casos que el estudio apruebe. Si el estudio aprueba un reembolso total o parcial, lo registra y ajusta las clases de tu paquete.</li>
-            <li>Ante una fuerza mayor (accidente, hospitalización, emergencia médica comprobable), el estudio puede evaluar extender tu paquete. Pídelo en recepción con tu documentación.</li>
+            <li>Las vigencias no se extienden. Los paquetes y clases vencen a los 30 días naturales desde la compra; el paquete de 20 clases vence a los 60 días naturales. Las clases deben utilizarse dentro de su vigencia.</li>
           </ul>
 
           <LegalH2>8. Contacto</LegalH2>

@@ -1,7 +1,7 @@
 // Revisión de código, 8 sep 2026 · Regresiones que introdujeron mis propios arreglos.
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
-import { api, login, sql, makeClient, studioFixtures, cleanup, closeDb, day, ADMIN } from "./helpers.mjs";
+import { api, login, sql, makeClient, studioFixtures, cleanup, closeDb, day, ADMIN, fakeSignaturePng } from "./helpers.mjs";
 
 const PFX = "rgrev";
 let A, f;
@@ -32,16 +32,26 @@ test("R2 un PUT que no menciona classLimit lo conserva", async () => {
   assert.equal(after_.class_limit, 12, "sin mencionar classLimit el valor debe conservarse");
 });
 
-test("R3 el alta manual de clienta con paquete también entra en ingresos", async () => {
-  const [plan] = await sql(
-    `SELECT id, price FROM plans WHERE is_active AND class_category=$1 AND class_limit>=4 LIMIT 1`, [f.category]);
-  const r = await api("POST", "/api/admin/clients/manual", { token: A, body: {
-    displayName: `${PFX} Alta`, email: `${PFX}_alta@qa.local`, phone: "5512340000",
-    planId: plan.id, paymentMethod: "cash", startDate: day(0) } });
-  assert.ok(r.status < 400, `alta manual devolvió ${r.status}: ${JSON.stringify(r.body).slice(0,150)}`);
-  const [u] = await sql(`SELECT id FROM users WHERE email=$1`, [`${PFX}_alta@qa.local`]);
+test("R3 alta manual, firma y venta posterior también entran una sola vez en ingresos", async () => {
+  const plan = f.plan;
+  const profile = { displayName: `${PFX} Alta`, email: `${PFX}_alta@qa.local`, phone: "5512340000" };
+  const combined = await api("POST", "/api/admin/clients/manual", { token: A, body: { ...profile, planId: plan.id, paymentMethod: "cash" } });
+  assert.equal(combined.status, 403);
+  assert.equal(combined.body.code, "WAIVER_REQUIRED");
+  assert.equal((await sql('SELECT count(*)::int n FROM users WHERE email=$1',[profile.email]))[0].n, 0);
+  const r = await api("POST", "/api/admin/clients/manual", { token: A, body: profile });
+  assert.equal(r.status, 201, JSON.stringify(r.body));
+  const u = r.body.data.user;
+  assert.equal((await sql('SELECT count(*)::int n FROM orders WHERE user_id=$1',[u.id]))[0].n, 0);
+  const signed = await api("POST", `/api/admin/users/${u.id}/waiver`, { token: A, body: {
+    full_name: profile.displayName, phone: profile.phone, waiver_version: "v3", signature_data: fakeSignaturePng(),
+    emergency_contact_name: "Contacto QA", emergency_contact_phone: "5511112222",
+  } });
+  assert.equal(signed.status, 201, JSON.stringify(signed.body));
+  const sale = await api("POST", "/api/memberships", { token: A, body: { userId: u.id, planId: plan.id, paymentMethod: "cash", startDate: day(0) } });
+  assert.equal(sale.status, 201, JSON.stringify(sale.body));
   const ords = await sql(`SELECT status, total_amount FROM orders WHERE user_id=$1`, [u.id]);
-  assert.equal(ords.length, 1, "la otra vía de venta de mostrador también debe dejar orden");
+  assert.equal(ords.length, 1, "la venta posterior al alta debe dejar exactamente una orden");
   assert.equal(ords[0].status, "approved");
   assert.equal(Number(ords[0].total_amount), Number(plan.price), "monto del catálogo del servidor");
 });

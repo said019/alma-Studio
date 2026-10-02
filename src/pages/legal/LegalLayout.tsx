@@ -9,6 +9,7 @@ import { STUDIO, whatsappUrl } from "@/lib/studio";
 import { COLOR } from "@/design/tokens";
 
 const LEGAL_PAGES = [
+  { path: "/legal/informacion", label: "Preguntas frecuentes y reglamento" },
   { path: "/legal/terminos", label: "Términos y condiciones" },
   { path: "/legal/privacidad", label: "Aviso de privacidad" },
   { path: "/legal/cancelacion", label: "Política de cancelación" },

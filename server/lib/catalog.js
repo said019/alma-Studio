@@ -10,35 +10,21 @@ export const CATALOG_CLASS_TYPES = [
   { name: "Sculpt",           category: "studio",         capacity: 8, duration_min: 50, color: "#C0A688", sort_order: 5 },
 ];
 
-export const CATALOG_SCHEDULE_SLOTS = [
-  "6:00 am", "7:00 am", "8:00 am", "9:00 am", "10:00 am", "11:00 am",
-  "5:00 pm", "6:00 pm", "7:00 pm", "8:00 pm",
-];
-export const CATALOG_SCHEDULE_DAYS = [1, 2, 3, 4, 5, 6]; // lun..sáb
+// Horas de inicio publicadas. De 11 a 16 h LV también hay sesiones especiales.
+export const CATALOG_SCHEDULE_SLOTS = ["6:00 am","7:00 am","8:00 am","9:00 am","10:00 am","11:00 am","12:00 pm","1:00 pm","2:00 pm","3:00 pm","4:00 pm","5:00 pm","6:00 pm","7:00 pm","8:00 pm"];
+export const CATALOG_SCHEDULE_DAYS = [1,2,3,4,5,6,0];
+export const CATALOG_SCHEDULE_BY_DAY = Object.fromEntries(CATALOG_SCHEDULE_DAYS.map(day=>[day,day===6?["8:00 am","9:00 am","10:00 am","11:00 am","12:00 pm"]:day===0?["8:00 am","9:00 am","10:00 am","11:00 am"]:CATALOG_SCHEDULE_SLOTS]));
 
-// Catálogo HIVE aprobado: MXN, 30 días; apertura se controla en ajustes.
+// Catálogo autorizado HIVE, octubre de 2026. Vigencia desde compra.
+const baseRules = { allowed_weekdays: [0,1,2,3,4,5,6], daily_class_limit: null, requires_student_id: false, guest_passes: 0, guest_pass_period: "membership", complimentary_coffee_per_day: 0, billing_period: "one_time", commitment_months: 0, auto_renew: false, transferable: false, extendable: false };
 export const CATALOG_PLANS = [
-  ["1 Clase", 300, 280, 1],
-  ["4 Clases", 1140, 1080, 4],
-  ["10 Clases", 2600, 2450, 10],
-  ["20 Clases", 4500, 4200, 20],
-  ["Mes", 4200, 3750, null],
-  ["Suscripción", 4000, 3900, null],
-  ["Clases de 12 a 4", 250, 200, 1],
-  ["Mes de 12 a 4", 3799, 3600, null],
-  ["Personalizado", 500, 500, 1],
-  ["Clase muestra", 200, 500, 1],
-].map(([name, price, opening_price, class_limit], i) => ({
-  name, price, opening_price, class_limit, duration_days: 30,
-  class_category: "all", morning_only: false,
-  afternoon_only: name.includes("12 a 4"),
-  personal_only: name === "Personalizado",
-  is_non_repeatable: name === "Clase muestra",
-  repeat_key: name === "Clase muestra" ? "hive_trial" : null,
-  sort_order: i + 1,
-  description: name === "Suscripción"
-    ? "Clases ilimitadas por 30 días. Renovación manual, sin cobros automáticos."
-    : name === "Personalizado"
-      ? "Una sesión individual, con cupo de una persona. Coordina tu horario con el estudio. Vigencia: 30 días."
-      : `${class_limit == null ? "Clases ilimitadas" : `${class_limit} clase${class_limit === 1 ? "" : "s"}`}${name.includes("12 a 4") ? ", con inicio entre las 12:00 y las 16:00 (hora de Ciudad de México)" : ""}. Vigencia: 30 días.${name === "Clase muestra" ? " Una sola compra por persona." : ""}`,
-}));
+  { name:"1 Clase", price:330, opening_price:290, class_limit:1 },
+  { name:"4 Clases", price:1200, opening_price:1080, class_limit:4 },
+  { name:"10 Clases", price:2700, opening_price:2200, class_limit:10 },
+  { name:"20 Clases", price:4400, opening_price:4000, class_limit:20, duration_days:60 },
+  { name:"Plan mensual", price:4800, opening_price:4200, class_limit:null, rules:{daily_class_limit:1,guest_passes:2}, description:"1 sesión por día y 2 guest pass. Vigencia: 30 días desde la compra." },
+  { name:"Plan anual / pago mensual", price:4200, opening_price:3900, class_limit:null, rules:{daily_class_limit:2,guest_passes:2,guest_pass_period:"month",complimentary_coffee_per_day:1,billing_period:"month",commitment_months:12,auto_renew:true,payment_url:"https://mpago.la/1YY3tpp",opening_payment_url:"https://mpago.la/1HWyxU1"}, description:"Compromiso anual con pago y renovación mensual automática. 2 sesiones por día, 2 guest pass por mes y 1 café regular de cortesía por día. Activación de cada periodo sujeta a pago confirmado." },
+  { name:"Horario especial", price:250, opening_price:null, class_limit:1, afternoon_only:true, rules:{allowed_weekdays:[1,2,3,4,5],booking_start_time:"11:00",booking_end_time:"16:00"}, description:"1 sesión de lunes a viernes, de 11:00 a 16:00. Vigencia: 30 días desde la compra." },
+  { name:"Promo estudiante", price:250, opening_price:null, class_limit:1, rules:{requires_student_id:true}, description:"1 sesión, cualquier horario y todos los días, presentando credencial estudiantil vigente. Vigencia: 30 días desde la compra." },
+  { name:"Personalizado", price:500, opening_price:null, class_limit:1, personal_only:true, rules:{allowed_weekdays:[1,2,3,4,5],booking_start_time:"11:00",booking_end_time:"16:00"}, description:"Sesión individual 1 a 1 de lunes a viernes de 11:00 a 16:00. Vigencia: 30 días desde la compra." },
+].map((p,i)=>({duration_days:30,class_category:"reformer_tower",morning_only:false,afternoon_only:false,personal_only:false,is_non_repeatable:false,repeat_key:null,is_non_transferable:true,sort_order:i+1,description:`${p.class_limit} sesión(es). Vigencia: ${p.duration_days||30} días naturales desde la compra. Personal e intransferible; sin prórroga.`,...p,rules:{...baseRules,...p.rules}}));

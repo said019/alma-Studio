@@ -72,6 +72,7 @@ import AuditLogPage from "./pages/admin/audit/AuditLogPage";
 import Privacidad from "./pages/legal/Privacidad";
 import Terminos from "./pages/legal/Terminos";
 import Cancelacion from "./pages/legal/Cancelacion";
+import Informacion from "./pages/legal/Informacion";
 import UpdateBanner from "./components/UpdateBanner";
 
 // Referencia viva del sistema HIVE (spec §7). Sólo en desarrollo.
@@ -101,6 +102,7 @@ const App = () => (
 
           {/* Legal pages */}
           <Route path="/legal/privacidad" element={<Privacidad />} />
+          <Route path="/legal/informacion" element={<Informacion />} />
           <Route path="/legal/terminos" element={<Terminos />} />
           <Route path="/legal/cancelacion" element={<Cancelacion />} />
 

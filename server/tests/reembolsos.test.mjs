@@ -315,7 +315,7 @@ test("reservar sobre una membresía que se cancela o vence justo antes (p. ej. u
     { key: "vig-app", cambio: `status = 'cancelled', cancelled_at = NOW()`, reservar: (c, classId) =>
       api("POST", "/api/bookings", { token: c.token, body: { classId } }), mensaje: "Tu paquete ya no está vigente." },
     { key: "vig-rec", cambio: `end_date = CURRENT_DATE - 1`, reservar: (c, classId) =>
-      api("POST", "/api/admin/bookings/assign", { token: A, body: { userId: c.id, classId } }), mensaje: "El paquete de la clienta ya no está vigente." },
+      api("POST", "/api/admin/bookings/assign", { token: A, body: { userId: c.id, classId } }), mensaje: "El paquete del usuario ya no está vigente." },
   ];
   for (const k of casos) {
     const { c, membershipId } = await venta(k.key);
@@ -377,7 +377,7 @@ test("las ventas de visita (mostrador y walk-in) ya no dan 500, ligan su membres
      VALUES ($1, 'Paquete de visitas de la regresión', 250, 'MXN', 30, 1, $2, true, true, 999) RETURNING id`,
     [`${PFX} QA visita`, f.category],
   );
-  const perfil = (k) => ({ name: `QA visita ${k}`, phone: `55${Math.floor(10000000 + Math.random() * 89999999)}`, email: `${PFX}_visita_${k}@qa.local` });
+  const perfil = (k) => ({ acceptedWaiver: true, name: `QA visita ${k}`, phone: `55${Math.floor(10000000 + Math.random() * 89999999)}`, email: `${PFX}_visita_${k}@qa.local` });
   const unaVez = async (userId, orderId) => {
     const [m] = await sql(`SELECT id, order_id FROM memberships WHERE user_id = $1`, [userId]);
     assert.equal(m.order_id, orderId, "la membresía queda ligada a su orden");

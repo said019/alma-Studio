@@ -14,9 +14,11 @@ import {
   GhostButton,
 } from "@/components/app/AppShell";
 import { BackLink, DataRow } from "@/components/app/widgets";
-import { responsivaDocument } from "@/components/app/responsivaContent";
+import { WAIVER_DETAILS_FIELDS } from "@/components/app/ResponsivaDialog";
+import { responsivaDocument, RESPONSIVA_PDF_URL } from "@/components/app/responsivaContent";
 
 interface WaiverRow {
+  [key: string]: string | boolean | null | undefined;
   full_name: string;
   phone: string | null;
   email: string | null;
@@ -73,7 +75,7 @@ const Responsiva = () => {
           <EmptyState
             icon={<FileSignature size={22} />}
             title="Aún no has firmado tu responsiva"
-            description="La firmarás al reservar tu primera clase. Es un proceso rápido y solo se realiza una vez."
+            description="Debes firmarla al inscribirte o comprar una clase."
           />
         ) : (
           <>
@@ -97,6 +99,7 @@ const Responsiva = () => {
                   </span>
                 }
               />
+              {waiver.waiver_version === "v3" && WAIVER_DETAILS_FIELDS.map(([key, label]) => waiver[key] ? <DataRow key={key} label={label.replace(" *", "")} value={String(waiver[key])} /> : null)}
               {signedDate && <DataRow label="Firmada el" value={<span className="nums">{signedDate}</span>} />}
             </div>
 
@@ -113,6 +116,7 @@ const Responsiva = () => {
 
             {/* Full document */}
             <Section title="Documento completo">
+              {waiver.waiver_version === "v3" && <a href={RESPONSIVA_PDF_URL} target="_blank" rel="noopener noreferrer" className="underline text-sm text-accent-strong">Documento original del estudio (PDF)</a>}
               {documento.sections.map((section) => (
                 <div key={section.n} className="pt-4 pb-4 border-t border-line">
                   <h3 className="font-display text-[1.05rem] leading-snug mb-1.5 text-ink">

@@ -19,7 +19,10 @@ before(async () => {
   f = await studioFixtures(PFX, A);
   sinResponsiva = await makeClient(PFX, "sinr", { waiver: false });
   conResponsiva = await makeClient(PFX, "conr", { waiver: true });
-  await giveMembership(A, sinResponsiva.id, f.plan.id, 8);
+  // Saldo legado anterior al requisito de firmar antes de comprar. La API
+  // de venta ya debe rechazar este caso, pero asignación conserva su override.
+  await sql(`INSERT INTO memberships(user_id,plan_id,status,payment_method,start_date,end_date,classes_remaining)
+    VALUES($1,$2,'active','cash',CURRENT_DATE,CURRENT_DATE+30,8)`, [sinResponsiva.id, f.plan.id]);
   await giveMembership(A, conResponsiva.id, f.plan.id, 8);
 });
 after(async () => { await cleanup(PFX); await closeDb(); });

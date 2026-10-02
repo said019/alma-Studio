@@ -3,7 +3,7 @@
 // de saldo/vigencia/estado con motivo; todo en la bitácora.
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
-import { api, login, sql, makeClient, studioFixtures, cleanup, closeDb, day, ADMIN } from "./helpers.mjs";
+import { api, login, sql, makeClient, studioFixtures, cleanup, closeDb, day, ADMIN, fakeSignaturePng } from "./helpers.mjs";
 
 const PFX = "rgventas";
 let A, adminId, f, listPrice;
@@ -224,24 +224,37 @@ test("fechas inválidas o fin antes del inicio → 400", async () => {
   }
 });
 
-test("alta manual con paquete: activated_by, referencia y bitácora; en $0 exige motivo en Notas", async () => {
-  const email = `${PFX}_alta@qa.local`;
-  const r = await api("POST", "/api/admin/clients/manual", { token: A, body: { displayName: "QA alta", email, planId: f.plan.id, paymentMethod: "cash" } });
-  assert.equal(r.status, 201, JSON.stringify(r.body).slice(0, 200));
-  const [u] = await sql(`SELECT id FROM users WHERE email=$1`, [email]);
+test("alta manual, firma y venta: activated_by, referencia y bitácora; cortesía exige motivo", async () => {
+  const createAndSign = async (email, name) => {
+    const created = await api("POST", "/api/admin/clients/manual", { token: A, body: { displayName: name, email, phone: "5512340000" } });
+    assert.equal(created.status, 201, JSON.stringify(created.body));
+    const u = created.body.data.user;
+    assert.equal((await sql('SELECT count(*)::int n FROM memberships WHERE user_id=$1',[u.id]))[0].n, 0);
+    const signed = await api("POST", `/api/admin/users/${u.id}/waiver`, { token: A, body: {
+      full_name: name, phone: "5512340000", waiver_version: "v3", signature_data: fakeSignaturePng(),
+      emergency_contact_name: "Contacto QA", emergency_contact_phone: "5511112222",
+    } });
+    assert.equal(signed.status, 201, JSON.stringify(signed.body));
+    return u;
+  };
+  const u = await createAndSign(`${PFX}_alta@qa.local`, "QA alta");
+  const r = await venta({ userId: u.id, planId: f.plan.id, paymentReference: "Alta presencial QA" });
+  assert.equal(r.status, 201, JSON.stringify(r.body));
   const m = await membresiaDe(u.id);
   assert.equal(m.activated_by, adminId);
-  assert.ok(m.payment_reference);
+  assert.equal(m.payment_reference, "Alta presencial QA");
   const [log] = await auditOf(m.id, "membership.sale");
-  assert.equal(log.meta.source, "alta_manual");
+  assert.equal(log.meta.source, "mostrador");
 
   const [p0] = await sql(`INSERT INTO plans (name, description, price, currency, duration_days, class_limit, class_category, is_active, sort_order)
                           VALUES ($1, 'QA cortesía', 0, 'MXN', 30, 1, $2, true, 999) RETURNING id`, [`${PFX} cortesía`, f.category]);
-  const email0 = `${PFX}_alta0@qa.local`;
-  const sin = await api("POST", "/api/admin/clients/manual", { token: A, body: { displayName: "QA alta 0", email: email0, planId: p0.id, paymentMethod: "cash" } });
+  const u0 = await createAndSign(`${PFX}_alta0@qa.local`, "QA alta 0");
+  const sin = await venta({ userId: u0.id, planId: p0.id });
   assert.equal(sin.status, 400);
   assert.equal(sin.body.code, "REASON_REQUIRED");
-  assert.equal((await sql(`SELECT COUNT(*)::int n FROM users WHERE email=$1`, [email0]))[0].n, 0, "se revirtió todo");
-  const con = await api("POST", "/api/admin/clients/manual", { token: A, body: { displayName: "QA alta 0", email: email0, planId: p0.id, paymentMethod: "cash", notes: "Cortesía por evento de apertura" } });
-  assert.equal(con.status, 201, JSON.stringify(con.body).slice(0, 200));
+  assert.equal((await sql('SELECT count(*)::int n FROM memberships WHERE user_id=$1',[u0.id]))[0].n, 0);
+  assert.equal((await sql('SELECT count(*)::int n FROM orders WHERE user_id=$1',[u0.id]))[0].n, 0, "el cobro fallido no crea venta");
+  const con = await venta({ userId: u0.id, planId: p0.id, reason: "Cortesía por evento de apertura" });
+  assert.equal(con.status, 201, JSON.stringify(con.body));
+  assert.equal((await sql('SELECT count(*)::int n FROM orders WHERE user_id=$1',[u0.id]))[0].n, 1);
 });

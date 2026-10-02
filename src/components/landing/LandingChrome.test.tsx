@@ -81,7 +81,7 @@ describe("portada", () => {
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
     expect(screen.getByText("Pilates Reformer · Coyoacán")).toBeInTheDocument();
     expect(screen.getByText("Sal más fuerte.")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Reserva tu clase muestra/ })).toHaveAttribute("href", "/auth/register?returnUrl=%2Fapp%2Fcheckout");
+    expect(screen.getByRole("link", { name: /Reserva tu primera clase/ })).toHaveAttribute("href", "/auth/register?returnUrl=%2Fapp%2Fcheckout");
     expect(screen.getByRole("link", { name: "Ver horario" })).toHaveAttribute("href", "#horario");
   });
   it("staff: el botón lleva al panel", () => {

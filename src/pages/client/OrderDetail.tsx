@@ -1,3 +1,4 @@
+import { EmbeddedCardPayment } from "@/components/checkout/EmbeddedCardPayment";
 import { OrderActions } from "@/components/app/OrderActions";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -38,6 +39,7 @@ const STATUS: Record<string, { label: string; tone: Tone; variant?: "soft" | "so
   approved: { label: "Aprobado · membresía activa", tone: "success" },
   rejected: { label: "Rechazado", tone: "danger" },
   cancelled: { label: "Cancelado", tone: "danger" },
+  expired: { label: "Vencido", tone: "muted" },
 };
 
 const OrderDetail = () => {
@@ -45,6 +47,7 @@ const OrderDetail = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const qc = useQueryClient();
+  const [cardOpen, setCardOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
 
   const { data, isLoading, isError, error, refetch } = useQuery({
@@ -52,6 +55,10 @@ const OrderDetail = () => {
     queryFn: async () => (await api.get(`/orders/${orderId}`)).data,
   });
   const order: Order | null = data?.data ?? data ?? null;
+  const provider = order?.payment_provider ?? order?.paymentProvider;
+  const embedded = provider === "mercadopago";
+  const external = provider === "mercadopago_external";
+  const cardInProgress = embedded && !!order && ["pending_payment", "pending_verification"].includes(order.status);
   const notFound =
     (error as any)?.response?.status === 404 || (!isLoading && !isError && !order);
 
@@ -77,7 +84,8 @@ const OrderDetail = () => {
       }),
   });
 
-  const status = order ? STATUS[order.status] ?? { label: order.status, tone: "accent" as const } : null;
+  const reversal: {label: string; tone: Tone; variant?: "soft" | "solid"} | null = order?.mp_payment_status === "charged_back" ? {label:"Contracargo",tone:"danger" as const} : order?.refund_status === "refunded" || order?.mp_payment_status === "refunded" ? {label:"Reembolsado",tone:"muted" as const} : order?.refund_status === "partially_refunded" ? {label:"Reembolso parcial",tone:"accent" as const} : null;
+  const status = reversal ?? (order ? STATUS[order.status] ?? { label: order.status, tone: "accent" as const } : null);
   const amountStr = order ? `$${formatMoneyMX(order.total_amount ?? order.amount)} ${order.currency ?? "MXN"}` : "";
 
   return (
@@ -108,7 +116,10 @@ const OrderDetail = () => {
               actions={status ? <StatusPill label={status.label} tone={status.tone} variant={status.variant ?? "soft"} /> : null}
             />
 
-            {order.status === "pending_payment" && <OrderActions orderId={order.id} />}
+            {(cardOpen || cardInProgress) && <EmbeddedCardPayment key={order.id} orderId={order.id} onClose={() => navigate("/app/orders")} />}
+            {order.status === "pending_payment" && !embedded && !cardOpen && <OrderActions orderId={order.id} canChangePayment={external || order.payment_method !== "card"} external={external} onCardPayment={() => setCardOpen(true)} />}
+            {order.status === "pending_payment" && order.payment_method === "card" && !embedded && !external && <InfoBanner title="Pago creado anteriormente" description="Este pago usa el proveedor original de la orden. Consulta al estudio para verificar su estado antes de iniciar otra compra." />}
+
             <Section>
               <div className="rounded-3xl p-5 sm:p-7 border border-line bg-sunken">
                 <div className="flex flex-wrap items-baseline justify-between gap-3 pb-3 border-b border-line">
@@ -124,6 +135,7 @@ const OrderDetail = () => {
                     label="Fecha"
                     value={order.created_at ? format(safeParse(order.created_at), "d MMM yyyy", { locale: es }) : "—"}
                   />
+                  {Number(order.refunded_amount) > 0 && <DataRow label="Importe reembolsado" value={`$${formatMoneyMX(order.refunded_amount)} MXN`} />}
                   <DataRow label="Método" value={order.payment_method === "cash" ? "Efectivo" : order.payment_method === "card" ? "Tarjeta" : "Transferencia"} />
                   {(order as any).orderNumber && (
                     <DataRow label="Folio" value={(order as any).orderNumber} mono />
@@ -132,7 +144,7 @@ const OrderDetail = () => {
               </div>
             </Section>
 
-            {order.status === "pending_payment" && order.bank_clabe && (
+            {order.status === "pending_payment" && order.payment_method === "transfer" && order.bank_clabe && (
               <Section title="Datos para transferencia">
                 <div className="rounded-3xl p-5 sm:p-7 bg-canvas border border-line">
                   <DataRow label="CLABE" value={order.bank_clabe} mono copyable={String(order.bank_clabe)} />
@@ -145,7 +157,7 @@ const OrderDetail = () => {
               </Section>
             )}
 
-            {order.status === "pending_payment" && (
+            {order.status === "pending_payment" && order.payment_method !== "card" && !cardOpen && (
               <Section title="Subir comprobante">
                 <UploadDropzone file={file} onFileChange={setFile} />
 

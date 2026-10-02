@@ -1,5 +1,5 @@
 // Tarea 3 · auditoría 2026-09-27, bloque 3 (P0-4 · C1 · C8 · C2). La cuota de
-// cancelaciones por paquete es configurable (2 por defecto, 0 = sin límite) y
+// cancelaciones por paquete es configurable (0 por defecto = sin límite) y
 // sólo la cambia la dueña; salir de la lista de espera no la consume; la
 // ventana es la configurada; recepción ajusta cancellationsUsed con motivo.
 import { test, before, after } from "node:test";
@@ -34,7 +34,7 @@ before(async () => {
   recep = await makeClient(PFX, "recep", { role: "reception" });
   [prevCancel] = await sql(`SELECT value FROM settings WHERE key = 'cancellation_settings'`);
   [prevLoyalty] = await sql(`SELECT value FROM settings WHERE key = 'loyalty_config'`);
-  // La suite arranca sin configurar: la cuota debe ser 2.
+  // La suite arranca sin configurar: la cuota debe ser 0.
   await sql(`DELETE FROM settings WHERE key = 'cancellation_settings'`);
 });
 after(async () => {
@@ -46,7 +46,14 @@ after(async () => {
   await closeDb();
 });
 
-test("sin configurar la cuota es 2: la tercera cancelación → 403 CANCELLATION_LIMIT y nada cambia", async () => {
+test("HIVE arranca sin límite de cancelaciones y con ventana de 12 horas", async () => {
+  const policy = await api("GET", "/api/public/booking-policy");
+  assert.equal(policy.body.data.cancellationLimit, 0);
+  assert.equal(policy.body.data.cancelWindowHours, 12);
+});
+
+test("si la dueña configura cuota 2, la tercera cancelación → 403 CANCELLATION_LIMIT y nada cambia", async () => {
+  await ponerCuota(2);
   const c = await makeClient(PFX, "tres");
   await giveMembership(A, c.id, f.plan.id, 8);
   const primera = await cancelar(c, await reservar(c, await makeClass(A, f, { date: day(20) })));

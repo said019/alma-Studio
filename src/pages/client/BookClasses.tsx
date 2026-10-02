@@ -1,3 +1,4 @@
+import { classRestriction, planConditions } from "@/lib/planConditions";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FEATURES } from "@/config/features";
 import { useQuery } from "@tanstack/react-query";
@@ -46,6 +47,7 @@ type ScheduleClass = {
   start_time?: string | null;
   end_time?: string | null;
   class_type_name?: string | null;
+  class_category?: ClassCat | null;
   instructor_name?: string | null;
   instructor_photo?: string | null;
   current_bookings?: number | null;
@@ -85,7 +87,7 @@ function decorateClass(cls: ScheduleClass): DecoratedClass {
   const start = cls.start_time ? safeParse(cls.start_time) : null;
   const end = cls.end_time ? safeParse(cls.end_time) : null;
   const name = cls.class_type_name ?? "Clase";
-  const classCat = inferClassCat(name);
+  const classCat = cls.class_category ?? inferClassCat(name);
   // Cupo real del backend; si falta, se deriva del área: Reformer/Tower 4, Studio 8.
   const areaFallback = classCat === "reformer_tower" ? 4 : 8;
   const capacity = Number(cls.max_capacity ?? cls.capacity ?? areaFallback);
@@ -181,11 +183,17 @@ const BookClasses = () => {
       (await api.get(`/bookings/weekly-status?date=${format(weekStart, "yyyy-MM-dd")}`)).data,
   });
 
+  const { data: allMembershipsData } = useQuery({
+    queryKey: ["my-memberships", "all"],
+    queryFn: async () => (await api.get("/memberships/mine/all")).data,
+  });
+
   const classes: ScheduleClass[] = Array.isArray(classesData?.data) ? classesData.data : Array.isArray(classesData) ? classesData : [];
   const myBookings: BookingClient[] = Array.isArray(bookingsData?.data) ? bookingsData.data : Array.isArray(bookingsData) ? bookingsData : [];
   const membership = membershipData?.data ?? null;
-  const hasActive = membership?.status === "active";
-  const membershipCat: ClassCat | null = hasActive
+  const activeMemberships = (Array.isArray(allMembershipsData?.data) && allMembershipsData.data.length ? allMembershipsData.data : membership ? [membership] : []).filter((m: any) => m.status === "active" && !m.isExpired);
+  const hasActive = activeMemberships.length > 0;
+  const membershipCat: ClassCat | null = hasActive && membership
     ? ((membership.classCategory ?? membership.class_category ?? "all") as ClassCat)
     : null;
   const classesRemaining = membership?.classesRemaining ?? membership?.classes_remaining;
@@ -193,7 +201,7 @@ const BookClasses = () => {
   const weeklyStatus: { plan_name: string; limit: number; used: number; remaining: number }[] =
     Array.isArray(weeklyStatusData?.data) ? weeklyStatusData.data : [];
   const weeklyCap = weeklyStatus[0] ?? null;
-  const myBookedClassIds = useMemo(() => new Set(myBookings.map((b) => b.class_id)), [myBookings]);
+  const myBookedClassIds = useMemo(() => new Set(myBookings.filter(b => ["confirmed", "waitlist", "checked_in"].includes(b.status)).map((b) => b.class_id)), [myBookings]);
 
   const days = useMemo(() => {
     return Array.from({ length: 7 }, (_, i) => {
@@ -248,7 +256,8 @@ const BookClasses = () => {
   const getRowState = (cls: DecoratedClass): RowState => {
     const isPast = cls.start ? isBefore(cls.start, now) : true;
     const isBooked = myBookedClassIds.has(cls.raw.id);
-    const allowed = canBook(cls.classCat, membershipCat);
+    const restrictions = activeMemberships.map((m: any) => canBook(cls.classCat, m.classCategory ?? m.class_category ?? "all") ? classRestriction(m, {...cls.raw, class_category: cls.classCat}, myBookings) : "Otra membresía");
+    const restriction = restrictions.includes(null) ? null : restrictions[0];
     if (isBooked) {
       return { label: "Reservada", toneClass: "text-success", dimmed: isPast, interactive: hasActive && !isPast };
     }
@@ -263,8 +272,8 @@ const BookClasses = () => {
         interactive: false,
       };
     }
-    if (!allowed) {
-      return { label: "Otra membresía", toneClass: "text-ink", dimmed: true, interactive: false };
+    if (restriction) {
+      return { label: restriction, toneClass: "text-ink", dimmed: true, interactive: false };
     }
     if (cls.remaining === 0) {
       return { label: "Lista de espera", toneClass: "text-accent-strong", dimmed: false, interactive: true };
@@ -290,7 +299,7 @@ const BookClasses = () => {
   const endRaw = membership?.endDate ?? membership?.end_date ?? null;
   const endLabel = endRaw ? format(safeParse(endRaw), "d MMM", { locale: es }) : null;
   const remainingLabel = isUnlimited
-    ? "Clases ilimitadas"
+    ? (membership?.rules?.daily_class_limit ? `${membership.rules.daily_class_limit} ${membership.rules.daily_class_limit === 1 ? "sesión" : "sesiones"} por día` : "Clases ilimitadas")
     : Number(classesRemaining) === 1
       ? "Te queda 1 clase"
       : `Te quedan ${classesRemaining} clases`;
@@ -337,7 +346,7 @@ const BookClasses = () => {
           ) : (
             <InfoBanner
               title="Aún no tienes paquete activo."
-              description="Activa un paquete para reservar clases. Puedes empezar con una clase muestra."
+              description="Activa un paquete para reservar clases. Puedes empezar con una sesión individual."
               action={<PrimaryButton size="sm" to="/app/checkout">Ver paquetes</PrimaryButton>}
             />
           )}
@@ -348,6 +357,8 @@ const BookClasses = () => {
               <span className="text-accent-strong font-semibold">{CAT_LABEL[membershipCat]}</span>.
             </p>
           )}
+
+          {hasActive && membership?.rules && <p className="mt-2 text-sm text-ink-muted">{planConditions(membership).join(" · ")}</p>}
 
           {weeklyCap && weeklyCap.remaining === 0 && (
             <p className="mt-1 text-[0.84rem] text-accent-strong">

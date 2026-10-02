@@ -34,7 +34,10 @@ const llenarYEnviar = () => {
   fireEvent.change(screen.getByLabelText("Nombre completo *"), { target: { value: "Ana Test" } });
   fireEvent.click(screen.getByText("Sí autorizo"));
   fireEvent.click(screen.getByTestId("firma"));
-  fireEvent.click(screen.getByRole("checkbox"));
+  fireEvent.change(screen.getByLabelText("Teléfono *"), { target: { value: "5559449611" } });
+  fireEvent.change(screen.getByLabelText("Contacto de emergencia: nombre *"), { target: { value: "Juan Test" } });
+  fireEvent.change(screen.getByLabelText("Contacto de emergencia: teléfono *"), { target: { value: "5551234567" } });
+  fireEvent.click(screen.getByRole("checkbox", { name: /He leído y acepto/ }));
   fireEvent.click(screen.getByRole("button", { name: /Firmar y continuar/ }));
 };
 
@@ -55,12 +58,12 @@ describe("ResponsivaDialog: marcas de obligatorio (M6)", () => {
   });
   it('"Uso de imagen" y "Tu firma" llevan su asterisco', () => {
     abrir();
-    expect(screen.getByText("Uso de imagen (sección 4) *")).toBeInTheDocument();
+    expect(screen.getByText("Uso de imagen (opcional)")).toBeInTheDocument();
     expect(screen.getByText("Tu firma *")).toBeInTheDocument();
   });
-  it("teléfono y correo siguen opcionales, sin asterisco", () => {
+  it("teléfono es requerido y correo opcional", () => {
     abrir();
-    expect(screen.getByLabelText("Teléfono").id).toBe("field-tel-fono");
+    expect(screen.getByLabelText("Teléfono *").id).toBe("field-tel-fono");
     expect(screen.getByLabelText("Correo")).toBeInTheDocument();
   });
 });
@@ -103,8 +106,44 @@ describe("ResponsivaDialog: versión del documento (bloque 3)", () => {
   it("muestra la responsiva de HIVE y manda la versión al firmar", async () => {
     vi.mocked(api.post).mockResolvedValueOnce({ data: { data: {} } });
     abrir();
-    expect(screen.getByText("HIVE Pilates Studio — Responsiva y Consentimiento Informado")).toBeInTheDocument();
+    expect(screen.getByText("HIVE Pilates Studio — Carta de Consentimiento Informado y Responsiva")).toBeInTheDocument();
     llenarYEnviar();
-    await waitFor(() => expect(api.post).toHaveBeenCalledWith("/me/waiver", expect.objectContaining({ waiver_version: "v2" })));
+    await waitFor(() => expect(api.post).toHaveBeenCalledWith("/me/waiver", expect.objectContaining({ waiver_version: "v3" })));
+  });
+});
+
+describe("Responsiva HIVE v3: datos del documento", () => {
+  it("exige consentimiento explícito antes de enviar datos de salud opcionales", async () => {
+    vi.mocked(api.post).mockResolvedValueOnce({ data: { data: {} } });
+    abrir();
+    fireEvent.change(screen.getByLabelText("Alergias a medicamentos"), { target: { value: "Penicilina" } });
+    llenarYEnviar();
+    expect(screen.getByRole("button", { name: /Firmar y continuar/ })).toBeDisabled();
+    expect(api.post).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("checkbox", { name: /Autorizo expresamente/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Firmar y continuar/ }));
+    await waitFor(() => expect(api.post).toHaveBeenCalledWith("/me/waiver", expect.objectContaining({
+      health_consent: true, medication_allergies: "Penicilina", emergency_contact_name: "Juan Test", emergency_contact_phone: "5551234567", waiver_version: "v3",
+    })));
+  });
+
+  it("no permite firmar sin el contacto de emergencia", () => {
+    abrir();
+    fireEvent.change(screen.getByLabelText("Nombre completo *"), { target: { value: "Ana Test" } });
+    fireEvent.change(screen.getByLabelText("Teléfono *"), { target: { value: "5559449611" } });
+    fireEvent.click(screen.getByTestId("firma"));
+    fireEvent.click(screen.getByRole("checkbox", { name: /He leído y acepto/ }));
+    expect(screen.getByRole("button", { name: /Firmar y continuar/ })).toBeDisabled();
+  });
+});
+
+
+describe("firma presencial por administración", () => {
+  it("guarda la firma del cliente seleccionado sin alterar la responsiva del administrador", async () => {
+    vi.mocked(api.post).mockResolvedValueOnce({ data: { data: {} } });
+    render(<QueryClientProvider client={new QueryClient()}><ResponsivaDialog userId="cliente-presencial" open onClose={() => {}} onSigned={() => {}} /></QueryClientProvider>);
+    llenarYEnviar();
+    await waitFor(() => expect(api.post).toHaveBeenCalledWith("/admin/users/cliente-presencial/waiver", expect.objectContaining({ waiver_version: "v3", full_name: "Ana Test" })));
+    expect(vi.mocked(api.post).mock.calls.some(([url]) => url === "/me/waiver")).toBe(false);
   });
 });

@@ -1,0 +1,33 @@
+import { beforeEach, expect, it, vi, type Mock } from 'vitest';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { renderAdmin, routeApi } from '@/test/admin-harness';
+import { useAuthStore } from '@/stores/authStore';
+import { normalizePlanRules } from '@/lib/planConditions';
+vi.mock('@/lib/api', () => ({default: {get:vi.fn(), post:vi.fn()}}));
+vi.mock('@/components/app/ResponsivaDialog', () => ({ResponsivaDialog: ({open,onSigned}:any) => open ? <div role="dialog"><button onClick={onSigned}>Firmar consentimiento</button></div> : null}));
+import api from '@/lib/api';
+import Checkout from './Checkout';
+const mockApi = api as unknown as {get:Mock;post:Mock};
+beforeEach(() => {
+  vi.stubGlobal('IntersectionObserver', class { observe() {} disconnect() {} unobserve() {} });
+  mockApi.get.mockReset(); mockApi.post.mockReset();
+  useAuthStore.setState({user:{id:'c1', role:'client', displayName:'Cliente', email:'client@hive.test'} as never, token:'t', isAuthenticated:true});
+  routeApi(mockApi, {'/plans':{data:[{id:'annual', name:'Plan anual',price:4200,effectivePrice:3900,openingActive:true,duration_days:30,class_category:'reformer_tower',class_limit:null,rules:normalizePlanRules({daily_class_limit:2,guest_passes:2,guest_pass_period:'month',billing_period:'month',commitment_months:12,auto_renew:true,complimentary_coffee_per_day:1})}]}});
+});
+it('expone el compromiso anual y pide firma sin continuar el pago hasta firmar', async () => {
+  mockApi.post.mockRejectedValueOnce({response:{status:403,data:{code:'WAIVER_REQUIRED'}}}).mockResolvedValueOnce({data:{data:{orderId:'o1',bankDetails:{bank:'Mercado Pago',clabe:'722969020124160665'}}}});
+  renderAdmin(<Checkout/>,{route:'/app/checkout'});
+  const heading = await screen.findByRole('heading',{name:'Plan anual'});
+  expect(screen.getByText('Compromiso de 12 meses')).toBeInTheDocument();
+  expect(screen.getByText('1 café regular de cortesía por día')).toBeInTheDocument();
+  expect(screen.queryByText('Ilimitado')).not.toBeInTheDocument();
+  fireEvent.click(heading.closest('button')!);
+  fireEvent.click(screen.getByRole('button',{name:'Continuar a pago'}));
+  expect(screen.getByText('Compromiso de 12 meses')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button',{name:'Confirmar'}));
+  expect(await screen.findByRole('dialog')).toBeInTheDocument();
+  expect(mockApi.post).toHaveBeenCalledTimes(1);
+  fireEvent.click(screen.getByRole('button',{name:'Firmar consentimiento'}));
+  await waitFor(() => expect(mockApi.post).toHaveBeenCalledTimes(2));
+  expect(mockApi.post).toHaveBeenLastCalledWith('/orders',{planId:'annual',discountCode:undefined,paymentMethod:'transfer'});
+});

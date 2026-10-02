@@ -4,7 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useNavigate } from "react-router-dom";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { useAuthStore } from "@/stores/authStore";
 import { Camera, ShieldCheck } from "lucide-react";
@@ -42,6 +42,7 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>;
 
 const ProfileEdit = () => {
+  const qc = useQueryClient();
   const { user, updateUser } = useAuthStore();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -115,6 +116,7 @@ const ProfileEdit = () => {
   const retirar = useMutation({
     mutationFn: (_origen: "retirar" | "borrar") => api.delete("/me/health-consent"),
     onSuccess: (res, origen) => {
+      qc.invalidateQueries({ queryKey: ["my-waiver"] });
       const updated = res.data?.user;
       if (updated) updateUser(updated);
       setConfirmarRetiro(false);
@@ -123,7 +125,7 @@ const ProfileEdit = () => {
       reset({ ...(user as unknown as Record<string, unknown>), healthNotes: "" } as never);
       toast({
         title: origen === "retirar" ? "Retiraste tu consentimiento" : "Borramos tus datos de salud",
-        description: "Borramos tus datos de salud de tu perfil.",
+        description: "Borramos tus datos de salud de tu perfil y responsiva.",
       });
     },
     onError: () => toast({ title: "No pudimos borrarlos", description: "Inténtalo de nuevo o pídelo en recepción.", variant: "destructive" }),

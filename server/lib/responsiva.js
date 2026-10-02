@@ -1,8 +1,5 @@
-// Responsiva y consentimiento informado, por versión (auditoría 2026-09-27,
-// punto 7). La v1 es la que se firmó con Alma Movement y se conserva tal cual:
-// una responsiva firmada vale con el texto de su versión. La v2 es la de HIVE
-// Pilates Studio. Debe coincidir con src/components/app/responsivaContent.ts
-// (responsivaContent.test.ts lo exige). PENDIENTE: revisión de un abogado.
+// Versiones históricas inmutables v1/v2. La v3 transcribe la carta original
+// proporcionada por HIVE el 1 de octubre de 2026; coincide con la app.
 
 function documento(studio, disciplinas) {
   return Object.freeze({
@@ -41,9 +38,40 @@ function documento(studio, disciplinas) {
 export const RESPONSIVA_DOCUMENTS = Object.freeze({
   v1: documento("Alma Movement", "Pilates Reformer, Tower, Mat, Barre y Sculpt"),
   v2: documento("HIVE Pilates Studio", "Pilates en Reformer y las demás clases que ofrece el estudio"),
+  v3: {
+  "studio": "HIVE Pilates Studio",
+  "title": "Carta de Consentimiento Informado y Responsiva",
+  "sections": [
+    {
+      "n": "1",
+      "title": "Declaración de Salud y Condición Física",
+      "body": "Nombre completo: _______________ Teléfono de contacto: ____________ Contacto de emergencia (Nombre y teléfono): _________________________________________ 1. Declaración de Salud y Condición Física Declaro bajo mi propia responsabilidad que me encuentro en condiciones físicas y de salud adecuadas para la práctica de ejercicio físico de moderado a intenso, específicamente el método Pilates Reformer, y con el conocimiento que consiste en lo siguiente: Es un aparato para realizar ejercicios que pueden ser de moderado a intenso. Permite desarrollar fuerza, movilidad, estabilidad, coordinación, y control mediante sistema de resistencia progresiva proporcionada por resortes de alta calidad y sumamente resistentes al uso diario y constante, al estar hecho con metales resistentes. Aviso médico: Informo y manifiesto que no padezco ninguna lesión, enfermedad crónica, dolor articular agudo, embarazo o condición médica relevante. Me comprometo a presentar un certificado médico de aptitud física si el instructor lo requiere, o si presento alguna condición de salud particular."
+    },
+    {
+      "n": "2",
+      "title": "Asunción de Riesgos",
+      "body": "Entiendo y acepto que la práctica de Pilates Reformer utiliza equipos con resistencia por resortes, poleas y plataformas móviles que implican fuerzas mecánicas y movimientos exigentes. Reconozco que, como en cualquier actividad física, existe un riesgo inherente de lesiones, accidentes, caídas o malestares musculares imprevistos. Asumo de manera libre y voluntaria dicha responsabilidad."
+    },
+    {
+      "n": "3",
+      "title": "Compromiso y Normas del Estudio",
+      "body": "Me comprometo a seguir en todo momento las indicaciones y adaptaciones sugeridas por el instructor o instructora a cargo. Acepto utilizar de forma correcta el equipo (Reformer y accesorios) y notificar de inmediato cualquier anomalía o incomodidad física que sienta antes, durante o después de la sesión. Eximo al instructor, a Hive Pilates Studio y a su personal administrativo de toda responsabilidad legal penal, civil, administrativa o médica, así como de cualquier otra, por cualquier lesión o incidente derivado de la omisión de información sobre mi estado de salud o por el incumplimiento de las reglas del establecimiento."
+    },
+    {
+      "n": "4",
+      "title": "Firma de conformidad",
+      "body": "HE LEÍDO, COMPRENDIDO Y ACEPTO LOS TÉRMINOS DE ESTA CARTA RESPONSIVA."
+    },
+    {
+      "n": "5",
+      "title": "Aviso de Privacidad",
+      "body": "Hive Pilates Studio, con domicilio en la calle de Cuauhtémoc, numero 68, Planta baja, local uno, Colonia del Carmen, Alcaldía Coyoacán, en la Ciudad de México, es el sujeto obligado y responsable del tratamiento de los datos personales que se recaban de forma general a través del presente escrito, los cuales serán protegidos conforme a lo dispuesto por la Ley General de Protección de Datos Personales en Posesión de Sujetos Obligados, y demás normatividad que resulte aplicable; dichos datos son los listados en el apartado siguiente. Los datos personales recolectados por los particulares morales o físicos, los cuales consolidan datos personales sensibles, o aquellos datos recabados por cualquier otro sujeto obligado que utilice pilates reformer para la prestación de algún servicio, serán tratados bajo su responsabilidad, conforme a sus atribuciones legales y el aviso de privacidad correspondiente. Datos personales que se recolectan y la finalidad del tratamiento El único dato personal que se recaba a través del presente escrito, no está condicionado a proporcionar el correo electrónico, este dato personal se recopila como dato opcional, para que el usuario reciba mayor y mejor información. Se informa que no es obligación proporcionar datos personales sensibles. Los datos que proporcione, serán utilizados para las siguientes finalidades: Única: hacer llegar promociones de nuestros productos o información por cualquier eventualidad medica o física, que se tenga durante la estancia en nuestras instalaciones, jamás para cobrarle o proporcionárselos a terceros. Hive Pilates Studio, trata los datos personales antes señalados con fundamento en los artículos 6° Base A y 16 segundo párrafo de la Constitución Política de los Estados Unidos Mexicanos; 3°, fracción XXXIII, 4°, 16, 17 y 18 de la Ley General de Protección de Datos Personales en Posesión de Sujetos Obligados; El Mecanismo para ejercer sus derechos de acceso, rectificación, cancelación u oposición de sus datos personales, se deberá hacer por escrito en estas instalaciones especificando las modificaciones o el asunto a tratar, debiendo pilates reformer contestar su petición en 24 horas, y que nos ubicamos en la calle de Cuauhtémoc, numero 68, Planta baja, local uno, Colonia del Carmen, Alcaldía Coyoacán, en la Ciudad de México. Transferencia de datos personales No se realizarán transferencias de datos personales, salvo aquellas que sean necesarias para atender requerimientos debidamente fundados y motivados, provenientes de una autoridad competente. Cambios al aviso de privacidad En caso de que existir una modificación a este aviso de privacidad, se notificará por escrito en nuestras instalaciones, estamos ubicados en la calle de Cuauhtémoc, numero 68, Planta baja, local uno, Colonia del Carmen, Alcaldía Coyoacán, en la Ciudad de México."
+    }
+  ]
+},
 });
 export const RESPONSIVA_VERSIONS = Object.freeze(Object.keys(RESPONSIVA_DOCUMENTS));
-export const CURRENT_RESPONSIVA_VERSION = "v2";
+export const CURRENT_RESPONSIVA_VERSION = "v3";
 
 /** El texto de una versión. Las firmas de antes del versionado no traen versión: son v1. */
 export function responsivaDocument(version) {

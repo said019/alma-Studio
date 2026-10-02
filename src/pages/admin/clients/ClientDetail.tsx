@@ -316,6 +316,17 @@ const ClientDetail = () => {
   const { toast } = useToast();
   const qc = useQueryClient();
   const showFinance = useCanSeeFinance();
+  const coffeeRedemption = useMutation({
+    mutationFn: (membershipId: string) => api.post(`/admin/memberships/${membershipId}/redeem-coffee`),
+    onSuccess: () => toast({ title: "Café de cortesía registrado" }),
+    onError: (e: any) => toast({ title: e.response?.data?.message || "No se pudo registrar el café", variant: "destructive" }),
+  });
+  const [studentUntil, setStudentUntil] = useState("");
+  const studentVerification = useMutation({
+    mutationFn: (validUntil: string | null) => api.put(`/admin/users/${id}/student-verification`, { validUntil }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["client", id] }); toast({ title: "Verificación estudiantil actualizada" }); },
+    onError: (e: any) => toast({ title: e.response?.data?.message || "No se pudo guardar la verificación", variant: "destructive" }),
+  });
   const [editOpen, setEditOpen] = useState(false);
   const [tab, setTab] = useState("profile");
   const [adjPoints, setAdjPoints] = useState("");
@@ -586,6 +597,16 @@ const ClientDetail = () => {
                       </div>
 
                       <div className="rounded-xl border border-line bg-sunken p-4 space-y-3">
+                        <h3 className="text-sm font-semibold text-ink">Credencial de estudiante</h3>
+                        <p className="text-sm text-ink-muted">Vigente hasta: {u?.studentIdValidUntil || u?.student_id_valid_until ? formatDate(u.studentIdValidUntil || u.student_id_valid_until) : "Sin validar"}. Revisa la credencial original antes de habilitar la promoción.</p>
+                        <Label htmlFor="student-valid-until">Fecha de vencimiento de la credencial</Label>
+                        <Input id="student-valid-until" type="date" value={studentUntil} onChange={e => setStudentUntil(e.target.value)} />
+                        <div className="flex flex-wrap gap-2">
+                          <Button disabled={!studentUntil || studentVerification.isPending} onClick={() => studentVerification.mutate(studentUntil)}>Validar credencial</Button>
+                          <Button variant="outline" disabled={studentVerification.isPending || !(u?.studentIdValidUntil || u?.student_id_valid_until)} onClick={() => studentVerification.mutate(null)}>Retirar verificación</Button>
+                        </div>
+                      </div>
+                      <div className="rounded-xl border border-line bg-sunken p-4 space-y-3">
                         <h3 className="text-sm font-semibold text-ink">Cuestionario de ingreso</h3>
                         {u?.onboardingCompleted === false ? (
                           <p className="text-sm text-ink/55">
@@ -842,7 +863,7 @@ const ClientDetail = () => {
                     <ErrorState title="No pudimos cargar la responsiva" onRetry={() => refetchWaiver()} />
                   ) : !waiver ? (
                     <div className="rounded-xl border border-line bg-sunken p-6 text-sm text-ink/55">
-                      Este usuario aún no ha firmado su responsiva. La firmará al reservar su primera clase.
+                      Este usuario aún no ha firmado su responsiva. Debe firmarla al inscribirse o comprar una clase.
                     </div>
                   ) : (
                     <div className="space-y-5">
@@ -910,6 +931,13 @@ const ClientDetail = () => {
                   isError={membershipsError}
                   onRetry={refetchMemberships}
                 />
+                {membershipRows.filter(m => m.status === "active" && Number(m.rules?.complimentary_coffee_per_day) > 0).map(m => (
+                  <Panel key={m.id} className="p-4 space-y-2">
+                    <h3 className="text-sm font-semibold text-ink">Café de cortesía · {m.planName}</h3>
+                    <p className="text-xs text-ink-muted">{m.rules.complimentary_coffee_per_day} café regular por día. Registra la entrega para evitar duplicados.</p>
+                    <Button disabled={coffeeRedemption.isPending} onClick={() => coffeeRedemption.mutate(m.id)}>Registrar café entregado</Button>
+                  </Panel>
+                ))}
                 <UpcomingCard
                   bookings={bookingRows}
                   onSeeAll={() => setTab("bookings")}

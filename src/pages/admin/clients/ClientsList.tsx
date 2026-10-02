@@ -7,6 +7,7 @@ import { z } from "zod";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { ResponsivaDialog } from "@/components/app/ResponsivaDialog";
 import api from "@/lib/api";
 import { AuthGuard } from "@/components/admin/AuthGuard";
 import AdminLayout from "@/components/admin/AdminLayout";
@@ -19,7 +20,7 @@ import { useSearchParamState } from "@/hooks/use-search-param-state";
 import { waLink } from "@/lib/phone";
 import { useConfirm } from "@/components/admin/ConfirmDialog";
 import { ErrorState } from "@/components/app/AppShell";
-import { formatMXN, formatDate } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,12 +28,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { MessageCircle, Cake, MoreHorizontal, Search, SearchX, UserPlus, UsersRound, CreditCard, Banknote, Building2, type LucideProps } from "lucide-react";
+import { MessageCircle, Cake, MoreHorizontal, Search, SearchX, UserPlus, UsersRound, CreditCard, type LucideProps } from "lucide-react";
 import { useDebounce } from "@/hooks/use-debounce";
 import { cn } from "@/lib/utils";
-import { DatePicker } from "@/components/ui/date-picker";
 import { useCanSeeFinance } from "@/lib/roles";
 
 // ── Schemas ────────────────────────────────────────────────────────────────────
@@ -43,26 +42,13 @@ const manualSchema = z.object({
   dateOfBirth: z.string().optional(),
   emergencyContactName: z.string().optional(),
   emergencyContactPhone: z.string().optional(),
-  healthNotes: z.string().optional(),
-  planId: z.string().optional(),
-  paymentMethod: z.enum(["cash", "card", "transfer"]).optional(),
   startDate: z.string().optional(),
   notes: z.string().optional(),
-  discountCode: z.string().optional(),
 });
 
 type ManualFormData = z.infer<typeof manualSchema>;
 
 type Client = { id: string; displayName: string; email?: string | null; phone?: string | null; role?: string; createdAt?: string };
-
-interface Plan { id: string; name: string; price: number; category: string; }
-
-// ── Payment method selector ────────────────────────────────────────────────────
-const PAYMENT_METHODS = [
-  { value: "cash",     label: "Efectivo",     Icon: Banknote },
-  { value: "card",     label: "Tarjeta",      Icon: CreditCard },
-  { value: "transfer", label: "Transferencia",Icon: Building2 },
-] as const;
 
 // ── Clases compartidas de campos (tema claro nativo) ──────────────────────────
 const fieldCls = "bg-canvas border-line-strong/60 text-ink placeholder:text-ink/40";
@@ -106,6 +92,7 @@ const ClientsList = () => {
   const [editId, setEditId] = useState<string | null>(null);
   // Manual registration sheet
   const [manualOpen, setManualOpen] = useState(false);
+  const [newUserToSign, setNewUserToSign] = useState<Client | null>(null);
 
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 300);
@@ -139,14 +126,6 @@ const ClientsList = () => {
   const listIsError = isBirthdayMode ? birthdaysQ.isError : isError;
   const listRefetch = isBirthdayMode ? birthdaysQ.refetch : refetch;
 
-  // Plans for the manual sheet
-  const { data: plansData, isError: plansError, refetch: refetchPlans } = useQuery<{ data: Plan[] }>({
-    queryKey: ["plans-active"],
-    queryFn: async () => (await api.get("/plans?active=true")).data,
-    staleTime: 60_000,
-  });
-  const plans: Plan[] = Array.isArray(plansData?.data) ? plansData.data : [];
-
   const deleteMutation = useMutation({
     mutationFn: ({ id, reason }: { id: string; reason?: string }) =>
       api.delete(`/users/${id}`, { data: reason ? { reason } : {} }),
@@ -174,20 +153,14 @@ const ClientsList = () => {
     resolver: zodResolver(manualSchema),
     defaultValues: { startDate: format(new Date(), "yyyy-MM-dd") },
   });
-  const selectedPlanId = manualForm.watch("planId");
-  const selectedPlan   = plans.find((p) => p.id === selectedPlanId);
-  const paymentMethod  = manualForm.watch("paymentMethod");
-
   const manualMutation = useMutation({
     mutationFn: (d: ManualFormData) => api.post("/admin/clients/manual", d),
     onSuccess: (res) => {
       qc.invalidateQueries({ queryKey: ["clients"] });
       setSearch("");
       setBirthday(null);
-      const msg = res.data?.data?.membership
-        ? "Usuario registrado y membresía activada"
-        : "Usuario registrado";
-      toast({ title: msg });
+      toast({ title: "Usuario registrado", description: "Ahora debe leer y firmar su responsiva antes de comprar." });
+      if (res.data?.data?.user?.id) setNewUserToSign(res.data.data.user);
       setManualOpen(false);
       manualForm.reset({ startDate: format(new Date(), "yyyy-MM-dd") });
     },
@@ -202,11 +175,12 @@ const ClientsList = () => {
 
   const onManualSubmit = (d: ManualFormData) => manualMutation.mutate(d);
 
-  const hasPlanSelected = !!selectedPlanId && selectedPlanId !== "none";
+
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <AuthGuard>
+      {newUserToSign && <ResponsivaDialog key={newUserToSign.id} userId={newUserToSign.id} open onClose={() => setNewUserToSign(null)} onSigned={() => { const id = newUserToSign.id; setNewUserToSign(null); navigate(canSeeFinance ? `/admin/payments?clienta=${id}` : `/admin/clients/${id}`); }} defaultName={newUserToSign.displayName} defaultEmail={newUserToSign.email ?? ""} defaultPhone={newUserToSign.phone ?? ""} />}
       <AdminLayout>
         <AdminPage>
           <AdminPageHeader
@@ -417,104 +391,7 @@ const ClientsList = () => {
               </div>
 
               {/* Salud */}
-              <div className="border-t border-line pt-5">
-                <SectionLabel>Salud</SectionLabel>
-                <div className="space-y-1">
-                  <Label className="text-ink/70 text-xs">Notas de salud</Label>
-                  <Input className={fieldCls} placeholder="Lesiones, condiciones..." {...manualForm.register("healthNotes")} />
-                </div>
-              </div>
-
-              {/* Membresía (opcional) */}
-              <div className="border-t border-line pt-5">
-                <SectionLabel>Membresía (opcional)</SectionLabel>
-                {plansError ? (
-                  <ErrorState
-                    title="No pudimos cargar los planes"
-                    description="Puedes registrar al usuario sin plan y asignarlo después, o reintentar."
-                    onRetry={() => refetchPlans()}
-                  />
-                ) : (
-                <div className="space-y-3">
-                  <div className="space-y-1">
-                    <Label className="text-ink/70 text-xs">Plan</Label>
-                    <Select
-                      value={selectedPlanId ?? "none"}
-                      onValueChange={(v) => manualForm.setValue("planId", v === "none" ? undefined : v)}
-                    >
-                      <SelectTrigger className={fieldCls}>
-                        <SelectValue placeholder="Sin plan (solo crear cuenta)" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-canvas border-line text-ink">
-                        <SelectItem value="none" className="text-ink/60 focus:bg-sunken">Sin plan</SelectItem>
-                        {plans.map((p) => (
-                          <SelectItem key={p.id} value={p.id} className="text-ink focus:bg-sunken">
-                            {p.name}
-                            {p.price > 0 && (
-                              <span className="ml-2 text-ink/50 nums">{formatMXN(p.price)}</span>
-                            )}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Show price of selected plan */}
-                  {selectedPlan && (
-                    <div className="flex items-center justify-between rounded-xl border border-line-strong/60 bg-sunken/50 px-4 py-2.5">
-                      <span className="text-sm text-ink/70">{selectedPlan.name}</span>
-                      <span className="text-lg font-semibold text-ink nums">{formatMXN(selectedPlan.price)}</span>
-                    </div>
-                  )}
-
-                  {/* Payment method — only if plan selected */}
-                  {hasPlanSelected && (
-                    <div className="space-y-1">
-                      <Label className="text-ink/70 text-xs">Método de pago</Label>
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                        {PAYMENT_METHODS.map(({ value, label, Icon }) => (
-                          <button
-                            key={value}
-                            type="button"
-                            onClick={() => manualForm.setValue("paymentMethod", value)}
-                            className={cn(
-                              "flex flex-col items-center gap-1.5 p-3 rounded-xl border text-xs font-semibold transition-colors",
-                              paymentMethod === value
-                                ? "border-line-strong bg-sunken text-ink"
-                                : "border-line bg-sunken text-ink/55 hover:border-line-strong hover:text-ink"
-                            )}
-                          >
-                            <Icon size={16} />
-                            {label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Start date — only if plan selected */}
-                  {hasPlanSelected && (
-                    <div className="space-y-1">
-                      <Label className="text-ink/70 text-xs">Fecha de inicio</Label>
-                      <DatePicker value={manualForm.watch("startDate")} onChange={(v) => manualForm.setValue("startDate", v)} />
-                    </div>
-                  )}
-
-                  {/* Discount code — only if plan selected */}
-                  {hasPlanSelected && (
-                    <div className="space-y-1">
-                      <Label className="text-ink/70 text-xs">Cupón de descuento (opcional)</Label>
-                      <Input
-                        className={cn(fieldCls, "uppercase")}
-                        placeholder="Ej: ONLINE75"
-                        {...manualForm.register("discountCode")}
-                      />
-                      <p className="text-xs text-ink/50">Se valida contra el plan elegido y queda anotado en la membresía.</p>
-                    </div>
-                  )}
-                </div>
-                )}
-              </div>
+              <p className="rounded-xl border border-line p-4 text-sm text-ink-muted">Primero registra al usuario y solicita su firma de consentimiento informado y responsiva. Después podrás seleccionar y cobrar un plan en Cobrar.</p>
 
               {/* Internal notes */}
               <div className="border-t border-line pt-5 space-y-1">
@@ -527,7 +404,7 @@ const ClientsList = () => {
                   Cancelar
                 </Button>
                 <Button type="submit" disabled={manualMutation.isPending} className={cn(primaryBtnCls, "min-w-[140px]")}>
-                  {manualMutation.isPending ? "Registrando…" : hasPlanSelected ? "Registrar + activar plan" : "Registrar usuario"}
+                  {manualMutation.isPending ? "Registrando…" : "Registrar y solicitar firma"}
                 </Button>
               </div>
             </form>

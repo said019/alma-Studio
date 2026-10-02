@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { BrandLogo } from "@/components/brand/BrandLogo";
 
-const LEGAL = [["/legal/privacidad", "Privacidad"], ["/legal/terminos", "Términos"], ["/legal/cancelacion", "Cancelación"]] as const;
+const LEGAL = [["/legal/informacion", "Preguntas frecuentes y reglamento"], ["/legal/privacidad", "Privacidad"], ["/legal/terminos", "Términos"], ["/legal/cancelacion", "Cancelación"]] as const;
 
 export function LandingFooter() {
   return (

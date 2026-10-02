@@ -1,3 +1,4 @@
+import { planConditions } from "@/lib/planConditions";
 import { useQuery } from "@tanstack/react-query";
 import { format, differenceInCalendarDays } from "date-fns";
 import { es } from "date-fns/locale";
@@ -43,6 +44,7 @@ const ProfileMembership = () => {
     queryFn: async () => (await api.get("/memberships/my")).data,
   });
 
+  const rawMembership = data?.data ?? data ?? null;
   const membership:
     | (ClientMembership & {
         classCategory?: string;
@@ -52,7 +54,13 @@ const ProfileMembership = () => {
         cancellationLimit?: number;
         cancellationsLeft?: number | null;
       })
-    | null = data?.data ?? data ?? null;
+    | null = rawMembership ? {
+      ...rawMembership,
+      class_limit: rawMembership.classLimit ?? rawMembership.class_limit ?? null,
+      classes_remaining: rawMembership.classesRemaining ?? rawMembership.classes_remaining ?? null,
+      start_date: rawMembership.startDate ?? rawMembership.start_date,
+      end_date: rawMembership.endDate ?? rawMembership.end_date,
+    } : null;
   const isMixto = membership?.classCategory === "mixto";
 
   const daysRemaining = membership?.end_date
@@ -122,9 +130,9 @@ const ProfileMembership = () => {
                     {CATEGORY_LABEL[String(membership.classCategory ?? "all")] ?? "Todas las disciplinas"}
                   </span>
                   <span className="nums font-display text-accent-strong dark:text-accent" style={{ fontSize: "clamp(1.6rem, 2.6vw, 2.1rem)" }}>
-                    {isUnlimited ? "∞" : Number(membership.classes_remaining ?? 0)}{" "}
+                    {isUnlimited ? (membership.rules?.daily_class_limit ?? "∞") : Number(membership.classes_remaining ?? 0)}{" "}
                     <span className="text-[0.75rem] font-sans uppercase tracking-[0.18em] text-ink-muted">
-                      por usar
+                      {isUnlimited && membership.rules?.daily_class_limit ? "máximo por día" : "por usar"}
                     </span>
                   </span>
                 </div>
@@ -151,7 +159,7 @@ const ProfileMembership = () => {
                   />
                   <DataRow
                     label="Total del paquete"
-                    value={isUnlimited ? "Ilimitado" : Number(membership.class_limit ?? 0)}
+                    value={isUnlimited ? (membership.rules?.daily_class_limit ? `${membership.rules.daily_class_limit} ${membership.rules.daily_class_limit === 1 ? "sesión" : "sesiones"} por día` : "Ilimitado") : Number(membership.class_limit ?? 0)}
                   />
                 </div>
               </div>
@@ -215,6 +223,8 @@ const ProfileMembership = () => {
                 </div>
               </Section>
             )}
+
+            {membership.rules && <Section title="Condiciones y beneficios"><ul className="space-y-2 text-sm text-ink-muted">{planConditions(membership).map(condition => <li key={condition}>{condition}</li>)}</ul></Section>}
 
             <Section title="Cancelaciones">
               <ol className="list-none m-0 p-0">

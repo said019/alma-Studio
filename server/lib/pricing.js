@@ -9,3 +9,12 @@ export function resolveEffectivePrice(plan, openingActive) {
   }
   return base;
 }
+
+// A fixed external payment link must follow the same branch as the charged price.
+export function resolvePlanPaymentUrl(plan, openingActive) {
+  const opening = plan?.opening_price ?? plan?.openingPrice;
+  const useOpening = openingActive && opening != null && Number.isFinite(Number(opening)) && Number(opening) > 0;
+  return useOpening
+    ? plan?.rules?.opening_payment_url || (Number(opening) === Number(plan?.price) ? plan?.rules?.payment_url : undefined)
+    : plan?.rules?.payment_url;
+}

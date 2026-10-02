@@ -1,3 +1,4 @@
+import { sessionWithinRules, sessionWithinValidity } from './planRules.js';
 const VALID_CATEGORIES = ["studio", "reformer_tower", "mixto", "all"];
 
 export function normalizeClassCategory(value, fallback = "all") {
@@ -63,21 +64,27 @@ export function canMixtoBook(buckets, classCategory) {
   return true;
 }
 
-// Franja inclusiva por hora de INICIO: 12:00–16:00 en Ciudad de México.
+// Franja inclusiva por hora de INICIO: 11:00–16:00 en Ciudad de México.
 export function isWithinAfternoonWindow(startsAt, timeZone = "America/Mexico_City") {
   if (!startsAt) return false;
   const d = new Date(startsAt);
   if (Number.isNaN(d.getTime())) return false;
   const parts = new Intl.DateTimeFormat("en-GB", { timeZone, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(d);
   const minutes = Number(parts.find(p => p.type === "hour").value) * 60 + Number(parts.find(p => p.type === "minute").value);
-  return minutes >= 720 && minutes <= 960;
+  return minutes >= 660 && minutes <= 960;
 }
 
 export function membershipAllowsSession(membership, startsAt, capacity) {
+  if (!sessionWithinValidity(membership, startsAt)) return false;
+  if (membership.rules && !sessionWithinRules(membership.rules, startsAt)) return false;
   if (membership.morning_only && !isWithinMorningWindow(startsAt)) return false;
   if (membership.afternoon_only && !isWithinAfternoonWindow(startsAt)) return false;
   // Sesiones individuales reservadas para el paquete Personalizado.
   if (membership.personal_only) return Number(capacity) === 1;
+  // Existing plans with an explicitly empty rules object retain their group
+  // classes even when reception reduces the capacity to one. New HIVE plans
+  // carry rules and reserve one-seat sessions for Personalizado.
+  if (membership.rules && Object.keys(membership.rules).length === 0) return true;
   return Number(capacity) !== 1;
 }
 

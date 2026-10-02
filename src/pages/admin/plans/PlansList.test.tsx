@@ -91,3 +91,39 @@ describe("Planes", () => {
     expect(src).not.toMatch(/text-\[0\.(?:[0-6]\d*|7[0-4]?)rem\]/);
   });
 });
+
+describe('Configuración completa de planes HIVE', () => {
+  it('envía reglas estructuradas para el plan anual y todos sus beneficios', async () => {
+    const post = api.post as Mock;
+    post.mockReset().mockResolvedValue({data: {}});
+    renderAdmin(<PlansList />, {route: '/admin/plans'});
+    fireEvent.click(await screen.findByRole('button', {name: 'Nuevo plan'}));
+    fireEvent.change(screen.getByLabelText('Nombre'), {target: {value: 'Plan anual / pago mensual'}});
+    fireEvent.change(screen.getByLabelText('Precio (MXN)'), {target: {value: '4200'}});
+    fireEvent.change(screen.getByLabelText('Sesiones máximas por día'), {target: {value: '2'}});
+    fireEvent.change(screen.getByLabelText('Guest pass incluidos'), {target: {value: '2'}});
+    fireEvent.change(screen.getByLabelText('Periodo de guest pass'), {target: {value: 'month'}});
+    fireEvent.change(screen.getByLabelText('Cafés regulares de cortesía por día'), {target: {value: '1'}});
+    fireEvent.change(screen.getByLabelText('Periodicidad de pago'), {target: {value: 'month'}});
+    fireEvent.change(screen.getByLabelText('Compromiso mínimo (meses)'), {target: {value: '12'}});
+    fireEvent.click(screen.getByRole('switch', {name: 'Renovación mensual prevista'}));
+    fireEvent.change(screen.getByLabelText('Enlace de pago regular'), {target: {value: 'https://mpago.la/1YY3tpp'}});
+    fireEvent.change(screen.getByLabelText('Enlace de pago de apertura'), {target: {value: 'https://mpago.la/1HWyxU1'}});
+    fireEvent.click(screen.getByRole('button', {name: 'Crear plan'}));
+    await waitFor(() => expect(post).toHaveBeenCalledWith('/plans', expect.objectContaining({price:4200, isNonTransferable:true, rules: expect.objectContaining({daily_class_limit:2, guest_passes:2, guest_pass_period:'month', complimentary_coffee_per_day:1, billing_period:'month', commitment_months:12, auto_renew:true, payment_url:'https://mpago.la/1YY3tpp', opening_payment_url:'https://mpago.la/1HWyxU1', transferable:false, extendable:false})})));
+  });
+  it('rechaza franjas invertidas y compromiso con pago único antes de guardar', async () => {
+    const post = api.post as Mock;
+    post.mockReset();
+    renderAdmin(<PlansList />, {route:'/admin/plans'});
+    fireEvent.click(await screen.findByRole('button', {name:'Nuevo plan'}));
+    fireEvent.change(screen.getByLabelText('Nombre'), {target:{value:'Inválido'}});
+    fireEvent.change(screen.getByLabelText('Desde (CDMX)'), {target:{value:'16:00'}});
+    fireEvent.change(screen.getByLabelText('Hasta (CDMX)'), {target:{value:'11:00'}});
+    fireEvent.change(screen.getByLabelText('Compromiso mínimo (meses)'), {target:{value:'12'}});
+    fireEvent.click(screen.getByRole('button', {name:'Crear plan'}));
+    expect(await screen.findByText('Define ambas horas y un fin posterior al inicio')).toBeInTheDocument();
+    expect(screen.getByText('El compromiso y la renovación requieren pago mensual')).toBeInTheDocument();
+    expect(post).not.toHaveBeenCalled();
+  });
+});

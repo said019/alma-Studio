@@ -62,7 +62,7 @@ export const bookingId = (r) => r.body?.booking?.id ?? r.body?.data?.id ?? r.bod
 // exige prefijo data:image/png;base64,, ≥200 caracteres base64 y ≥50×20 px
 // en la IHDR. La firma dummy previa ("...iVBORw0KGgo=") era una
 // cabecera truncada que ese chequeo ahora rechaza con 400.
-const fakeSignaturePng = (w = 600, h = 200, extraBytes = 2000) => {
+export const fakeSignaturePng = (w = 600, h = 200, extraBytes = 2000) => {
   const b = Buffer.alloc(33 + extraBytes);
   Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(b, 0);
   b.writeUInt32BE(13, 8); b.write("IHDR", 12, "ascii");
@@ -116,6 +116,7 @@ export async function studioFixtures(prefix, adminToken) {
       WHERE is_active AND class_category=$1 AND class_limit>=8
         AND COALESCE(morning_only,false) = false
         AND COALESCE(is_visit_pack,false) = false
+        AND COALESCE(rules,'{}'::jsonb) = '{}'::jsonb
       ORDER BY class_limit LIMIT 1`, [ct.category]);
   // El arranque ya no reimpone el catálogo inicial (sólo siembra una tabla
   // vacía): en una base creada con schema_complete.sql quedan los paquetes

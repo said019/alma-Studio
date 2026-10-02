@@ -35,7 +35,7 @@ test("check-in manual de una clase de hoy, dentro de la ventana → 200 y queda 
 test("check-in manual de una clase de otro día → 409 NOT_TODAY", async () => {
   const cliente = await makeClient(PFX, "otrodia");
   await giveMembership(A, cliente.id, f.plan.id, 8);
-  const classId = await makeClass(A, f, { date: day(80) });
+  const classId = await makeClass(A, f, { date: day(8) });
   const asg = await api("POST", "/api/admin/bookings/assign", { token: A, body: { userId: cliente.id, classId } });
   assert.ok(asg.status < 300, `asignar devolvió ${asg.status}: ${JSON.stringify(asg.body).slice(0, 150)}`);
   const [bk] = await sql(`SELECT id FROM bookings WHERE class_id=$1 AND user_id=$2`, [classId, cliente.id]);
@@ -98,7 +98,7 @@ test("check-in manual dos veces sobre la misma reserva no duplica los puntos", a
 test("repetir el check-in de una reserva ya asistida de otro día → 200 idempotente, sin puntos ni cambios", async () => {
   const cliente = await makeClient(PFX, "repite");
   await giveMembership(A, cliente.id, f.plan.id, 8);
-  const classId = await makeClass(A, f, { date: day(80) });
+  const classId = await makeClass(A, f, { date: day(8) });
   const asg = await api("POST", "/api/admin/bookings/assign", { token: A, body: { userId: cliente.id, classId } });
   assert.ok(asg.status < 300, `asignar devolvió ${asg.status}: ${JSON.stringify(asg.body).slice(0, 150)}`);
   const [bk] = await sql(`SELECT id FROM bookings WHERE class_id=$1 AND user_id=$2`, [classId, cliente.id]);

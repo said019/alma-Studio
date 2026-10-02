@@ -67,7 +67,7 @@ const Orders = () => {
           ) : (
             <ListGroup>
               {orders.map((order) => {
-                const status = STATUS[order.status] ?? { label: order.status, tone: "accent" as const };
+                const status = order.mp_payment_status === "charged_back" ? {label:"Contracargo",tone:"danger" as const,variant:"soft" as const} : order.refund_status === "refunded" || order.mp_payment_status === "refunded" ? {label:"Reembolsado",tone:"muted" as const,variant:"soft" as const} : order.refund_status === "partially_refunded" ? {label:"Reembolso parcial",tone:"accent" as const,variant:"soft" as const} : STATUS[order.status] ?? { label: order.status, tone: "accent" as const };
                 return (
                   <ListRow
                     key={order.id}
@@ -80,6 +80,7 @@ const Orders = () => {
                         {order.created_at ? format(safeParse(order.created_at), "d MMM yyyy", { locale: es }) : "—"}
                         {" · "}
                         ${formatMoneyMX(order.total_amount ?? order.amount)} {order.currency ?? "MXN"}
+                        {(order.payment_provider ?? order.paymentProvider) === "mercadopago" && ["pending_payment", "pending_verification"].includes(order.status) && <span className="block text-accent-strong">Continuar pago / consultar estado</span>}
                       </>
                     }
                     trailing={<StatusPill label={status.label} tone={status.tone} variant={status.variant ?? "soft"} />}

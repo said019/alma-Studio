@@ -1,3 +1,4 @@
+import { applyHiveStudioSettings } from "./lib/hiveStudioSettings.js";
 import { registerCommunications } from "./lib/communications.js";
 import { registerVelanParity } from "./lib/velanParity.js";
 import "dotenv/config";
@@ -58,15 +59,20 @@ import {
   sendPasswordResetEmail,
   FROM_EMAIL,
 } from "./emailService.js";
-import { CATALOG_CLASS_TYPES, CATALOG_SCHEDULE_SLOTS, CATALOG_SCHEDULE_DAYS, CATALOG_PLANS } from "./lib/catalog.js";
+import { CATALOG_CLASS_TYPES, CATALOG_SCHEDULE_SLOTS, CATALOG_SCHEDULE_DAYS, CATALOG_SCHEDULE_BY_DAY, CATALOG_PLANS } from "./lib/catalog.js";
 import { seedClassTypesIfEmpty, seedPlansIfEmpty } from "./lib/catalogSeed.js";
 import { DEFAULT_NOTIFICATION_TEMPLATES } from "./lib/notificationTemplates.js";
 import { PASS_DEFAULT_TEXTS, LOYALTY_MILESTONES_SEED } from "./lib/passDefaults.js";
 import { passLocationFields } from "./lib/passGeofence.js";
 import { syntheticGuestEmail } from "./lib/syntheticEmail.js";
-import { resolveEffectivePrice } from "./lib/pricing.js";
+import { mpConfig, MP_SCHEMA } from "./lib/mercadoPago.js";
+import { registerMercadoPago } from "./lib/mercadoPagoRoutes.js";
+import { resolveEffectivePrice, resolvePlanPaymentUrl } from "./lib/pricing.js";
 import { saleAmountPlan, planMembershipAdjust, cleanPaymentReference, saleStartProblem, saleStartDay, saleAuditAfter, PAYMENT_METHODS, normalizePaymentMethod, PAYMENT_METHOD_INVALID, calcMembershipEndDate } from "./lib/membershipAdmin.js";
 import { cancellationLimitProblem, cancellationQuota, clientCancelDecision, normalizeCancellationSettings, publicBookingPolicy } from "./lib/cancellationPolicy.js";
+import { registerPlanBenefits } from "./lib/planBenefits.js";
+import { PLAN_RULES_SCHEMA } from "./lib/planSchema.js";
+import { validatePlanRules } from "./lib/planRules.js";
 import { isMembershipCategoryCompatible as ruleCategoryCompatible, normalizeClassCategory as ruleNormalizeCategory, isWithinMorningWindow, membershipAllowsSession, purchaseCredits, categoryLabel, canMixtoBook } from "./lib/bookingRules.js";
 import { rateKey } from "./lib/rateKey.js";
 import { isWithinCancelWindow, penaltyDueAt, faltaReversal } from "./lib/faltas.js";
@@ -86,6 +92,7 @@ import { wellhubMonthRange, summarizeWellhubMonth } from "./lib/wellhub/reconcil
 import { isUuid, isDay, signatureProblem } from "./lib/validate.js";
 import { checkinRule, noShowCorrectionRule } from "./lib/checkin.js";
 import { responsivaDocument, waiverVersionProblem } from "./lib/responsiva.js";
+import { normalizeWaiverIntake, waiverWithIntake, WAIVER_INTAKE_LABELS, WAIVER_HEALTH_FIELDS } from "./lib/waiverIntake.js";
 import { pgReminderLog, sendClassReminders } from "./lib/classReminder.js";
 import { createChannelState } from "./lib/whatsappState.js";
 import { recordAudit, recordAuditBestEffort, reasonProblem, cleanReason, buildAuditQuery, auditRowOut } from "./lib/audit.js";
@@ -179,7 +186,6 @@ function normalizeBankInfo(rawValue) {
   const accountDigits = digitsOnly(candidate.account_number);
   const shouldUseDefault =
     !candidate.bank ||
-    !candidate.account_holder ||
     clabeDigits.length !== 18 ||
     (accountDigits && accountDigits.length < 10) ||
     clabeDigits === "012180001234567890" ||
@@ -197,10 +203,10 @@ function normalizeBankInfo(rawValue) {
       "BANK_ACCOUNT_NUMBER / BANK_CLABE: sin esto la pantalla de transferencia sale vacía."
     );
   }
-  const formattedAccount = formatAccountNumber(base.account_number || DEFAULT_BANK_INFO.account_number);
-  const formattedClabe = formatClabe(base.clabe || DEFAULT_BANK_INFO.clabe);
-  const holder = String(base.account_holder || DEFAULT_BANK_INFO.account_holder).trim();
-  const bank = String(base.bank || DEFAULT_BANK_INFO.bank).trim();
+  const formattedAccount = formatAccountNumber(base.account_number);
+  const formattedClabe = formatClabe(base.clabe);
+  const holder = String(base.account_holder || "").trim();
+  const bank = String(base.bank || "").trim();
 
   return {
     bank,
@@ -781,7 +787,7 @@ async function ensureSchema() {
       const params = [];
       let i = 1;
       for (const day of CATALOG_SCHEDULE_DAYS) {
-        for (const slot of CATALOG_SCHEDULE_SLOTS) {
+        for (const slot of CATALOG_SCHEDULE_BY_DAY[day]) {
           values.push(`($${i++}, $${i++}, NULL)`);
           params.push(slot, day);
         }
@@ -844,6 +850,8 @@ async function ensureSchema() {
     await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS is_visit_pack BOOLEAN DEFAULT false`).catch(() => { });
     await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS opening_price DECIMAL(10,2)`).catch(() => { });
     await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS morning_only BOOLEAN DEFAULT false`).catch(() => { });
+    await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS rules JSONB NOT NULL DEFAULT '{}'::jsonb`);
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS student_id_valid_until DATE`);
     await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS afternoon_only BOOLEAN NOT NULL DEFAULT false, ADD COLUMN IF NOT EXISTS personal_only BOOLEAN NOT NULL DEFAULT false`);
     // Paquetes MIXTOS: créditos dedicados a cada área (NULL = el plan no es mixto).
     await pool.query(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS studio_credits INTEGER`).catch(() => { });
@@ -886,6 +894,7 @@ async function ensureSchema() {
     // ── Seed plans: el lineup inicial sólo se siembra si la tabla está vacía ──
     // Con filas existentes (los paquetes que el estudio captura en el panel) no
     // se desactiva ni se reescribe nada. Ver server/lib/catalogSeed.js.
+    await pool.query(PLAN_RULES_SCHEMA);
     await seedPlansIfEmpty(pool, CATALOG_PLANS);
     // Planes de muestra/visita heredados eliminados: el catálogo inicial define
     // "Studio Intro" como única clase muestra y las clases únicas Studio /
@@ -1164,6 +1173,7 @@ async function ensureSchema() {
         signed_at      TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `).catch(() => { });
+    await pool.query(`ALTER TABLE waivers ADD COLUMN IF NOT EXISTS intake_data JSONB NOT NULL DEFAULT '{}'::jsonb`);
     await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_waivers_user ON waivers(user_id)`).catch(() => { });
     // (Bloque 3, auditoría 2026-09-27, P0-4: aquí corría en cada arranque una
     // "reconciliación" que igualaba cancellations_used al total de reservas
@@ -1660,6 +1670,8 @@ async function ensureSchema() {
         processed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `).catch(() => { });
+
+    await pool.query(MP_SCHEMA);
 
     // ── Wellhub / partner channels ──────────────────────────────────────────
     await pool.query(`CREATE TABLE IF NOT EXISTS platform_credentials (
@@ -2372,7 +2384,7 @@ function isMembershipCategoryCompatible(membershipCategory, classCategory) {
   return ruleCategoryCompatible(membershipCategory, classCategory);
 }
 
-async function selectMembershipForClass({ userId, classCategory, startsAt, capacity, client = null }) {
+async function selectMembershipForClass({ userId, classCategory, startsAt, capacity, client = null, includeIneligible = false }) {
   if (!userId) return null;
   const q = client ?? pool;
   const clsCat = normalizeClassCategory(classCategory, "all");
@@ -2382,7 +2394,8 @@ async function selectMembershipForClass({ userId, classCategory, startsAt, capac
             m.classes_remaining,
             m.studio_remaining,
             m.rt_remaining,
-            m.end_date,
+            m.start_date, m.end_date,
+            p.rules,
             m.created_at,
             COALESCE(p.class_category, 'all') AS class_category,
             COALESCE(p.morning_only, false) AS morning_only,
@@ -2420,7 +2433,13 @@ async function selectMembershipForClass({ userId, classCategory, startsAt, capac
         m.created_at ASC`,
     [userId, clsCat]
   );
-  return r.rows.find(m => membershipAllowsSession(m, startsAt, capacity)) ?? null;
+  let firstIneligible = null;
+  for (const membership of r.rows) {
+    if (!membershipAllowsSession(membership, startsAt, capacity)) continue;
+    if (startsAt && !(await checkWeeklyClassLimit(q, userId, membership.id, todayInStudio(new Date(startsAt)))).ok) { firstIneligible ??= membership; continue; }
+    return membership;
+  }
+  return includeIneligible ? firstIneligible : null;
 }
 
 // ─── Créditos de membresía con soporte de paquetes MIXTOS ──────────────────
@@ -3041,17 +3060,21 @@ function getPlanFlags(plan) {
   };
 }
 
-async function findNonRepeatablePlanConflict({
+async function findPlanPurchaseConflict({
   userId,
   plan,
   excludeOrderId = null,
   client = null,
 }) {
   if (!userId || !plan?.id) return null;
+  const q = client ?? pool;
+  if (plan.rules?.requires_student_id) {
+    const verified = await q.query(`SELECT 1 FROM users WHERE id=$1 AND student_id_valid_until >= (NOW() AT TIME ZONE '${STUDIO_TIMEZONE}')::date`,[userId]);
+    if (!verified.rowCount) return {message:"Antes de comprar la promoción, presenta tu credencial estudiantil vigente en recepción para verificarla."};
+  }
   const { isNonRepeatable, repeatKey } = getPlanFlags(plan);
   if (!isNonRepeatable) return null;
 
-  const q = client ?? pool;
   const key = repeatKey || `plan:${plan.id}`;
 
   const memConflict = await q.query(
@@ -3265,6 +3288,7 @@ function mapUser(u) {
   return {
     id: u.id,
     displayName: u.display_name,
+    studentIdValidUntil: u.student_id_valid_until,
     email: u.email,
     phone: u.phone,
     role: u.role,
@@ -3415,7 +3439,7 @@ app.get("/api/auth/me", authMiddleware, async (req, res) => {
 app.get("/api/me/waiver", authMiddleware, async (req, res) => {
   try {
     const r = await pool.query("SELECT * FROM waivers WHERE user_id = $1 LIMIT 1", [req.userId]);
-    return res.json({ data: r.rows[0] ?? null });
+    return res.json({ data: waiverWithIntake(r.rows[0]) });
   } catch (err) {
     console.error("GET waiver error:", err);
     return res.status(500).json({ message: "Error interno" });
@@ -3427,9 +3451,11 @@ app.get("/api/me/waiver", authMiddleware, async (req, res) => {
 // la app manda `waiver_version`; sin él, v1 — una app en caché de antes del
 // versionado mostró la v1, y sin este resguardo quedaría registrado que aceptó
 // un texto (v2) que nunca vio. Las ya firmadas no se tocan ni se piden de nuevo.
-app.post("/api/me/waiver", authMiddleware, async (req, res) => {
+async function saveSignedWaiver(req, res) {
+  const waiverUserId = req.params.userId || req.userId;
+  if (!isUuid(waiverUserId)) return res.status(400).json({ message: "Usuario inválido." });
   const { full_name, phone, email, image_consent, signature_data, waiver_version } = req.body || {};
-  if (!full_name?.trim() || !signature_data) {
+  if (typeof full_name !== "string" || full_name.trim().length < 2 || full_name.length > 150 || !signature_data) {
     return res.status(400).json({ message: "Nombre y firma son requeridos." });
   }
   const firmaMala = signatureProblem(signature_data);
@@ -3437,21 +3463,35 @@ app.post("/api/me/waiver", authMiddleware, async (req, res) => {
   const versionMala = waiverVersionProblem(waiver_version);
   if (versionMala) return res.status(400).json({ message: versionMala });
   const version = waiver_version ?? "v1";
+  const intake = normalizeWaiverIntake(req.body || {}, version);
+  if (intake.error) return res.status(400).json({ message: intake.error });
+  const client = await pool.connect();
   try {
-    const r = await pool.query(
-      `INSERT INTO waivers (user_id, full_name, phone, email, image_consent, signature_data, waiver_version, signed_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,NOW())
+    await client.query("BEGIN");
+    const existing = await client.query("SELECT id FROM users WHERE id=$1 AND is_active=true FOR UPDATE", [waiverUserId]);
+    if (!existing.rowCount) { await client.query("ROLLBACK"); return res.status(404).json({ message: "Usuario no encontrado o inactivo." }); }
+    const r = await client.query(
+      `INSERT INTO waivers (user_id, full_name, phone, email, image_consent, signature_data, waiver_version, intake_data, signed_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,NOW())
        ON CONFLICT (user_id) DO UPDATE SET
-         full_name=$2, phone=$3, email=$4, image_consent=$5, signature_data=$6, waiver_version=$7, signed_at=NOW()
+         full_name=$2, phone=$3, email=$4, image_consent=$5, signature_data=$6, waiver_version=$7, intake_data=$8::jsonb, signed_at=NOW()
        RETURNING *`,
-      [req.userId, full_name.trim(), phone || null, email || null, !!image_consent, signature_data, version]
+      [waiverUserId, full_name.trim(), phone || null, email || null, !!image_consent, signature_data, version, JSON.stringify(intake.data)]
     );
-    return res.status(201).json({ data: r.rows[0] });
+    if (intake.data.health_consent) await client.query(
+      "UPDATE users SET health_consent_version=$2, health_consent_at=NOW() WHERE id=$1",
+      [waiverUserId, PRIVACY_NOTICE_VERSION]
+    );
+    await client.query("COMMIT");
+    return res.status(201).json({ data: waiverWithIntake(r.rows[0]) });
   } catch (err) {
+    await client.query("ROLLBACK").catch(() => {});
     console.error("POST waiver error:", err);
     return res.status(500).json({ message: "Error interno" });
-  }
-});
+  } finally { client.release(); }
+}
+app.post("/api/me/waiver", authMiddleware, saveSignedWaiver);
+app.post("/api/admin/users/:userId/waiver", adminMiddleware, saveSignedWaiver);
 
 // POST /api/auth/change-password — cambiar contraseña estando logueado.
 // Sirve a cualquier rol (cliente, admin, super_admin). Pide la contraseña
@@ -3688,7 +3728,8 @@ app.get("/api/memberships/my", authMiddleware, async (req, res) => {
               COALESCE(p.name, m.plan_name_override, 'Membresía') AS plan_name,
               COALESCE(p.class_limit, m.class_limit_override)      AS class_limit,
               COALESCE(p.duration_days, 30)                        AS duration_days,
-              p.features,
+              p.features, p.rules, p.morning_only, p.afternoon_only, p.personal_only,
+              (SELECT student_id_valid_until FROM users WHERE id=m.user_id) AS student_id_valid_until,
               COALESCE(p.class_category, 'all')                    AS class_category,
               (m.end_date IS NOT NULL AND m.end_date < (NOW() AT TIME ZONE '${STUDIO_TIMEZONE}')::date) AS is_expired
        FROM memberships m
@@ -3753,7 +3794,8 @@ app.get("/api/memberships/mine/all", authMiddleware, async (req, res) => {
               COALESCE(p.name, m.plan_name_override, 'Membresía') AS plan_name,
               COALESCE(p.class_limit, m.class_limit_override)      AS class_limit,
               COALESCE(p.duration_days, 30)                        AS duration_days,
-              p.features,
+              p.features, p.rules, p.morning_only, p.afternoon_only, p.personal_only,
+              (SELECT student_id_valid_until FROM users WHERE id=m.user_id) AS student_id_valid_until,
               COALESCE(p.class_category, 'all')                    AS class_category
        FROM memberships m
        LEFT JOIN plans p ON m.plan_id = p.id
@@ -3850,6 +3892,7 @@ app.get("/api/classes/:id", async (req, res) => {
       `SELECT c.*,
               (c.date || 'T' || c.start_time) AS start_time,
               (c.date || 'T' || c.end_time)   AS end_time,
+              ct.category AS class_category,
               ct.name  AS class_type_name,
               ct.color AS class_type_color,
               ct.icon  AS class_type_icon,
@@ -3889,6 +3932,7 @@ app.get("/api/bookings/my-bookings", authMiddleware, async (req, res) => {
               (c.date || 'T' || c.start_time) AS start_time,
               (c.date || 'T' || c.end_time)   AS end_time,
               c.status AS class_status,
+              ct.category AS class_category,
               ct.name  AS class_type_name,
               ct.color AS class_color,
               i.display_name AS instructor_name,
@@ -3935,11 +3979,26 @@ app.get("/api/bookings/my-bookings", authMiddleware, async (req, res) => {
  */
 async function checkWeeklyClassLimit(client, userId, membershipId, classDate) {
   const planRes = await client.query(
-    `SELECT p.weekly_class_limit
-       FROM memberships m JOIN plans p ON p.id = m.plan_id
+    `SELECT p.weekly_class_limit, p.rules, m.start_date::text, m.end_date::text, u.student_id_valid_until::text
+       FROM memberships m JOIN plans p ON p.id = m.plan_id JOIN users u ON u.id = m.user_id
       WHERE m.id = $1`,
     [membershipId],
   );
+  const product = planRes.rows[0];
+  if (!product) return { ok:false, message:"Membresía no encontrada." };
+  const day = classDate instanceof Date ? classDate.toISOString().slice(0,10) : String(classDate).slice(0,10);
+  if ((product.start_date && day < product.start_date) || (product.end_date && day > product.end_date)) return {ok:false,message:"La clase está fuera de la vigencia de tu paquete."};
+  if (product.rules?.requires_student_id && (!product.student_id_valid_until || day > product.student_id_valid_until)) return {ok:false,message:"Presenta tu credencial estudiantil vigente en recepción para validar este beneficio."};
+  const dailyLimit = product.rules?.daily_class_limit;
+  if (dailyLimit) {
+    // Membresía bloqueada por el llamador: serializa reservas simultáneas.
+    // No-show y cancelación tardía consumen el beneficio del día.
+    const used = await client.query(`SELECT COUNT(*)::int AS n FROM bookings b JOIN classes c ON c.id=b.class_id
+      WHERE b.membership_id=$1 AND b.user_id=$2 AND c.date=$3::date
+        AND (b.status IN ('confirmed','checked_in','no_show') OR (b.status='cancelled' AND b.plan_late_cancel))`, [membershipId,userId,day]);
+    const count = used.rows[0]?.n || 0;
+    if(count >= dailyLimit) return {ok:false,count,limit:dailyLimit,message:`Tu plan permite ${dailyLimit} sesión(es) por día. Ya utilizaste o reservaste ${count} para esta fecha.`};
+  }
   const limit = planRes.rows[0]?.weekly_class_limit;
   if (!limit || limit <= 0) return { ok: true };
   const countRes = await client.query(
@@ -4106,7 +4165,7 @@ async function promoteOneFromWaitlist(classId) {
       // Dada de baja (bloque 2): no sube aunque le quede una fila previa.
       if (w.anonymized) reason = "baja";
       else {
-        mem = w.user_id ? await selectMembershipForClass({ userId: w.user_id, classCategory: category, startsAt: cls.starts_at, capacity: cls.max_capacity, client }) : null;
+        mem = w.user_id ? await selectMembershipForClass({ userId: w.user_id, classCategory: category, startsAt: cls.starts_at, capacity: cls.max_capacity, client, includeIneligible: true }) : null;
         if (!mem) reason = "sin_clases";
         else if (mem.morning_only && !isWithinMorningWindow(cls.starts_at)) reason = "solo_manana";
         else if (!(await checkWeeklyClassLimit(client, w.user_id, mem.id, cls.date)).ok) reason = "tope_semanal";
@@ -4280,7 +4339,7 @@ const runWaitlistSweep = singleFlight(async () => {
 // y /admin/bookings/assign (auditoría 2026-09-27, bloque 1, tarea 5).
 const hasSignedWaiver = async (db, userId) =>
   (await db.query("SELECT 1 FROM waivers WHERE user_id = $1 LIMIT 1", [userId]).catch(() => ({ rows: [] }))).rows.length > 0;
-const WAIVER_REQUIRED_MSG = "Antes de tu primera reserva necesitas leer y firmar la responsiva y consentimiento informado.";
+const WAIVER_REQUIRED_MSG = "Antes de comprar o reservar necesitas leer y firmar la responsiva y consentimiento informado.";
 
 // WhatsApp de una reserva nueva (app y asignación) según su estado final: la que
 // queda en la fila usa su propia llave (bookingNotice, server/lib/waitlist.js),
@@ -4543,6 +4602,7 @@ app.post("/api/bookings", authMiddleware, async (req, res) => {
   } catch (err) {
     if (!released) { try { await client.query("ROLLBACK"); } catch (_) { } }
     console.error("POST bookings error:", err);
+    if (String(err.message).startsWith("HIVE_PLAN:")) return res.status(403).json({message:err.message.replace("HIVE_PLAN: ","")});
     return res.status(500).json({ message: "Error interno" });
   } finally {
     if (!released) client.release();
@@ -4619,7 +4679,7 @@ app.delete("/api/bookings/:id", authMiddleware, async (req, res) => {
     const minutesUntilClass = classStartUTC ? (classStartUTC.getTime() - Date.now()) / 60_000 : 999;
     const isLate = decision.countsTowardQuota && isWithinCancelWindow(minutesUntilClass, policy.cancelWindowHours);
 
-    await client.query("UPDATE bookings SET status = 'cancelled', cancelled_at = NOW() WHERE id = $1", [req.params.id]);
+    await client.query("UPDATE bookings SET status = 'cancelled', cancelled_at = NOW(), plan_late_cancel = $2 WHERE id = $1", [req.params.id, isLate]);
     // Cupo: lo mantiene el trigger update_class_booking_count (auditoría 2026-09-08, P1-6).
 
     let used = Number(membership?.cancellations_used ?? 0);
@@ -4899,31 +4959,9 @@ async function finalizeStripeOrder(client, orderId) {
   if (!planRes.rows.length) return;
   const plan = planRes.rows[0];
 
-  // Renovar el mismo plan conserva créditos finitos sin transferir restricciones entre planes.
-  let carryOver = 0;
-  const activeMemberships = await client.query(
-    `SELECT id, classes_remaining FROM memberships
-      WHERE user_id = $1 AND plan_id = $2 AND status = 'active' AND classes_remaining > 0 AND classes_remaining < 9999`,
-    [order.user_id, plan.id]
-  );
-  if (activeMemberships.rows.length > 0) {
-    for (const m of activeMemberships.rows) {
-      carryOver += Number(m.classes_remaining) || 0;
-    }
-    const oldIds = activeMemberships.rows.map((m) => m.id);
-    await client.query(
-      `UPDATE memberships
-          SET status = 'cancelled',
-              cancellation_reason = 'Renovación: créditos transferidos a nueva membresía',
-              cancelled_at = NOW(),
-              end_date = NOW()
-        WHERE id = ANY($1::uuid[])`,
-      [oldIds]
-    );
-  }
-
-  const newCredits = purchaseCredits(plan.class_limit, carryOver);
-  const end = new Date();
+  const newCredits = purchaseCredits(plan.class_limit);
+  const purchasedAt = new Date(order.created_at || Date.now());
+  const end = new Date(purchasedAt);
   end.setDate(end.getDate() + (plan.duration_days || 30));
 
   const existing = await client.query(
@@ -4941,8 +4979,8 @@ async function finalizeStripeOrder(client, orderId) {
     await client.query(
       `INSERT INTO memberships
           (user_id, plan_id, status, payment_method, start_date, end_date, classes_remaining, order_id)
-         VALUES ($1, $2, 'active', 'card', NOW(), $3, $4, $5)`,
-      [order.user_id, order.plan_id, end.toISOString(), newCredits, orderId]
+         VALUES ($1, $2, 'active', 'card', $6, $3, $4, $5)`,
+      [order.user_id, order.plan_id, end.toISOString(), newCredits, orderId, purchasedAt.toISOString()]
     );
   }
 
@@ -4956,6 +4994,13 @@ async function finalizeStripeOrder(client, orderId) {
   // disparaba notificación al pase (las de transferencia sí, al verificarlas).
   triggerWalletPassSync(order.user_id, "stripe_payment_completed");
 }
+
+registerMercadoPago(app, {
+  pool, auth: authMiddleware, finalizeOrder: finalizeStripeOrder,
+  afterPayment: (userId) => triggerWalletPassSync(userId, "mercadopago_payment_updated"),
+  afterReversal: (ids) => onSeatReleased(ids, {source:"mercadopago_reversal"}),
+  purchaseConflict: findPlanPurchaseConflict, hasWaiver: hasSignedWaiver,
+});
 
 // ── Generate short order number: OPH-YYMM-XXXX ──
 async function generateOrderNumber(client) {
@@ -5092,6 +5137,7 @@ async function handleStripeEvent(client, event) {
 
 // POST /api/orders
 app.post("/api/orders", authMiddleware, async (req, res) => {
+  if (!(await hasSignedWaiver(pool, req.userId))) return res.status(403).json({ code: "WAIVER_REQUIRED", message: WAIVER_REQUIRED_MSG });
   const { planId, discountCode, paymentMethod = "transfer" } = req.body;
   if (!planId) return res.status(400).json({ message: "planId requerido" });
   const client = await pool.connect();
@@ -5108,7 +5154,15 @@ app.post("/api/orders", authMiddleware, async (req, res) => {
     const generalForPrice = await getSettingValueWithDefaults("general_settings");
     const effectivePrice = resolveEffectivePrice(plan, generalForPrice?.opening_pricing_active !== false);
 
-    const nonRepeatableConflict = await findNonRepeatablePlanConflict({ userId: req.userId, plan, client });
+    const externalAnnual = paymentMethod === "card" && plan.rules?.auto_renew === true;
+    const annualPaymentUrl = externalAnnual ? resolvePlanPaymentUrl(plan, generalForPrice?.opening_pricing_active !== false) : null;
+    const mpAccount = mpConfig();
+    if (paymentMethod === "card" && (externalAnnual ? !annualPaymentUrl : !mpAccount.ready)) {
+      await client.query("ROLLBACK");
+      return res.status(503).json({message:externalAnnual ? "El enlace de contratación anual no está configurado para este precio." : "El pago integrado con tarjeta todavía no está disponible."});
+    }
+
+    const nonRepeatableConflict = await findPlanPurchaseConflict({ userId: req.userId, plan, client });
     if (nonRepeatableConflict) {
       await client.query("ROLLBACK");
       return res.status(409).json({ message: nonRepeatableConflict.message });
@@ -5142,6 +5196,10 @@ app.post("/api/orders", authMiddleware, async (req, res) => {
       appliedDiscountCode = discountResult.code;
     }
 
+    if (discount > 0 && externalAnnual) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({message:"El enlace de Mercado Pago tiene un importe fijo. Para aplicar este descuento utiliza transferencia o paga en el estudio."});
+    }
     const total = subtotal - discount;
     const bankInfo = await getConfiguredBankInfo(client);
     const expires = new Date(Date.now() + 48 * 60 * 60 * 1000); // 48h
@@ -5164,46 +5222,19 @@ app.post("/api/orders", authMiddleware, async (req, res) => {
       ]
     );
 
+    if (paymentMethod === "card") {
+      const saved = await client.query(`UPDATE orders SET payment_provider=$2,mp_checkout_mode=$3,mp_collector_id=$4,mp_external_checkout_url=$5 WHERE id=$1 RETURNING *`,
+        [orderRes.rows[0].id,externalAnnual ? "mercadopago_external" : "mercadopago",externalAnnual ? "external" : "embedded",externalAnnual ? null : mpAccount.collectorId,annualPaymentUrl]);
+      orderRes.rows[0] = saved.rows[0];
+    }
     await client.query("COMMIT");
 
     const order = orderRes.rows[0];
 
-    // ── Card: create Stripe Checkout Session ──────────────────────────────
     if (paymentMethod === "card") {
-      if (!process.env.STRIPE_SECRET_KEY) {
-        return res.status(503).json({ message: "Pagos con tarjeta no disponibles en este momento" });
-      }
-      try {
-        const customerId = await createOrGetStripeCustomer(pool, req.userId);
-        const session = await createCheckoutSession(pool, {
-          order,
-          plan,
-          totalAmount: total,
-          customerId,
-        });
-        await pool.query(
-          `UPDATE orders SET
-              stripe_session_id   = $1,
-              stripe_checkout_url = $2,
-              payment_provider    = 'stripe'
-            WHERE id = $3`,
-          [session.id, session.url, order.id]
-        );
-        return res.status(201).json({
-          data: {
-            ...order,
-            plan_name: plan.name,
-            checkout_url: session.url,
-          },
-        });
-      } catch (stripeErr) {
-        // Log con type/code para diagnosticar en Railway (api version, key, etc.)
-        console.error("[Stripe] createCheckoutSession error:", stripeErr?.message, "| type:", stripeErr?.type, "| code:", stripeErr?.code);
-        return res.status(502).json({
-          message: "Error al crear sesión de pago. Intenta de nuevo.",
-          detail: stripeErr?.message ?? null,
-        });
-      }
+      return res.status(201).json({data:{...order,plan_name:plan.name,
+        ...(externalAnnual ? {checkout_url:annualPaymentUrl,requires_payment_verification:true} : {}),
+        recurringSupported:false}});
     }
 
     // ── Transfer / cash ───────────────────────────────────────────────────
@@ -5231,6 +5262,8 @@ app.post("/api/orders/:id/proof", authMiddleware, upload.any(), async (req, res)
       [req.params.id, req.userId]
     );
     if (orderRes.rows.length === 0) return res.status(404).json({ message: "Orden no encontrada" });
+
+    if (orderRes.rows[0].mp_checkout_mode === "embedded") return res.status(409).json({message:"Este pago con tarjeta se confirma directamente con Mercado Pago; no requiere comprobante."});
 
     // Accept any uploaded field name ("proof", "file", etc.)
     const uploadedFile = req.files?.[0] ?? req.file ?? null;
@@ -9197,7 +9230,11 @@ app.get("/api/admin/users/:userId/waiver/pdf", adminMiddleware, async (req, res)
     doc.text(`Nombre: ${w.full_name || w.display_name || "—"}`);
     doc.text(`Teléfono: ${w.phone || "—"}`);
     doc.text(`Correo: ${w.email || "—"}`);
-    doc.text(`Uso de imagen (Sección 4): ${w.image_consent ? "Sí autorizo" : "No autorizo"}`);
+    if (w.waiver_version !== "v3") doc.text(`Uso de imagen (Sección 4): ${w.image_consent ? "Sí autorizo" : "No autorizo"}`);
+    for (const [key, label] of Object.entries(WAIVER_INTAKE_LABELS)) {
+      if (w.intake_data?.[key]) doc.text(`${label}: ${w.intake_data[key]}`);
+    }
+    if (w.intake_data?.health_consent) doc.text("Consentimiento expreso para datos de salud: otorgado al firmar.");
     doc.text(`Firmado: ${fmtDate}`);
     doc.text(`Versión del documento: ${w.waiver_version || "v1"}`);
     doc.moveDown(0.8);
@@ -9319,19 +9356,28 @@ app.put("/api/users/:id", authMiddleware, async (req, res) => {
 // de salud: se borran sus notas de salud y sus lesiones registradas
 // (auditoría 2026-09-27, P1-10).
 app.delete("/api/me/health-consent", authMiddleware, async (req, res) => {
+  let client;
   try {
-    const r = await pool.query(
+    client = await pool.connect();
+    await client.query("BEGIN");
+    const r = await client.query(
       `UPDATE users SET health_notes = NULL, has_injury = NULL, injury_details = NULL,
               health_consent_version = NULL, health_consent_at = NULL, updated_at = NOW()
         WHERE id = $1 RETURNING *`,
       [req.userId],
     );
-    if (!r.rows.length) return res.status(404).json({ message: "Usuario no encontrado" });
-    return res.json({ user: mapUser(r.rows[0]), message: "Retiraste tu consentimiento: borramos tus datos de salud de tu perfil." });
+    if (!r.rows.length) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ message: "Usuario no encontrado" });
+    }
+    await client.query(`UPDATE waivers SET intake_data = (COALESCE(intake_data, '{}'::jsonb) - $2::text[]) || '{"health_consent":false}'::jsonb WHERE user_id=$1`, [req.userId, WAIVER_HEALTH_FIELDS]);
+    await client.query("COMMIT");
+    return res.json({ user: mapUser(r.rows[0]), message: "Retiraste tu consentimiento: borramos tus datos de salud de tu perfil y responsiva." });
   } catch (err) {
+    if (client) await client.query("ROLLBACK").catch(() => {});
     console.error("[DELETE /me/health-consent]", err.message);
     return res.status(500).json({ message: "Error interno" });
-  }
+  } finally { client?.release(); }
 });
 
 // ─── Routes: /api/referrals ─────────────────────────────────────────────────
@@ -10556,6 +10602,7 @@ app.get("/api/admin/guest-profiles/search", adminMiddleware, async (req, res) =>
 // Plan debe tener is_visit_pack=true. Crea/reusa guest_profile + user lite +
 // crea membership con class_limit del plan + orden 'approved' con el método.
 app.post("/api/admin/visit-sale", adminMiddleware, async (req, res) => {
+  if (req.body?.profile?.acceptedWaiver !== true) return res.status(403).json({ code: "WAIVER_REQUIRED", message: "Confirma que la visitante firmó la responsiva y conserva el documento en recepción." });
   const { profile = {}, planId, paymentMethod = "cash", startDate, hostUserId } = req.body || {};
   if (!profile.name) return res.status(400).json({ message: "Nombre requerido" });
   if (!planId) return res.status(400).json({ message: "Plan requerido" });
@@ -10629,6 +10676,7 @@ app.post("/api/admin/visit-sale", adminMiddleware, async (req, res) => {
 // Si la invitada YA tiene pack activo con crédito: solo crea el booking.
 // Si NO tiene pack y viene `sale`: vende el pack y reserva en el mismo paso.
 app.post("/api/admin/classes/:id/walkin-visit", adminMiddleware, async (req, res) => {
+  if (req.body?.profile?.acceptedWaiver !== true) return res.status(403).json({ code: "WAIVER_REQUIRED", message: "Confirma que la visitante firmó la responsiva y conserva el documento en recepción." });
   const { profile = {}, hostUserId, sale } = req.body || {};
   const classId = req.params.id;
   if (!profile.name) return res.status(400).json({ message: "Nombre de la invitada requerido" });
@@ -10682,7 +10730,7 @@ app.post("/api/admin/classes/:id/walkin-visit", adminMiddleware, async (req, res
            FROM memberships m
            JOIN plans p ON p.id = m.plan_id
           WHERE m.user_id = $1 AND m.status = 'active'
-            AND p.is_visit_pack = true
+            AND (p.is_visit_pack = true OR COALESCE((p.rules->>'guest_passes')::int,0)>0)
             AND (m.end_date IS NULL OR m.end_date >= CURRENT_DATE)
             AND (m.classes_remaining IS NULL OR m.classes_remaining > 0)
           ORDER BY m.created_at DESC LIMIT 1
@@ -10811,6 +10859,27 @@ app.get("/api/my-guests/search", authMiddleware, async (req, res) => {
   }
 });
 
+async function selectGuestMembershipForClass(client,userId,classId) {
+  const cls=(await client.query(`SELECT c.*, ct.category AS class_category, ((c.date+c.start_time) AT TIME ZONE '${STUDIO_TIMEZONE}') AS starts_at FROM classes c JOIN class_types ct ON ct.id=c.class_type_id WHERE c.id=$1`,[classId])).rows[0];
+  if(!cls)return {rows:[]};
+  const memberships=await client.query(`SELECT m.*,p.rules,p.is_visit_pack,p.class_category,p.morning_only,p.afternoon_only,p.personal_only FROM memberships m JOIN plans p ON p.id=m.plan_id
+    WHERE m.user_id=$1 AND m.status='active' AND (p.is_visit_pack=true OR COALESCE((p.rules->>'guest_passes')::int,0)>0)
+      AND (m.classes_remaining IS NULL OR m.classes_remaining>0)
+    ORDER BY m.end_date ASC NULLS LAST,m.created_at ASC FOR UPDATE OF m`,[userId]);
+  for(const m of memberships.rows) {
+    if(!membershipAllowsSession(m,cls.starts_at,cls.max_capacity) || !isMembershipCategoryCompatible(m.class_category,cls.class_category))continue;
+    const limit=m.rules?.guest_passes || 0;
+    if(limit) {
+      const count=(await client.query(`SELECT count(*)::int AS n FROM bookings b JOIN classes c ON c.id=b.class_id
+        WHERE b.membership_id=$1 AND b.user_id<>$2 AND ($4::text<>'month' OR floor((c.date-$3::date)/30.0)=floor(($5::date-$3::date)/30.0))
+          AND (b.status IN ('confirmed','checked_in','no_show') OR (b.status='cancelled' AND b.plan_late_cancel))`,[m.id,userId,m.start_date,m.rules.guest_pass_period||'membership',cls.date])).rows[0].n;
+      if(count>=limit)continue;
+    }
+    return {rows:[m]};
+  }
+  return {rows:[]};
+}
+
 // POST /api/bookings/with-guest — la socia reserva PARA una acompañante usando
 // SU pack de visitas. Body: { classId, guest: { name, phone, ...intake... } }.
 // La socia debe tener un membership activo con plan.is_visit_pack=true y créditos.
@@ -10862,20 +10931,7 @@ app.post("/api/bookings/with-guest", authMiddleware, async (req, res) => {
     }
 
     // La socia tiene pack de visitas activo con crédito?
-    const packRes = await dbClient.query(
-      `SELECT m.id, m.classes_remaining
-         FROM memberships m
-         JOIN plans p ON p.id = m.plan_id
-        WHERE m.user_id = $1
-          AND m.status = 'active'
-          AND p.is_visit_pack = true
-          AND (m.end_date IS NULL OR m.end_date >= CURRENT_DATE)
-          AND (m.classes_remaining IS NULL OR m.classes_remaining > 0)
-        ORDER BY m.created_at DESC
-        LIMIT 1
-        FOR UPDATE`,
-      [req.userId]
-    );
+    const packRes = await selectGuestMembershipForClass(dbClient, req.userId, classId);
     if (!packRes.rows.length) {
       await dbClient.query("ROLLBACK");
       return res.status(403).json({
@@ -10922,7 +10978,7 @@ app.post("/api/bookings/with-guest", authMiddleware, async (req, res) => {
       [classId, guestUser.id, pack.id, guestProfile.id]
     );
     // Descontar 1 del pack de la socia (si no es ilimitado).
-    if (pack.classes_remaining !== null) {
+    if (pack.classes_remaining !== null && !(pack.rules?.guest_passes > 0)) {
       await dbClient.query(
         "UPDATE memberships SET classes_remaining = GREATEST(classes_remaining - 1, 0), updated_at = NOW() WHERE id = $1",
         [pack.id]
@@ -10968,6 +11024,7 @@ app.post("/api/bookings/with-guest", authMiddleware, async (req, res) => {
   } catch (err) {
     await dbClient.query("ROLLBACK").catch(() => {});
     console.error("[POST /bookings/with-guest]", err.message);
+    if (String(err.message).startsWith("HIVE_PLAN:")) return res.status(403).json({message:err.message.replace("HIVE_PLAN: ","")});
     return res.status(500).json({ message: "Error interno" });
   } finally {
     dbClient.release();
@@ -13971,7 +14028,7 @@ app.get("/api/memberships", adminMiddleware, async (req, res) => {
   try {
     const { status, userId, limit = 100 } = req.query;
     let q = `SELECT m.*, u.display_name AS user_name, p.name AS plan_name,
-                    p.class_limit, p.duration_days, p.class_category
+                    p.class_limit, p.duration_days, p.class_category, p.rules
              FROM memberships m
              LEFT JOIN users u ON m.user_id = u.id
              LEFT JOIN plans p ON m.plan_id = p.id
@@ -14008,6 +14065,7 @@ app.get("/api/memberships", adminMiddleware, async (req, res) => {
         planId: m.plan_id,
         planName: m.plan_name ?? m.plan_id,
         classCategory: m.class_category ?? "all",
+        rules: m.rules ?? {},
         status: m.status,
         paymentMethod: m.payment_method,
         startDate: m.start_date,
@@ -14037,6 +14095,7 @@ app.post("/api/memberships", adminMiddleware, async (req, res) => {
     const { userId, planId, startDate } = req.body || {};
     if (!userId || !planId) return res.status(400).json({ message: "userId y planId requeridos" });
     if (!isUuid(userId) || !isUuid(planId)) return res.status(400).json({ message: "Identificador inválido" });
+    if (!(await hasSignedWaiver(pool, userId))) return res.status(403).json({ code: "WAIVER_REQUIRED", message: WAIVER_REQUIRED_MSG });
     const anonConflict = await anonymizedSaleConflict(userId);
     if (anonConflict) return res.status(409).json(anonConflict);
     // El método de pago se exige explícito: el default anterior ("efectivo") ni
@@ -14067,7 +14126,7 @@ app.post("/api/memberships", adminMiddleware, async (req, res) => {
     const _eff = resolveEffectivePrice(plan, _gen?.opening_pricing_active !== false);
     let sale = saleAmountPlan({ listPrice: _eff ?? 0, amount: req.body.amount, reason: req.body.discountCode ? `Cupón ${req.body.discountCode}` : req.body.reason });
     if (!sale.ok) return res.status(400).json({ ...(sale.code ? { code: sale.code } : {}), message: sale.message });
-    const nonRepeatableConflict = await findNonRepeatablePlanConflict({ userId, plan });
+    const nonRepeatableConflict = await findPlanPurchaseConflict({ userId, plan });
     if (nonRepeatableConflict) {
       return res.status(409).json({ message: nonRepeatableConflict.message });
     }
@@ -14360,7 +14419,7 @@ app.put("/api/memberships/:id", adminMiddleware, async (req, res) => {
               COALESCE(m.cancellations_used, 0)::int AS cancellations_used,
               m.payment_method::text AS payment_method,
               to_char(m.start_date, 'YYYY-MM-DD') AS start_date, to_char(m.end_date, 'YYYY-MM-DD') AS end_date,
-              p.duration_days, p.class_limit AS plan_class_limit, p.name AS plan_name
+              p.duration_days, p.rules, p.class_limit AS plan_class_limit, p.name AS plan_name
          FROM memberships m
          LEFT JOIN plans p ON p.id = m.plan_id
         WHERE m.id = $1
@@ -14372,6 +14431,10 @@ app.put("/api/memberships/:id", adminMiddleware, async (req, res) => {
       return res.status(404).json({ message: "Membresía no encontrada" });
     }
     const before = cur.rows[0];
+    if (before.rules?.extendable === false && ((endDate && endDate > before.end_date) || (startDate && startDate !== before.start_date))) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({message:"Este plan no admite prórrogas ni cambios de fecha de compra."});
+    }
     const plan = planMembershipAdjust({ before, input: { status, classesRemaining, startDate, endDate, paymentMethod, cancellationsUsed } });
     if (!plan.ok) {
       await client.query("ROLLBACK");
@@ -14429,6 +14492,28 @@ app.put("/api/memberships/:id", adminMiddleware, async (req, res) => {
   }
 });
 
+registerPlanBenefits(app, { pool, adminMiddleware });
+
+// Staff verification stores only the validity date, never a copy of the identity card.
+app.put("/api/admin/users/:id/student-verification", adminMiddleware, async (req,res) => {
+  if(!isUuid(req.params.id)) return res.status(400).json({message:"Identificador inválido."});
+  const value=req.body.validUntil;
+  if(value !== null && (!/^\d{4}-\d{2}-\d{2}$/.test(String(value)) || Number.isNaN(new Date(value).getTime()) || new Date(value).toISOString().slice(0,10)!==value)) return res.status(400).json({message:"Fecha inválida."});
+  try {
+    const result=await pool.query("UPDATE users SET student_id_valid_until=$1 WHERE id=$2 RETURNING id,student_id_valid_until",[value,req.params.id]);
+    if(!result.rowCount)return res.status(404).json({message:"Usuario no encontrado"});
+    return res.json({data:result.rows[0]});
+  } catch(error) { console.error("Student verification error:",error.message);return res.status(500).json({message:"No se pudo guardar la verificación."}); }
+});
+
+function validatePlanInput(req,res,next) {
+  try {
+    if (Object.hasOwn(req.body,'rules')) req.body.rules=validatePlanRules(req.body.rules);
+    for(const key of ['price','opening_price']) if(req.body[key]!=null && req.body[key]!=='' && (!Number.isFinite(Number(req.body[key])) || Number(req.body[key])<0)) throw new Error('Precio inválido.');
+    for(const key of ['durationDays','classLimit']) if(req.body[key]!=null && (!Number.isInteger(Number(req.body[key])) || Number(req.body[key])<1)) throw new Error('La vigencia y las clases deben ser enteros positivos.');
+    next();
+  } catch(error) { return res.status(400).json({message:error.message}); }
+}
 // ─── Plans admin CRUD ────────────────────────────────────────────────────────
 
 // GET /api/plans — public
@@ -14436,7 +14521,7 @@ app.put("/api/memberships/:id", adminMiddleware, async (req, res) => {
 
 // POST /api/plans — admin (mirror of /api/admin/plans)
 // PUT /api/plans/:id
-app.put("/api/plans/:id", adminMiddleware, async (req, res) => {
+app.put("/api/plans/:id", adminMiddleware, validatePlanInput, async (req, res) => {
   try {
     const {
       name, description, price, currency, durationDays, classLimit, classCategory,
@@ -14482,11 +14567,12 @@ app.put("/api/plans/:id", adminMiddleware, async (req, res) => {
        features=COALESCE($7, features),
        is_active=COALESCE($8, is_active), sort_order=COALESCE($9, sort_order),
        class_category=COALESCE($10, class_category),
-       is_non_transferable=COALESCE($11, is_non_transferable),
+       is_non_transferable=CASE WHEN $22::jsonb IS NOT NULL THEN true ELSE COALESCE($11, is_non_transferable) END,
        is_non_repeatable=COALESCE($12, is_non_repeatable),
        repeat_key=CASE WHEN $12::boolean IS NULL THEN repeat_key ELSE $13 END,
        is_visit_pack=COALESCE($14, is_visit_pack),
-       opening_price=COALESCE($15, opening_price), morning_only=COALESCE($16, morning_only),
+       opening_price=CASE WHEN $23::boolean THEN $15 ELSE opening_price END, morning_only=COALESCE($16, morning_only),
+       rules=COALESCE($22::jsonb,rules),
        afternoon_only=COALESCE($20, afternoon_only), personal_only=COALESCE($21, personal_only),
        updated_at=NOW()
        WHERE id=$17 RETURNING *`,
@@ -14512,6 +14598,7 @@ app.put("/api/plans/:id", adminMiddleware, async (req, res) => {
         Object.prototype.hasOwnProperty.call(req.body, "classLimit")
           || Object.prototype.hasOwnProperty.call(req.body, "class_limit"),
         flagOrNull("afternoon_only"), flagOrNull("personal_only"),
+        req.body.rules === undefined ? null : JSON.stringify(req.body.rules), Object.hasOwn(req.body,"opening_price"),
       ]
     );
     if (!r.rows.length) return res.status(404).json({ message: "Plan no encontrado" });
@@ -14596,7 +14683,7 @@ app.delete("/api/plans/:id", adminMiddleware, async (req, res) => {
 });
 
 // POST /api/plans
-app.post("/api/plans", adminMiddleware, async (req, res) => {
+app.post("/api/plans", adminMiddleware, validatePlanInput, async (req, res) => {
   try {
     const {
       name, description, price, currency = "MXN", durationDays = 30, classLimit,
@@ -14609,7 +14696,7 @@ app.post("/api/plans", adminMiddleware, async (req, res) => {
     const cat = validCats.includes(classCategory) ? classCategory : "all";
     const openingPrice = opening_price === "" || opening_price == null ? null : Number(opening_price);
     const morningOnly = parseBooleanFlag(morning_only);
-    const nonTransferable = parseBooleanFlag(isNonTransferable ?? req.body.is_non_transferable);
+    const nonTransferable = req.body.rules ? true : parseBooleanFlag(isNonTransferable ?? req.body.is_non_transferable);
     const nonRepeatable = parseBooleanFlag(isNonRepeatable ?? req.body.is_non_repeatable);
     const safeRepeatKey = nonRepeatable
       ? String(repeatKey ?? req.body.repeat_key ?? "").trim() || null
@@ -14622,9 +14709,9 @@ app.post("/api/plans", adminMiddleware, async (req, res) => {
     const isVisitPack = parseBooleanFlag(req.body.isVisitPack ?? req.body.is_visit_pack);
     const r = await pool.query(
       `INSERT INTO plans
-        (name, description, price, currency, duration_days, class_limit, class_category, features, is_active, sort_order, is_non_transferable, is_non_repeatable, repeat_key, is_visit_pack, opening_price, morning_only, afternoon_only, personal_only)
+        (name, description, price, currency, duration_days, class_limit, class_category, features, is_active, sort_order, is_non_transferable, is_non_repeatable, repeat_key, is_visit_pack, opening_price, morning_only, afternoon_only, personal_only, rules)
        VALUES
-        ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING *`,
+        ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19::jsonb) RETURNING *`,
       [
         name,
         description || null,
@@ -14642,7 +14729,7 @@ app.post("/api/plans", adminMiddleware, async (req, res) => {
         isVisitPack,
         openingPrice,
         morningOnly,
-        parseBooleanFlag(afternoon_only), parseBooleanFlag(personal_only),
+        parseBooleanFlag(afternoon_only), parseBooleanFlag(personal_only), JSON.stringify(req.body.rules ?? {}),
       ]
     );
     return res.status(201).json({ data: camelRow(r.rows[0]) });
@@ -15019,7 +15106,7 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
     if (!adminWeeklyCheck.ok) {
       await client.query("ROLLBACK");
       return res.status(403).json({
-        message: `El usuario llegó a su tope semanal: ${adminWeeklyCheck.limit} clase${adminWeeklyCheck.limit === 1 ? "" : "s"} por semana. Esta semana ya tiene ${adminWeeklyCheck.count} reservada${adminWeeklyCheck.count === 1 ? "" : "s"}.`,
+        message: adminWeeklyCheck.message,
       });
     }
 
@@ -15107,7 +15194,7 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
           await client.query("ROLLBACK");
           return res.status(403).json({ message: "El plan de la acompañante no permite el horario o tipo de esta sesión." });
         }
-        const trialConflict = await findNonRepeatablePlanConflict({ userId: guestUser.id, plan, client });
+        const trialConflict = await findPlanPurchaseConflict({ userId: guestUser.id, plan, client });
         if (trialConflict) {
           await client.query("ROLLBACK");
           return res.status(409).json({ message: trialConflict.message });
@@ -15151,19 +15238,8 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
         }
       } else {
         // Modo A: pack de visitas activo de la socia.
-        const packRes = await client.query(
-          `SELECT m.id, m.classes_remaining
-             FROM memberships m
-             JOIN plans p ON p.id = m.plan_id
-            WHERE m.user_id = $1 AND m.status = 'active'
-              AND p.is_visit_pack = true
-              AND (m.end_date IS NULL OR m.end_date >= CURRENT_DATE)
-              AND (m.classes_remaining IS NULL OR m.classes_remaining > 0)
-            ORDER BY m.created_at DESC LIMIT 1
-            FOR UPDATE`,
-          [userId]
-        );
-        if (!packRes.rows.length) {
+        const packRes = await selectGuestMembershipForClass(client, userId, classId);
+    if (!packRes.rows.length) {
           await client.query("ROLLBACK");
           return res.status(403).json({
             message: "La socia no tiene un paquete de visitas activo con créditos. Véndele uno primero o vende clase suelta para la acompañante.",
@@ -15174,7 +15250,7 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
         guestMembershipCreditsAfter = pack.classes_remaining === null
           ? null
           : Math.max(0, pack.classes_remaining - 1);
-        if (pack.classes_remaining !== null) {
+        if (pack.classes_remaining !== null && !(pack.rules?.guest_passes > 0)) {
           await client.query(
             "UPDATE memberships SET classes_remaining = GREATEST(classes_remaining - 1, 0), updated_at = NOW() WHERE id = $1",
             [pack.id]
@@ -15280,6 +15356,7 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
   } catch (err) {
     if (!released) { try { await client.query("ROLLBACK"); } catch (_) { } }
     console.error("POST /admin/bookings/assign error:", err);
+    if (String(err.message).startsWith("HIVE_PLAN:")) return res.status(403).json({message:err.message.replace("HIVE_PLAN: ","")});
     // Devolver detalle del error de Postgres (constraint que falló) en lugar
     // del genérico "Error interno", para que la admin pueda diagnosticar y
     // reintentar (ej. teléfono duplicado, constraint violation, etc.).
@@ -15681,6 +15758,7 @@ app.get("/api/classes/:id/roster", adminMiddleware, async (req, res) => {
 
 // POST /api/admin/clients/manual — crea clienta + membresía en un solo paso (sin que use la app)
 app.post("/api/admin/clients/manual", adminMiddleware, async (req, res) => {
+  if (req.body?.planId) return res.status(403).json({ code: "WAIVER_REQUIRED", message: "Primero crea el perfil y recoge su firma. Después vende el plan desde Pagos." });
   const client = await pool.connect();
   try {
     const {
@@ -15726,7 +15804,7 @@ app.post("/api/admin/clients/manual", adminMiddleware, async (req, res) => {
       const plan = planRes.rows[0];
       const _gen = await getSettingValueWithDefaults("general_settings");
       const _eff = resolveEffectivePrice(plan, _gen?.opening_pricing_active !== false);
-      const nonRepeatableConflict = await findNonRepeatablePlanConflict({ userId: user.id, plan, client });
+      const nonRepeatableConflict = await findPlanPurchaseConflict({ userId: user.id, plan, client });
       if (nonRepeatableConflict) {
         await client.query("ROLLBACK");
         return res.status(409).json({ message: nonRepeatableConflict.message });
@@ -15887,6 +15965,10 @@ app.put("/api/admin/orders/:id/verify", adminMiddleware, async (req, res) => {
       return res.status(404).json({ message: "Orden no encontrada" });
     }
     let order = orderRes.rows[0];
+    if (order.mp_checkout_mode === "embedded" && order.status !== "approved") {
+      await client.query("ROLLBACK");
+      return res.status(409).json({message:"El pago integrado solo se activa después de confirmar su estado directamente con Mercado Pago."});
+    }
     let justApproved = false;
 
     if (order.status !== "approved") {
@@ -15895,7 +15977,7 @@ app.put("/api/admin/orders/:id/verify", adminMiddleware, async (req, res) => {
         const planRes = await client.query("SELECT * FROM plans WHERE id = $1", [order.plan_id]);
         if (planRes.rows.length) {
           plan = planRes.rows[0];
-          const nonRepeatableConflict = await findNonRepeatablePlanConflict({
+          const nonRepeatableConflict = await findPlanPurchaseConflict({
             userId: order.user_id,
             plan,
             excludeOrderId: order.id,
@@ -15917,28 +15999,9 @@ app.put("/api/admin/orders/:id/verify", adminMiddleware, async (req, res) => {
 
       // Activate membership if this order is for a plan
       if (order.plan_id && plan && order.user_id) {
-        // Renovación del mismo plan: conserva créditos sin mezclar franjas ni sesiones individuales.
-        let carryOver = 0;
-        const activeMemberships = await client.query(
-          `SELECT m.id, m.classes_remaining
-             FROM memberships m LEFT JOIN plans p ON p.id = m.plan_id
-            WHERE m.user_id = $1 AND m.plan_id = $2 AND m.status = 'active' AND m.classes_remaining > 0 AND m.classes_remaining < 9999`,
-          [order.user_id, plan.id]
-        );
-        if (activeMemberships.rows.length > 0) {
-          for (const m of activeMemberships.rows) {
-            carryOver += (Number(m.classes_remaining) || 0);
-          }
-          const oldIds = activeMemberships.rows.map((m) => m.id);
-          await client.query(
-            `UPDATE memberships SET status = 'cancelled', cancellation_reason = 'Renovación: créditos transferidos a nueva membresía', cancelled_at = NOW(), end_date = NOW()
-             WHERE id = ANY($1::uuid[])`,
-            [oldIds]
-          );
-        }
-
-        const newCredits = purchaseCredits(plan.class_limit, carryOver);
-        const end = new Date();
+        const newCredits = purchaseCredits(plan.class_limit);
+        const purchasedAt = new Date(order.created_at || Date.now());
+        const end = new Date(purchasedAt);
         end.setDate(end.getDate() + (plan.duration_days || 30));
 
         const existing = await client.query(
@@ -15954,8 +16017,8 @@ app.put("/api/admin/orders/:id/verify", adminMiddleware, async (req, res) => {
         } else {
           await client.query(
             `INSERT INTO memberships (user_id, plan_id, status, payment_method, start_date, end_date, classes_remaining, order_id)
-             VALUES ($1,$2,'active',$3,NOW(),$4,$5,$6)`,
-            [order.user_id, order.plan_id, order.payment_method || "transfer", end.toISOString(), newCredits, order.id]
+             VALUES ($1,$2,'active',$3,$7,$4,$5,$6)`,
+            [order.user_id, order.plan_id, order.payment_method || "transfer", end.toISOString(), newCredits, order.id, purchasedAt.toISOString()]
           );
         }
       }
@@ -18470,6 +18533,7 @@ function scheduleEmailCrons() {
 // ─── Start ───────────────────────────────────────────────────────────────────
 async function bootServer() {
   await ensureSchema();
+  await applyHiveStudioSettings(pool);
   scheduleEmailCrons();
   // Initialize Google Wallet loyalty class if configured
   ensureGoogleWalletClass().catch(() => { });

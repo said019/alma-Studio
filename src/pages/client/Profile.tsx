@@ -158,6 +158,7 @@ const Profile = () => {
                 description="Respondemos rápido"
               />
             )}
+            <ListRow to="/legal/informacion" icon={<HelpCircle size={17} strokeWidth={1.7} />} iconTint="accent" title="Preguntas frecuentes y reglamento" />
             <ListRow
               to="/legal/terminos"
               icon={<HelpCircle size={17} strokeWidth={1.7} />}

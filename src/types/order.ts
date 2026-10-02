@@ -17,6 +17,14 @@ export interface Order {
   currency: string;
   status: OrderStatus;
   payment_method: string;
+  refund_status?: string;
+  refunded_amount?: number;
+  mp_payment_status?: string;
+  payment_provider?: string;
+  paymentProvider?: string;
+  mp_checkout_mode?: string;
+  mpCheckoutMode?: string;
+  checkout_url?: string;
   bank_clabe?: string;
   bank_name?: string;
   bank_account_holder?: string;

@@ -6,7 +6,7 @@ import {
 describe("política de reservas y cancelación", () => {
   it("las tres reglas con la política por defecto (cuota, ventana, pérdida de la clase) y las faltas", () => {
     expect(cancellationRules(DEFAULT_BOOKING_POLICY)).toEqual([
-      "Puedes cancelar hasta 2 veces por paquete. Salir de la lista de espera no cuenta.",
+      "No hay límite de cancelaciones por paquete. Salir de la lista de espera no cuenta.",
       "Si cancelas con 12 horas o más de anticipación, la clase regresa a tu paquete.",
       "Si cancelas con menos de 12 horas, pierdes la clase: no regresa a tu paquete y cuenta como falta.",
       "Al juntar 5 faltas (cancelaciones tardías o inasistencias) se descuentan puntos.",

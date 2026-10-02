@@ -1,5 +1,10 @@
+import { EmbeddedCardPayment } from "@/components/checkout/EmbeddedCardPayment";
+import type { CardReadiness } from "@/lib/mercadopago";
+import { planConditions } from "@/lib/planConditions";
+import { ResponsivaDialog } from "@/components/app/ResponsivaDialog";
+import { useAuthStore } from "@/stores/authStore";
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { ClientAuthGuard } from "@/components/layout/ClientAuthGuard";
@@ -33,7 +38,7 @@ import {
   ArrowLeft,
 } from "lucide-react";
 
-type Step = "select" | "method" | "bank" | "cash" | "upload" | "done" | "stripe-success" | "stripe-cancelled";
+type Step = "card" | "external-card" | "select" | "method" | "bank" | "cash" | "upload" | "done" | "stripe-success" | "stripe-cancelled";
 type PaymentMethod = "transfer" | "cash" | "card";
 
 const flag = (value: unknown): boolean => {
@@ -92,6 +97,7 @@ const PlanRow = ({
   onSelect: () => void;
 }) => {
   const category = detectCategory(plan);
+  const conditions = planConditions(plan);
   const durationDays = Number(plan.durationDays ?? plan.duration_days ?? 0);
   const classLimit = plan.classLimit ?? plan.class_limit ?? null;
   const isUnlimited = classLimit == null || Number(classLimit) >= 900;
@@ -127,7 +133,7 @@ const PlanRow = ({
             <Tag tint="ink">{CATEGORY_LABEL[category]}</Tag>
             {isUnlimited ? (
               <span className="text-[0.75rem] uppercase tracking-[0.18em] text-ink-muted">
-                Ilimitado
+                {plan.rules?.daily_class_limit ? `${plan.rules.daily_class_limit} ${plan.rules.daily_class_limit === 1 ? "sesión" : "sesiones"} por día` : "Ilimitado"}
               </span>
             ) : Number(classLimit) > 0 ? (
               <span className="nums text-[0.75rem] uppercase tracking-[0.18em] text-ink-muted">
@@ -138,10 +144,11 @@ const PlanRow = ({
           <h3 className="font-display leading-tight text-ink" style={{ fontSize: "clamp(1.1rem, 1.6vw, 1.35rem)" }}>
             {plan.name}
           </h3>
-          {plan.description && <p className="mt-1 text-[0.8rem] text-ink-muted">{plan.description}</p>}
+          {conditions.map(condition => <p key={condition} className="mt-1 text-[0.8rem] text-ink-muted">{condition}</p>)}
+          {plan.description && !plan.rules?.auto_renew && <p className="mt-1 text-[0.8rem] text-ink-muted">{plan.description}</p>}
           {durationDays > 0 && (
             <p className="text-[0.75rem] mt-0.5 text-ink-muted">
-              {durationDays} días de vigencia
+              {durationDays} días naturales desde la compra
               {nonTransferable && " · No transferible"}
               {nonRepeatable && " · No repetible"}
             </p>
@@ -155,6 +162,7 @@ const PlanRow = ({
           )}
           <div className="font-display nums leading-none text-ink" style={{ fontSize: "clamp(1.4rem, 2.2vw, 1.8rem)" }}>
             ${formatMoneyMX(effectivePrice)}
+            {plan.rules?.billing_period === "month" && <span className="block text-xs font-normal mt-1">por mes</span>}
           </div>
           {hasOpening ? (
             <div className="text-[0.75rem] uppercase tracking-[0.18em] mt-1 text-accent-strong">
@@ -187,6 +195,11 @@ const PlanRow = ({
 const Checkout = () => {
   const { toast } = useToast();
   const qc = useQueryClient();
+  const navigate = useNavigate();
+  const [externalCheckoutUrl, setExternalCheckoutUrl] = useState<string | null>(null);
+  const {data: cardReadiness, isLoading: loadingCardReadiness} = useQuery<CardReadiness>({queryKey:["card-readiness"], queryFn:async () => { const res = await api.get("/payments/card-readiness"); return res.data.data ?? res.data; }});
+  const { user } = useAuthStore();
+  const [waiverOpen, setWaiverOpen] = useState(false);
 
   const [step, setStep] = useState<Step>("select");
   const [selectedPlan, setSelectedPlan] = useState<any>(null);
@@ -295,20 +308,30 @@ const Checkout = () => {
       const data = res.data?.data ?? res.data;
       setOrderId(data.orderId ?? data.id);
       setOrderNumber(data.orderNumber ?? data.order_number ?? null);
-      // Card: redirect browser to Stripe Hosted Checkout
+      if (paymentMethod === "card" && (data.mp_checkout_mode === "embedded" || data.mpCheckoutMode === "embedded")) {
+        setStep("card");
+        return;
+      }
       if (paymentMethod === "card" && data.checkout_url) {
-        window.location.href = data.checkout_url;
+        setExternalCheckoutUrl(data.checkout_url);
+        setStep("external-card");
+        return;
+      }
+      if (paymentMethod === "card") {
+        navigate(`/app/orders/${data.orderId ?? data.id}`);
         return;
       }
       setBankDetails(data.bankDetails ?? data.bank_details);
       setStep(paymentMethod === "transfer" ? "bank" : "cash");
     },
-    onError: (err: any) =>
+    onError: (err: any) => {
+      if (err?.response?.data?.code === "WAIVER_REQUIRED") { setWaiverOpen(true); return; }
       toast({
         title: "No se pudo crear la orden",
         description: err.response?.data?.message ?? "Inténtalo de nuevo.",
         variant: "destructive",
-      }),
+      });
+    },
   });
 
   const uploadProofMutation = useMutation({
@@ -344,16 +367,19 @@ const Checkout = () => {
   ];
 
   const stepperCurrent: Step =
-    step === "bank" || step === "cash" ? "method" : step;
+    step === "bank" || step === "cash" || step === "card" || step === "external-card" ? "method" : step;
+  const annualExternal = Boolean(selectedPlan?.rules?.auto_renew && (selectedPlan?.rules?.payment_url || selectedPlan?.rules?.opening_payment_url));
+  const cardAvailable = annualExternal || cardReadiness?.ready === true;
 
   return (
     <ClientAuthGuard requiredRoles={["client"]}>
+      <ResponsivaDialog open={waiverOpen} onClose={() => setWaiverOpen(false)} onSigned={() => { setWaiverOpen(false); createOrderMutation.mutate(); }} defaultName={user?.displayName ?? user?.display_name ?? user?.full_name ?? ""} defaultEmail={user?.email ?? ""} defaultPhone={(user as any)?.phone ?? ""} />
       <AppShell hideGreeting>
         <PageHeader
           eyebrow="Membresía"
           title={<>Compra tu</>}
           titleAccent="paquete."
-          subtitle="Cuatro pasos: elige plan, elige cómo pagar, sube el comprobante y listo."
+          subtitle="Elige tu plan y cómo pagar. Con tarjeta completas el pago aquí; para transferencia, adjunta tu comprobante."
         />
 
         <Section>
@@ -522,6 +548,13 @@ const Checkout = () => {
           </div>
         )}
 
+        {step === "card" && orderId && <EmbeddedCardPayment key={orderId} orderId={orderId} onClose={() => navigate(`/app/orders/${orderId}`)} />}
+        {step === "external-card" && orderId && externalCheckoutUrl && <Section title="Plan anual">
+          <p className="mb-4 text-sm text-ink-muted">La contratación de este plan anual se completa en Mercado Pago. Revisa ahí las condiciones de renovación y autoriza el pago. Tu orden se activará cuando el estudio confirme el cobro.</p>
+          <a href={externalCheckoutUrl} className="inline-flex min-h-11 items-center rounded-full bg-accent px-5 font-bold text-accent-foreground">Continuar con plan anual en Mercado Pago</a>
+          <GhostButton onClick={() => navigate(`/app/orders/${orderId}`)}>Ver mi orden</GhostButton>
+        </Section>}
+
         {/* ── Step 2: Payment method ── */}
         {step === "method" && (
           <>
@@ -542,10 +575,15 @@ const Checkout = () => {
               </div>
             </Section>
 
+            <Section title="Condiciones del plan">
+              <ul className="space-y-1 text-sm text-ink-muted">{planConditions(selectedPlan).map(condition => <li key={condition}>{condition}</li>)}</ul>
+              <p className="mt-2 text-sm text-ink-muted">Vigencia de {selectedPlan?.durationDays ?? selectedPlan?.duration_days} días naturales desde la compra.</p>
+            </Section>
+
             <Section title="¿Cómo quieres pagar?">
               <div role="radiogroup" aria-label="Método de pago" className="space-y-2">
                 {[
-                  { id: "card" as const, label: "Tarjeta", sub: "Visa, Mastercard — pago seguro con Stripe", icon: CreditCard },
+                  { id: "card" as const, label: "Tarjeta", sub: annualExternal ? "Contratación anual en Mercado Pago" : cardAvailable ? "Paga aquí con Mercado Pago, sin salir de la app" : loadingCardReadiness ? "Consultando disponibilidad…" : cardReadiness?.message || "Pago con tarjeta aún no disponible; elige otro método", icon: CreditCard },
                   { id: "transfer" as const, label: "Transferencia", sub: "Subes tu comprobante", icon: Building2 },
                   { id: "cash" as const, label: "Efectivo", sub: "Pagas en recepción del estudio", icon: Banknote },
                 ].map((opt) => {
@@ -557,6 +595,7 @@ const Checkout = () => {
                       type="button"
                       role="radio"
                       aria-checked={sel}
+                      disabled={opt.id === "card" && !cardAvailable}
                       onClick={() => setPaymentMethod(opt.id)}
                       className={
                         "w-full grid grid-cols-[auto_1fr_auto] items-center gap-4 rounded-2xl border p-4 text-left cursor-pointer transition-colors " +
@@ -597,7 +636,7 @@ const Checkout = () => {
             <StickyCta>
               <PrimaryButton
                 onClick={() => createOrderMutation.mutate()}
-                disabled={createOrderMutation.isPending}
+                disabled={createOrderMutation.isPending || (paymentMethod === "card" && !cardAvailable)}
                 loading={createOrderMutation.isPending}
                 loadingLabel="Procesando…"
                 className="w-full"
@@ -773,7 +812,7 @@ const Checkout = () => {
             <InfoBanner
               tone="muted"
               title="Selecciona un paquete para continuar."
-              description="Si nunca has venido, prueba con la clase muestra desde el sitio principal."
+              description="Elige una clase o paquete para comenzar. Consulta sus condiciones antes de pagar."
             />
           </Section>
         )}

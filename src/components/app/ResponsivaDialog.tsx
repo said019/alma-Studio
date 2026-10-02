@@ -1,3 +1,4 @@
+import { useAuthStore } from "@/stores/authStore";
 import { useState, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { X } from "lucide-react";
@@ -6,10 +7,11 @@ import api from "@/lib/api";
 import { PrimaryButton } from "@/components/app/AppShell";
 import { Field } from "@/components/app/fields";
 import { SignaturePad } from "@/components/app/SignaturePad";
-import { RESPONSIVA_TITLE, RESPONSIVA_SECTIONS, RESPONSIVA_VERSION } from "@/components/app/responsivaContent";
+import { RESPONSIVA_TITLE, RESPONSIVA_SECTIONS, RESPONSIVA_VERSION, RESPONSIVA_PDF_URL } from "@/components/app/responsivaContent";
 import { useToast } from "@/hooks/use-toast";
 
 interface ResponsivaDialogProps {
+  userId?: string;
   open: boolean;
   onClose: () => void;
   onSigned: () => void;
@@ -19,9 +21,24 @@ interface ResponsivaDialogProps {
 }
 
 /* Etiqueta pequeña de las dos secciones sin campo dedicado (uso de imagen, firma). */
+export const WAIVER_DETAILS_FIELDS = [
+  ["emergency_contact_name", "Contacto de emergencia: nombre *"],
+  ["emergency_contact_phone", "Contacto de emergencia: teléfono *"],
+  ["medical_conditions", "Lesión, enfermedad, embarazo u otra condición médica"],
+  ["blood_type", "Tipo de sangre"],
+  ["medication_allergies", "Alergias a medicamentos"],
+  ["food_allergies", "Alergias a alimentos"],
+  ["body_oil_allergies", "Alergias a aceites corporales"],
+  ["medical_insurance", "Seguro de gastos médicos o servicio médico"],
+  ["emergency_medical_service", "Servicio médico al que acudir en una emergencia"],
+  ["physician_name", "Médico particular o familiar: nombre"],
+  ["physician_phone", "Médico particular o familiar: teléfono"],
+] as const;
+
 const LABEL_CLASS = "block mb-2.5 text-[0.75rem] font-bold uppercase tracking-[0.12em] text-ink-muted";
 
 export const ResponsivaDialog = ({
+  userId,
   open,
   onClose,
   onSigned,
@@ -35,9 +52,12 @@ export const ResponsivaDialog = ({
   const [fullName, setFullName] = useState(defaultName);
   const [phone, setPhone] = useState(defaultPhone);
   const [email, setEmail] = useState(defaultEmail);
-  const [imageConsent, setImageConsent] = useState<boolean | null>(null);
+  const [imageConsent, setImageConsent] = useState<boolean | null>(false);
   const [signatureData, setSignatureData] = useState<string | null>(null);
   const [accepted, setAccepted] = useState(false);
+  const [details, setDetails] = useState<Record<string, string>>({});
+  const [healthConsent, setHealthConsent] = useState(false);
+  const hasHealthDetails = WAIVER_DETAILS_FIELDS.slice(2).some(([key]) => details[key]?.trim());
 
   // Sync defaults when they change (e.g. auth resolves after dialog mounts)
   useEffect(() => {
@@ -52,23 +72,35 @@ export const ResponsivaDialog = ({
 
   const canSubmit =
     fullName.trim().length >= 2 &&
+    phone.replace(/\D/g, "").length >= 10 &&
+    (details.emergency_contact_name?.trim().length ?? 0) >= 2 &&
+    (details.emergency_contact_phone?.replace(/\D/g, "").length ?? 0) >= 10 &&
+    (!hasHealthDetails || healthConsent) &&
     signatureData !== null &&
     accepted &&
     imageConsent !== null;
 
   const mutation = useMutation({
     mutationFn: () =>
-      api.post("/me/waiver", {
+      api.post(userId ? `/admin/users/${userId}/waiver` : "/me/waiver", {
         full_name: fullName.trim(),
         phone: phone.trim() || undefined,
         email: email.trim() || undefined,
         image_consent: imageConsent,
         signature_data: signatureData,
         waiver_version: RESPONSIVA_VERSION,
+        ...Object.fromEntries(WAIVER_DETAILS_FIELDS.map(([key]) => [key, details[key]?.trim() || null])),
+        health_consent: healthConsent,
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["my-waiver"] });
-      toast({ title: "Responsiva firmada. ¡Bienvenida a HIVE!" });
+      if (userId) {
+        qc.invalidateQueries({ queryKey: ["admin-waiver", userId] });
+        qc.invalidateQueries({ queryKey: ["client", userId] });
+      } else {
+        void useAuthStore.getState().checkAuth();
+      }
+      toast({ title: "Responsiva firmada. ¡Te damos la bienvenida a HIVE!" });
       onSigned();
     },
     onError: (e: any) => {
@@ -96,7 +128,7 @@ export const ResponsivaDialog = ({
         <div className="sticky top-0 z-10 flex items-center justify-between gap-3 px-6 py-4 border-b border-line bg-canvas/95 backdrop-blur-md">
           <div>
             <p className="m-0 text-[0.75rem] font-medium uppercase tracking-[0.28em] text-accent-strong">
-              Antes de reservar
+              Al inscribirte o comprar
             </p>
             <h2
               className="font-display text-ink mt-1"
@@ -117,6 +149,7 @@ export const ResponsivaDialog = ({
 
         {/* Scrollable content */}
         <div className="px-6 pt-6 pb-8">
+          <a href={RESPONSIVA_PDF_URL} target="_blank" rel="noopener noreferrer" className="mb-5 block text-sm underline text-accent-strong">Consultar la carta original del estudio (PDF)</a>
           {/* Document sections */}
           <div className="mb-8">
             {RESPONSIVA_SECTIONS.map((section) => (
@@ -150,7 +183,8 @@ export const ResponsivaDialog = ({
             {/* Phone + Email row */}
             <div className="grid grid-cols-2 gap-3">
               <Field
-                label="Teléfono"
+                label="Teléfono *"
+                id="field-tel-fono"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="+52 000 000 0000"
@@ -167,9 +201,16 @@ export const ResponsivaDialog = ({
               />
             </div>
 
-            {/* Uso de imagen */}
+            <p className="m-0 text-sm text-ink-muted">Los datos de salud son opcionales. Puedes dejarlos en blanco; si los proporcionas, autoriza su tratamiento abajo. Informa al coach cualquier condición relevante antes de tu clase.</p>
+            {WAIVER_DETAILS_FIELDS.map(([key, label]) => <Field key={key} id={`waiver-${key}`} label={label} value={details[key] ?? ""} type={key.endsWith("phone") ? "tel" : "text"} maxLength={key === "medical_conditions" ? 2000 : 300} onChange={e => setDetails(previous => ({ ...previous, [key]: e.target.value }))} />)}
+            <label className="flex gap-3 text-sm text-ink">
+              <input type="checkbox" checked={healthConsent} onChange={e => setHealthConsent(e.target.checked)} className="h-4 w-4 mt-1 shrink-0" />
+              <span>Autorizo expresamente el tratamiento de los datos de salud que proporciono para mi atención en HIVE. <a href="/legal/privacidad" target="_blank" rel="noopener noreferrer" className="underline">Consultar aviso de privacidad</a>.</span>
+            </label>
+            {/* Uso de imagen: autorización adicional independiente de la carta del estudio. */}
             <div>
-              <label className={LABEL_CLASS}>Uso de imagen (sección 4) *</label>
+              <label className={LABEL_CLASS}>Uso de imagen (opcional)</label>
+              <p className="text-sm text-ink-muted">Autorización adicional, independiente de la carta: permite usar fotografías o videos de las clases para redes sociales y comunicación de HIVE, sin compensación económica. Puedes negarte sin afectar tu inscripción.</p>
               <div className="flex gap-2.5">
                 {(
                   [

@@ -1,4 +1,7 @@
+import type { PlanRules } from "@/lib/planConditions";
 export interface ClientMembership {
+  rules?: Partial<PlanRules>;
+  personalOnly?: boolean;
   id: string;
   planId: string;
   planName: string;

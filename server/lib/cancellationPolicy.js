@@ -1,9 +1,9 @@
 // Cuota de cancelaciones por paquete y política pública de reservas (auditoría
-// 2026-09-27, P0-4). La cuota vive en settings.cancellation_settings (2 por
+// 2026-09-27, P0-4). La cuota vive en settings.cancellation_settings (0 por
 // defecto, 0 = sin límite); la ventana, en loyalty_config.faltas_cancel_window_hours.
 // Cuenta toda cancelación que la clienta hace de una reserva confirmada, a tiempo
 // o tarde. Salir de la lista de espera no cuenta.
-export const DEFAULT_CANCELLATION_LIMIT = 2;
+export const DEFAULT_CANCELLATION_LIMIT = 0;
 export const MAX_CANCELLATION_LIMIT = 20;
 
 export function normalizeCancellationSettings(raw) {

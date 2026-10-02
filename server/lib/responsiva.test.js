@@ -4,9 +4,9 @@ import {
   RESPONSIVA_DOCUMENTS, RESPONSIVA_VERSIONS, CURRENT_RESPONSIVA_VERSION, responsivaDocument, waiverVersionProblem,
 } from "./responsiva.js";
 
-test("la vigente es la v2 de HIVE; la v1 de Alma se conserva tal como se firmó", () => {
-  assert.equal(CURRENT_RESPONSIVA_VERSION, "v2");
-  assert.deepEqual(RESPONSIVA_VERSIONS, ["v1", "v2"]);
+test("la vigente es la v3 de HIVE; la v1 de Alma se conserva tal como se firmó", () => {
+  assert.equal(CURRENT_RESPONSIVA_VERSION, "v3");
+  assert.deepEqual(RESPONSIVA_VERSIONS, ["v1", "v2", "v3"]);
   assert.equal(RESPONSIVA_DOCUMENTS.v2.studio, "HIVE Pilates Studio");
   assert.ok(!JSON.stringify(RESPONSIVA_DOCUMENTS.v2).includes("Alma"));
   assert.equal(RESPONSIVA_DOCUMENTS.v1.studio, "Alma Movement");
