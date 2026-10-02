@@ -38,6 +38,7 @@ function Reveal({ children }: { children: ReactNode }) {
 }
 
 export default function Landing() {
+  const [motionPaused, setMotionPaused] = useState(false);
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
     const refresh = () => setNow(new Date());
@@ -79,10 +80,10 @@ export default function Landing() {
   ];
 
   return (
-    <div className="hive-landing min-h-[100dvh] bg-canvas text-ink">
-      <LandingNav links={links} />
+    <div className={`hive-landing min-h-[100dvh] bg-canvas text-ink${motionPaused ? " hive-motion-paused" : ""}`}>
+      <LandingNav links={links} motionPaused={motionPaused} onToggleMotion={() => setMotionPaused((paused) => !paused)} />
       <main>
-        <LandingHero />
+        <LandingHero showPlans={showPlans} />
         <Reveal>
           <ClassesCoaches />
         </Reveal>

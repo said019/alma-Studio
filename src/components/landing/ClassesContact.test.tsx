@@ -14,15 +14,17 @@ describeZone([
 describe("oferta editorial de HIVE", () => {
   it("presenta sólo Pilates Reformer con condiciones verificadas", () => {
     renderPage(<ClassesCoaches />, "/");
-    expect(screen.getByRole("heading", {name:"Pilates Reformer."})).toBeInTheDocument();
-    expect(screen.getByText(/Paquetes de 1, 4, 10 o 20 sesiones/)).toBeInTheDocument();
-    expect(screen.getByText("Disponible de lunes a viernes, de 11 am a 4 pm.")).toBeInTheDocument();
+    expect(screen.getByRole("heading", {name:"Pilates Reformer. En HIVE."})).toBeInTheDocument();
+    expect(screen.getByText(/Una sesión, paquetes de 4, 10 o 20 clases y membresías/)).toBeInTheDocument();
+    expect(screen.getByText(/personalizadas de lunes a viernes, de 11 am a 4 pm/)).toBeInTheDocument();
     expect(screen.queryByText(/Barre|Sculpt|Pilates Mat|Pilates Tower/)).toBeNull();
     expect(screen.queryByText("Nuestro equipo.")).toBeNull();
+    expect(screen.getByRole("img", {name:/Detalle ilustrativo/})).toHaveAttribute("src", "/hive/reformer-detail.webp");
+    expect(screen.getByText("Imagen ilustrativa de un Reformer.")).toBeInTheDocument();
   });
   it("enlaza a compra aunque la landing no tenga paquetes publicados", () => {
     renderPage(<ClassesCoaches />, "/");
-    expect(screen.getByRole("link", {name:/Encuentra tu plan/})).toHaveAttribute("href","/app/checkout");
+    expect(screen.getByRole("link", {name:/Ver opciones de plan/})).toHaveAttribute("href","/app/checkout");
   });
 });
 

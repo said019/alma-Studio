@@ -12,8 +12,8 @@ export const THEME_COLOR: Record<Theme, string> = {
   dark: THEMES.dark.canvas,
 };
 
-/** App y acceso van en oscuro; el inicio editorial, panel y legales en claro. */
-export const themeForPath = (path: string): Theme => (/^\/(?:app|auth)(?:\/|$)/.test(path) ? "dark" : "light");
+/** Inicio, app y acceso van en oscuro; panel y legales en claro. */
+export const themeForPath = (path: string): Theme => (path === "/" || /^\/(?:app|auth)(?:\/|$)/.test(path) ? "dark" : "light");
 
 export function applyTheme(theme: Theme, doc: Document = document) {
   doc.documentElement.dataset.theme = theme;

@@ -79,10 +79,24 @@ describe("portada", () => {
   it("titular, un solo h1 y botón a registro con regreso a comprar", () => {
     renderPage(<LandingHero />, "/");
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
-    expect(screen.getByRole("heading", { level: 1, name: "Pilates Reformer en Coyoacán." })).toBeInTheDocument();
-    expect(screen.getByText("BEE HEALTHY. BE HIVE.")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "BEE HEALTHY. BE HIVE." })).toBeInTheDocument();
+    expect(screen.getByText("Pilates Reformer en Coyoacán")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Reserva tu primera clase/ })).toHaveAttribute("href", "/auth/register?returnUrl=%2Fapp%2Fcheckout");
-    expect(screen.getByRole("link", { name: "Ver horario" })).toHaveAttribute("href", "#horario");
+    expect(screen.getByRole("link", { name: "Encuentra tu plan" })).toHaveAttribute("href", "#paquetes");
+  });
+  it("el Reformer responde al control nativo sin cambiar las rutas de reserva", () => {
+    renderPage(<LandingHero />, "/");
+    const slider = screen.getByRole("slider", { name: "Mover el carro del Reformer" });
+    expect(slider).toHaveAttribute("min", "0");
+    expect(slider).toHaveAttribute("max", "100");
+    fireEvent.input(slider, { target: { value: "75" } });
+    const apparatus = slider.closest(".hive-apparatus") as HTMLElement;
+    expect(apparatus).toHaveClass("user-moving");
+    expect(apparatus.style.getPropertyValue("--travel")).toBe("-75px");
+    expect(apparatus.style.getPropertyValue("--spring")).toBe("1.39");
+    fireEvent.input(slider, { target: { value: "0" } });
+    expect(apparatus.style.getPropertyValue("--travel")).toBe("0px");
+    expect(apparatus.style.getPropertyValue("--spring")).toBe("1");
   });
   it("staff: el botón lleva al panel", () => {
     login("reception");

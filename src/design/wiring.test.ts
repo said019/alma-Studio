@@ -78,6 +78,7 @@ describe("cableado", () => {
     expect(s).toBeGreaterThan(i);
     const script = html.slice(s, html.indexOf("</script>", s));
     expect(script).toContain("/^\\/(?:app|auth)(?:\\/|$)/");
+    expect(script).toContain('location.pathname === "/"');
     expect(script).toContain("dataset.theme");
     expect(script).toContain(DARK.canvas);
   });

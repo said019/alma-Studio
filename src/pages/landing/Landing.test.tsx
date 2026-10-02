@@ -16,6 +16,18 @@ const PLANES = [
 afterEach(() => vi.clearAllMocks());
 
 describe("landing de HIVE", () => {
+  it("permite pausar y reactivar el movimiento desde escritorio y menú móvil", async () => {
+    vi.mocked(api.get).mockImplementation(respuestas({ "/plans": { data: [] }, "/classes": { data: [] } }) as never);
+    renderPage(<Landing />, "/");
+    await screen.findByText("Pronto publicamos el horario de la semana.");
+    fireEvent.click(screen.getByRole("button", { name: "Pausar movimiento" }));
+    expect(document.querySelector(".hive-landing")).toHaveClass("hive-motion-paused");
+    fireEvent.click(screen.getByRole("button", { name: "Abrir menú" }));
+    const control = within(document.getElementById("landing-menu")!).getByRole("button", { name: "Activar movimiento" });
+    expect(control).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(control);
+    expect(document.querySelector(".hive-landing")).not.toHaveClass("hive-motion-paused");
+  });
   it("pide sólo horario y paquetes; la oferta editorial no depende de catálogos heredados", async () => {
     vi.mocked(api.get).mockImplementation(respuestas({
       "/plans": { data: PLANES },
@@ -24,7 +36,7 @@ describe("landing de HIVE", () => {
       "/classes": { data: [] },
     }) as never);
     renderPage(<Landing />, "/");
-    expect(await screen.findByText("4 clases")).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /4 clases/ })).toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 1 })).toBeInTheDocument();
     for (const id of ["clases", "horario", "paquetes", "contacto"]) expect(document.getElementById(id)).not.toBeNull();
     expect(screen.getAllByRole("link", { name: "Paquetes" }).length).toBeGreaterThan(0);
@@ -37,6 +49,7 @@ describe("landing de HIVE", () => {
     await screen.findByText("Pronto publicamos el horario de la semana.");
     expect(document.getElementById("paquetes")).toBeNull();
     expect(screen.queryByRole("link", { name: "Paquetes" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Encuentra tu plan" })).toBeNull();
   });
   it("mientras cargan los paquetes, la sección y su liga ya están, con esqueleto", async () => {
     const resto = respuestas({ "/classes": { data: [] } });
@@ -64,10 +77,10 @@ describe("landing de HIVE", () => {
       "/public/instructors": new Error("500"),
     }) as never);
     renderPage(<Landing />, "/");
-    expect(await screen.findByRole("heading", { name: "Pilates Reformer." })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Pilates Reformer. En HIVE." })).toBeInTheDocument();
     expect(screen.queryByText("No pudimos actualizar la información del equipo.")).toBeNull();
     expect(screen.queryByRole("list", { name: "Coaches" })).toBeNull();
-    expect(document.querySelector("#clases img")).toBeNull();
+    expect(document.querySelector("#clases img")).toHaveAttribute("alt", expect.stringMatching(/ilustrativo/i));
   });
   it("tras Reintentar, horario y paquetes muestran esqueleto mientras piden de nuevo", async () => {
     vi.mocked(api.get).mockImplementation(respuestas({
@@ -108,7 +121,7 @@ describe("landing de HIVE", () => {
         "/classes": { data: [] },
       }) as never);
       renderPage(<Landing />, "/");
-      await screen.findByText("4 clases");
+      await screen.findByRole("button", { name: /4 clases/ });
       const reveals = Array.from(document.querySelectorAll("[data-reveal]"));
       expect(reveals.length).toBe(4);
       const paquetes = document.getElementById("paquetes")!.closest("[data-reveal]");
@@ -129,7 +142,7 @@ describe("landing de HIVE", () => {
       "/classes": { data: [] },
     }) as never);
     renderPage(<Landing />, "/");
-    await screen.findByText("4 clases");
+    await screen.findByRole("button", { name: /4 clases/ });
     const paquetes = document.getElementById("paquetes");
     expect(paquetes?.closest("[data-reveal]")).toHaveClass("is-visible");
     const reveals = document.querySelectorAll("[data-reveal]");

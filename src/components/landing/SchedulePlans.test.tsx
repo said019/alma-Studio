@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
-import { screen, fireEvent, within } from "@testing-library/react";
+import { screen, fireEvent, within, render } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { renderPage, atenuadoPor } from "@/test/renderPage";
 import { describeZone } from "@/design/zoneGuard";
 import { WeekSchedule } from "./WeekSchedule";
@@ -153,5 +154,58 @@ describe("categorías de planes HIVE", () => {
     fireEvent.click(screen.getByRole("button", { name: "Especiales" }));
     expect(screen.getByText("Requiere credencial de estudiante vigente")).toBeInTheDocument();
     expect(screen.queryByText("Plan anual")).toBeNull();
+  });
+});
+
+
+describe("selector dinámico de planes", () => {
+  const detalle = () => screen.getByRole("article", { name: "Detalle del plan seleccionado" });
+  it("selecciona cuatro clases por defecto y cambia todo el detalle desde los datos", () => {
+    const twenty = plan({ id: "api-twenty", name: "Mi paquete largo", classLimit: 20, price: 4400, finalPrice: 4000, opening: true, durationDays: 60, perClass: 200, description: "Descripción del catálogo", conditions: ["Personal e intransferible", "Sin prórroga", "Sin acumulación"] });
+    renderPage(<Plans {...listo} trial={null} plans={[twenty, plan({ id: "api-four", name: "Mi paquete inicial" })]} />);
+    expect(screen.getByRole("button", { name: "Mi paquete inicial" })).toHaveAttribute("aria-pressed", "true");
+    expect(within(detalle()).getByRole("heading")).toHaveTextContent("Mi paquete inicial");
+    fireEvent.click(screen.getByRole("button", { name: "Mi paquete largo" }));
+    expect(screen.getByRole("button", { name: "Mi paquete largo" })).toHaveAttribute("aria-pressed", "true");
+    const detail = within(detalle());
+    ["Descripción del catálogo", "$4,400", "$4,000", "60 días naturales desde la compra", "$200 por clase", ...twenty.conditions!].forEach(text => expect(detail.getByText(text)).toBeInTheDocument());
+    expect(detail.queryByText("30 días naturales desde la compra")).toBeNull();
+    expect(detail.getByRole("link", { name: "Comprar paquete" })).toHaveAttribute("href", "/app/checkout");
+  });
+  it("permite elegir cada membresía y especial manteniendo todas sus condiciones", () => {
+    const entries = [plan({ id: "monthly", name: "Mensual API", kind: "membership", billingPeriod: "month", classLimit: 999, perClass: null, conditions: ["Una sesión por día", "2 guest pass"] }), plan({ id: "annual", name: "Anual API", kind: "membership", billingPeriod: "month", classLimit: 999, perClass: null, conditions: ["2 sesiones por día", "Compromiso de 12 meses", "2 guest pass por mes", "Un café regular por día", "Cada pago requiere confirmación"] }), plan({ id: "student", name: "Estudiante API", kind: "special", conditions: ["Credencial vigente", "Cualquier horario"] }), plan({ id: "private", name: "Personal API", kind: "special", conditions: ["Lunes a viernes", "11:00–16:00", "Atención individual"] })];
+    renderPage(<Plans {...listo} trial={null} plans={entries} />);
+    fireEvent.click(screen.getByRole("button", { name: "Anual API" }));
+    entries[1].conditions!.forEach(text => expect(within(detalle()).getByText(text)).toBeInTheDocument());
+    expect(within(detalle()).getByText("por mes")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Especiales" }));
+    entries[2].conditions!.forEach(text => expect(within(detalle()).getByText(text)).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "Personal API" }));
+    entries[3].conditions!.forEach(text => expect(within(detalle()).getByText(text)).toBeInTheDocument());
+    expect(within(detalle()).queryByText("Credencial vigente")).toBeNull();
+  });
+  it("revalida plan y categoría eliminados y usa valores actualizados al refrescar", () => {
+    const initial = [plan({ id: "four", name: "Cuatro" }), plan({ id: "ten", name: "Diez", classLimit: 10 }), plan({ id: "annual", name: "Anual", kind: "membership" })];
+    const view = (plans: LandingPlan[]) => <MemoryRouter><Plans {...listo} trial={null} plans={plans} /></MemoryRouter>;
+    const { rerender } = render(view(initial));
+    fireEvent.click(screen.getByRole("button", { name: "Diez" }));
+    rerender(view([initial[0], initial[2]]));
+    expect(screen.getByRole("button", { name: "Cuatro" })).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(screen.getByRole("button", { name: "Membresías" }));
+    rerender(view([{ ...initial[0], price: 1750, finalPrice: 1750, conditions: ["Condición actualizada"] }]));
+    expect(within(detalle()).getByRole("heading")).toHaveTextContent("Cuatro");
+    expect(within(detalle()).getByText("$1,750")).toBeInTheDocument();
+    expect(within(detalle()).getByText("Condición actualizada")).toBeInTheDocument();
+    rerender(view([]));
+    expect(screen.queryByRole("article")).toBeNull();
+    expect(screen.queryByRole("link", { name: "Comprar paquete" })).toBeNull();
+  });
+  it("sin paquete de cuatro elige el primero y conserva compra cuando sólo hay prueba", () => {
+    const { unmount } = renderPage(<Plans {...listo} trial={null} plans={[plan({ name: "Primero", classLimit: 10 }), plan({ id: "other", name: "Segundo", classLimit: 20 })]} />);
+    expect(screen.getByRole("button", { name: "Primero" })).toHaveAttribute("aria-pressed", "true");
+    unmount();
+    renderPage(<Plans {...listo} trial={plan({ name: "Prueba API", conditions: ["Sólo una vez"] })} plans={[]} />);
+    expect(screen.getByText("Sólo una vez")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Comprar paquete" })).toHaveAttribute("href", "/app/checkout");
   });
 });

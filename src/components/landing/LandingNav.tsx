@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Menu, X } from "lucide-react";
+import { Menu, X, Pause, Play } from "lucide-react";
 import { BrandLogo } from "@/components/brand/BrandLogo";
 import { useAuthStore } from "@/stores/authStore";
 import { accountLink } from "./landingData";
 
 type NavLinkItem = { href: string; label: string };
 
-export function LandingNav({ links }: { links: NavLinkItem[] }) {
+export function LandingNav({ links, motionPaused = false, onToggleMotion }: { links: NavLinkItem[]; motionPaused?: boolean; onToggleMotion?: () => void }) {
   const { isAuthenticated, user } = useAuthStore();
   const account = accountLink(user, isAuthenticated);
   const [open, setOpen] = useState(false);
@@ -25,6 +25,13 @@ export function LandingNav({ links }: { links: NavLinkItem[] }) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [open]);
+
+  const motionControl = onToggleMotion && (
+    <button type="button" className="hive-motion-control inline-flex min-h-[44px] items-center gap-2 text-sm text-ink-muted" aria-pressed={motionPaused} onClick={onToggleMotion}>
+      {motionPaused ? <Play size={14} aria-hidden="true" /> : <Pause size={14} aria-hidden="true" />}
+      {motionPaused ? "Activar movimiento" : "Pausar movimiento"}
+    </button>
+  );
 
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-canvas/90 backdrop-blur">
@@ -49,6 +56,7 @@ export function LandingNav({ links }: { links: NavLinkItem[] }) {
           ))}
         </nav>
         <div className="flex items-center gap-2">
+          <div className="hidden lg:block">{motionControl}</div>
           <Link
             to={account.to}
             className="inline-flex min-h-[44px] items-center rounded-full border border-line-strong px-4 text-[0.8rem] font-extrabold text-ink no-underline"
@@ -70,6 +78,7 @@ export function LandingNav({ links }: { links: NavLinkItem[] }) {
       </div>
       {open && (
         <nav id="landing-menu" aria-label="Secciones" className="border-t border-line px-5 pb-3 lg:hidden">
+          {motionControl}
           {links.map((l) => (
             <a key={l.href} href={l.href} onClick={() => setOpen(false)} className="flex min-h-[44px] items-center text-[0.95rem] font-bold text-ink no-underline">
               {l.label}

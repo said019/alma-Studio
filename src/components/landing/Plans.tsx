@@ -10,7 +10,7 @@ function Price({ p, big }: { p: LandingPlan; big?: boolean }) {
   return (
     <div className="text-right">
       {p.opening && (p.finalPrice < p.price ? <s className="block text-[0.75rem] text-ink-muted">{money(p.price)}</s> : <span className="block text-[0.75rem] text-ink-muted">Normal {money(p.price)}</span>)}
-      <span className={"font-display font-extrabold text-ink " + (big ? "text-[1.4rem]" : "text-[1.1rem]")}>{money(p.finalPrice)}</span>
+      <span className={"font-display font-extrabold text-ink " + (big ? "hive-plan-price text-[1.4rem]" : "text-[1.1rem]")}>{money(p.finalPrice)}</span>
       {p.billingPeriod === "month" && <span className="block text-xs text-ink-muted">por mes</span>}
     </div>
   );
@@ -22,6 +22,7 @@ const ESQUELETO = "animate-pulse rounded-[18px] border border-line bg-surface/70
 
 export function Plans({ trial, plans, loading, error, onRetry }: Props) {
   const [chosen, setChosen] = useState<string | null>(null);
+  const [chosenPlan, setChosenPlan] = useState<string | null>(null);
   const groups = [
     { id: "sessions", label: "Por sesiones", description: "Una clase o un paquete. Encuentra el ritmo que va contigo." },
     { id: "membership", label: "Membresías", description: "Haz del movimiento parte de tu día. Consulta los beneficios y el compromiso de cada plan." },
@@ -29,7 +30,7 @@ export function Plans({ trial, plans, loading, error, onRetry }: Props) {
   ].filter(group => plans.some(p => (p.kind ?? "sessions") === group.id));
   const selected = groups.find(group => group.id === chosen) ?? groups[0];
   const visiblePlans = plans.filter(p => (p.kind ?? "sessions") === selected?.id);
-  const anyOpening = visiblePlans.some((p) => p.opening);
+  const activePlan = visiblePlans.find(p => p.id === chosenPlan) ?? visiblePlans.find(p => p.classLimit === 4) ?? visiblePlans[0];
   return (
     <section id="paquetes" aria-labelledby="paquetes-titulo" className="hive-plans scroll-mt-20 border-t border-line">
       <div className="mx-auto max-w-[1120px] px-5 py-14 sm:px-8 lg:py-20">
@@ -72,25 +73,42 @@ export function Plans({ trial, plans, loading, error, onRetry }: Props) {
                 </button>)}
               </div>
             )}
-            {selected && <p className="mb-6 max-w-xl text-sm leading-relaxed text-ink-muted">{selected.description}</p>}
-            {anyOpening && <p className="mb-2 text-[0.75rem] font-extrabold uppercase tracking-[0.12em] text-accent">Precio de apertura</p>}
-            <ul>
-              {visiblePlans.map((p) => (
-                <li key={p.id} className="hive-plan-row flex items-start justify-between gap-5 border-t border-line py-5">
-                  <div className="min-w-0">
-                    <p className="text-[0.95rem] font-bold text-ink">{p.name}</p>
-                    {p.durationDays != null && <p className="text-[0.8rem] text-ink-muted">{p.durationDays} días naturales {p.billingPeriod === "month" ? "por periodo mensual" : "desde la compra"}</p>}
-                    {p.conditions?.map(condition => <p key={condition} className="text-[0.8rem] text-ink-muted">{condition}</p>)}
-                    {p.perClass != null && <p className="text-[0.8rem] text-ink-muted">{money(p.perClass)} por clase</p>}
+            {activePlan && (
+              <div className="hive-plan-layout">
+                <div>
+                  {selected && <p className="mb-6 max-w-xl text-sm leading-relaxed text-ink-muted">{selected.description}</p>}
+                  <div role="group" aria-label="Planes disponibles" className="hive-plan-pickers"
+                    data-category={selected?.id === "membership" ? "memberships" : selected?.id}>
+                    {visiblePlans.map(p => (
+                      <button key={p.id} type="button" aria-pressed={activePlan.id === p.id}
+                        aria-label={p.name} onClick={() => setChosenPlan(p.id)}
+                        className="min-h-[44px] text-ink">
+                        <b>{selected?.id === "sessions" && p.classLimit != null && p.classLimit > 0 && p.classLimit < 900 ? p.classLimit : p.name}</b>
+                        <small>{selected?.id === "sessions" && p.classLimit != null && p.classLimit > 0 && p.classLimit < 900 ? p.name : p.billingPeriod === "month" ? "Pago mensual" : "Ver condiciones"}</small>
+                      </button>
+                    ))}
                   </div>
-                  <Price p={p} />
-                </li>
-              ))}
-            </ul>
-            <div className="mt-8 flex flex-wrap items-center gap-5">
-              <PrimaryButton to="/app/checkout" className="w-full sm:w-auto">Comprar paquete</PrimaryButton>
-              <p className="text-xs text-ink-muted">Precios en MXN. Revisa las condiciones antes de comprar.</p>
-            </div>
+                  <p className="mt-6 text-sm text-ink-muted">Selecciona una opción para ver su precio y condiciones.</p>
+                </div>
+                <article className="hive-plan-detail" aria-label="Detalle del plan seleccionado">
+                  <div aria-live="polite" aria-atomic="true">
+                    <h3 className="hive-plan-name font-bold text-ink">{activePlan.name}</h3>
+                    {activePlan.description && <p className="mt-3 text-sm text-ink-muted">{activePlan.description}</p>}
+                    {activePlan.opening && <p className="mt-4 text-[0.75rem] font-extrabold uppercase tracking-[0.12em] text-accent">Precio de apertura</p>}
+                    <Price p={activePlan} big />
+                    <p className="text-xs text-ink-muted">Precios en MXN</p>
+                    <ul className="hive-plan-terms">
+                      {activePlan.durationDays != null && <li>{activePlan.durationDays} días naturales {activePlan.billingPeriod === "month" ? "por periodo mensual" : "desde la compra"}</li>}
+                      {activePlan.conditions?.map((condition, index) => <li key={`${index}-${condition}`}>{condition}</li>)}
+                      {activePlan.perClass != null && <li>{money(activePlan.perClass)} por clase</li>}
+                    </ul>
+                  </div>
+                  <PrimaryButton to="/app/checkout" className="hive-reserve mt-6 w-full">Comprar paquete</PrimaryButton>
+                </article>
+              </div>
+            )}
+            {!activePlan && trial && <PrimaryButton to="/app/checkout" className="mt-6 w-full sm:w-auto">Comprar paquete</PrimaryButton>}
+            {!activePlan && !trial && <p className="text-sm text-ink-muted">Pronto publicaremos nuestros paquetes.</p>}
           </>
         )}
       </div>
