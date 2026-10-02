@@ -79,8 +79,8 @@ describe("portada", () => {
   it("titular, un solo h1 y botón a registro con regreso a comprar", () => {
     renderPage(<LandingHero />, "/");
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
-    expect(screen.getByText("Pilates Reformer · Coyoacán")).toBeInTheDocument();
-    expect(screen.getByText("Sal más fuerte.")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "Pilates Reformer en Coyoacán." })).toBeInTheDocument();
+    expect(screen.getByText("BEE HEALTHY. BE HIVE.")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Reserva tu primera clase/ })).toHaveAttribute("href", "/auth/register?returnUrl=%2Fapp%2Fcheckout");
     expect(screen.getByRole("link", { name: "Ver horario" })).toHaveAttribute("href", "#horario");
   });
@@ -94,7 +94,7 @@ describe("portada", () => {
 describe("pie", () => {
   it("lema, ligas legales y © HIVE", () => {
     renderPage(<LandingFooter />, "/");
-    expect(screen.getByText("MOVIMIENTO · BIENESTAR · COMUNIDAD")).toBeInTheDocument();
+    expect(screen.getByText("BEE HEALTHY. BE HIVE.")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Privacidad" })).toHaveAttribute("href", "/legal/privacidad");
     expect(screen.getByRole("link", { name: "Términos" })).toHaveAttribute("href", "/legal/terminos");
     expect(screen.getByRole("link", { name: "Cancelación" })).toHaveAttribute("href", "/legal/cancelacion");

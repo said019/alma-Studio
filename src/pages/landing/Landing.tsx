@@ -1,6 +1,5 @@
-import { useEffect, useMemo, useRef, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { format } from "date-fns";
 import api from "@/lib/api";
 import { LandingNav } from "@/components/landing/LandingNav";
 import { LandingHero } from "@/components/landing/LandingHero";
@@ -10,8 +9,8 @@ import { Plans } from "@/components/landing/Plans";
 import { Contact } from "@/components/landing/Contact";
 import { LandingFooter } from "@/components/landing/LandingFooter";
 import {
-  normalizeClasses, splitPlans, weekDays, weekStartFor,
-  type ApiClass, type ClassTypeRow, type PlanRow,
+  normalizeClasses, splitPlans, studioClock, weekDays, weekStartFor,
+  type ApiClass, type PlanRow,
 } from "@/components/landing/landingData";
 
 const lista = <T,>(data: unknown): T[] => (Array.isArray(data) ? data : ((data as { data?: T[] })?.data ?? []));
@@ -39,7 +38,18 @@ function Reveal({ children }: { children: ReactNode }) {
 }
 
 export default function Landing() {
-  const now = useMemo(() => new Date(), []);
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const refresh = () => setNow(new Date());
+    const timer = window.setInterval(refresh, 30_000);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, []);
   const start = weekStartFor(now);
   const days = weekDays(start);
   const from = days[0].iso;
@@ -54,12 +64,6 @@ export default function Landing() {
     queryKey: ["plans-public"],
     queryFn: async () => lista<PlanRow>((await api.get("/plans?active=true")).data),
   });
-  const typesQ = useQuery({
-    queryKey: ["class-types-public"],
-    queryFn: async () => lista<ClassTypeRow>((await api.get("/class-types")).data),
-  });
-
-
   const classes = useMemo(() => normalizeClasses(classesQ.data ?? [], now), [classesQ.data, now]);
   const { trial, rest } = useMemo(() => splitPlans(plansQ.data ?? []), [plansQ.data]);
   const hasPlans = !!trial || rest.length > 0;
@@ -75,24 +79,18 @@ export default function Landing() {
   ];
 
   return (
-    <div className="min-h-screen bg-canvas bg-app-glow text-ink">
+    <div className="hive-landing min-h-[100dvh] bg-canvas text-ink">
       <LandingNav links={links} />
       <main>
         <LandingHero />
         <Reveal>
-          <ClassesCoaches
-            classTypes={typesQ.data ?? []}
-            coaches={[]}
-            loading={cargando(typesQ)}
-            error={typesQ.isError}
-            onRetry={() => { typesQ.refetch(); }}
-          />
+          <ClassesCoaches />
         </Reveal>
         <Reveal>
           <WeekSchedule
             days={days}
             classes={classes}
-            todayIso={format(now, "yyyy-MM-dd")}
+            todayIso={studioClock(now).day}
             loading={cargando(classesQ)}
             error={classesQ.isError}
             onRetry={() => classesQ.refetch()}

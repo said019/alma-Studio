@@ -14,7 +14,7 @@
     <script>
       /* Tema por ruta antes de que cargue React (src/design/theme.ts): sin parpadeo claro en la app. */
       (function () {
-        var dark = /^\/(?:(?:app|auth)(?:\/|$)|$)/.test(location.pathname);
+        var dark = /^\/(?:app|auth)(?:\/|$)/.test(location.pathname);
         document.documentElement.dataset.theme = dark ? "dark" : "light";
         if (dark) document.querySelector('meta[name="theme-color"]').setAttribute("content", "#141210");
       })();

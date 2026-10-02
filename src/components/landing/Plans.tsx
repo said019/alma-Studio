@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { PrimaryButton } from "@/components/app/AppShell";
 import { formatMoneyMX } from "@/components/app/widgets";
 import { SectionTitle } from "./SectionTitle";
@@ -20,11 +21,19 @@ type Props = { trial: LandingPlan | null; plans: LandingPlan[]; loading: boolean
 const ESQUELETO = "animate-pulse rounded-[18px] border border-line bg-surface/70";
 
 export function Plans({ trial, plans, loading, error, onRetry }: Props) {
-  const anyOpening = plans.some((p) => p.opening);
+  const [chosen, setChosen] = useState<string | null>(null);
+  const groups = [
+    { id: "sessions", label: "Por sesiones", description: "Una clase o un paquete. Encuentra el ritmo que va contigo." },
+    { id: "membership", label: "Membresías", description: "Haz del movimiento parte de tu día. Consulta los beneficios y el compromiso de cada plan." },
+    { id: "special", label: "Especiales", description: "Horario especial, tarifa de estudiante y atención personalizada." },
+  ].filter(group => plans.some(p => (p.kind ?? "sessions") === group.id));
+  const selected = groups.find(group => group.id === chosen) ?? groups[0];
+  const visiblePlans = plans.filter(p => (p.kind ?? "sessions") === selected?.id);
+  const anyOpening = visiblePlans.some((p) => p.opening);
   return (
-    <section id="paquetes" aria-labelledby="paquetes-titulo" className="scroll-mt-20 border-t border-line">
-      <div className="mx-auto max-w-[720px] px-5 py-14 sm:px-8 lg:py-20">
-        <SectionTitle id="paquetes-titulo" eyebrow="Paquetes" title="Elige cómo" accent="entrar a la colmena." />
+    <section id="paquetes" aria-labelledby="paquetes-titulo" className="hive-plans scroll-mt-20 border-t border-line">
+      <div className="mx-auto max-w-[1120px] px-5 py-14 sm:px-8 lg:py-20">
+        <SectionTitle id="paquetes-titulo" eyebrow="Paquetes" title="Tu práctica." accent="Tu ritmo." />
         {loading ? (
           // Altura aproximada de la sección cargada (clase muestra, filas y botón): la página no salta al llegar.
           <div aria-hidden="true">
@@ -54,13 +63,23 @@ export function Plans({ trial, plans, loading, error, onRetry }: Props) {
                 <Price p={trial} big />
               </div>
             )}
+            {groups.length > 1 && (
+              <div role="group" aria-label="Tipos de plan" className="hive-plan-options mb-5 flex flex-wrap gap-2">
+                {groups.map(group => <button key={group.id} type="button" aria-pressed={selected?.id === group.id}
+                  onClick={() => setChosen(group.id)}
+                  className="min-h-[44px] rounded-full border border-line-strong px-5 py-2 text-[0.85rem] font-bold text-ink">
+                  {group.label}
+                </button>)}
+              </div>
+            )}
+            {selected && <p className="mb-6 max-w-xl text-sm leading-relaxed text-ink-muted">{selected.description}</p>}
             {anyOpening && <p className="mb-2 text-[0.75rem] font-extrabold uppercase tracking-[0.12em] text-accent">Precio de apertura</p>}
             <ul>
-              {plans.map((p) => (
-                <li key={p.id} className="flex items-center justify-between gap-3 border-t border-line py-3">
+              {visiblePlans.map((p) => (
+                <li key={p.id} className="hive-plan-row flex items-start justify-between gap-5 border-t border-line py-5">
                   <div className="min-w-0">
                     <p className="text-[0.95rem] font-bold text-ink">{p.name}</p>
-                    {p.durationDays != null && <p className="text-[0.8rem] text-ink-muted">{p.durationDays} días naturales desde la compra</p>}
+                    {p.durationDays != null && <p className="text-[0.8rem] text-ink-muted">{p.durationDays} días naturales {p.billingPeriod === "month" ? "por periodo mensual" : "desde la compra"}</p>}
                     {p.conditions?.map(condition => <p key={condition} className="text-[0.8rem] text-ink-muted">{condition}</p>)}
                     {p.perClass != null && <p className="text-[0.8rem] text-ink-muted">{money(p.perClass)} por clase</p>}
                   </div>
@@ -68,8 +87,9 @@ export function Plans({ trial, plans, loading, error, onRetry }: Props) {
                 </li>
               ))}
             </ul>
-            <div className="mt-6">
-              <PrimaryButton to="/app/checkout" className="w-full">Comprar paquete</PrimaryButton>
+            <div className="mt-8 flex flex-wrap items-center gap-5">
+              <PrimaryButton to="/app/checkout" className="w-full sm:w-auto">Comprar paquete</PrimaryButton>
+              <p className="text-xs text-ink-muted">Precios en MXN. Revisa las condiciones antes de comprar.</p>
             </div>
           </>
         )}

@@ -11,7 +11,7 @@ const CTA = "inline-flex min-h-[44px] shrink-0 items-center rounded-full px-4 te
 export function WeekSchedule({ days, classes, todayIso, loading, error, onRetry }: Props) {
   const byDay = useMemo(() => groupByDay(classes), [classes]);
   const [chosen, setChosen] = useState<string | null>(null);
-  const selected = chosen ?? defaultDay(days, byDay, todayIso);
+  const selected = chosen && days.some((day) => day.iso === chosen) ? chosen : defaultDay(days, byDay, todayIso);
   const list = byDay[selected] ?? [];
   const selectedDay = days.find((d) => d.iso === selected);
   const dayName = selectedDay ? `${selectedDay.weekday} ${selectedDay.dayNum}` : "";
@@ -100,7 +100,9 @@ export function WeekSchedule({ days, classes, todayIso, loading, error, onRetry 
                       <p className="truncate text-[0.8rem] text-ink-muted">{c.durationMin ? `${c.durationMin} min` : ""}</p>
                       <p className={"text-[0.75rem] font-bold " + (a.full ? "text-ink-muted" : "text-accent")}>{a.label}</p>
                     </div>
-                    {a.full ? (
+                    {c.bookingClosed ? (
+                      <span className="text-center text-[0.75rem] font-bold text-ink-muted">Reservas cerradas</span>
+                    ) : a.full ? (
                       <Link to={`/app/classes/${c.id}`} className={`${CTA} border border-line-strong text-ink`}>
                         <span className="sr-only">{c.name}, {c.start}: </span>Lista de espera
                       </Link>

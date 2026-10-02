@@ -13,8 +13,8 @@ beforeEach(() => {
 });
 
 describe("tema", () => {
-  it("la ruta decide el tema: landing, app y acceso oscuros; lo demás claro", () => {
-    expect(themeForPath("/")).toBe("dark");
+  it("la ruta decide el tema: inicio claro, app y acceso oscuros", () => {
+    expect(themeForPath("/")).toBe("light");
     expect(themeForPath("/app")).toBe("dark");
     expect(themeForPath("/app/wallet")).toBe("dark");
     expect(themeForPath("/auth/login")).toBe("dark");

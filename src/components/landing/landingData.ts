@@ -1,5 +1,6 @@
 import { planConditions, type PlanRules } from "@/lib/planConditions";
 import { addDays, format, startOfWeek } from "date-fns";
+import { DEFAULT_BOOKING_POLICY } from "@/lib/booking-policy";
 
 /* ── Sesión ─────────────────────────────────────────────────────────── */
 export const STAFF_ROLES: readonly string[] = ["admin", "super_admin", "instructor", "reception"];
@@ -25,43 +26,66 @@ export type ApiClass = {
 };
 export type LandingClass = {
   id: string; day: string; start: string; end: string; name: string; coach: string;
-  durationMin: number | null; capacity: number; remaining: number;
+  durationMin: number | null; capacity: number; remaining: number; bookingClosed?: boolean;
 };
 
+const studioFormatter = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "America/Mexico_City", year: "numeric", month: "2-digit", day: "2-digit",
+  hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23",
+});
+/** Studio civil time, independent of the visitor's device timezone. */
+export function studioClock(now: Date) {
+  const parts = Object.fromEntries(studioFormatter.formatToParts(now).map(({ type, value }) => [type, value]));
+  return { day: `${parts.year}-${parts.month}-${parts.day}`, time: `${parts.hour}:${parts.minute}`,
+    minutes: Number(parts.hour) * 60 + Number(parts.minute) + Number(parts.second) / 60 };
+}
+const hasOffset = (t?: string) => !!t && /T.*(?:Z|[+-]\d{2}:?\d{2})$/i.test(t);
 const hhmm = (t?: string) => {
   if (!t) return "";
-  const part = t.includes("T") ? t.split("T")[1] : t;
-  return part.slice(0, 5);
+  if (hasOffset(t)) return Number.isFinite(Date.parse(t)) ? studioClock(new Date(t)).time : "";
+  return (t.includes("T") ? t.split("T")[1] : t).slice(0, 5);
 };
-const minutes = (h: string) => (h ? Number(h.slice(0, 2)) * 60 + Number(h.slice(3, 5)) : NaN);
+const minutes = (h: string) => /^([01]\d|2[0-3]):[0-5]\d$/.test(h) ? Number(h.slice(0, 2)) * 60 + Number(h.slice(3, 5)) : NaN;
+const dayMinutes = (day: string) => Date.parse(`${day}T00:00:00Z`) / 60000;
+const approvedDiscipline = (name = "") => {
+  const normalized = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  return /\b(reformer|personalizad[oa])\b/.test(normalized) && !/\b(tower|barre|sculpt|mat|yoga)\b/.test(normalized);
+};
 
 export function normalizeClasses(raw: ApiClass[], now: Date): LandingClass[] {
-  const nowIso = format(now, "yyyy-MM-dd");
-  const nowMin = now.getHours() * 60 + now.getMinutes();
+  const clock = studioClock(now);
+  const nowMinutes = dayMinutes(clock.day) + clock.minutes;
   return raw
-    .filter((c) => c.status !== "cancelled")
+    .filter((c) => (!c.status || c.status === "scheduled") && approvedDiscipline(c.class_type_name))
     .map((c) => {
-      const day = (c.date || c.class_date || c.start_time?.split("T")[0] || "").split("T")[0];
+      // API date/time values without an offset are studio wall times. Zoned timestamps are instants.
+      const day = hasOffset(c.start_time) && Number.isFinite(Date.parse(c.start_time!))
+        ? studioClock(new Date(c.start_time!)).day
+        : (c.date || c.class_date || c.start_time?.split("T")[0] || "").split("T")[0];
       const start = hhmm(c.start_time);
       const end = hhmm(c.end_time);
       const dur = minutes(end) - minutes(start);
       const capacity = Math.max(0, c.capacity ?? c.max_capacity ?? 0);
       return {
         id: c.id, day, start, end,
-        name: c.class_type_name || "Clase",
-        coach: c.instructor_name || "Por confirmar",
+        name: c.class_type_name!, coach: c.instructor_name || "Por confirmar",
         durationMin: Number.isFinite(dur) && dur > 0 ? dur : null,
-        capacity,
-        remaining: Math.max(0, capacity - (c.current_bookings ?? 0)),
+        capacity, remaining: Math.max(0, capacity - (c.current_bookings ?? 0)),
+        // Matches the server's fixed booking/waitlist lead time; exactly two hours remains open.
+        bookingClosed: dayMinutes(day) + minutes(start) - nowMinutes < DEFAULT_BOOKING_POLICY.bookingLeadHours * 60,
       };
     })
-    .filter((c) => c.day > nowIso || (c.day === nowIso && minutes(c.start) > nowMin))
+    .filter((c) => dayMinutes(c.day) + minutes(c.start) > nowMinutes)
     .sort((a, b) => (a.day + a.start).localeCompare(b.day + b.start));
 }
 
 export function weekStartFor(now: Date): Date {
-  const monday = startOfWeek(now, { weekStartsOn: 1 });
-  return now.getDay() === 0 && now.getHours() >= 12 ? addDays(monday, 7) : monday;
+  const clock = studioClock(now);
+  const [year, month, day] = clock.day.split("-").map(Number);
+  // A local calendar carrier for date-fns, not the visitor's current date.
+  const studioDay = new Date(year, month - 1, day);
+  const monday = startOfWeek(studioDay, { weekStartsOn: 1 });
+  return studioDay.getDay() === 0 && clock.minutes >= 12 * 60 ? addDays(monday, 7) : monday;
 }
 
 export type WeekDay = { iso: string; weekday: string; dayNum: string };
@@ -104,7 +128,7 @@ export type PlanRow = {
   isNonRepeatable?: boolean; is_non_repeatable?: boolean; sortOrder?: number | null; sort_order?: number | null;
 };
 export type LandingPlan = {
-  conditions?: string[]; billingPeriod?: string;
+  conditions?: string[]; billingPeriod?: string; kind?: "sessions" | "membership" | "special";
   id: string; name: string; description: string | null; price: number; finalPrice: number; opening: boolean;
   classLimit: number | null; perClass: number | null; durationDays: number | null; nonRepeatable: boolean;
 };
@@ -119,6 +143,7 @@ export function toLandingPlan(p: PlanRow): LandingPlan {
   const perClass = classLimit != null && classLimit > 1 && classLimit < 900 ? Math.round(finalPrice / classLimit) : null;
   return {
     conditions: planConditions(p), billingPeriod: p.rules?.billing_period,
+    kind: p.rules?.billing_period === "month" || (p.rules?.daily_class_limit && (classLimit == null || classLimit >= 900)) ? "membership" : (p.rules?.requires_student_id || p.personalOnly || p.personal_only || p.afternoonOnly || p.afternoon_only || p.rules?.booking_start_time || (p.rules?.allowed_weekdays && p.rules.allowed_weekdays.length < 7)) ? "special" : "sessions",
     id: p.id, name: p.name, description: p.description ?? null, price, finalPrice, opening, classLimit, perClass,
     durationDays: p.durationDays ?? p.duration_days ?? null,
     nonRepeatable: Boolean(p.isNonRepeatable ?? p.is_non_repeatable),

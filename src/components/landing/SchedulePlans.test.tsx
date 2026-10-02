@@ -135,3 +135,23 @@ describe("paquetes", () => {
     expect(screen.queryByText("Precio de apertura")).toBeNull();
   });
 });
+
+
+describe("categorías de planes HIVE", () => {
+  it("separa sesiones, membresías y especiales sin perder condiciones ni precios", () => {
+    const annual = plan({ id: "annual", name: "Plan anual", kind: "membership", billingPeriod: "month", conditions: ["2 sesiones por día", "Compromiso de 12 meses", "2 guest pass por mes"], price: 4200, finalPrice: 3900, opening: true });
+    const student = plan({ id: "student", name: "Estudiante", kind: "special", conditions: ["Requiere credencial de estudiante vigente"], price: 250, finalPrice: 250, classLimit: 1, perClass: null });
+    renderPage(<Plans trial={null} plans={[plan({ id: "pack", kind: "sessions", durationDays: 60 }), annual, student]} {...listo} />, "/");
+    expect(screen.getByText("60 días naturales desde la compra")).toBeInTheDocument();
+    expect(screen.queryByText("Plan anual")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Membresías" }));
+    expect(screen.getByRole("button", { name: "Membresías" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("Compromiso de 12 meses")).toBeInTheDocument();
+    expect(screen.getByText("2 guest pass por mes")).toBeInTheDocument();
+    expect(screen.getByText("$3,900")).toBeInTheDocument();
+    expect(screen.getByText("por mes")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Especiales" }));
+    expect(screen.getByText("Requiere credencial de estudiante vigente")).toBeInTheDocument();
+    expect(screen.queryByText("Plan anual")).toBeNull();
+  });
+});

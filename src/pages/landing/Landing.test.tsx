@@ -16,7 +16,7 @@ const PLANES = [
 afterEach(() => vi.clearAllMocks());
 
 describe("landing de HIVE", () => {
-  it("pide horario, paquetes y clases sin cargar fotos ni coaches", async () => {
+  it("pide sólo horario y paquetes; la oferta editorial no depende de catálogos heredados", async () => {
     vi.mocked(api.get).mockImplementation(respuestas({
       "/plans": { data: PLANES },
       "/class-types": { data: [{ id: "r", name: "Reformer", durationMin: 50 }] },
@@ -29,7 +29,7 @@ describe("landing de HIVE", () => {
     for (const id of ["clases", "horario", "paquetes", "contacto"]) expect(document.getElementById(id)).not.toBeNull();
     expect(screen.getAllByRole("link", { name: "Paquetes" }).length).toBeGreaterThan(0);
     expect(vi.mocked(api.get).mock.calls.map(([u]) => String(u).split("?")[0]).sort())
-      .toEqual(["/class-types", "/classes", "/plans"]);
+      .toEqual(["/classes", "/plans"]);
   });
   it("sin paquetes activos: no hay sección ni liga de Paquetes", async () => {
     vi.mocked(api.get).mockImplementation(respuestas({ "/plans": { data: [] } }) as never);
@@ -64,18 +64,18 @@ describe("landing de HIVE", () => {
       "/public/instructors": new Error("500"),
     }) as never);
     renderPage(<Landing />, "/");
-    expect(await screen.findByText("Reformer", { selector: "h3" })).toBeInTheDocument();
-    expect(screen.queryByText("No pudimos cargar las clases.")).toBeNull();
+    expect(await screen.findByRole("heading", { name: "Pilates Reformer." })).toBeInTheDocument();
+    expect(screen.queryByText("No pudimos actualizar la información del equipo.")).toBeNull();
     expect(screen.queryByRole("list", { name: "Coaches" })).toBeNull();
     expect(document.querySelector("#clases img")).toBeNull();
   });
-  it("tras Reintentar, horario, clases y paquetes muestran esqueleto mientras piden de nuevo", async () => {
+  it("tras Reintentar, horario y paquetes muestran esqueleto mientras piden de nuevo", async () => {
     vi.mocked(api.get).mockImplementation(respuestas({
       "/classes": new Error("500"), "/plans": new Error("500"), "/class-types": new Error("500"),
     }) as never);
     renderPage(<Landing />, "/");
     const avisos = {
-      horario: "No pudimos cargar el horario.", paquetes: "No pudimos cargar los paquetes.", clases: "No pudimos cargar las clases.",
+      horario: "No pudimos cargar el horario.", paquetes: "No pudimos cargar los paquetes.",
     };
     for (const texto of Object.values(avisos)) await screen.findByText(texto);
     vi.mocked(api.get).mockImplementation((() => new Promise(() => {})) as never);

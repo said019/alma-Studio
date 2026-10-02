@@ -9,7 +9,7 @@ export function LandingFooter() {
       <div className="flex justify-center text-accent">
         <BrandLogo variant="mark" size={34} title="HIVE" />
       </div>
-      <p className="mt-4 text-[0.75rem] font-extrabold tracking-[0.3em] text-accent">MOVIMIENTO · BIENESTAR · COMUNIDAD</p>
+      <p className="mt-4 text-[0.75rem] font-extrabold tracking-[0.3em] text-accent">BEE HEALTHY. BE HIVE.</p>
       <nav aria-label="Legales" className="mt-3 flex flex-wrap justify-center gap-x-5">
         {LEGAL.map(([to, label]) => (
           <Link key={to} to={to} className="inline-flex min-h-[44px] items-center text-[0.8rem] text-ink-muted no-underline hover:text-ink">

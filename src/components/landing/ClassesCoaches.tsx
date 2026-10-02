@@ -1,81 +1,35 @@
-import { SectionTitle } from "./SectionTitle";
-import { classTypeDuration, specialtiesText, type ClassTypeRow, type CoachRow } from "./landingData";
+import { Link } from "react-router-dom";
 
-const DIFF = ["Grupos pequeños: atención de verdad.", "Comunidad que te empuja a volver.", "Pilates · Café · Wellness."];
-
-type Props = { classTypes: ClassTypeRow[]; coaches: CoachRow[]; loading: boolean; error: boolean; onRetry: () => void };
-
-export function ClassesCoaches({ classTypes, coaches, loading, error, onRetry }: Props) {
+// The public offer comes from HIVE's approved flyer. Legacy API disciplines
+// and coach specialties must not silently become advertised services.
+export function ClassesCoaches() {
   return (
     <section id="clases" aria-labelledby="clases-titulo" className="scroll-mt-20 border-t border-line">
-      <div className="mx-auto max-w-[1120px] px-5 py-14 sm:px-8 lg:py-20">
-        <SectionTitle id="clases-titulo" eyebrow={coaches.length ? "Clases y coaches" : "Clases"} title="Reformer," accent="a tu ritmo y al nuestro." />
-
-        {loading ? (
-          <div className="grid gap-3 sm:grid-cols-2" aria-hidden="true">
-            {[0, 1].map((i) => <div key={i} className="h-28 animate-pulse rounded-[18px] border border-line bg-surface/70" />)}
+      <div className="mx-auto max-w-[1120px] px-5 py-16 sm:px-8 lg:py-24">
+        <div className="grid gap-10 lg:grid-cols-[1.15fr_1fr] lg:gap-20">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.22em] text-accent">La práctica / HIVE</p>
+            <h2 id="clases-titulo" className="mt-5 font-display text-3xl font-bold leading-[0.95] tracking-tight text-ink sm:text-4xl">Pilates<br />Reformer.</h2>
+            <p className="mt-6 max-w-md text-base leading-relaxed text-ink-muted">Un espacio para tu práctica. Elige tus sesiones y resérvalas desde nuestra app.</p>
+            <Link to="/app/checkout" className="mt-6 inline-flex min-h-11 items-center border-b border-line-strong text-sm font-bold text-ink transition-transform hover:translate-x-1 active:scale-[0.98] motion-reduce:transform-none">Encuentra tu plan <span aria-hidden="true" className="ml-5">↗</span></Link>
           </div>
-        ) : (
-          <>
-            {/* Si falla una de las dos consultas, el aviso va arriba y la otra mitad se conserva. */}
-            {error && (
-              <div className={"flex flex-wrap items-center justify-between gap-3 rounded-[18px] border border-line bg-surface/70 p-4" + (classTypes.length > 0 || coaches.length > 0 ? " mb-6" : "")}>
-                <p className="text-[0.9rem] text-ink-muted">No pudimos cargar las clases.</p>
-                <button type="button" onClick={onRetry} className="min-h-[44px] rounded-full border border-line-strong px-4 text-[0.85rem] font-bold text-ink">
-                  Reintentar
-                </button>
+          <div className="self-end">
+            <svg viewBox="0 0 440 170" fill="none" aria-hidden="true" className="mb-8 w-full max-w-lg text-accent" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M38 104h340v22H38zM49 126v24h24v-24m272 0v24h24v-24M82 98h182l18-13H103zM67 85V65h33m-19 0 17 20M328 102V29m-13 0h28M112 85l216-48M294 101h60M179 104v22m24-22v22" />
+            </svg>
+            <dl className="divide-y divide-line border-y border-line">
+              <div className="grid gap-2 py-5 sm:grid-cols-[1fr_1.2fr] sm:gap-5">
+                <dt className="text-sm font-bold text-ink">Sesiones de Reformer</dt>
+                <dd className="text-sm leading-relaxed text-ink-muted">Paquetes de 1, 4, 10 o 20 sesiones. También planes mensual y anual con pago mensual.</dd>
               </div>
-            )}
-            {classTypes.length > 0 && (
-              <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {classTypes.map((t) => {
-                  const dur = classTypeDuration(t);
-                  return (
-                    <li key={t.id} className="rounded-[18px] border border-line bg-surface/70 p-4">
-                      <h3 className="font-display text-[1rem] font-bold text-ink">{t.name}</h3>
-                      {(t.description || t.subtitle) && (
-                        <p className="mt-1 text-[0.85rem] leading-[1.5] text-ink-muted">{t.description || t.subtitle}</p>
-                      )}
-                      {dur && <span className="mt-3 inline-block rounded-full bg-accent-soft px-2.5 py-1 text-[0.75rem] font-extrabold text-accent">{dur} min</span>}
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-            {coaches.length > 0 && (
-              <ul aria-label="Coaches" className="mt-8 flex gap-4 overflow-x-auto pb-2">
-                {coaches.map((c) => (
-                  <li key={c.id} className="w-24 shrink-0 text-center">
-                    {c.photoUrl ? (
-                      <img
-                        src={c.photoUrl}
-                        alt=""
-                        loading="lazy"
-                        className="clip-hex mx-auto h-[74px] w-16 object-cover"
-                        style={{ objectPosition: `${c.photoFocusX ?? 50}% ${c.photoFocusY ?? 50}%` }}
-                      />
-                    ) : (
-                      <span data-monograma aria-hidden="true" className="clip-hex mx-auto grid h-[74px] w-16 place-items-center bg-accent-soft font-display text-[1.25rem] font-extrabold text-accent">
-                        {c.displayName.trim().charAt(0).toUpperCase()}
-                      </span>
-                    )}
-                    <p className="mt-2 truncate text-[0.8rem] font-bold text-ink">{c.displayName}</p>
-                    {specialtiesText(c.specialties) && <p className="truncate text-[0.75rem] text-ink-muted">{specialtiesText(c.specialties)}</p>}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </>
-        )}
+              <div className="grid gap-2 py-5 sm:grid-cols-[1fr_1.2fr] sm:gap-5">
+                <dt className="text-sm font-bold text-ink">Sesión personalizada</dt>
+                <dd className="text-sm leading-relaxed text-ink-muted">Disponible de lunes a viernes, de 11 am a 4 pm.</dd>
+              </div>
+            </dl>
+          </div>
+        </div>
 
-        <ul className="mt-8 grid gap-2">
-          {DIFF.map((d) => (
-            <li key={d} className="flex items-center gap-2 text-[0.9rem] text-ink">
-              <span aria-hidden="true" className="text-accent">⬡</span>
-              {d}
-            </li>
-          ))}
-        </ul>
       </div>
     </section>
   );
