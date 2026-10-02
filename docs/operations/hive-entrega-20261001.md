@@ -1,6 +1,6 @@
 # Aplicación de información HIVE — 1 de octubre de 2026
 
-Fuentes: imagen de precios, texto de información para la app y carta PDF entregados por el usuario. La entrega incluye los cambios de catálogo, consentimiento y pago integrado. El estado del despliegue se documenta al terminar las verificaciones de producción.
+Fuentes: imagen de precios, texto de información para la app y carta PDF entregados por el usuario. La entrega incluye los cambios de catálogo, consentimiento y pago integrado. Desplegado el 1 de octubre de 2026 en https://www.almamovement.com.mx, servicio Railway `alma-web` de `Hive studio`.
 
 ## Catálogo
 
@@ -53,3 +53,13 @@ Las pruebas que necesitan base de datos se omiten deliberadamente en los comando
 ## Verificación adicional del cobro integrado
 
 El smoke HTTP del servidor completo (`server/tests/hive-mercadopago-http.smoke.mjs`) utiliza una base temporal independiente y bloquea la red saliente. Validó firma previa, dos envíos simultáneos con una sola llamada al proveedor ficticio y una única membresía activa de 20 clases, 60 días, tras sincronizaciones repetidas. La base y el proceso se eliminaron al terminar. No se usaron credenciales ni tarjetas reales.
+
+## Producción verificada
+
+- Despliegue funcional `fabefe1f-637b-4f72-ac6f-d461d24e664f`, commit `14c9fdb`, confirmado SUCCESS por Railway.
+- Respaldo PostgreSQL previo guardado fuera del repositorio en el directorio privado de respaldos de Codex (310,210 bytes).
+- Reconciliación aplicada: 8 planes actualizados, Promo estudiante creada, Clase muestra y Mes de 12 a 4 retirados; historial e identificadores conservados.
+- Nueve planes activos verificados tanto en PostgreSQL como en el sitio público, con precios y condiciones del material entregado.
+- Healthcheck HTTP200, base conectada, zona America/Mexico_City; PDF original accesible HTTP200.
+- Readiness Mercado Pago HTTP200 con `ready:false`: falta confirmar cuenta receptora y configurar sus credenciales. No se activaron cobros integrados ni se copiaron claves de Bao. Transferencia, efectivo y contratación anual por enlaces conservan sus flujos.
+- El smoke adicional usa las reglas reales del catálogo para comprobar 60 días naturales inclusivos (fin menos inicio = 59).

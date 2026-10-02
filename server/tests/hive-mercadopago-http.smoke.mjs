@@ -7,6 +7,7 @@ import {tmpdir} from 'node:os';
 import path from 'node:path';
 import pg from 'pg';
 import jwt from 'jsonwebtoken';
+import {CATALOG_PLANS} from '../lib/catalog.js';
 const source=new URL(process.env.DATABASE_URL||'postgres://saidromero@127.0.0.1:5432/hive_conditions_qa');
 assert.ok(['127.0.0.1','localhost'].includes(source.hostname),'LOCAL QA only');
 const name=`hive_mp_http_${Date.now()}`, target=new URL(source);target.pathname=`/${name}`;
@@ -31,7 +32,8 @@ globalThis.fetch=async(url,init={})=>{
  assert.ok(ready,logs);
  db=new pg.Pool({connectionString:target.href});
  const user=(await db.query("INSERT INTO users(display_name,email,phone,role,accepts_terms,is_active) VALUES('QA HTTP','qa-http@example.test','5555555555','client',true,true) RETURNING id")).rows[0];
- const plan=(await db.query("INSERT INTO plans(name,price,currency,duration_days,class_limit,is_active,rules) VALUES('QA HTTP 20',4400,'MXN',60,20,true,'{}') RETURNING id")).rows[0];
+ const hive20=CATALOG_PLANS.find(p=>p.name==='20 Clases');
+ const plan=(await db.query("INSERT INTO plans(name,price,currency,duration_days,class_limit,is_active,rules,class_category) VALUES('QA HTTP 20',$1,'MXN',$2,$3,true,$4,$5) RETURNING id",[hive20.price,hive20.duration_days,hive20.class_limit,JSON.stringify(hive20.rules),hive20.class_category])).rows[0];
  const token=jwt.sign({sub:user.id},'qa-local-http-only');
  const call=async(route,body)=>{const r=await fetch(base+'/api'+route,{method:body===undefined?'GET':'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});return {status:r.status,body:await r.json()};};
  assert.equal((await call('/orders',{planId:plan.id,paymentMethod:'card'})).status,403);
@@ -43,10 +45,10 @@ globalThis.fetch=async(url,init={})=>{
  const submitted=await Promise.all([call(`/orders/${id}/card-payment`,payload),call(`/orders/${id}/card-payment`,payload)]);assert.ok(submitted.every(r=>r.status===202),JSON.stringify(submitted));
  const synced=await Promise.all([call(`/orders/${id}/card-payment-sync`,{}),call(`/orders/${id}/card-payment-sync`,{})]);assert.ok(synced.every(r=>r.status===200&&r.body.data.orderStatus==='approved'),JSON.stringify(synced));
  const memberships=(await db.query('SELECT *,end_date::date-start_date::date days FROM memberships WHERE order_id=$1',[id])).rows;
- assert.equal(memberships.length,1);assert.equal(memberships[0].status,'active');assert.equal(memberships[0].classes_remaining,20);assert.equal(memberships[0].days,60);assert.equal(memberships[0].payment_method,'card');
+ assert.equal(memberships.length,1);assert.equal(memberships[0].status,'active');assert.equal(memberships[0].classes_remaining,20);assert.equal(memberships[0].days,59);assert.equal(memberships[0].payment_method,'card');
  const provider=JSON.parse(await readFile(stats,'utf8'));assert.equal(provider.posts,1);assert.equal(provider.body.transaction_amount,4400);assert.equal(provider.body.external_reference,id);assert.equal(provider.body.three_d_secure_mode,'optional');
  await call(`/orders/${id}/card-payment-sync`,{});assert.equal((await db.query('SELECT count(*)::int n FROM memberships WHERE order_id=$1',[id])).rows[0].n,1);
- console.log('PASS real HTTP: waiver gate, order amount4400, concurrent submit1, real finalize membership20 credits/60days, repeated sync idempotent. No real provider network.');
+ console.log('PASS real HTTP: waiver gate, order amount4400, concurrent submit1, real finalize membership20 credits/60 inclusive calendar days, repeated sync idempotent. No real provider network.');
 } catch(e){console.error(logs.slice(-8000));throw e;} finally {
  if(child && child.exitCode===null && child.signalCode===null){const exited=new Promise(r=>child.once('exit',r));child.kill('SIGTERM');await exited;}
  await db?.end();await admin.query(`DROP DATABASE IF EXISTS ${name} WITH (FORCE)`);await admin.end();await rm(dir,{recursive:true,force:true});
