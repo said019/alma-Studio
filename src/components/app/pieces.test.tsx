@@ -24,7 +24,7 @@ describe("AppShell (oscuro)", () => {
   it("barra inferior: las cinco pestañas reales con etiqueta", () => {
     wrap(<AppShell hideGreeting><p>x</p></AppShell>, "/app/classes");
     const nav = document.querySelector("nav[data-bottom-nav]")!;
-    expect([...nav.querySelectorAll("a")].map((a) => a.textContent)).toEqual(["Inicio", "Reservar", "Mis clases", "Wallet", "Perfil"]);
+    expect([...nav.querySelectorAll("a")].map((a) => a.textContent)).toEqual(["Inicio", "Reservar", "Mis clases", "QR", "Perfil"]);
   });
   it("la pestaña activa va en degradado terracota con ícono oscuro; las demás en taupe", () => {
     wrap(<AppShell hideGreeting><p>x</p></AppShell>, "/app/classes");

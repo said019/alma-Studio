@@ -7,7 +7,7 @@ import {
   Home,
   CalendarDays,
   ClipboardList,
-  Wallet as WalletIcon,
+  QrCode,
   User as UserIcon,
   Bell,
   ChevronRight,
@@ -37,7 +37,7 @@ const NAV: readonly NavItem[] = [
   { to: "/app", label: "Inicio", icon: Home, exact: true },
   { to: "/app/classes", label: "Reservar", icon: CalendarDays },
   { to: "/app/bookings", label: "Mis clases", icon: ClipboardList },
-  { to: "/app/wallet", label: "Wallet", icon: WalletIcon },
+  { to: "/app/wallet", label: "QR", icon: QrCode },
   { to: "/app/profile", label: "Perfil", icon: UserIcon },
 ];
 
