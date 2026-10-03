@@ -14,7 +14,7 @@ export const AUDIT_ACTIONS = Object.freeze([
   "booking.no_show",
   "booking.no_show_corrected",
   "booking.cancel",
-  "class.cancel",
+  "class.cancel", "class.bulk_edit",
   "class.delete",
   "class.week_clear",
   "user.anonymize",

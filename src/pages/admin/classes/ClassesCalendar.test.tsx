@@ -43,6 +43,18 @@ describe("Clases · Calendario", () => {
     expect(screen.getByText("Gestionar en Reservas").closest("a")).toHaveAttribute("href", "/admin/bookings?clase=c11");
   });
 
+  it("abre la edición masiva desde la barra cuando la carga de clases es exitosa", async () => {
+    renderAdmin(<ClassesCalendar />, { route: "/admin/classes" });
+    await screen.findByRole("button", { name: /Reformer Intermedio.*8 de 8, llena/ });
+    expect(screen.queryByText(/No pudimos cargar las clases de la semana/)).toBeNull();
+    expect(screen.getByRole("button", { name: "Copiar semana" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Editar varias clases" }));
+    const editor = await screen.findByRole("dialog", { name: "Editar varias clases" });
+    expect(within(editor).getByLabelText("Desde")).toHaveValue("2026-09-21");
+    expect(within(editor).getByLabelText("Hasta")).toHaveValue("2026-09-27");
+    expect(within(editor).getByRole("button", { name: "Revisar cambios" })).toBeDisabled();
+  });
+
   it("recepción no ve el control de Wellhub de la clase (sólo la dueña publica a Wellhub)", async () => {
     loginAs("reception");
     renderAdmin(<ClassesCalendar />, { route: "/admin/classes" });

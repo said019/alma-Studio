@@ -52,6 +52,7 @@ const ACTION_LABEL: Record<string, string> = {
   "booking.no_show_corrected": "Falta corregida a asistencia",
   "booking.cancel": "Reserva cancelada por el estudio",
   "class.cancel": "Clase cancelada",
+  "class.bulk_edit": "Clase editada en lote",
   "class.delete": "Clase borrada (sin reservas)",
   "class.week_clear": "Limpieza de semana",
   "user.anonymize": "Usuario dado de baja (anonimizada)",
@@ -76,6 +77,12 @@ export function actionLabel(e: Pick<AuditEntry, "action" | "meta">): string {
 }
 
 const FIELD_LABEL: Record<string, string> = {
+  class_type_name: "Disciplina",
+  instructor_name: "Instructora",
+  max_capacity: "Cupo",
+  start_time: "Hora de inicio",
+  end_time: "Hora de fin",
+  notes: "Notas",
   plan_name: "Plan",
   amount: "Cobrado",
   list_price: "Precio del plan",

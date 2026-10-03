@@ -1,3 +1,4 @@
+import { registerBulkClasses } from "./lib/bulkClasses.js";
 import { applyHiveStudioSettings } from "./lib/hiveStudioSettings.js";
 import { registerCommunications } from "./lib/communications.js";
 import { registerVelanParity } from "./lib/velanParity.js";
@@ -4103,6 +4104,7 @@ async function liveBookingCount(classId, db = pool) {
 // ctx: { source?: string, quietUserIds?: string[] }.
 async function onSeatReleased(classIds, ctx = {}) {
   const out = [];
+  const failures = [];
   try {
     const ids = [...new Set([].concat(classIds ?? []).map((x) => String(x ?? "")).filter((x) => isUuid(x)))];
     const quietUserIds = Array.isArray(ctx?.quietUserIds) ? ctx.quietUserIds.map(String) : [];
@@ -4110,12 +4112,15 @@ async function onSeatReleased(classIds, ctx = {}) {
       try {
         out.push(...(await promoteWaitlist(id, { quietUserIds })));
       } catch (err) {
+        failures.push(id);
         console.error(`[waitlist] no se pudo subir la fila de ${id} (${ctx?.source ?? "?"}):`, err?.message);
       }
     }
   } catch (err) {
+    failures.push("batch");
     console.error(`[waitlist] onSeatReleased (${ctx?.source ?? "?"}):`, err?.message);
   }
+  if (ctx.reportFailures && failures.length) throw Object.assign(new Error("waitlist_followup_failed"), { failedClassIds: failures });
   return out;
 }
 
@@ -17138,6 +17143,8 @@ app.post("/api/admin/classes", adminMiddleware, async (req, res) => {
 // Tanto `maxCapacity` como `capacity` se mapean a la columna max_capacity.
 // Si el nuevo max_capacity es MENOR al conteo real de reservas activas, se
 // rechaza para no dejar bookings "fuera del cupo" silenciosamente.
+registerBulkClasses(app, { pool, adminMiddleware, recordAudit, onSeatReleased, classEditReleasesSeats, studioTimezone: STUDIO_TIMEZONE });
+
 app.put("/api/admin/classes/:id", adminMiddleware, async (req, res) => {
   try {
     const {

@@ -1,4 +1,5 @@
 import { ClassOperations } from "@/components/admin/ClassOperations";
+import { BulkClassEditor } from "@/components/admin/BulkClassEditor";
 import { DuplicateWeek } from "@/components/admin/DuplicateWeek";
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
@@ -433,6 +434,12 @@ function CalendarView({
   const mobileDayDate = parseISO(mobileDay);
   const mobileClasses = classes.filter((c) => c.startTime?.startsWith(mobileDay));
 
+  const bulkActions = isOwner ? <>
+    <DuplicateWeek sourceStart={start} />
+    <BulkClassEditor startDate={start} endDate={end} types={types} instructors={instructors} />
+    <ClassOperations />
+  </> : null;
+
   if (classesQuery.isError) {
     return (
       <>
@@ -440,7 +447,7 @@ function CalendarView({
           description="No pudimos cargar las clases de la semana. Revisa tu conexión y vuelve a intentarlo."
           onRetry={() => classesQuery.refetch()}
         />
-        {dialog}{isOwner && <div className="mb-4 flex flex-wrap gap-2"><DuplicateWeek sourceStart={start} /><ClassOperations /></div>}
+        {dialog}{bulkActions && <div className="mb-4 flex flex-wrap gap-2">{bulkActions}</div>}
       </>
     );
   }
@@ -474,6 +481,7 @@ function CalendarView({
               <span className="nums">{active.length}</span> {active.length === 1 ? "clase" : "clases"} · <span className="nums">{bookedTotal}</span> {bookedTotal === 1 ? "reserva" : "reservas"} · <span className="nums">{occ}%</span> ocupación
             </span>
             <div className="ml-auto flex flex-wrap gap-2">
+              {bulkActions}
               <Button
                 variant="ghost"
                 className="text-danger"
