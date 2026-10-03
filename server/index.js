@@ -2989,7 +2989,7 @@ async function recordFalta({ userId, reason, client = null }) {
   const threshold = Number(cfg.faltas_threshold);
   const penaltyPoints = Number(cfg.faltas_penalty_points);
   let penaltyApplied = false;
-  if (penaltyDueAt(faltasCount, threshold) && penaltyPoints > 0) {
+  if (cfg.enabled !== false && penaltyDueAt(faltasCount, threshold) && penaltyPoints > 0) {
     await q.query(
       "INSERT INTO loyalty_transactions (user_id, type, points, description) VALUES ($1,'adjust',$2,$3)",
       [userId, -Math.abs(penaltyPoints), `Penalización por ${threshold} inasistencias/cancelaciones tardías${reason ? " (" + reason + ")" : ""}`]
@@ -5401,7 +5401,7 @@ app.get("/api/wallet/pass", authMiddleware, async (req, res) => {
       "SELECT COALESCE(SUM(CASE WHEN type='earn' THEN points WHEN type='adjust' THEN points ELSE -points END), 0) AS total FROM loyalty_transactions WHERE user_id = $1",
       [req.userId]
     );
-    const total = parseInt(pointsRes.rows[0].total);
+    const total = (await getLoyaltyConfig()).enabled === false ? 0 : parseInt(pointsRes.rows[0].total);
     const passesRes = await pool.query(
       `SELECT ep.id,
               ep.pass_code,
@@ -5708,6 +5708,7 @@ app.get("/api/admin/notifications/unread-count", adminMiddleware, async (req, re
 app.get("/api/me/notifications", authMiddleware, async (req, res) => {
   try {
     const userId = req.userId;
+    const loyaltyEnabled = (await getLoyaltyConfig()).enabled !== false;
     const limit = Math.min(Number(req.query.limit) || 30, 100);
 
     // 1) Motivation/milestone WhatsApp templates enviados
@@ -5715,12 +5716,13 @@ app.get("/api/me/notifications", authMiddleware, async (req, res) => {
       `SELECT 'motivation' AS source, id, template_key AS title, sent_at AS occurred_at
          FROM motivation_sends
         WHERE user_id = $1
+          AND ($3::boolean OR (template_key NOT IN ('points_earned', 'reward_redeemed') AND LEFT(template_key, 10) <> 'milestone_'))
         ORDER BY sent_at DESC LIMIT $2`,
-      [userId, limit],
+      [userId, limit, loyaltyEnabled],
     );
 
     // 2) Milestones desbloqueados con info del milestone
-    const mileRes = await pool.query(
+    const mileRes = !loyaltyEnabled ? { rows: [] } : await pool.query(
       `SELECT 'milestone' AS source, a.id, m.name AS title, m.award_points AS points,
               a.classes_at_award AS classes, a.awarded_at AS occurred_at
          FROM loyalty_milestone_awards a
@@ -5731,7 +5733,7 @@ app.get("/api/me/notifications", authMiddleware, async (req, res) => {
     );
 
     // 3) Transacciones de puntos (earn / spend / adjust)
-    const txRes = await pool.query(
+    const txRes = !loyaltyEnabled ? { rows: [] } : await pool.query(
       `SELECT 'transaction' AS source, id, type, points, description AS title, created_at AS occurred_at
          FROM loyalty_transactions
         WHERE user_id = $1
@@ -5870,20 +5872,21 @@ app.post("/api/me/notifications/mark-read", authMiddleware, async (req, res) => 
 app.get("/api/me/notifications/unread-count", authMiddleware, async (req, res) => {
   try {
     const userId = req.userId;
+    const loyaltyEnabled = (await getLoyaltyConfig()).enabled !== false;
     const u = await pool.query("SELECT notifications_last_read_at FROM users WHERE id = $1", [userId]);
     const lastReadAt = u.rows[0]?.notifications_last_read_at;
     // Conteo simple: motivation_sends + milestone_awards + transactions + bookings con time > lastReadAt
     const cutoff = lastReadAt || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000); // si nunca leyó, contar últimos 30d
     const r = await pool.query(
       `SELECT
-        (SELECT COUNT(*)::int FROM motivation_sends WHERE user_id = $1 AND sent_at > $2) +
-        (SELECT COUNT(*)::int FROM loyalty_milestone_awards WHERE user_id = $1 AND awarded_at > $2) +
-        (SELECT COUNT(*)::int FROM loyalty_transactions WHERE user_id = $1 AND created_at > $2) +
+        (SELECT COUNT(*)::int FROM motivation_sends WHERE user_id = $1 AND sent_at > $2 AND ($3::boolean OR (template_key NOT IN ('points_earned', 'reward_redeemed') AND LEFT(template_key, 10) <> 'milestone_'))) +
+        (SELECT COUNT(*)::int FROM loyalty_milestone_awards WHERE user_id = $1 AND awarded_at > $2 AND $3::boolean) +
+        (SELECT COUNT(*)::int FROM loyalty_transactions WHERE user_id = $1 AND created_at > $2 AND $3::boolean) +
         (SELECT COUNT(*)::int FROM bookings WHERE user_id = $1
           AND status IN ('confirmed','checked_in','cancelled')
           AND GREATEST(checked_in_at, created_at) > $2)
         AS n`,
-      [userId, cutoff],
+      [userId, cutoff, loyaltyEnabled],
     );
     return res.json({ data: { unread_count: r.rows[0]?.n || 0 } });
   } catch (err) {
@@ -5945,6 +5948,7 @@ function humanizeMotivationKey(key) {
 // GET /api/loyalty/my-history
 app.get("/api/loyalty/my-history", authMiddleware, async (req, res) => {
   try {
+    if ((await getLoyaltyConfig()).enabled === false) return res.json({ data: [] });
     const r = await pool.query(
       `SELECT lt.*,
               CASE WHEN lt.type = 'earn' OR lt.points > 0 THEN 'earned' ELSE 'redeemed' END AS movement_type
@@ -5964,6 +5968,7 @@ app.get("/api/loyalty/my-history", authMiddleware, async (req, res) => {
 // GET /api/loyalty/rewards
 app.get("/api/loyalty/rewards", authMiddleware, async (req, res) => {
   try {
+    if ((await getLoyaltyConfig()).enabled === false) return res.json({ data: [] });
     const r = await pool.query(
       "SELECT * FROM loyalty_rewards WHERE is_active = true ORDER BY points_cost ASC"
     );
@@ -5979,6 +5984,7 @@ app.post("/api/loyalty/redeem", authMiddleware, async (req, res) => {
   const { rewardId } = req.body;
   if (!rewardId) return res.status(400).json({ message: "rewardId requerido" });
   try {
+    if ((await getLoyaltyConfig()).enabled === false) return res.status(409).json({ code: "LOYALTY_DISABLED", message: "El programa de puntos está desactivado." });
     const rewardRes = await pool.query(
       "SELECT * FROM loyalty_rewards WHERE id = $1 AND is_active = true",
       [rewardId]
@@ -6978,7 +6984,7 @@ async function getWalletSnapshotForUser(userId, { eventId = null } = {}) {
     "SELECT COALESCE(SUM(CASE WHEN type='earn' THEN points WHEN type='adjust' THEN points ELSE -points END), 0) AS total FROM loyalty_transactions WHERE user_id = $1",
     [userId],
   );
-  const points = parseInt(pointsRes.rows[0]?.total ?? 0, 10) || 0;
+  const points = (await getLoyaltyConfig()).enabled === false ? 0 : (parseInt(pointsRes.rows[0]?.total ?? 0, 10) || 0);
 
   let membership = null;
   try {
@@ -7325,6 +7331,7 @@ const firstNameOf = (displayName, fallback = "") => {
  */
 async function notifyByTemplate(userId, templateKey, extraVars = {}, fallback = "") {
   if (!userId || !templateKey) return { sent: false, reason: "missing_arg" };
+  if ((templateKey === "points_earned" || templateKey === "reward_redeemed" || templateKey.startsWith("milestone_")) && (await getLoyaltyConfig()).enabled === false) return { sent: false, reason: "loyalty_disabled" };
   if (!EVOLUTION_API_URL || !EVOLUTION_INSTANCE) {
     return { sent: false, reason: "evolution_not_configured" };
   }
@@ -7488,6 +7495,7 @@ async function sendMotivationIfDue(userId) {
  * Returns array of awarded milestones (vacío si ninguno disparó).
  */
 async function checkLoyaltyMilestones(userId) {
+  if ((await getLoyaltyConfig()).enabled === false) return [];
   // Milestones activos NO otorgados todavía a este usuario.
   const milestonesRes = await pool.query(
     `SELECT m.id, m.name, m.classes_required, m.period, m.award_type, m.award_points,
@@ -7614,6 +7622,7 @@ async function notifyClassAttended(userId, ctx = {}) {
  * Template: points_earned · vars: firstName, points, totalPoints
  */
 async function notifyPointsEarned(userId, points, totalPoints) {
+  if ((await getLoyaltyConfig()).enabled === false) return;
   triggerWalletPassSync(userId, "points_earned");
   if (Number(points || 0) >= 50) {
     notifyByTemplate(
@@ -7731,6 +7740,7 @@ async function notifyEventRegistered(userId, ctx = {}) {
  * Template: reward_redeemed · vars: firstName, rewardName, points
  */
 async function notifyRewardRedeemed(userId, rewardName, pointsSpent) {
+  if ((await getLoyaltyConfig()).enabled === false) return;
   triggerWalletPassSync(userId, "reward_redeemed");
   notifyByTemplate(
     userId,
@@ -8012,7 +8022,7 @@ async function generateApplePkpass({ userId, userName, points, qrCode, membershi
   // queremos surfacearlos en el pase para gamificación.
   let nextMilestone = null;
   let milestoneClassesRemaining = null;
-  if (userId) {
+  if (userId && (await getLoyaltyConfig()).enabled !== false) {
     try {
       const lifetimeRes = await pool.query(
         "SELECT COUNT(*)::int AS n FROM bookings WHERE user_id = $1 AND status = 'checked_in'",
@@ -9924,7 +9934,7 @@ async function applyCancellationRollback(client, booking, opts = {}) {
     try {
       const cfg = await getLoyaltyConfig(client);
       const pts = Number(cfg.points_per_class);
-      if (pts > 0 && booking.user_id) {
+      if (cfg.enabled !== false && pts > 0 && booking.user_id) {
         await client.query(
           `INSERT INTO loyalty_transactions (user_id, type, points, description)
            VALUES ($1, 'adjust', $2, $3)`,
@@ -9995,7 +10005,7 @@ async function cancelClassInTx(client, classId, { actorId, reason, source = "man
         const count=(await client.query("SELECT COALESCE(faltas_count,0)::int AS n FROM users WHERE id=$1 FOR UPDATE",[b.user_id])).rows[0]?.n??0;
         const reversal=faltaReversal({faltasCount:count,threshold:cfg.faltas_threshold,penaltyPoints:cfg.faltas_penalty_points});
         await client.query("UPDATE users SET faltas_count=$2 WHERE id=$1",[b.user_id,reversal.newCount]);
-        if(reversal.refundPoints>0)await client.query("INSERT INTO loyalty_transactions(user_id,type,points,description) VALUES($1,'adjust',$2,'Reverso: clase no realizada')",[b.user_id,reversal.refundPoints]);
+        if(cfg.enabled!==false && reversal.refundPoints>0)await client.query("INSERT INTO loyalty_transactions(user_id,type,points,description) VALUES($1,'adjust',$2,'Reverso: clase no realizada')",[b.user_id,reversal.refundPoints]);
       }
       await client.query("UPDATE bookings SET falta_recorded_at=NULL WHERE id=$1",[b.id]);
     }
@@ -11472,7 +11482,7 @@ app.post("/api/pos/checkout", adminMiddleware, async (req, res) => {
 // ─── Loyalty config & rewards admin ─────────────────────────────────────────
 
 const LOYALTY_CONFIG_DEFAULTS = {
-  enabled: true,
+  enabled: false,
   points_per_class: 10,
   points_per_peso: 1,
   welcome_bonus: 50,
@@ -11645,6 +11655,7 @@ app.get("/api/loyalty/milestones/me", authMiddleware, async (req, res) => {
       [userId],
     );
     const lifetime = lifetimeRes.rows[0]?.n || 0;
+    if ((await getLoyaltyConfig()).enabled === false) return res.json({ data: { lifetime_classes: lifetime, next_milestone: null, next_progress: null, next_remaining: null, milestones: [] } });
     const milestonesRes = await pool.query(
       `SELECT m.id, m.name, m.description, m.classes_required, m.period, m.award_type, m.award_points,
               CASE WHEN a.id IS NOT NULL THEN true ELSE false END AS achieved,
@@ -12044,6 +12055,7 @@ app.get("/api/admin/campaigns/:id/logs", adminMiddleware, async (req, res) => {
 // GET /api/loyalty/points/:userId
 app.get("/api/loyalty/points/:userId", adminMiddleware, async (req, res) => {
   try {
+    if ((await getLoyaltyConfig()).enabled === false) return res.json({ data: { balance: 0 } });
     const r = await pool.query(
       "SELECT COALESCE(SUM(CASE WHEN type='earn' OR type='adjust' THEN points ELSE -points END),0) AS balance FROM loyalty_transactions WHERE user_id=$1",
       [req.params.userId]
@@ -15672,13 +15684,13 @@ app.put("/api/bookings/:id/correct-no-show", adminMiddleware, async (req, res) =
       const antes = Number(u.rows[0]?.n ?? 0);
       const rev = faltaReversal({ faltasCount: antes, threshold: cfg.faltas_threshold, penaltyPoints: cfg.faltas_penalty_points });
       await client.query("UPDATE users SET faltas_count = $2 WHERE id = $1", [bk.user_id, rev.newCount]);
-      if (rev.refundPoints > 0) {
+      if (cfg.enabled !== false && rev.refundPoints > 0) {
         await client.query(
           "INSERT INTO loyalty_transactions (user_id, type, points, description) VALUES ($1, 'adjust', $2, $3)",
           [bk.user_id, rev.refundPoints, "Reverso de penalización: falta corregida a asistencia"],
         );
       }
-      faltas = { antes, despues: rev.newCount, refund: rev.refundPoints };
+      faltas = { antes, despues: rev.newCount, refund: cfg.enabled === false ? 0 : rev.refundPoints };
     }
     let pointsAwarded = 0;
     if (firstAttendance && bk.user_id) {
@@ -16842,6 +16854,7 @@ app.delete("/api/products/:id", adminMiddleware, async (req, res) => {
 // GET /api/admin/loyalty/users — list users with points
 app.get("/api/admin/loyalty/users", adminMiddleware, async (req, res) => {
   try {
+    if ((await getLoyaltyConfig()).enabled === false) return res.json({ data: [] });
     const r = await pool.query(
       `SELECT u.id, u.display_name, u.email,
               COALESCE(SUM(CASE WHEN lt.type='earn' THEN lt.points ELSE -lt.points END), 0) AS balance
@@ -16859,6 +16872,7 @@ app.get("/api/admin/loyalty/users", adminMiddleware, async (req, res) => {
 // POST /api/admin/loyalty/adjust — manual points adjustment
 app.post("/api/admin/loyalty/adjust", adminMiddleware, async (req, res) => {
   try {
+    if ((await getLoyaltyConfig()).enabled === false) return res.status(409).json({ code: "LOYALTY_DISABLED", message: "El programa de puntos está desactivado." });
     const { userId, points, reason, type = "earn" } = req.body;
     if (!userId || !points) return res.status(400).json({ message: "userId y points requeridos" });
     const r = await pool.query(

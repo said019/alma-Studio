@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { format, isToday, isYesterday, differenceInDays } from "date-fns";
 import { es } from "date-fns/locale";
 import api from "@/lib/api";
+import { FEATURES } from "@/config/features";
 import { ClientAuthGuard } from "@/components/layout/ClientAuthGuard";
 import {
   AppShell,
@@ -74,7 +75,8 @@ const Notifications = () => {
     refetchInterval: 30_000,
     placeholderData: keepPreviousData,
   });
-  const items = Array.isArray(data?.data) ? data!.data : [];
+  const receivedItems = Array.isArray(data?.data) ? data!.data : [];
+  const items = FEATURES.loyalty ? receivedItems : receivedItems.filter((n) => !["loyalty_earn", "loyalty_spend", "milestone"].includes(n.category));
   const hasUnread = items.some((n) => n.unread);
 
   const markReadMutation = useMutation({
@@ -116,7 +118,7 @@ const Notifications = () => {
             <EmptyState
               icon={<BellOff size={20} />}
               title="Sin novedades aún."
-              description="Aquí van a aparecer tus reservas, logros, puntos ganados y avisos del estudio."
+              description={FEATURES.loyalty ? "Aquí van a aparecer tus reservas, logros, puntos ganados y avisos del estudio." : "Aquí van a aparecer tus reservas y avisos del estudio."}
             />
           ) : (
             <>
@@ -149,7 +151,7 @@ const Notifications = () => {
                 ))}
               </ListGroup>
 
-              {items.length >= limit && (
+              {receivedItems.length >= limit && (
                 <div className="mt-6 flex justify-center">
                   <GhostButton
                     onClick={() => setLimit((l) => l + PAGE_SIZE)}
