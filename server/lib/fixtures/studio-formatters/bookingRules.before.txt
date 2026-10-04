@@ -1,5 +1,4 @@
 import { sessionWithinRules, sessionWithinValidity } from './planRules.js';
-import { studioDateTimeFormatter } from './studioDateFormatters.js';
 const VALID_CATEGORIES = ["studio", "reformer_tower", "mixto", "all"];
 
 export function normalizeClassCategory(value, fallback = "all") {
@@ -30,7 +29,7 @@ export function isWithinMorningWindow(startsAt, timeZone = "America/Mexico_City"
   const d = new Date(startsAt);
   if (Number.isNaN(d.getTime())) return false;
   const hour = Number(
-    studioDateTimeFormatter('morning', timeZone).format(d)
+    new Intl.DateTimeFormat("en-US", { timeZone, hour: "2-digit", hour12: false }).format(d)
   );
   return hour <= lastHour;
 }
@@ -70,7 +69,7 @@ export function isWithinAfternoonWindow(startsAt, timeZone = "America/Mexico_Cit
   if (!startsAt) return false;
   const d = new Date(startsAt);
   if (Number.isNaN(d.getTime())) return false;
-  const parts = studioDateTimeFormatter('afternoon', timeZone).formatToParts(d);
+  const parts = new Intl.DateTimeFormat("en-GB", { timeZone, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(d);
   const minutes = Number(parts.find(p => p.type === "hour").value) * 60 + Number(parts.find(p => p.type === "minute").value);
   return minutes >= 660 && minutes <= 960;
 }

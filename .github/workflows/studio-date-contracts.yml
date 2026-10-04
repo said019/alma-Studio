@@ -1,0 +1,49 @@
+name: Studio date contracts
+
+on:
+  pull_request:
+    paths:
+      - 'server/**'
+      - 'scripts/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/scripts/compare-studio-formatters.py'
+      - '.github/workflows/studio-date-contracts.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: candidate
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/checkout@v4
+        with:
+          path: baseline
+          ref: ${{ github.event.pull_request.base.sha || 'a30a7c6e2c60072855bc1f583793fb4793e0cfcc' }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20.19.5'
+      - name: Install identical locked dependencies without lifecycle scripts
+        run: |
+          npm ci --prefix baseline --ignore-scripts --no-audit --no-fund
+          npm ci --prefix candidate --ignore-scripts --no-audit --no-fund
+      - name: Check server syntax
+        run: |
+          node --check candidate/server/index.js
+          node --check candidate/server/lib/bookingRules.js
+          node --check candidate/server/lib/planRules.js
+          node --check candidate/server/lib/studioDateFormatters.js
+      - name: Compare complete offline server and scripts selections
+        run: python3 candidate/.github/scripts/compare-studio-formatters.py --baseline baseline --candidate candidate --output proof
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: studio-date-contracts
+          path: proof
