@@ -1,4 +1,5 @@
 import { registerBulkClasses } from "./lib/bulkClasses.js";
+import { studioDateTimeFormatter } from "./lib/studioDateFormatters.js";
 import { applyHiveStudioSettings } from "./lib/hiveStudioSettings.js";
 import { registerCommunications } from "./lib/communications.js";
 import { registerVelanParity } from "./lib/velanParity.js";
@@ -30,9 +31,7 @@ process.env.TZ = STUDIO_TIMEZONE;
 
 /** Fecha civil de HOY en el estudio, "YYYY-MM-DD". */
 export function todayInStudio(d = new Date()) {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: STUDIO_TIMEZONE, year: "numeric", month: "2-digit", day: "2-digit",
-  }).format(d);
+  return studioDateTimeFormatter('day', STUDIO_TIMEZONE).format(d);
 }
 
 import express from "express";
