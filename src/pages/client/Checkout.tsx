@@ -48,41 +48,16 @@ const flag = (value: unknown): boolean => {
   return false;
 };
 
-const detectCategory = (plan: any): "studio" | "reformer_tower" | "mixto" | "all" => {
-  const raw = String(plan.classCategory ?? plan.class_category ?? "").toLowerCase();
-  if (["studio", "reformer_tower", "mixto", "all"].includes(raw)) return raw as any;
-  const byName = String(plan.name ?? "").toLowerCase();
-  if (byName.includes("reformer") || byName.includes("tower")) return "reformer_tower";
-  if (byName.includes("studio") || byName.includes("mat") || byName.includes("barre") || byName.includes("sculpt")) return "studio";
-  if (byName.includes("mixto")) return "mixto";
-  return "all";
+// HIVE groups follow the offer sheet; modality codes remain internal booking rules.
+const catalogGroup = (plan: any) => {
+  const r = plan.rules ?? {};
+  if (flag(plan.personalOnly ?? plan.personal_only)) return "Sesión personalizada";
+  if (Number(r.commitment_months) >= 12) return "Plan anual / pago mensual";
+  if (Number(r.daily_class_limit) > 0) return "Plan mensual";
+  if (r.requires_student_id || flag(plan.afternoonOnly ?? plan.afternoon_only) || r.booking_start_time) return "Promociones";
+  return "Sesiones de Pilates Reformer";
 };
-
-const CATEGORY_LABEL: Record<string, string> = {
-  studio: "Studio",
-  reformer_tower: "Reformer/Tower",
-  mixto: "Mixto",
-  all: "Todas las disciplinas",
-};
-
-/* Mejor precio por clase dentro de una sección (sin datos de popularidad,
-   el dato disponible es precio/clase). Solo aplica con 2+ planes. */
-const bestPerClassId = (plans: any[]): string | number | null => {
-  if (plans.length < 2) return null;
-  let bestId: string | number | null = null;
-  let bestPpc = Infinity;
-  for (const p of plans) {
-    const limit = Number(p.classLimit ?? p.class_limit ?? 0);
-    const price = Number(p.price ?? 0);
-    if (limit <= 0 || limit >= 900 || price <= 0) continue;
-    const ppc = price / limit;
-    if (ppc < bestPpc) {
-      bestPpc = ppc;
-      bestId = p.id;
-    }
-  }
-  return bestId;
-};
+const GROUP_ORDER = ["Sesiones de Pilates Reformer", "Plan mensual", "Plan anual / pago mensual", "Promociones", "Sesión personalizada"];
 
 /* ── PlanRow ─────────────────────────────────────────────── */
 const PlanRow = ({
@@ -96,7 +71,6 @@ const PlanRow = ({
   recommended?: boolean;
   onSelect: () => void;
 }) => {
-  const category = detectCategory(plan);
   const conditions = planConditions(plan);
   const durationDays = Number(plan.durationDays ?? plan.duration_days ?? 0);
   const classLimit = plan.classLimit ?? plan.class_limit ?? null;
@@ -130,7 +104,7 @@ const PlanRow = ({
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2 mb-1">
             {recommended && <Tag tint="accent">Recomendado</Tag>}
-            <Tag tint="ink">{CATEGORY_LABEL[category]}</Tag>
+            <Tag tint="ink">Pilates Reformer</Tag>
             {isUnlimited ? (
               <span className="text-[0.75rem] uppercase tracking-[0.18em] text-ink-muted">
                 {plan.rules?.daily_class_limit ? `${plan.rules.daily_class_limit} ${plan.rules.daily_class_limit === 1 ? "sesión" : "sesiones"} por día` : "Ilimitado"}
@@ -144,12 +118,13 @@ const PlanRow = ({
           <h3 className="font-display leading-tight text-ink" style={{ fontSize: "clamp(1.1rem, 1.6vw, 1.35rem)" }}>
             {plan.name}
           </h3>
+          {plan.rules?.requires_student_id && !plan.rules?.booking_start_time && plan.rules?.allowed_weekdays?.length === 7 && <p className="mt-1 text-[0.8rem] text-ink-muted">Disponible en cualquier horario, todos los días</p>}
           {conditions.map(condition => <p key={condition} className="mt-1 text-[0.8rem] text-ink-muted">{condition}</p>)}
-          {plan.description && !plan.rules?.auto_renew && <p className="mt-1 text-[0.8rem] text-ink-muted">{plan.description}</p>}
+          {plan.description && !plan.rules && <p className="mt-1 text-[0.8rem] text-ink-muted">{plan.description}</p>}
           {durationDays > 0 && (
             <p className="text-[0.75rem] mt-0.5 text-ink-muted">
-              {durationDays} días naturales desde la compra
-              {nonTransferable && " · No transferible"}
+              {plan.rules?.billing_period === "month" ? `Vigencia de cada periodo: ${durationDays} días naturales` : `${durationDays} días naturales desde la compra`}
+              {nonTransferable && !plan.rules && " · No transferible"}
               {nonRepeatable && " · No repetible"}
             </p>
           )}
@@ -157,7 +132,7 @@ const PlanRow = ({
         <div className="text-right">
           {hasOpening && (
             <div className={`nums text-[0.75rem] text-ink-muted ${effectivePrice < regularPrice ? "line-through" : ""}`}>
-              ${formatMoneyMX(regularPrice)}
+              Regular ${formatMoneyMX(regularPrice)}
             </div>
           )}
           <div className="font-display nums leading-none text-ink" style={{ fontSize: "clamp(1.4rem, 2.2vw, 1.8rem)" }}>
@@ -166,7 +141,7 @@ const PlanRow = ({
           </div>
           {hasOpening ? (
             <div className="text-[0.75rem] uppercase tracking-[0.18em] mt-1 text-accent-strong">
-              apertura
+              Promo apertura
             </div>
           ) : perClass ? (
             <div className="nums text-[0.75rem] mt-1 text-accent-strong">
@@ -204,7 +179,6 @@ const Checkout = () => {
   const [step, setStep] = useState<Step>("select");
   const [selectedPlan, setSelectedPlan] = useState<any>(null);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("transfer");
-  const [modality, setModality] = useState<string>("studio");
   const [discountCode, setDiscountCode] = useState("");
   const [discountResult, setDiscountResult] = useState<any>(null);
   const [orderId, setOrderId] = useState<string | null>(null);
@@ -241,55 +215,12 @@ const Checkout = () => {
   const isVisitPack = (p: any): boolean =>
     Boolean(p?.isVisitPack ?? p?.is_visit_pack);
 
-  // Agrupado por modalidad: el catálogo tiene ~14 paquetes; verlos todos juntos
-  // abruma. Se separan por modalidad (Studio / Reformer-Tower / Mixto / Todo) y
-  // la alumna ve solo los de la modalidad elegida. Las clases sueltas aparecen
-  // dentro de su modalidad (las más baratas, arriba). Los packs de visita van
-  // aparte (son para llevar acompañantes, no para asistir ella misma).
-  const MODALITY_ORDER = ["studio", "reformer_tower", "mixto", "all"] as const;
-  const MODALITY_LABEL: Record<string, string> = {
-    studio: "Studio",
-    reformer_tower: "Reformer/Tower",
-    mixto: "Mixto",
-    all: "Todo",
-  };
-
-  const plansByModality = useMemo(() => {
-    const map: Record<string, any[]> = { studio: [], reformer_tower: [], mixto: [], all: [] };
-    for (const p of activePlans) {
-      if (isVisitPack(p)) continue;
-      if (String(p.name ?? "").toLowerCase().includes("muestra")) continue;
-      const cat = detectCategory(p);
-      (map[cat] ?? (map[cat] = [])).push(p);
-    }
-    for (const k of Object.keys(map)) {
-      map[k].sort((a, b) => Number(a.price ?? 0) - Number(b.price ?? 0));
-    }
-    return map;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [plansData]);
-
-  const availableModalities = MODALITY_ORDER.filter((m) => (plansByModality[m]?.length ?? 0) > 0);
-
-  const visitPacks = useMemo(() => {
-    return activePlans
-      .filter(isVisitPack)
-      .filter((p) => !String(p.name ?? "").toLowerCase().includes("muestra"))
-      .sort((a, b) => Number(a.price ?? 0) - Number(b.price ?? 0));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [plansData]);
-
-  // Si la modalidad activa se queda sin planes (datos cargados), cae a la 1ª disponible.
-  useEffect(() => {
-    if (availableModalities.length && !(availableModalities as readonly string[]).includes(modality)) {
-      setModality(availableModalities[0]);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [availableModalities.join(","), modality]);
-
-  const modalityPlans = plansByModality[modality] ?? [];
-  const recommendedModalityId = useMemo(() => bestPerClassId(modalityPlans), [modalityPlans]);
-  const recommendedVisitId = useMemo(() => bestPerClassId(visitPacks), [visitPacks]);
+  const planGroups = useMemo(() => GROUP_ORDER.map(title => ({
+    title,
+    plans: activePlans.filter(p => !isVisitPack(p) && catalogGroup(p) === title)
+      .sort((a, b) => Number(a.sortOrder ?? a.sort_order ?? 0) - Number(b.sortOrder ?? b.sort_order ?? 0)),
+  })).filter(group => group.plans.length), [plansData]);
+  const visitPacks = activePlans.filter(isVisitPack);
 
   const validateCodeMutation = useMutation({
     mutationFn: () => api.post("/discount-codes/validate", { code: discountCode, planId: selectedPlan?.id }),
@@ -405,46 +336,17 @@ const Checkout = () => {
                 <div className="space-y-3">
                   {[1, 2, 3].map((i) => <SkeletonRow key={i} height={88} />)}
                 </div>
-              ) : availableModalities.length === 0 ? (
+              ) : planGroups.length === 0 ? (
                 <p className="text-[0.86rem] text-ink-muted">
                   Aún no hay paquetes activos. Si esto persiste, escríbenos por WhatsApp.
                 </p>
               ) : (
                 <>
-                  {/* Tabs de modalidad: la alumna ve solo su disciplina */}
-                  <div role="tablist" aria-label="Modalidad" className="flex flex-wrap gap-2 mb-4">
-                    {availableModalities.map((m) => {
-                      const active = modality === m;
-                      return (
-                        <button
-                          key={m}
-                          type="button"
-                          role="tab"
-                          aria-selected={active}
-                          onClick={() => setModality(m)}
-                          className={
-                            "inline-flex min-h-[44px] items-center rounded-full px-4 text-[0.8rem] font-bold transition-colors cursor-pointer border " +
-                            (active
-                              ? "bg-ink text-canvas dark:bg-accent-gradient dark:text-accent-foreground border-transparent"
-                              : "bg-surface dark:bg-surface/70 text-ink-muted border-line hover:text-ink")
-                          }
-                        >
-                          {MODALITY_LABEL[m] ?? m}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <div className="space-y-3">
-                    {modalityPlans.map((plan: any) => (
-                      <PlanRow
-                        key={plan.id}
-                        plan={plan}
-                        selected={selectedPlan?.id === plan.id}
-                        recommended={recommendedModalityId === plan.id}
-                        onSelect={() => { setSelectedPlan(plan); setDiscountResult(null); }}
-                      />
-                    ))}
-                  </div>
+                  <p className="mb-5 text-sm text-ink-muted">Precios en MXN. Los paquetes son personales e intransferibles. La vigencia comienza al comprar; el paquete de 20 sesiones dura 60 días y los demás, 30 días.</p>
+                  {planGroups.map(group => <section key={group.title} aria-label={group.title} className="mb-7 space-y-3">
+                    <h2 className="font-display text-xl text-ink">{group.title}</h2>
+                    {group.plans.map((plan: any) => <PlanRow key={plan.id} plan={plan} selected={selectedPlan?.id === plan.id} onSelect={() => { setSelectedPlan(plan); setDiscountResult(null); }} />)}
+                  </section>)}
                 </>
               )}
             </Section>
@@ -460,7 +362,6 @@ const Checkout = () => {
                       key={plan.id}
                       plan={plan}
                       selected={selectedPlan?.id === plan.id}
-                      recommended={recommendedVisitId === plan.id}
                       onSelect={() => { setSelectedPlan(plan); setDiscountResult(null); }}
                     />
                   ))}
