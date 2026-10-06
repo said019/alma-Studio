@@ -1,3 +1,4 @@
+import { resolveEffectivePrice, resolvePlanPaymentUrl } from "./pricing.js";
 import crypto from 'node:crypto';
 import {mpConfig,mpError,assertMpPayment,buildMpPayment,verifyMpSignature} from './mercadoPago.js';
 const uuid=s=>/^[a-f\d]{8}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{12}$/i.test(String(s));
@@ -127,7 +128,8 @@ export function registerMercadoPago(app,{pool,auth,finalizeOrder,afterPayment=()
    const p=(await db.query('SELECT * FROM plans WHERE id=$1',[o.plan_id])).rows[0];
    if(p?.rules?.auto_renew) {
     const amount=Number(o.total_amount);
-    const link=Number(p.opening_price)===amount ? p.rules.opening_payment_url : Number(p.price)===amount ? p.rules.payment_url : null;
+    const openingAllowed=(p.rules.promotion_mode??'studio')==='studio';
+    const link=openingAllowed&&Number(p.opening_price)===amount ? p.rules.opening_payment_url : Number(p.price)===amount ? p.rules.payment_url : !openingAllowed&&amount===resolveEffectivePrice(p,false) ? resolvePlanPaymentUrl(p,false) : null;
     if(!link)throw mpError('El plan anual requiere un enlace compatible con el importe de esta orden.',409);
     await db.query("UPDATE orders SET payment_method='card',payment_provider='mercadopago_external',mp_checkout_mode='external',mp_external_checkout_url=$2 WHERE id=$1",[o.id,link]);
     await db.query('COMMIT');return res.json({data:{payment_provider:'mercadopago_external',mp_checkout_mode:'external',checkout_url:link}});

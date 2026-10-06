@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { SegmentedTabs, StatusPill, InfoBanner, Stepper, DataRow, StickyCta } from "./widgets";
+import { formatMoneyMX, SegmentedTabs, StatusPill, InfoBanner, Stepper, DataRow, StickyCta } from "./widgets";
 import { TONE_CLASS } from "@/design/tokens";
 import { describeZone } from "@/design/zoneGuard";
 
@@ -66,4 +66,10 @@ describe("widgets (clases por tema)", () => {
     const conColor = [...container.querySelectorAll<HTMLElement>("[style]")].filter((n) => n.style.color || n.style.backgroundColor || n.style.borderColor);
     expect(conColor).toEqual([]);
   });
+});
+
+it("conserva centavos de descuentos sin redondear el precio a pesos enteros", () => {
+  expect(formatMoneyMX(850.5)).toBe("850.50");
+  expect(formatMoneyMX(850)).toBe("850");
+  expect(formatMoneyMX(0)).toBe("0");
 });

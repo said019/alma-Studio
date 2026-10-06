@@ -1,9 +1,11 @@
+import { validatePlanPromotion } from "./pricing.js";
 import { studioDateTimeFormatter } from './studioDateFormatters.js';
 
 // Persisted product conditions. Missing keys preserve legacy plans' behavior.
 export function validatePlanRules(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('Las condiciones del plan deben ser un objeto.');
   const rules = { ...input };
+  validatePlanPromotion(rules);
   if (rules.transferable === true || rules.extendable === true) throw new Error("Los paquetes HIVE son personales, intransferibles y sin prórroga.");
   for (const key of ['daily_class_limit', 'guest_passes', 'complimentary_coffee_per_day', 'commitment_months']) {
     if (rules[key] == null && key === 'daily_class_limit') continue;
@@ -14,7 +16,7 @@ export function validatePlanRules(input) {
   if (Boolean(rules.booking_start_time) !== Boolean(rules.booking_end_time) || (rules.booking_start_time && rules.booking_start_time > rules.booking_end_time)) throw new Error('Configura una franja horaria válida con inicio y fin.');
   for (const key of ['requires_student_id','auto_renew','transferable','extendable']) if (rules[key] !== undefined && typeof rules[key] !== 'boolean') throw new Error(`Valor inválido: ${key}.`);
   for (const [key, values] of [['billing_period',['one_time','month']],['guest_pass_period',['membership','month']]]) if (rules[key] !== undefined && !values.includes(rules[key])) throw new Error(`Valor inválido: ${key}.`);
-  for (const key of ['payment_url','opening_payment_url']) if (rules[key]) { let url; try { url = new URL(rules[key]); } catch { throw new Error('Enlace de pago inválido.'); } if (url.protocol !== 'https:' || url.username || url.password) throw new Error('El enlace de pago debe usar HTTPS.'); }
+  for (const key of ['payment_url','opening_payment_url','promotion_payment_url']) if (rules[key]) { let url; try { url = new URL(rules[key]); } catch { throw new Error('Enlace de pago inválido.'); } if (url.protocol !== 'https:' || url.username || url.password) throw new Error('El enlace de pago debe usar HTTPS.'); }
   if (rules.auto_renew && rules.billing_period !== 'month') throw new Error('La renovación automática requiere cobro mensual.');
   return rules;
 }

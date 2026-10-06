@@ -33,7 +33,7 @@ import { MoreHorizontal, Package, Plus } from "lucide-react";
 
 const CATEGORIES = [
   { value: "studio",         label: "Studio" },
-  { value: "reformer_tower", label: "Reformer/Tower" },
+  { value: "reformer_tower", label: "Pilates Reformer" },
   { value: "mixto",          label: "Mixto" },
   { value: "all",            label: "Todo (all)" },
 ] as const;
@@ -63,6 +63,9 @@ export const planSchema = z.object({
   sortOrder: z.coerce.number().default(0),
   isVisitPack: z.boolean().default(false),
   rules: z.object({
+    promotion_payment_url: nullableUrl,
+    promotion_mode: z.enum(["studio", "disabled", "price", "percent", "amount"]),
+    promotion_value: z.preprocess(v => v === "" || v == null ? null : Number(v), z.number().finite().nonnegative().nullable()),
     daily_class_limit: nullablePositive,
     allowed_weekdays: z.array(z.number().int().min(0).max(6)).min(1, "Selecciona al menos un día"),
     booking_start_time: nullableTime, booking_end_time: nullableTime,
@@ -74,6 +77,9 @@ export const planSchema = z.object({
     transferable: z.boolean(), extendable: z.boolean(),
   }).refine(r => (!r.booking_start_time && !r.booking_end_time) || (r.booking_start_time && r.booking_end_time && r.booking_start_time < r.booking_end_time), { message: "Define ambas horas y un fin posterior al inicio", path: ["booking_end_time"] })
     .refine(r => r.billing_period === "month" || (!r.auto_renew && !r.commitment_months), { message: "El compromiso y la renovación requieren pago mensual", path: ["billing_period"] }),
+}).superRefine((p, ctx) => {
+  const mode = p.rules.promotion_mode, value = p.rules.promotion_value;
+  if (!["studio", "disabled"].includes(mode) && (value == null || (mode === "percent" ? value > 100 : value > p.price))) ctx.addIssue({code:z.ZodIssueCode.custom,path:["rules","promotion_value"],message:"Indica un descuento válido: hasta 100% o un importe no mayor al precio regular."});
 });
 
 type PlanFormData = z.infer<typeof planSchema>;
@@ -85,7 +91,10 @@ interface Plan extends PlanFormData {
 
 function normalizePlanRow(row: any): Plan {
   return {
-    rules: normalizePlanRules({ ...row?.rules, transferable: false, extendable: false }),
+    rules: normalizePlanRules({
+      ...((row?.afternoonOnly ?? row?.afternoon_only) ? {allowed_weekdays:[1,2,3,4,5],booking_start_time:"11:00",booking_end_time:"16:00"} : (row?.morningOnly ?? row?.morning_only) ? {booking_start_time:"00:00",booking_end_time:"10:00"} : {}),
+      ...row?.rules, transferable: false, extendable: false,
+    }),
     id: String(row?.id ?? ""),
     name: String(row?.name ?? ""),
     description: String(row?.description ?? ""),
@@ -118,7 +127,7 @@ function normalizePlanRow(row: any): Plan {
 
 const EMPTY: PlanFormData = {
   name: "", description: "", price: 0, currency: "MXN",
-  durationDays: 30, classLimit: null, classCategory: "studio",
+  durationDays: 30, classLimit: null, classCategory: "reformer_tower",
   openingPrice: null, morningOnly: false, afternoonOnly: false, personalOnly: false,
   features: "", isActive: true, isNonTransferable: true, isNonRepeatable: false, repeatKey: "",
   sortOrder: 0,
@@ -133,8 +142,9 @@ function serializePlan(d: PlanFormData) {
     rules: { ...d.rules, transferable: false, extendable: false },
     repeatKey: d.isNonRepeatable ? (d.repeatKey?.trim() || null) : null,
     opening_price: d.openingPrice,
-    morning_only: !!d.morningOnly,
-    afternoon_only: !!d.afternoonOnly,
+    morningOnly: false, afternoonOnly: false,
+    morning_only: false,
+    afternoon_only: false,
     personal_only: !!d.personalOnly,
     features: d.features
       ? d.features.split(",").map((s) => s.trim()).filter(Boolean)
@@ -228,7 +238,8 @@ function PlanCard({ p, onEdit, onToggleActive, onDelete }: {
       </div>
       <div className="flex flex-wrap items-baseline gap-2.5">
         <span className="nums font-display text-[1.625rem] font-semibold leading-none">{formatMXN(Number(p.price))}</span>
-        {p.openingPrice != null && <span className="nums text-[0.75rem] font-bold text-ink-muted">Apertura {formatMXN(Number(p.openingPrice))}</span>}
+        {p.rules.promotion_mode === "studio" && p.openingPrice != null && <span className="nums text-[0.75rem] font-bold text-ink-muted">Apertura {formatMXN(Number(p.openingPrice))}</span>}
+        {!["studio", "disabled"].includes(p.rules.promotion_mode) && <span className="text-xs">{p.rules.promotion_mode === "percent" ? `${p.rules.promotion_value}% de descuento` : p.rules.promotion_mode === "amount" ? `${formatMXN(Number(p.rules.promotion_value))} de descuento` : `Promoción ${formatMXN(Number(p.rules.promotion_value))}`}</span>}
       </div>
       <p className="text-[13px] text-ink-muted">
         {p.classLimit == null ? (p.rules.daily_class_limit ? `${p.rules.daily_class_limit} ${p.rules.daily_class_limit === 1 ? "sesión" : "sesiones"}/día` : "Ilimitado") : `${p.classLimit} ${p.classLimit === 1 ? "clase" : "clases"}`} · {p.durationDays} días
@@ -264,13 +275,13 @@ const PlansList = () => {
 
   const createMutation = useMutation({
     mutationFn: (d: PlanFormData) => api.post("/plans", serializePlan(d)),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["plans"] }); toast({ title: "Plan creado" }); closeSheet(); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["plans"] }); qc.invalidateQueries({ queryKey: ["plans-public"] }); toast({ title: "Plan creado" }); closeSheet(); },
     onError: (e: any) => toast({ title: e?.response?.data?.message ?? "Error al crear", variant: "destructive" }),
   });
 
   const updateMutation = useMutation({
     mutationFn: ({ id, ...d }: Plan) => api.put(`/plans/${id}`, serializePlan(d)),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["plans"] }); toast({ title: "Plan actualizado" }); closeSheet(); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["plans"] }); qc.invalidateQueries({ queryKey: ["plans-public"] }); toast({ title: "Plan actualizado" }); closeSheet(); },
     onError: (e: any) => toast({ title: e?.response?.data?.message ?? "Error al actualizar", variant: "destructive" }),
   });
 
@@ -405,8 +416,8 @@ const PlansList = () => {
                   {form.formState.errors.name && <p className="text-xs text-destructive">{form.formState.errors.name.message}</p>}
                 </div>
                 <div className="space-y-1">
-                  <Label>Descripción</Label>
-                  <Input {...form.register("description")} />
+                  <Label htmlFor="plan-description">Descripción visible al usuario</Label>
+                  <Input id="plan-description" {...form.register("description")} />
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1">
@@ -435,10 +446,11 @@ const PlansList = () => {
                   </Select>
                 </div>
                 <div className="space-y-1">
-                  <Label>Beneficios (separados por coma)</Label>
-                  <Input {...form.register("features")} />
+                  <Label htmlFor="plan-features">Beneficios (separados por coma)</Label>
+                  <Input id="plan-features" {...form.register("features")} />
                   <FieldHelp>Se muestran como lista del plan en la página de precios.</FieldHelp>
                 </div>
+                <Label htmlFor="plan-sort">Orden de aparición</Label><Input id="plan-sort" type="number" {...form.register("sortOrder")} />
                 <SwitchRow
                   label="Activo"
                   help="Solo los planes activos aparecen a la venta."
@@ -449,8 +461,8 @@ const PlansList = () => {
 
               <FormSection title="Reglas">
                 <div className="space-y-1">
-                  <Label>Límite de clases</Label>
-                  <Input type="number" className="nums" placeholder="Vacío = ilimitado" {...form.register("classLimit")} />
+                  <Label htmlFor="plan-limit">Límite de clases</Label>
+                  <Input id="plan-limit" type="number" className="nums" placeholder="Vacío = ilimitado" {...form.register("classLimit")} />
                   <FieldHelp>Cuántas clases incluye durante la vigencia. Déjalo vacío para clases ilimitadas.</FieldHelp>
                 </div>
                 <FieldHelp>Todos los planes HIVE son personales e intransferibles y no permiten extensión de vigencia. Los guest pass son beneficios independientes para invitadas.</FieldHelp>
@@ -461,26 +473,18 @@ const PlansList = () => {
                   onCheckedChange={(v) => form.setValue("isNonRepeatable", v)}
                 />
                 <SwitchRow
-                  label="Horario especial HIVE (11 a 16, lunes a viernes)"
-                  help="Inicio de clase entre las 11:00 y las 16:00, de lunes a viernes, hora de Ciudad de México."
-                  checked={form.watch("afternoonOnly")}
-                  onCheckedChange={(v) => { form.setValue("afternoonOnly", v); if (v) form.setValue("morningOnly", false); }}
-                />
-                <SwitchRow
                   label="Sesión personalizada"
                   help="Solo permite reservar sesiones con cupo de una persona."
                   checked={form.watch("personalOnly")}
                   onCheckedChange={(v) => form.setValue("personalOnly", v)}
                 />
-                <SwitchRow
-                  label="Solo horario matutino (AM Club)"
-                  help="Solo permite reservar clases que empiezan a las 10:00 am o antes."
-                  checked={form.watch("morningOnly")}
-                  onCheckedChange={(v) => { form.setValue("morningOnly", v); if (v) form.setValue("afternoonOnly", false); }}
-                />
               </FormSection>
 
               <FormSection title="Disponibilidad y límites diarios">
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" variant="outline" onClick={() => { form.setValue("rules.allowed_weekdays", [0,1,2,3,4,5,6]); form.setValue("rules.booking_start_time", null); form.setValue("rules.booking_end_time", null); }}>Cualquier día y horario</Button>
+                  <Button type="button" variant="outline" onClick={() => { form.setValue("rules.allowed_weekdays", [1,2,3,4,5]); form.setValue("rules.booking_start_time", "11:00"); form.setValue("rules.booking_end_time", "16:00"); }}>Usar horario especial HIVE</Button>
+                </div>
                 <Label htmlFor="daily-limit">Sesiones máximas por día</Label>
                 <Input id="daily-limit" type="number" min={1} placeholder="Vacío = sin límite diario" {...form.register("rules.daily_class_limit")} />
                 <FieldHelp>El límite total y el límite diario se aplican juntos. Mensual HIVE: 1; anual HIVE: 2.</FieldHelp>
@@ -491,7 +495,7 @@ const PlansList = () => {
                   <div><Label htmlFor="start-time">Desde (CDMX)</Label><Input id="start-time" type="time" {...form.register("rules.booking_start_time")} /></div>
                   <div><Label htmlFor="end-time">Hasta (CDMX)</Label><Input id="end-time" type="time" {...form.register("rules.booking_end_time")} /></div>
                 </div>
-                <FieldHelp>Se valida la hora de inicio de la clase. Deja ambas horas vacías para cualquier horario. Las restricciones de horario anteriores también se aplican.</FieldHelp>
+                <FieldHelp>Se valida la hora de inicio de la clase. Deja ambas horas vacías para cualquier horario. Estas son las únicas restricciones de horario del plan; puedes cambiar libremente los días y la franja.</FieldHelp>
                 <SwitchRow label="Credencial de estudiante vigente" help="Requiere verificación por el equipo antes de usar el plan." checked={form.watch("rules.requires_student_id")} onCheckedChange={v => form.setValue("rules.requires_student_id", v)} />
               </FormSection>
               <FormSection title="Beneficios incluidos">
@@ -506,7 +510,22 @@ const PlansList = () => {
                 <SwitchRow label="Renovación mensual prevista" help="Esta opción describe el plan; no activa cargos automáticos. La suscripción debe contratarse y confirmarse con el proveedor." checked={form.watch("rules.auto_renew")} onCheckedChange={v => form.setValue("rules.auto_renew", v)} />
                 <Label htmlFor="payment-url">Enlace de pago regular</Label><Input id="payment-url" type="url" placeholder="https://mpago.la/..." {...form.register("rules.payment_url")} />
                 <Label htmlFor="opening-payment-url">Enlace de pago de apertura</Label><Input id="opening-payment-url" type="url" placeholder="https://mpago.la/..." {...form.register("rules.opening_payment_url")} />
+                <Label htmlFor="promotion-payment-url">Enlace de pago para descuento propio</Label><Input id="promotion-payment-url" type="url" placeholder="https://mpago.la/..." {...form.register("rules.promotion_payment_url")} />
                 <FieldHelp>Enlaces HTTPS del proveedor de pago. Confirma que el importe y la periodicidad coincidan con este plan.</FieldHelp>
+              </FormSection>
+              <FormSection title="Precios y descuentos">
+                <div className="space-y-1">
+                  <Label htmlFor="opening-price">Precio de apertura</Label>
+                  <Input id="opening-price" type="number" min={0} className="nums" {...form.register("openingPrice")} />
+                  <FieldHelp>Precio promocional de venta. Déjalo vacío si no aplica. La promoción se cobra cuando el periodo de apertura del estudio está activo.</FieldHelp>
+                </div>
+                <Label htmlFor="promotion-mode">Promoción de este plan</Label>
+                <select id="promotion-mode" className="w-full rounded-md border border-line bg-surface p-2" {...form.register("rules.promotion_mode")}>
+                  <option value="studio">Usar promoción de apertura del estudio</option><option value="disabled">Sin descuento (precio regular)</option><option value="percent">Descuento en porcentaje</option><option value="amount">Descuento en pesos</option><option value="price">Precio promocional fijo</option>
+                </select>
+                {!["studio", "disabled"].includes(form.watch("rules.promotion_mode")) && <><Label htmlFor="promotion-value">{form.watch("rules.promotion_mode") === "percent" ? "Descuento (%)" : form.watch("rules.promotion_mode") === "amount" ? "Descuento (MXN)" : "Precio promocional (MXN)"}</Label><Input id="promotion-value" type="number" min={0} step="0.01" {...form.register("rules.promotion_value")} />
+                  <p role="status" className="font-semibold">Precio de venta: {formatMXN(Math.max(0, form.watch("rules.promotion_mode") === "price" ? Number(form.watch("rules.promotion_value") ?? 0) : Number(form.watch("price")) - (form.watch("rules.promotion_mode") === "percent" ? Number(form.watch("price")) * Number(form.watch("rules.promotion_value") ?? 0) / 100 : Number(form.watch("rules.promotion_value") ?? 0))))}</p></>}
+                <FieldHelp>Los descuentos propios se aplican al precio regular y no se suman al de apertura. Guarda para actualizar el precio mostrado y cobrado a nuevas compras. En suscripciones con enlace fijo, un precio distinto requiere configurar el enlace de pago para descuento propio en Mercado Pago; mientras tanto se puede pagar en el estudio o por transferencia.</FieldHelp>
               </FormSection>
               <FormSection title="Avanzado">
                 <SwitchRow
@@ -524,11 +543,7 @@ const PlansList = () => {
                     </FieldHelp>
                   </div>
                 )}
-                <div className="space-y-1">
-                  <Label>Precio de apertura</Label>
-                  <Input type="number" min={0} className="nums" {...form.register("openingPrice")} />
-                  <FieldHelp>Precio promocional de venta. Déjalo vacío si no aplica. La promoción se cobra cuando el periodo de apertura del estudio está activo.</FieldHelp>
-                </div>
+
               </FormSection>
 
               {Object.keys(form.formState.errors).length > 0 && <div role="alert" className="space-y-1 text-sm text-destructive"><p>Revisa los campos: usa importes no negativos, límites enteros positivos, días y horarios válidos, enlaces HTTPS y pago mensual para renovación o compromiso.</p>{Object.values(form.formState.errors.rules ?? {}).map((error, index) => error && typeof error === "object" && "message" in error ? <p key={index}>{String(error.message)}</p> : null)}</div>}

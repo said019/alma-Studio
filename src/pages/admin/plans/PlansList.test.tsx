@@ -30,7 +30,7 @@ describe("Planes", () => {
     // falta: `asyncUtilTimeout` sube a 3000ms para toda la suite desde
     // src/test/setup.ts (Task 9 del review).
     expect(await screen.findByRole("heading", { name: "Studio" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Reformer/Tower" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Pilates Reformer" })).toBeInTheDocument();
     const paquete = screen.getByRole("heading", { name: "Paquete 8 clases" }).closest("article")!;
     expect(within(paquete).getByText("$1,450")).toBeInTheDocument();
     expect(within(paquete).getByText("Apertura $1,250")).toBeInTheDocument();
@@ -127,3 +127,33 @@ describe('Configuración completa de planes HIVE', () => {
     expect(post).not.toHaveBeenCalled();
   });
 });
+
+ it('guarda horarios libres sin flags heredados y descuento porcentual propio', async () => {
+   const put = api.put as Mock; put.mockReset().mockResolvedValue({data:{}});
+   routeApi(mockApi, {'/plans':{data:[{id:'special',name:'Especial',price:1000,duration_days:30,class_limit:4,class_category:'reformer_tower',afternoon_only:true,is_active:true}]}});
+   renderAdmin(<PlansList/>,{route:'/admin/plans'});
+   const card=(await screen.findByRole('heading',{name:'Especial'})).closest('article')!;
+   fireEvent.keyDown(within(card).getByRole('button',{name:'Acciones de Especial'}),{key:'Enter'});
+   fireEvent.click(await screen.findByRole('menuitem',{name:'Editar'}));
+   expect(screen.getByLabelText('Desde (CDMX)')).toHaveValue('11:00');
+   fireEvent.click(screen.getByRole('button',{name:'Cualquier día y horario'}));
+   fireEvent.change(screen.getByLabelText('Desde (CDMX)'),{target:{value:'17:00'}});
+   fireEvent.change(screen.getByLabelText('Hasta (CDMX)'),{target:{value:'20:00'}});
+   fireEvent.change(screen.getByLabelText('Promoción de este plan'),{target:{value:'percent'}});
+   fireEvent.change(screen.getByLabelText('Descuento (%)'),{target:{value:'15'}});
+   expect(screen.getByRole('status')).toHaveTextContent('Precio de venta: $850');
+   fireEvent.click(screen.getByRole('button',{name:'Guardar cambios'}));
+   await waitFor(()=>expect(put).toHaveBeenCalledWith('/plans/special',expect.objectContaining({afternoon_only:false,morning_only:false,rules:expect.objectContaining({promotion_mode:'percent',promotion_value:15,booking_start_time:'17:00',booking_end_time:'20:00',allowed_weekdays:[0,1,2,3,4,5,6]})})));
+ });
+ it('impide descuentos mayores al precio regular', async () => {
+   const post=api.post as Mock;post.mockReset();
+   renderAdmin(<PlansList/>,{route:'/admin/plans'});
+   fireEvent.click(await screen.findByRole('button',{name:'Nuevo plan'}));
+   fireEvent.change(screen.getByLabelText('Nombre'),{target:{value:'Prueba'}});
+   fireEvent.change(screen.getByLabelText('Precio (MXN)'),{target:{value:'100'}});
+   fireEvent.change(screen.getByLabelText('Promoción de este plan'),{target:{value:'amount'}});
+   fireEvent.change(screen.getByLabelText('Descuento (MXN)'),{target:{value:'101'}});
+   fireEvent.click(screen.getByRole('button',{name:'Crear plan'}));
+   expect(await screen.findByText(/Indica un descuento válido/)).toBeInTheDocument();
+   expect(post).not.toHaveBeenCalled();
+ });

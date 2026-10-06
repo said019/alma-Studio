@@ -122,27 +122,31 @@ export function availability(c: Pick<LandingClass, "remaining" | "capacity">): A
 /* ── Paquetes ───────────────────────────────────────────────────────── */
 export type PlanRow = {
   rules?: Partial<PlanRules>; personal_only?: boolean; personalOnly?: boolean; afternoon_only?: boolean; afternoonOnly?: boolean;
+  features?: string[];
   id: string; name: string; description?: string | null; price: number | string;
+  promotionActive?: boolean; promotion_active?: boolean; promotionLabel?: string | null; promotion_label?: string | null;
   effectivePrice?: number | string; effective_price?: number | string; openingActive?: boolean; opening_active?: boolean;
   classLimit?: number | null; class_limit?: number | null; durationDays?: number | null; duration_days?: number | null;
   isNonRepeatable?: boolean; is_non_repeatable?: boolean; sortOrder?: number | null; sort_order?: number | null;
 };
 export type LandingPlan = {
-  conditions?: string[]; billingPeriod?: string; kind?: "sessions" | "membership" | "special";
+  promotionLabel?: string | null; conditions?: string[]; billingPeriod?: string; kind?: "sessions" | "membership" | "special";
   id: string; name: string; description: string | null; price: number; finalPrice: number; opening: boolean;
   classLimit: number | null; perClass: number | null; durationDays: number | null; nonRepeatable: boolean;
 };
 
 export function toLandingPlan(p: PlanRow): LandingPlan {
   const price = Number(p.price) || 0;
-  const eff = Number(p.effectivePrice ?? p.effective_price ?? price) || price;
-  const opening = Boolean(p.openingActive ?? p.opening_active) && eff > 0 && eff !== price;
+  const parsed = Number(p.effectivePrice ?? p.effective_price ?? price);
+  const eff = Number.isFinite(parsed) ? parsed : price;
+  const opening = Boolean(p.promotionActive ?? p.promotion_active ?? p.openingActive ?? p.opening_active) && eff >= 0 && eff !== price;
   const finalPrice = opening ? eff : price;
   const classLimit = p.classLimit ?? p.class_limit ?? null;
   // Como en Checkout: 900 clases o más es ilimitado, y ahí no hay precio por clase.
   const perClass = classLimit != null && classLimit > 1 && classLimit < 900 ? Math.round(finalPrice / classLimit) : null;
   return {
-    conditions: planConditions(p), billingPeriod: p.rules?.billing_period,
+    promotionLabel: p.promotionLabel ?? p.promotion_label ?? "Precio de apertura",
+    conditions: [...new Set([...planConditions(p), ...(p.features ?? []).filter((feature) => typeof feature === "string" && feature.trim())])], billingPeriod: p.rules?.billing_period,
     kind: p.rules?.billing_period === "month" || (p.rules?.daily_class_limit && (classLimit == null || classLimit >= 900)) ? "membership" : (p.rules?.requires_student_id || p.personalOnly || p.personal_only || p.afternoonOnly || p.afternoon_only || p.rules?.booking_start_time || (p.rules?.allowed_weekdays && p.rules.allowed_weekdays.length < 7)) ? "special" : "sessions",
     id: p.id, name: p.name, description: p.description ?? null, price, finalPrice, opening, classLimit, perClass,
     durationDays: p.durationDays ?? p.duration_days ?? null,

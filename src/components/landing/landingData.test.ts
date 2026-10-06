@@ -64,6 +64,12 @@ describe("clases de la semana", () => {
 });
 
 describe("paquetes", () => {
+  it("publica beneficios personalizados y descuentos gratuitos", () => {
+    const plan = toLandingPlan({ id: "custom", name: "Personalizado", price: 1000, effectivePrice: 0, promotionActive: true, promotionLabel: "Promoción", features: ["Evaluación incluida"] });
+    expect(plan.finalPrice).toBe(0);
+    expect(plan.promotionLabel).toBe("Promoción");
+    expect(plan.conditions).toContain("Evaluación incluida");
+  });
   it("precios como texto; apertura respeta también precios superiores", () => {
     expect(toLandingPlan({ id: "1", name: "4 clases", price: "1140.00", effectivePrice: "1080.00", openingActive: true, classLimit: 4 }))
       .toMatchObject({ price: 1140, finalPrice: 1080, opening: true, perClass: 270 });

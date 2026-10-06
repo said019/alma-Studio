@@ -94,7 +94,7 @@ export function Plans({ trial, plans, loading, error, onRetry }: Props) {
                   <div aria-live="polite" aria-atomic="true">
                     <h3 className="hive-plan-name font-bold text-ink">{activePlan.name}</h3>
                     {activePlan.description && <p className="mt-3 text-sm text-ink-muted">{activePlan.description}</p>}
-                    {activePlan.opening && <p className="mt-4 text-[0.75rem] font-extrabold uppercase tracking-[0.12em] text-accent">Precio de apertura</p>}
+                    {activePlan.opening && <p className="mt-4 text-[0.75rem] font-extrabold uppercase tracking-[0.12em] text-accent">{activePlan.promotionLabel ?? "Precio de apertura"}</p>}
                     <Price p={activePlan} big />
                     <p className="text-xs text-ink-muted">Precios en MXN</p>
                     <ul className="hive-plan-terms">

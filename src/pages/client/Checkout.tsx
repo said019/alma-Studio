@@ -82,7 +82,7 @@ const PlanRow = ({
   const regularPrice = Number(plan.price ?? 0);
   const effectivePrice = Number(plan.effectivePrice ?? plan.effective_price ?? regularPrice);
   const hasOpening =
-    Boolean(plan.openingActive ?? plan.opening_active) && effectivePrice > 0;
+    Boolean(plan.promotionActive ?? plan.promotion_active ?? plan.openingActive ?? plan.opening_active) && effectivePrice !== regularPrice;
   const perClass =
     !isUnlimited && effectivePrice > 0 && Number(classLimit) > 1
       ? Math.round(effectivePrice / Number(classLimit))
@@ -120,7 +120,8 @@ const PlanRow = ({
           </h3>
           {plan.rules?.requires_student_id && !plan.rules?.booking_start_time && plan.rules?.allowed_weekdays?.length === 7 && <p className="mt-1 text-[0.8rem] text-ink-muted">Disponible en cualquier horario, todos los días</p>}
           {conditions.map(condition => <p key={condition} className="mt-1 text-[0.8rem] text-ink-muted">{condition}</p>)}
-          {plan.description && !plan.rules && <p className="mt-1 text-[0.8rem] text-ink-muted">{plan.description}</p>}
+          {plan.description && <p className="mt-1 text-[0.8rem] text-ink-muted">{plan.description}</p>}
+          {Array.isArray(plan.features) && plan.features.map((feature: string, index: number) => <p key={index} className="mt-1 text-[0.8rem] text-ink-muted">{feature}</p>)}
           {durationDays > 0 && (
             <p className="text-[0.75rem] mt-0.5 text-ink-muted">
               {plan.rules?.billing_period === "month" ? `Vigencia de cada periodo: ${durationDays} días naturales` : `${durationDays} días naturales desde la compra`}
@@ -141,7 +142,7 @@ const PlanRow = ({
           </div>
           {hasOpening ? (
             <div className="text-[0.75rem] uppercase tracking-[0.18em] mt-1 text-accent-strong">
-              Promo apertura
+              {plan.promotionLabel ?? plan.promotion_label ?? "Promo apertura"}
             </div>
           ) : perClass ? (
             <div className="nums text-[0.75rem] mt-1 text-accent-strong">
@@ -299,8 +300,14 @@ const Checkout = () => {
 
   const stepperCurrent: Step =
     step === "bank" || step === "cash" || step === "card" || step === "external-card" ? "method" : step;
-  const annualExternal = Boolean(selectedPlan?.rules?.auto_renew && (selectedPlan?.rules?.payment_url || selectedPlan?.rules?.opening_payment_url));
-  const cardAvailable = annualExternal || cardReadiness?.ready === true;
+  const recurringPlan = Boolean(selectedPlan?.rules?.auto_renew);
+  const resolvedPaymentUrl = selectedPlan && Object.hasOwn(selectedPlan, "paymentUrl") ? selectedPlan.paymentUrl
+    : selectedPlan && Object.hasOwn(selectedPlan, "payment_url") ? selectedPlan.payment_url
+    : (selectedPlan?.rules?.promotion_mode ?? "studio") === "studio"
+      ? (selectedPlan?.openingActive ?? selectedPlan?.opening_active) ? selectedPlan?.rules?.opening_payment_url : selectedPlan?.rules?.payment_url
+      : selectedEffective === Number(selectedPlan?.price) ? selectedPlan?.rules?.payment_url : selectedPlan?.rules?.promotion_payment_url;
+  const annualExternal = Boolean(recurringPlan && resolvedPaymentUrl && finalAmount === selectedEffective);
+  const cardAvailable = finalAmount > 0 && (recurringPlan ? annualExternal : cardReadiness?.ready === true);
 
   return (
     <ClientAuthGuard requiredRoles={["client"]}>
@@ -484,7 +491,7 @@ const Checkout = () => {
             <Section title="¿Cómo quieres pagar?">
               <div role="radiogroup" aria-label="Método de pago" className="space-y-2">
                 {[
-                  { id: "card" as const, label: "Tarjeta", sub: annualExternal ? "Contratación anual en Mercado Pago" : cardAvailable ? "Paga aquí con Mercado Pago, sin salir de la app" : loadingCardReadiness ? "Consultando disponibilidad…" : cardReadiness?.message || "Pago con tarjeta aún no disponible; elige otro método", icon: CreditCard },
+                  { id: "card" as const, label: "Tarjeta", sub: finalAmount <= 0 ? "El estudio debe confirmar la activación de los planes sin costo" : annualExternal ? "Contratación anual en Mercado Pago" : cardAvailable ? "Paga aquí con Mercado Pago, sin salir de la app" : recurringPlan ? "Este precio requiere un enlace de suscripción actualizado; elige otro método o contacta al estudio" : loadingCardReadiness ? "Consultando disponibilidad…" : cardReadiness?.message || "Pago con tarjeta aún no disponible; elige otro método", icon: CreditCard },
                   { id: "transfer" as const, label: "Transferencia", sub: "Subes tu comprobante", icon: Building2 },
                   { id: "cash" as const, label: "Efectivo", sub: "Pagas en recepción del estudio", icon: Banknote },
                 ].map((opt) => {

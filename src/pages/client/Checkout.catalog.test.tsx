@@ -33,3 +33,19 @@ it('muestra las nueve ofertas HIVE en el orden del folleto y sin modalidades her
   fireEvent.click(screen.getByRole('heading',{name:'10 Clases'}).closest('button')!);
   expect(screen.getByRole('button',{name:'Continuar a pago'})).toBeEnabled();
 });
+
+it('muestra descuento propio a cero, descripción y beneficios editados por administración', async () => {
+ routeApi(api as unknown as {get:Mock},{'/plans':{data:[{...plans[0],name:'Cortesía',description:'Texto del estudio',features:['Beneficio nuevo'],effectivePrice:0,promotionActive:true,promotionLabel:'Promoción',openingActive:false}]},'/payments/card-readiness':{data:{ready:true}}});
+ renderAdmin(<Checkout/>,{route:'/app/checkout'});
+ const card=(await screen.findByRole('heading',{name:'Cortesía',level:3})).closest('button')!;
+ expect(card).toHaveTextContent('$0');expect(card).toHaveTextContent('Promoción');expect(card).toHaveTextContent('Texto del estudio');expect(card).toHaveTextContent('Beneficio nuevo');
+ fireEvent.click(card);fireEvent.click(screen.getByRole('button',{name:'Continuar a pago'}));
+ expect(screen.getByRole('radio',{name:/Tarjeta/})).toBeDisabled();
+});
+it('no ofrece enlace de suscripción antiguo cuando el descuento cambia su importe', async () => {
+ routeApi(api as unknown as {get:Mock},{'/plans':{data:[{...plans[5],effectivePrice:3500,promotionActive:true,promotionLabel:'Promoción',openingActive:false,paymentUrl:null,rules:{...plans[5].rules,promotion_mode:'price',promotion_value:3500}}]},'/payments/card-readiness':{data:{ready:true}}});
+ renderAdmin(<Checkout/>,{route:'/app/checkout'});
+ fireEvent.click((await screen.findByRole('heading',{name:'Plan anual / pago mensual',level:3})).closest('button')!);
+ fireEvent.click(screen.getByRole('button',{name:'Continuar a pago'}));
+ expect(screen.getByRole('radio',{name:/Tarjeta/})).toBeDisabled();
+});

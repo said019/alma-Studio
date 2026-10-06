@@ -1,5 +1,8 @@
 /** Structured commercial conditions shared by the catalog and checkout. */
 export interface PlanRules {
+  promotion_mode: "studio" | "disabled" | "price" | "percent" | "amount";
+  promotion_value: number | null;
+  promotion_payment_url: string | null;
   daily_class_limit: number | null;
   allowed_weekdays: number[];
   booking_start_time: string | null;
@@ -17,6 +20,7 @@ export interface PlanRules {
   extendable: boolean;
 }
 export const DEFAULT_PLAN_RULES: PlanRules = {
+  promotion_mode: "studio", promotion_value: null, promotion_payment_url: null,
   daily_class_limit: null, allowed_weekdays: [0, 1, 2, 3, 4, 5, 6],
   booking_start_time: null, booking_end_time: null, requires_student_id: false,
   guest_passes: 0, guest_pass_period: 'membership', complimentary_coffee_per_day: 0,

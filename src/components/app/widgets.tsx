@@ -9,7 +9,7 @@ import { resolveToneClass, type Tone } from "@/design/tokens";
 /* ═══ formatMoneyMX ═══ */
 export const formatMoneyMX = (value: number | string | null | undefined) => {
   const n = Number(value ?? 0);
-  return n.toLocaleString("es-MX", { maximumFractionDigits: 0 });
+  return n.toLocaleString("es-MX", { minimumFractionDigits: Number.isInteger(n) ? 0 : 2, maximumFractionDigits: 2 });
 };
 
 /* ═══ SegmentedTabs ═══ activa en tinta (panel) o degradado (app) */

@@ -67,7 +67,7 @@ import { passLocationFields } from "./lib/passGeofence.js";
 import { syntheticGuestEmail } from "./lib/syntheticEmail.js";
 import { mpConfig, MP_SCHEMA } from "./lib/mercadoPago.js";
 import { registerMercadoPago } from "./lib/mercadoPagoRoutes.js";
-import { resolveEffectivePrice, resolvePlanPaymentUrl } from "./lib/pricing.js";
+import { resolveEffectivePrice, resolvePlanPaymentUrl, resolvePlanPricing, validatePlanPromotion } from "./lib/pricing.js";
 import { saleAmountPlan, planMembershipAdjust, cleanPaymentReference, saleStartProblem, saleStartDay, saleAuditAfter, PAYMENT_METHODS, normalizePaymentMethod, PAYMENT_METHOD_INVALID, calcMembershipEndDate } from "./lib/membershipAdmin.js";
 import { cancellationLimitProblem, cancellationQuota, clientCancelDecision, normalizeCancellationSettings, publicBookingPolicy } from "./lib/cancellationPolicy.js";
 import { registerPlanBenefits } from "./lib/planBenefits.js";
@@ -3694,18 +3694,7 @@ app.get("/api/plans", async (req, res) => {
     );
     const general = await getSettingValueWithDefaults("general_settings");
     const openingActive = general?.opening_pricing_active !== false;
-    const data = r.rows.map((p) => {
-      const row = camelRow(p);
-      const effective = resolveEffectivePrice(p, openingActive);
-      const openingThisRow = openingActive && p.opening_price != null;
-      return {
-        ...row,
-        effective_price: effective,
-        effectivePrice: effective,
-        opening_active: openingThisRow,
-        openingActive: openingThisRow,
-      };
-    });
+    const data = r.rows.map(p => ({ ...camelRow(p), ...resolvePlanPricing(p, openingActive) }));
     return res.json({ data });
   } catch (err) {
     console.error("Plans error:", err);
@@ -5207,6 +5196,10 @@ app.post("/api/orders", authMiddleware, async (req, res) => {
       return res.status(400).json({message:"El enlace de Mercado Pago tiene un importe fijo. Para aplicar este descuento utiliza transferencia o paga en el estudio."});
     }
     const total = subtotal - discount;
+    if (paymentMethod === "card" && total <= 0) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({message:"Este plan no requiere un cobro con tarjeta. Solicita la activación en recepción."});
+    }
     const bankInfo = await getConfiguredBankInfo(client);
     const expires = new Date(Date.now() + 48 * 60 * 60 * 1000); // 48h
     const orderNumber = await generateOrderNumber(client);
@@ -14540,7 +14533,16 @@ function validatePlanInput(req,res,next) {
 // POST /api/plans — admin (mirror of /api/admin/plans)
 // PUT /api/plans/:id
 app.put("/api/plans/:id", adminMiddleware, validatePlanInput, async (req, res) => {
+  let client;
   try {
+    const general = await getSettingValueWithDefaults("general_settings");
+    client = await pool.connect();
+    await client.query("BEGIN");
+    const existing = (await client.query("SELECT * FROM plans WHERE id=$1 FOR UPDATE", [req.params.id])).rows[0];
+    if (!existing) { await client.query("ROLLBACK"); return res.status(404).json({message:"Plan no encontrado"}); }
+    try { validatePlanPromotion(req.body.rules ?? existing.rules ?? {}, Number(req.body.price ?? existing.price)); }
+    catch(error) { await client.query("ROLLBACK"); return res.status(400).json({message:error.message}); }
+
     const {
       name, description, price, currency, durationDays, classLimit, classCategory,
       features, isActive, sortOrder, isNonTransferable, isNonRepeatable, repeatKey,
@@ -14569,7 +14571,7 @@ app.put("/api/plans/:id", adminMiddleware, validatePlanInput, async (req, res) =
         ? features.split(",").map((s) => s.trim()).filter(Boolean)
         : [];
     const isVisitPack = flagOrNull("isVisitPack", "is_visit_pack");
-    const r = await pool.query(
+    const r = await client.query(
       // PUT parcial: lo que el cuerpo no menciona se conserva. Un cuerpo
       // incompleto llegaba a borrar el nombre y el precio del plan (o a
       // reventar con NOT NULL). Auditoría 2026-09-08, P1-2.
@@ -14620,11 +14622,13 @@ app.put("/api/plans/:id", adminMiddleware, validatePlanInput, async (req, res) =
       ]
     );
     if (!r.rows.length) return res.status(404).json({ message: "Plan no encontrado" });
-    return res.json({ data: camelRow(r.rows[0]) });
+    await client.query("COMMIT");
+    return res.json({ data: { ...camelRow(r.rows[0]), ...resolvePlanPricing(r.rows[0], general?.opening_pricing_active !== false) } });
   } catch (err) {
+    if (client) await client.query("ROLLBACK").catch(() => {});
     console.error("[PUT /plans]", err.message);
     return res.status(500).json({ message: "Error interno" });
-  }
+  } finally { client?.release(); }
 });
 
 // DELETE /api/plans/:id — un plan con historial (membresías, órdenes o códigos
@@ -14709,6 +14713,7 @@ app.post("/api/plans", adminMiddleware, validatePlanInput, async (req, res) => {
       isNonTransferable, isNonRepeatable, repeatKey,
       opening_price, morning_only, afternoon_only, personal_only,
     } = req.body;
+    try { validatePlanPromotion(req.body.rules ?? {}, Number(price || 0)); } catch(error) { return res.status(400).json({message:error.message}); }
     if (!name) return res.status(400).json({ message: "Nombre requerido" });
     const validCats = ["studio", "reformer_tower", "mixto", "all"];
     const cat = validCats.includes(classCategory) ? classCategory : "all";
@@ -14725,6 +14730,7 @@ app.post("/api/plans", adminMiddleware, validatePlanInput, async (req, res) => {
         ? features.split(",").map((s) => s.trim()).filter(Boolean)
         : [];
     const isVisitPack = parseBooleanFlag(req.body.isVisitPack ?? req.body.is_visit_pack);
+    const general = await getSettingValueWithDefaults("general_settings");
     const r = await pool.query(
       `INSERT INTO plans
         (name, description, price, currency, duration_days, class_limit, class_category, features, is_active, sort_order, is_non_transferable, is_non_repeatable, repeat_key, is_visit_pack, opening_price, morning_only, afternoon_only, personal_only, rules)
@@ -14750,7 +14756,7 @@ app.post("/api/plans", adminMiddleware, validatePlanInput, async (req, res) => {
         parseBooleanFlag(afternoon_only), parseBooleanFlag(personal_only), JSON.stringify(req.body.rules ?? {}),
       ]
     );
-    return res.status(201).json({ data: camelRow(r.rows[0]) });
+    return res.status(201).json({ data: { ...camelRow(r.rows[0]), ...resolvePlanPricing(r.rows[0], general?.opening_pricing_active !== false) } });
   } catch (err) {
     console.error("[POST /plans]", err.message);
     return res.status(500).json({ message: "Error interno" });
