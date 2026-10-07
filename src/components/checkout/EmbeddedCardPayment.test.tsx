@@ -18,9 +18,18 @@ beforeEach(()=>{
 afterEach(()=>vi.clearAllMocks());
 const mount=()=>renderPage(<EmbeddedCardPayment orderId="same-order" onClose={()=>{}}/>,'/app/checkout');
 describe('tarjeta dentro de HIVE',()=>{
+ it('permite cerrar el modal sin enviar un pago',async()=>{
+  const close=vi.fn();
+  renderPage(<EmbeddedCardPayment orderId="same-order" onClose={close}/>, '/app/checkout');
+  await waitFor(()=>expect(create).toHaveBeenCalled());
+  fireEvent.click(screen.getByRole('button',{name:'Close'}));
+  expect(close).toHaveBeenCalledTimes(1);
+  expect(api.post).not.toHaveBeenCalled();
+ });
  it('carga campos hospedados sin popup y envía solo token; un doble submit produce un solo intento',async()=>{
   vi.mocked(api.post).mockImplementation(async(url)=>({data:{data:url.endsWith('card-payment')?{paymentId:'pay1',status:'in_process'}:{...session,canSubmit:false,payment:{paymentId:'pay1',status:'in_process'}}}}));
   mount();await waitFor(()=>expect(create).toHaveBeenCalled());
+  expect(screen.getByRole('dialog',{name:'Pagar con Mercado Pago'})).toBeInTheDocument();
   const submit=settings.callbacks.onSubmit;
   await act(async()=>{await Promise.all([submit({token:'tokenized',payment_method_id:'visa',issuer_id:'issuer',installments:12,transaction_amount:1,card_number:'SHOULD_NOT_LEAVE',payer:{email:'spoof@example.test',identification:{type:'CURP',number:'synthetic'}}}),submit({token:'duplicate'})]);});
   const payments=vi.mocked(api.post).mock.calls.filter(([url])=>url.endsWith('/card-payment'));

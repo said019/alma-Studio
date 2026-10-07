@@ -550,7 +550,7 @@ const Checkout = () => {
                 className="w-full"
               >
                 <CreditCard size={14} />
-                Confirmar
+                {paymentMethod === "card" ? "Pagar con Mercado Pago" : "Confirmar"}
               </PrimaryButton>
             </StickyCta>
           </>

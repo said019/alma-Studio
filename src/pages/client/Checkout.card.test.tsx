@@ -13,7 +13,7 @@ beforeEach(()=>{vi.stubGlobal('IntersectionObserver',class{observe(){}disconnect
 async function choose(){renderAdmin(<Checkout/>,{route:'/app/checkout'});fireEvent.click((await screen.findByRole('heading',{name:'4 Clases'})).closest('button')!);fireEvent.click(screen.getByRole('button',{name:'Continuar a pago'}));}
 it('crea una orden y abre tarjeta dentro del checkout',async()=>{
  routeApi(mock,{'/plans':{data:[plan]},'/payments/card-readiness':{data:{ready:true,provider:'mercadopago',recurringSupported:false}}});mock.post.mockResolvedValue({data:{data:{id:'same-order',mp_checkout_mode:'embedded',payment_provider:'mercadopago'}}});
- await choose();fireEvent.click(await screen.findByRole('radio',{name:/Tarjeta/}));fireEvent.click(screen.getByRole('button',{name:'Confirmar'}));
+ await choose();fireEvent.click(await screen.findByRole('radio',{name:/Tarjeta/}));fireEvent.click(screen.getByRole('button',{name:'Pagar con Mercado Pago'}));
  expect(await screen.findByRole('region',{name:'Tarjeta incrustada'})).toHaveTextContent('same-order');expect(mock.post).toHaveBeenCalledTimes(1);expect(mock.post).toHaveBeenCalledWith('/orders',{planId:'four',discountCode:undefined,paymentMethod:'card'});
 });
 it('no ofrece tarjeta operativa cuando Mercado Pago no está configurado',async()=>{

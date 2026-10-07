@@ -5,6 +5,8 @@ import api from "@/lib/api";
 import { loadMercadoPagoSdk, type CardSession, type CardPayment } from "@/lib/mercadopago";
 import { Button } from "@/components/ui/button";
 
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+
 type Controller = { unmount: () => void | Promise<void> };
 type CardForm = { token?: string; payment_method_id?: string; issuer_id?: string; payer?: { identification?: { type?: string; number?: string } } };
 type SDK = new (key: string, options: { locale: string }) => { bricks: () => { create: (kind: string, host: string, settings: unknown) => Promise<Controller> } };
@@ -130,9 +132,9 @@ export function EmbeddedCardPayment({ orderId, onClose }: { orderId: string; onC
     : kind === "statusScreen" ? "Completa la verificación de tu banco en esta página."
     : !kind ? "Estamos verificando el pago. No vuelvas a pagar esta orden."
     : "Introduce tu tarjeta en el formulario seguro de Mercado Pago.";
-  return <section aria-label="Pago con tarjeta" className="mx-auto w-full min-w-0 max-w-xl space-y-5 py-6 pb-24">
+  return <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}><DialogContent className="max-w-xl" onPointerDownOutside={(event) => event.preventDefault()}><DialogTitle>Pagar con Mercado Pago</DialogTitle><section aria-label="Pago con tarjeta" className="w-full min-w-0 space-y-5 py-2">
     <Button variant="outline" onClick={onClose}>Volver a mi orden</Button>
-    <h2 className="font-display text-2xl text-ink">Pago con tarjeta</h2>
+
     {session && <p className="nums text-xl text-ink">{session.amount.toLocaleString("es-MX", {style: "currency", currency: session.currency || "MXN"})}</p>}
     <p role="status" className="text-sm text-ink-muted">{statusText}</p>
     {error && <p role="alert" className="text-sm text-danger">{error}</p>}
@@ -141,5 +143,5 @@ export function EmbeddedCardPayment({ orderId, onClose }: { orderId: string; onC
     {error && <Button variant="outline" onClick={() => { void refresh.current(); if (!submitted.current) setRetry(v => v + 1); }}>Consultar / volver a cargar</Button>}
     <Link onClick={onClose} to={`/app/orders/${encodeURIComponent(orderId)}`} className="inline-flex min-h-11 items-center text-sm font-bold text-accent-strong">Ver mi orden</Link>
     <p className="text-xs text-ink-muted">Puedes retomar esta misma orden desde Mis órdenes. Este pago no autoriza cargos mensuales automáticos.</p>
-  </section>;
+  </section></DialogContent></Dialog>;
 }
