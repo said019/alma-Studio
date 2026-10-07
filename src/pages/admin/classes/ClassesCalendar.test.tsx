@@ -31,7 +31,7 @@ beforeEach(() => {
 afterEach(() => vi.useRealTimers());
 
 describe("Clases · Calendario", () => {
-  it("al tocar una clase abre su panel con el resumen, iniciales de inscritas, el control de Wellhub para la dueña y enlace directo a Reservas", async () => {
+  it("al tocar una clase abre su panel con el resumen, iniciales de inscritas, sin controles de Wellhub y enlace directo a Reservas", async () => {
     renderAdmin(<ClassesCalendar />, { route: "/admin/classes" });
     expect(await screen.findByRole("heading", { level: 1, name: "Clases" })).toBeInTheDocument();
     fireEvent.click(await screen.findByRole("button", { name: /Reformer Intermedio.*8 de 8, llena/ }));
@@ -39,7 +39,7 @@ describe("Clases · Calendario", () => {
     expect(await screen.findByText("1 en espera")).toBeInTheDocument();
     // Iniciales de la clienta confirmada (Camila Torres → "CT"), no de la instructora.
     expect(await screen.findByText("CT")).toBeInTheDocument();
-    expect(await screen.findByPlaceholderText("Cupo para Wellhub")).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("Cupo para Wellhub")).toBeNull();
     expect(screen.getByText("Gestionar en Reservas").closest("a")).toHaveAttribute("href", "/admin/bookings?clase=c11");
   });
 

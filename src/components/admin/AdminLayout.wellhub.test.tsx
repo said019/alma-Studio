@@ -13,11 +13,11 @@ beforeEach(() => {
 });
 
 describe("AdminLayout · Wellhub (P1-9)", () => {
-  it("la dueña ve los ajustes y los check-ins de Wellhub en Sistema", async () => {
+  it("Wellhub permanece oculto también para la dueña hasta configurar HIVE", async () => {
     loginAs("admin");
     renderAdmin(<AdminLayout><div>contenido</div></AdminLayout>, { route: "/admin/dashboard", path: "/admin/dashboard" });
-    expect(await screen.findByRole("link", { name: /Check-ins Wellhub/ })).toHaveAttribute("href", "/admin/bookings/partners-checkins");
-    expect(screen.getByRole("link", { name: /^Wellhub$/ })).toHaveAttribute("href", "/admin/settings/platforms");
+    await screen.findByRole("link", { name: /Reservas/ });
+    expect(screen.queryByRole("link", { name: /Wellhub/ })).toBeNull();
   });
 
   it("recepción no los ve", async () => {
