@@ -1,3 +1,4 @@
+import { ORDER_PAYMENT_WINDOW_MS, expireUnpaidOrders } from "./lib/orderExpiration.js";
 import { registerBulkClasses } from "./lib/bulkClasses.js";
 import { studioDateTimeFormatter } from "./lib/studioDateFormatters.js";
 import { applyHiveStudioSettings } from "./lib/hiveStudioSettings.js";
@@ -5201,7 +5202,7 @@ app.post("/api/orders", authMiddleware, async (req, res) => {
       return res.status(400).json({message:"Este plan no requiere un cobro con tarjeta. Solicita la activación en recepción."});
     }
     const bankInfo = await getConfiguredBankInfo(client);
-    const expires = new Date(Date.now() + 48 * 60 * 60 * 1000); // 48h
+    const expires = new Date(Date.now() + ORDER_PAYMENT_WINDOW_MS); // 1 hora
     const orderNumber = await generateOrderNumber(client);
     const orderRes = await client.query(
       `INSERT INTO orders (user_id, plan_id, status, payment_method, subtotal, tax_amount, total_amount, discount_amount, discount_code_id, bank_info, expires_at, order_number)
@@ -5264,6 +5265,8 @@ app.post("/api/orders/:id/proof", authMiddleware, upload.any(), async (req, res)
 
     if (orderRes.rows[0].mp_checkout_mode === "embedded") return res.status(409).json({message:"Este pago con tarjeta se confirma directamente con Mercado Pago; no requiere comprobante."});
 
+    if (orderRes.rows[0].status !== "pending_payment" || (orderRes.rows[0].expires_at && new Date(orderRes.rows[0].expires_at) <= new Date())) return res.status(409).json({message:"Esta orden ya no acepta comprobantes. Crea una nueva compra."});
+
     // Accept any uploaded field name ("proof", "file", etc.)
     const uploadedFile = req.files?.[0] ?? req.file ?? null;
 
@@ -5303,7 +5306,15 @@ app.post("/api/orders/:id/proof", authMiddleware, upload.any(), async (req, res)
       return res.status(400).json({ message: "No se recibió ningún archivo" });
     }
 
-    const updateRes = await pool.query(
+    const proofDb = await pool.connect();
+    try {
+      await proofDb.query("BEGIN");
+      const locked = (await proofDb.query("SELECT status,expires_at FROM orders WHERE id=$1 FOR UPDATE", [req.params.id])).rows[0];
+      if (!locked || locked.status !== "pending_payment" || (locked.expires_at && new Date(locked.expires_at) <= new Date())) {
+        await proofDb.query("ROLLBACK");
+        return res.status(409).json({message:"Esta orden ya no acepta comprobantes. Crea una nueva compra."});
+      }
+    const updateRes = await proofDb.query(
       `UPDATE payment_proofs 
        SET file_url = $2, file_name = $3, mime_type = $4, status = 'pending', uploaded_at = NOW()
        WHERE order_id = $1 RETURNING id`,
@@ -5311,16 +5322,19 @@ app.post("/api/orders/:id/proof", authMiddleware, upload.any(), async (req, res)
     );
 
     if (updateRes.rowCount === 0) {
-      await pool.query(
+      await proofDb.query(
         `INSERT INTO payment_proofs (order_id, file_url, file_name, mime_type, status)
          VALUES ($1, $2, $3, $4, 'pending')`,
         [req.params.id, fileUrl, fileName, mimeType]
       );
     }
-    await pool.query(
+    await proofDb.query(
       "UPDATE orders SET status = 'pending_verification', paid_at = COALESCE(paid_at, NOW()) WHERE id = $1",
       [req.params.id]
     );
+      await proofDb.query("COMMIT");
+    } catch (err) { await proofDb.query("ROLLBACK"); throw err; }
+    finally { proofDb.release(); }
     return res.json({ message: "Comprobante recibido — estamos verificando tu pago" });
   } catch (err) {
     console.error("POST orders/proof error:", err.message, err.stack);
@@ -18471,6 +18485,9 @@ async function runClassReminderCron() {
 }
 
 function scheduleEmailCrons() {
+  const expireOrders = () => expireUnpaidOrders(pool).catch((err) => console.error("[Orders expiration]", err.message));
+  void expireOrders();
+  setInterval(expireOrders, 60_000).unref();
   // Jobs a hora de reloj del estudio. Antes esto era un setInterval de 1 h que
   // comparaba contra `(getUTCHours() - 6 + 24) % 24`: el offset -6 escrito a
   // mano, el dia de la semana tomado en UTC, y el minuto de corrida decidido

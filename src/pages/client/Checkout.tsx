@@ -541,6 +541,7 @@ const Checkout = () => {
               </div>
             </Section>
 
+            <p className="text-sm text-ink-muted">Tienes 1 hora para completar el pago. Después, la orden sin pagar vence automáticamente.</p>
             <StickyCta>
               <PrimaryButton
                 onClick={() => createOrderMutation.mutate()}
