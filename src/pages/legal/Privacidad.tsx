@@ -40,7 +40,6 @@ const Privacidad = () => (
         <li><strong className={fuerte} style={{ color: COLOR.ink }}>Responsiva:</strong> tu nombre, tu firma, la fecha y la versión del documento que firmaste, y si autorizas el uso de tu imagen.</li>
         <li><strong className={fuerte} style={{ color: COLOR.ink }}>Reservas y asistencia:</strong> clases que reservas, lista de espera, asistencias, faltas, cancelaciones, puntos y reseñas.</li>
         <li><strong className={fuerte} style={{ color: COLOR.ink }}>Pagos:</strong> paquete, monto, método, referencia o comprobante de transferencia y reembolsos. Los pagos en línea con tarjeta los procesa un proveedor de pagos: no guardamos el número completo de tu tarjeta.</li>
-        <li><strong className={fuerte} style={{ color: COLOR.ink }}>Wellhub:</strong> si reservas por Wellhub, tu identificador y tu plan de Wellhub y la confirmación de tus visitas.</li>
         <li><strong className={fuerte} style={{ color: COLOR.ink }}>Datos técnicos:</strong> lo que tu navegador guarda para mantener tu sesión (sección 8).</li>
       </ul>
 
@@ -53,7 +52,6 @@ const Privacidad = () => (
         <li>Enviarte avisos del servicio por WhatsApp, correo o la app: confirmaciones, cambios, cancelaciones de clase y recordatorios.</li>
         <li>Cuidar tu seguridad en clase con tus datos de salud.</li>
         <li>Guardar tu responsiva y, si lo pides, generar tu pase digital para Apple Wallet o Google Wallet.</li>
-        <li>Conciliar tus visitas con Wellhub, si reservas por Wellhub.</li>
         <li>Atender tus dudas, aclaraciones y quejas, y cumplir obligaciones legales.</li>
       </ul>
 
@@ -80,11 +78,9 @@ const Privacidad = () => (
       <p>
         Para prestarte el servicio, algunos proveedores tratan tus datos por cuenta nuestra y bajo confidencialidad: servidores y base de datos (hosting), envío de correos, envío de mensajes de WhatsApp, procesamiento de pagos con tarjeta, almacenamiento de archivos (fotos de perfil y comprobantes) y pases digitales de Apple y Google.
       </p>
-      <p>Sólo transferimos tus datos a terceros en estos casos, necesarios para el servicio o exigidos por la ley:</p>
-      <ul className="list-disc pl-6 space-y-2">
-        <li>A Wellhub, si reservas a través de Wellhub: la confirmación de tus reservas y de tus visitas.</li>
-        <li>A autoridades, cuando una ley o una orden lo exija.</li>
-      </ul>
+      <p>
+        Sólo transferimos tus datos a autoridades cuando una ley o una orden debidamente fundamentada lo exija. No transferimos tus datos a ninguna plataforma ni a terceros con fines comerciales o de intermediación.
+      </p>
       <p>No vendemos tus datos personales.</p>
 
       <LegalH2>7. Tus derechos ARCO, revocación y limitación</LegalH2>

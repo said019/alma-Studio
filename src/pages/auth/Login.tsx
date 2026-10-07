@@ -86,7 +86,7 @@ const Login = () => {
       <InstallAppPrompt force={showInstall} onClose={() => setShowInstall(false)} />
       <AuthShell
         brandTint="berry"
-        brandEyebrow="Bienvenida de vuelta"
+        brandEyebrow="Bienvenida/o de vuelta"
         brandHeadline={<>Pasa,</>}
         brandHeadlineItalic="te estábamos esperando."
         brandSubline="Tu cuenta guarda tus reservas, tu progreso y los recordatorios de cada clase."

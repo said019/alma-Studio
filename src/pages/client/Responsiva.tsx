@@ -1,8 +1,10 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { FileSignature, Printer } from "lucide-react";
 import api from "@/lib/api";
+import { useAuthStore } from "@/stores/authStore";
 import { ClientAuthGuard } from "@/components/layout/ClientAuthGuard";
 import {
   AppShell,
@@ -14,7 +16,7 @@ import {
   GhostButton,
 } from "@/components/app/AppShell";
 import { BackLink, DataRow } from "@/components/app/widgets";
-import { WAIVER_DETAILS_FIELDS } from "@/components/app/ResponsivaDialog";
+import { ResponsivaDialog, WAIVER_DETAILS_FIELDS } from "@/components/app/ResponsivaDialog";
 import { responsivaDocument, RESPONSIVA_PDF_URL } from "@/components/app/responsivaContent";
 
 interface WaiverRow {
@@ -29,6 +31,8 @@ interface WaiverRow {
 }
 
 const Responsiva = () => {
+  const [signOpen, setSignOpen] = useState(false);
+  const { user } = useAuthStore();
   const { data, isLoading, isError, refetch } = useQuery<{ data: WaiverRow | null }>({
     queryKey: ["my-waiver"],
     queryFn: async () => (await api.get("/me/waiver")).data,
@@ -72,11 +76,26 @@ const Responsiva = () => {
             onRetry={() => refetch()}
           />
         ) : !waiver ? (
-          <EmptyState
-            icon={<FileSignature size={22} />}
-            title="Aún no has firmado tu responsiva"
-            description="Debes firmarla al inscribirte o comprar una clase."
-          />
+          <>
+            <EmptyState
+              icon={<FileSignature size={22} />}
+              title="Aún no has firmado tu responsiva"
+              description="Debes firmarla al inscribirte o antes de reservar tus clases."
+              ctaLabel="Firmar responsiva ahora"
+              onCta={() => setSignOpen(true)}
+            />
+            <ResponsivaDialog
+              open={signOpen}
+              onClose={() => setSignOpen(false)}
+              onSigned={() => {
+                setSignOpen(false);
+                refetch();
+              }}
+              defaultName={user?.displayName ?? user?.display_name ?? ""}
+              defaultEmail={user?.email ?? ""}
+              defaultPhone={(user as any)?.phone ?? ""}
+            />
+          </>
         ) : (
           <>
             {/* Summary card */}

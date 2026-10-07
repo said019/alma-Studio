@@ -1,7 +1,7 @@
 import { useAuthStore } from "@/stores/authStore";
 import { useState, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { X } from "lucide-react";
+import { X, ArrowLeft } from "lucide-react";
 import api from "@/lib/api";
 
 import { PrimaryButton } from "@/components/app/AppShell";
@@ -57,6 +57,7 @@ export const ResponsivaDialog = ({
   const [accepted, setAccepted] = useState(false);
   const [details, setDetails] = useState<Record<string, string>>({});
   const [healthConsent, setHealthConsent] = useState(false);
+  const [showPdfModal, setShowPdfModal] = useState(false);
   const hasHealthDetails = WAIVER_DETAILS_FIELDS.slice(2).some(([key]) => details[key]?.trim());
 
   // Sync defaults when they change (e.g. auth resolves after dialog mounts)
@@ -119,6 +120,47 @@ export const ResponsivaDialog = ({
       className="fixed inset-0 z-[60] flex items-end justify-center bg-canvas/80"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
+      {showPdfModal && (
+        <div className="fixed inset-0 z-[70] flex flex-col bg-canvas text-ink">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-line bg-canvas/95 backdrop-blur-md">
+            <button
+              type="button"
+              onClick={() => setShowPdfModal(false)}
+              className="flex items-center gap-1.5 text-sm font-semibold text-accent-strong hover:underline cursor-pointer bg-transparent border-0"
+            >
+              <ArrowLeft size={18} />
+              Volver a la responsiva
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowPdfModal(false)}
+              aria-label="Cerrar PDF"
+              className="grid h-11 w-11 place-items-center rounded-full text-ink-muted hover:text-ink cursor-pointer bg-transparent border-0"
+            >
+              <X size={20} />
+            </button>
+          </div>
+          <div className="flex-1 p-4 flex flex-col max-w-4xl w-full mx-auto">
+            <div className="mb-3 flex items-center justify-between text-xs text-ink-muted">
+              <span>HIVE Pilates Studio — Carta original</span>
+              <a
+                href={RESPONSIVA_PDF_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline text-accent-strong font-medium"
+              >
+                Abrir en pestaña externa
+              </a>
+            </div>
+            <iframe
+              src={RESPONSIVA_PDF_URL}
+              title="Carta de responsiva HIVE (PDF)"
+              className="w-full flex-1 rounded-xl border border-line bg-surface min-h-[400px]"
+            />
+          </div>
+        </div>
+      )}
+
       <div
         className="relative w-full max-w-[600px] max-h-[92vh] overflow-y-auto rounded-t-[24px] border-t border-line bg-canvas shadow-float"
         // Prevent click propagation so clicking inside doesn't close
@@ -149,7 +191,13 @@ export const ResponsivaDialog = ({
 
         {/* Scrollable content */}
         <div className="px-6 pt-6 pb-8">
-          <a href={RESPONSIVA_PDF_URL} target="_blank" rel="noopener noreferrer" className="mb-5 block text-sm underline text-accent-strong">Consultar la carta original del estudio (PDF)</a>
+          <button
+            type="button"
+            onClick={() => setShowPdfModal(true)}
+            className="mb-5 inline-flex items-center gap-1.5 text-sm underline text-accent-strong cursor-pointer bg-transparent border-0 p-0 text-left"
+          >
+            Consultar la carta original del estudio (PDF)
+          </button>
           {/* Document sections */}
           <div className="mb-8">
             {RESPONSIVA_SECTIONS.map((section) => (

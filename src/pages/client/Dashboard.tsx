@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { FEATURES } from "@/config/features";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
@@ -8,6 +8,7 @@ import api from "@/lib/api";
 import { useAuthStore } from "@/stores/authStore";
 import { ClientAuthGuard } from "@/components/layout/ClientAuthGuard";
 import { safeParse } from "@/lib/utils";
+import { ResponsivaDialog } from "@/components/app/ResponsivaDialog";
 import {
   AppShell,
   PageHeader,
@@ -90,6 +91,17 @@ const MilestoneRing = ({ value, max }: { value: number; max: number }) => {
 
 const Dashboard = () => {
   const { user } = useAuthStore();
+  const [waiverOpen, setWaiverOpen] = useState(false);
+
+  const {
+    data: waiverData,
+    refetch: refetchWaiver,
+  } = useQuery({
+    queryKey: ["my-waiver"],
+    queryFn: async () => (await api.get("/me/waiver")).data,
+    retry: false,
+  });
+  const waiver = waiverData?.data ?? null;
 
   const {
     data: membershipData,
@@ -151,7 +163,7 @@ const Dashboard = () => {
     .slice(0, 3);
   const nextBooking = upcoming[0];
 
-  const firstName = (user?.displayName ?? user?.display_name ?? "").split(" ")[0] || "alumna";
+  const firstName = (user?.displayName ?? user?.display_name ?? "").split(" ")[0] || "alumna/o";
 
   return (
     <ClientAuthGuard requiredRoles={["client"]}>
@@ -164,6 +176,30 @@ const Dashboard = () => {
             ? "Tu próxima clase, tu membresía y tus recompensas, en un solo lugar."
             : "Tu próxima clase y tu membresía, en un solo lugar."}
         />
+
+        {/* Banner de responsiva pendiente si aún no la firma */}
+        {waiverData !== undefined && !waiver && (
+          <div className="mt-4 rounded-2xl border border-accent-strong/40 bg-accent-soft/20 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
+            <div className="space-y-0.5">
+              <p className="text-[0.72rem] font-bold uppercase tracking-[0.16em] text-accent-strong">
+                Paso pendiente
+              </p>
+              <p className="font-semibold text-ink text-sm sm:text-base">
+                Firma tu responsiva y consentimiento informado
+              </p>
+              <p className="text-xs text-ink-muted">
+                Necesitas firmarla para poder reservar o adquirir paquetes de clases.
+              </p>
+            </div>
+            <PrimaryButton
+              size="sm"
+              onClick={() => setWaiverOpen(true)}
+              className="self-start sm:self-center shrink-0"
+            >
+              Firmar ahora
+            </PrimaryButton>
+          </div>
+        )}
 
         {/* ── Próxima clase, la acción principal ── */}
         <div className="mt-2">
@@ -459,6 +495,18 @@ const Dashboard = () => {
         <p className="mt-12 lg:mt-16 text-[0.75rem] text-ink-muted">
           Buena clase, {firstName}.
         </p>
+
+        <ResponsivaDialog
+          open={waiverOpen}
+          onClose={() => setWaiverOpen(false)}
+          onSigned={() => {
+            setWaiverOpen(false);
+            refetchWaiver();
+          }}
+          defaultName={user?.displayName ?? user?.display_name ?? ""}
+          defaultEmail={user?.email ?? ""}
+          defaultPhone={(user as any)?.phone ?? ""}
+        />
       </AppShell>
     </ClientAuthGuard>
   );

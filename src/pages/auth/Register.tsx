@@ -112,9 +112,9 @@ const Register = () => {
   };
 
   if (registration) return (
-    <AuthShell brandEyebrow="HIVE Pilates Studio" brandHeadline="Bienvenida a HIVE" formEyebrow="Último paso" formHeadline="Firma tu" formHeadlineItalic="responsiva.">
+    <AuthShell brandEyebrow="HIVE Pilates Studio" brandHeadline="Bienvenida/o a HIVE" formEyebrow="Último paso" formHeadline="Firma tu" formHeadlineItalic="responsiva.">
       <p className="text-ink-muted">Tu cuenta está creada. Completa la firma para terminar tu inscripción y adquirir tus clases.</p>
-      <ResponsivaDialog open onClose={() => {}} defaultName={registration.displayName}
+      <ResponsivaDialog open onClose={() => navigate(FEATURES.onboarding ? withReturnUrl("/auth/onboarding", returnUrl) : (returnUrl ?? "/app"))} defaultName={registration.displayName}
         defaultEmail={registration.email} defaultPhone={registration.phone}
         onSigned={() => navigate(FEATURES.onboarding ? withReturnUrl("/auth/onboarding", returnUrl) : (returnUrl ?? "/app"))} />
     </AuthShell>
@@ -123,9 +123,9 @@ const Register = () => {
   return (
     <AuthShell
       brandTint="berry"
-      brandEyebrow="Nueva en HIVE"
+      brandEyebrow="Nueva/o en HIVE"
       brandHeadline={<>Te recibimos</>}
-      brandHeadlineItalic="como te recibe una amiga."
+      brandHeadlineItalic="como te reciben en casa."
       brandSubline="Crea tu cuenta y reserva tu primera clase. Grupos pequeños, atención personalizada, técnica cuidada."
       brandList={[
         { label: "Reservas y check-in en línea" },

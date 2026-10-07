@@ -23,15 +23,16 @@ describe("Aviso de privacidad integral (P1-10, LFPDPPP)", () => {
     expect(screen.getByText(/El equipo del estudio.*también puede registrar los datos de salud que tú le comuniques/)).toBeInTheDocument();
     expect(screen.getByText(/Acompañantes:/)).toBeInTheDocument();
     expect(screen.getByText(/Si cambian las finalidades, te lo informaremos y, cuando la ley lo exija, te pediremos de nuevo tu consentimiento/)).toBeInTheDocument();
-    expect(screen.getByText(/A Wellhub, si reservas a través de Wellhub/)).toBeInTheDocument();
+    expect(screen.queryByText(/Wellhub/i)).toBeNull();
     expect(screen.getByText(/presenta tu solicitud en recepción, en Cuauhtémoc #68/)).toBeInTheDocument();
     expect(screen.getByText(/20 días hábiles/)).toBeInTheDocument();
     expect(screen.getByText(/no usa cookies de publicidad ni herramientas de rastreo de terceros/)).toBeInTheDocument();
   });
 
-  it("sin nada de Alma, sin un correo inventado y sin nombrar al proveedor de archivos", () => {
+  it("sin nada de Alma, sin un correo inventado, sin nombrar al proveedor de archivos y sin Wellhub", () => {
     const src = fs.readFileSync(path.resolve(__dirname, "Privacidad.tsx"), "utf8");
     expect(src).not.toMatch(/\bAlma\b|almamovement|Estefanía|info@|Drive/); // \b: "Almacenamiento" sí va
+    expect(src).not.toMatch(/Wellhub|wellhub/);
     expect(src).not.toMatch(/usePolicyText|LegalDynamicBody/);
     expect(src).not.toMatch(/text-\[0\.(?:[0-6]\d*|7[0-4]?)rem\]/);
   });

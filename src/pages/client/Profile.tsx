@@ -26,7 +26,7 @@ const Profile = () => {
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
 
-  const fullName = user?.displayName ?? user?.display_name ?? user?.email?.split("@")[0] ?? "Alumna";
+  const fullName = user?.displayName ?? user?.display_name ?? user?.email?.split("@")[0] ?? (user?.gender === "male" ? "Alumno" : user?.gender === "female" ? "Alumna" : "Alumna/o");
   const firstName = fullName.split(" ")[0];
   const email = user?.email ?? "";
   const phone = user?.phone ?? "";
@@ -44,7 +44,9 @@ const Profile = () => {
         ? "Alumno"
         : user?.gender === "other"
           ? "Comunidad"
-          : "Alumna"
+          : user?.gender === "female"
+            ? "Alumna"
+            : "Alumna/o"
       : (user?.role ?? "Usuario");
 
   const handleLogout = () => {

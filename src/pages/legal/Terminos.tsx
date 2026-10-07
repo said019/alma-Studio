@@ -32,7 +32,7 @@ const Terminos = () => (
       <LegalH2>1. Definiciones</LegalH2>
       <ul className="list-disc pl-6 space-y-2">
         <li><strong className={fuerte} style={{ color: COLOR.ink }}>"Estudio":</strong> {STUDIO.name} y sus instalaciones en {STUDIO.address}.</li>
-        <li><strong className={fuerte} style={{ color: COLOR.ink }}>"Alumna":</strong> cualquier persona registrada en la app que toma clases.</li>
+        <li><strong className={fuerte} style={{ color: COLOR.ink }}>"Alumna/o":</strong> cualquier persona registrada en la app que toma clases.</li>
         <li><strong className={fuerte} style={{ color: COLOR.ink }}>"Paquete":</strong> el plan de clases que compras en el estudio o en la app, con su número de clases y su vigencia.</li>
         <li><strong className={fuerte} style={{ color: COLOR.ink }}>"Clase":</strong> cada sesión programada en el calendario del estudio.</li>
       </ul>
@@ -95,7 +95,7 @@ const Terminos = () => (
 
       <LegalH2>9. Conducta</LegalH2>
       <ul className="list-disc pl-6 space-y-2">
-        <li>Esperamos un trato respetuoso hacia coaches, personal y demás alumnas.</li>
+        <li>Esperamos un trato respetuoso hacia coaches, personal y demás alumnas/os.</li>
         <li>No toleramos ningún tipo de discriminación, acoso o conducta inapropiada.</li>
         <li>El estudio puede negar el servicio a quien no respete estas reglas.</li>
       </ul>
