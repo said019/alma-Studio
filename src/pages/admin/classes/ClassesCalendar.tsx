@@ -30,7 +30,6 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight, Plus, CalendarDays, Loader2, ArrowRight } from "lucide-react";
 import { resolveClassColor, classTint, CLASSES_SECTION_TABS } from "./palette";
-import { WellhubClassControl } from "./WellhubClassControl";
 import { Avatar } from "@/components/admin/PersonCell";
 import WeekHourGrid from "./WeekHourGrid";
 import { FEATURES } from "@/config/features";
@@ -854,12 +853,6 @@ function CalendarView({
                   </div>
                 );
               })()}
-              {/* Publicar a Wellhub: sólo la dueña (auditoría 2026-09-27, P1-9). */}
-              {!selectedClass.isCancelled && FEATURES.partnerPlatforms && isOwner && (
-                <div className="pt-2">
-                  <WellhubClassControl classId={selectedClass.id} />
-                </div>
-              )}
               <div className="flex flex-col gap-2 pt-4">
                 {isOwner && !selectedClass.isCancelled && new Date(selectedClass.startTime).getTime() < Date.now() && <ClassOperations classId={selectedClass.id} />}
                 {!selectedClass.isCancelled && !selectedClass.isClosed && (
