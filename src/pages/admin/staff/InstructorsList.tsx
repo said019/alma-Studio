@@ -181,7 +181,7 @@ const InstructorsList = () => {
   const handleDelete = async (ins: Instructor) => {
     const ok = await confirm({
       title: `¿Eliminar a ${ins.displayName}?`,
-      description: "Su perfil se borra definitivamente (foto, bio y especialidades) y dejará de aparecer al programar clases. Esta acción no se puede deshacer.",
+      description: "Dejará de aparecer en el listado, en la página pública y al programar clases. Las clases que ya tiene asignadas y su historial se conservan.",
       confirmLabel: "Eliminar",
       destructive: true,
     });

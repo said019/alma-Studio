@@ -961,6 +961,7 @@ async function ensureSchema() {
     await pool.query(`ALTER TABLE instructors ADD COLUMN IF NOT EXISTS photo_focus_x SMALLINT DEFAULT 50`).catch(() => {});
     await pool.query(`ALTER TABLE instructors ADD COLUMN IF NOT EXISTS photo_focus_y SMALLINT DEFAULT 50`).catch(() => {});
     await pool.query(`ALTER TABLE instructors ADD COLUMN IF NOT EXISTS photo_url_2 TEXT`).catch(() => {});
+    await pool.query(`ALTER TABLE instructors ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ`);
     // Esquemas heredados (schema_complete.sql) dejaron instructors.user_id como
     // NOT NULL; el alta de coaches desde admin no envía user_id. Lo relajamos
     // para que POST /api/instructors funcione en cualquier base.
@@ -16972,7 +16973,7 @@ app.post("/api/admin/loyalty/recalculate/:userId", adminMiddleware, async (req, 
 // GET /api/instructors
 app.get("/api/instructors", adminMiddleware, async (req, res) => {
   try {
-    const r = await pool.query("SELECT * FROM instructors ORDER BY created_at DESC");
+    const r = await pool.query("SELECT * FROM instructors WHERE deleted_at IS NULL ORDER BY created_at DESC");
     return res.json({ data: camelRows(r.rows) });
   } catch (err) {
     return res.status(500).json({ message: "Error interno" });
@@ -17017,7 +17018,7 @@ app.put("/api/instructors/:id", adminMiddleware, async (req, res) => {
          photo_focus_x = COALESCE($11, photo_focus_x),
          photo_focus_y = COALESCE($12, photo_focus_y),
          updated_at    = NOW()
-       WHERE id=$13 RETURNING *`,
+       WHERE id=$13 AND deleted_at IS NULL RETURNING *`,
       [
         displayName ?? null,
         has("email"), email || null,
@@ -17040,7 +17041,8 @@ app.put("/api/instructors/:id", adminMiddleware, async (req, res) => {
 // DELETE /api/instructors/:id
 app.delete("/api/instructors/:id", adminMiddleware, async (req, res) => {
   try {
-    await pool.query("DELETE FROM instructors WHERE id = $1", [req.params.id]);
+    const result = await pool.query("UPDATE instructors SET is_active=false, deleted_at=COALESCE(deleted_at,NOW()), updated_at=NOW() WHERE id=$1 RETURNING id", [req.params.id]);
+    if (!result.rowCount) return res.status(404).json({message:"Instructor no encontrado"});
     return res.json({ message: "Instructor eliminado" });
   } catch (err) {
     return res.status(500).json({ message: "Error interno" });
