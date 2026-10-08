@@ -14,7 +14,9 @@ function llenar() {
   fireEvent.change(screen.getByLabelText("Nombre"), { target: { value: "Ana Pérez" } });
   fireEvent.change(screen.getByLabelText("WhatsApp"), { target: { value: "5512345678" } });
   fireEvent.change(screen.getByLabelText("Sexo"), { target: { value: "female" } });
-  fireEvent.change(screen.getByLabelText("Fecha de nacimiento"), { target: { value: "1990-05-05" } });
+  fireEvent.change(screen.getByLabelText("Día"), { target: { value: "05" } });
+  fireEvent.change(screen.getByLabelText("Mes"), { target: { value: "05" } });
+  fireEvent.change(screen.getByLabelText("Año"), { target: { value: "1990" } });
   fireEvent.change(screen.getByLabelText("Email"), { target: { value: "ana@correo.com" } });
   fireEvent.change(screen.getByLabelText("Contraseña", { selector: "input" }), { target: { value: "Clave1234" } });
   fireEvent.change(screen.getByLabelText("Confirmar", { selector: "input" }), { target: { value: "Clave1234" } });

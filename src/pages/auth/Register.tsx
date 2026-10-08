@@ -23,7 +23,8 @@ import {
 import { Check } from "lucide-react";
 import { HEALTH_CONSENT_TEXT } from "@/lib/legal/privacy-notice";
 
-const todayISO = new Date().toISOString().slice(0, 10);
+const currentYear = new Date().getFullYear();
+const birthMonths = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 
 const schema = z.object({
   displayName: z.string().min(2, "Mínimo 2 caracteres"),
@@ -37,7 +38,7 @@ const schema = z.object({
     .refine((v) => {
       const d = new Date(v + "T00:00:00Z");
       const y = Number(v.slice(0, 4));
-      return !Number.isNaN(d.getTime()) && y >= 1900 && d <= new Date();
+      return !Number.isNaN(d.getTime()) && y >= 1900 && d <= new Date() && d.toISOString().slice(0, 10) === v;
     }, "Fecha fuera de rango"),
   password: z
     .string()
@@ -68,6 +69,7 @@ type FormValues = {
 };
 
 const Register = () => {
+  const [birth, setBirth] = useState({ day: "", month: "", year: "" });
   const [registration, setRegistration] = useState<FormValues | null>(null);
   const { register: registerUser, isLoading, error, clearError } = useAuthStore();
   const navigate = useNavigate();
@@ -186,15 +188,24 @@ const Register = () => {
             <option value="other">Prefiero no decir</option>
           </AuthSelect>
 
-          <AuthField
-            label="Fecha de nacimiento"
-            type="date"
-            max={todayISO}
-            min="1900-01-01"
-            hint="Para felicitarte el día"
-            error={errors.dateOfBirth?.message}
-            {...register("dateOfBirth")}
-          />
+          <fieldset className="min-w-0 space-y-2">
+            <legend className="text-sm font-medium text-ink">Fecha de nacimiento</legend>
+            <div className="grid grid-cols-3 gap-2">
+              {(["day", "month", "year"] as const).map(part => (
+                <AuthSelect key={part} label={{day:"Día",month:"Mes",year:"Año"}[part]} autoComplete={{day:"bday-day",month:"bday-month",year:"bday-year"}[part]} value={birth[part]} onChange={event => {
+                  const next = {...birth, [part]: event.target.value};
+                  setBirth(next);
+                  setValue("dateOfBirth", next.day && next.month && next.year ? `${next.year}-${next.month}-${next.day}` : "", {shouldValidate:true, shouldDirty:true});
+                }}>
+                  <option value="">{{day:"Día",month:"Mes",year:"Año"}[part]}</option>
+                  {part === "day" && Array.from({length:31}, (_,i) => <option key={i} value={String(i+1).padStart(2,"0")}>{i+1}</option>)}
+                  {part === "month" && birthMonths.map((month,i) => <option key={month} value={String(i+1).padStart(2,"0")}>{month}</option>)}
+                  {part === "year" && Array.from({length:currentYear-1899}, (_,i) => <option key={i} value={currentYear-i}>{currentYear-i}</option>)}
+                </AuthSelect>
+              ))}
+            </div>
+            {errors.dateOfBirth && <p role="alert" className="text-sm text-danger">{errors.dateOfBirth.message}</p>}
+          </fieldset>
         </div>
 
         <AuthField
