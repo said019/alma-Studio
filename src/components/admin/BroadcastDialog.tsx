@@ -47,7 +47,7 @@ const TEMPLATES: Template[] = [
   {id:"blank",label:"Escribir desde cero",subject:"",headline:"Hola, {name}",body:"",whatsapp:""}
 ];
 
-export function BroadcastDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
+export function BroadcastDialog({ open, onOpenChange, emailOnly = false }: { open: boolean; onOpenChange: (v: boolean) => void; emailOnly?: boolean }) {
   const { toast } = useToast();
   const [tab, setTab] = useState<"email" | "whatsapp">("email");
   const [audience, setAudience] = useState<Audience>("accepts_communications");
@@ -129,7 +129,7 @@ export function BroadcastDialog({ open, onOpenChange }: { open: boolean; onOpenC
       setConfirmStep(true);
       return;
     }
-    if (tab === "email") emailMutation.mutate();
+    if (emailOnly || tab === "email") emailMutation.mutate();
     else waMutation.mutate();
   };
 
@@ -138,7 +138,7 @@ export function BroadcastDialog({ open, onOpenChange }: { open: boolean; onOpenC
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Enviar comunicado</DialogTitle>
-          <DialogDescription>Envía un email o WhatsApp a tus usuarios. Usa <code className="text-ink-muted">{"{name}"}</code> para personalizar con el nombre.</DialogDescription>
+          <DialogDescription>{emailOnly ? "Envía un correo a tus usuarios." : "Envía un email o WhatsApp a tus usuarios."} Usa <code className="text-ink-muted">{"{name}"}</code> para personalizar con el nombre.</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -201,7 +201,7 @@ export function BroadcastDialog({ open, onOpenChange }: { open: boolean; onOpenC
           <Tabs value={tab} onValueChange={(v) => setTab(v as "email" | "whatsapp")}>
             <TabsList className="w-full">
               <TabsTrigger value="email" className="flex-1"><Mail size={13} className="mr-1.5" />Email</TabsTrigger>
-              <TabsTrigger value="whatsapp" className="flex-1"><MessageSquare size={13} className="mr-1.5" />WhatsApp</TabsTrigger>
+              {!emailOnly && <TabsTrigger value="whatsapp" className="flex-1"><MessageSquare size={13} className="mr-1.5" />WhatsApp</TabsTrigger>}
             </TabsList>
 
             <TabsContent value="email" className="space-y-3 mt-4">
