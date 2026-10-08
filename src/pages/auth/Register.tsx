@@ -1,3 +1,4 @@
+import { internationalPhone, phoneCountries } from "@/lib/internationalPhone";
 import { useState } from "react";
 import { ResponsivaDialog } from "@/components/app/ResponsivaDialog";
 import { useForm } from "react-hook-form";
@@ -27,10 +28,8 @@ const todayISO = new Date().toISOString().slice(0, 10);
 const schema = z.object({
   displayName: z.string().min(2, "Mínimo 2 caracteres"),
   email: z.string().email("Email inválido"),
-  phone: z
-    .string()
-    .transform((v) => v.replace(/\D/g, ""))
-    .refine((v) => v.length === 10, "Debe tener 10 dígitos"),
+  phone: z.string().min(1, "Ingresa tu teléfono"),
+  phoneCountry: z.string().default("MX"),
   gender: z.enum(["female", "male", "other"], { required_error: "Selecciona una opción" }),
   dateOfBirth: z
     .string()
@@ -49,7 +48,7 @@ const schema = z.object({
   acceptsTerms: z.boolean().refine((v) => v, "Debes aceptar los términos"),
   acceptsCommunications: z.boolean().default(false),
   healthConsent: z.boolean().default(false),
-}).refine((d) => d.password === d.confirmPassword, {
+}).refine((d) => Boolean(internationalPhone(d.phone, d.phoneCountry)), { message: "Ingresa un número válido para el país seleccionado", path: ["phone"] }).refine((d) => d.password === d.confirmPassword, {
   message: "Las contraseñas no coinciden",
   path: ["confirmPassword"],
 });
@@ -58,6 +57,7 @@ type FormValues = {
   displayName: string;
   email: string;
   phone: string;
+  phoneCountry: string;
   gender: "female" | "male" | "other";
   dateOfBirth: string;
   password: string;
@@ -77,7 +77,7 @@ const Register = () => {
 
   const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { acceptsTerms: false, acceptsCommunications: false, healthConsent: false },
+    defaultValues: { phoneCountry: "MX", acceptsTerms: false, acceptsCommunications: false, healthConsent: false },
   });
 
   const acceptsTerms = watch("acceptsTerms");
@@ -89,8 +89,7 @@ const Register = () => {
 
   const onSubmit = async (data: FormValues) => {
     clearError();
-    const rawPhone = data.phone.replace(/\D/g, "");
-    const phone = rawPhone.startsWith("52") ? `+${rawPhone}` : `+52${rawPhone}`;
+    const phone = internationalPhone(data.phone, data.phoneCountry)!;
     try {
       await registerUser({
         email: data.email,
@@ -105,7 +104,7 @@ const Register = () => {
         ...(refCode ? { referralCode: refCode } : {}),
       } as any);
       // La inscripción continúa con la firma del documento vigente.
-      setRegistration(data);
+      setRegistration({ ...data, phone });
     } catch {
       // El error del store se muestra en el AuthErrorBanner, único canal de error.
     }
@@ -157,15 +156,21 @@ const Register = () => {
             error={errors.displayName?.message}
             {...register("displayName")}
           />
-          <AuthField
-            label="WhatsApp"
-            placeholder="4271234567"
-            inputMode="numeric"
-            autoComplete="tel"
-            hint="Solo dígitos, agregamos +52"
-            error={errors.phone?.message}
-            {...register("phone")}
-          />
+          <div className="space-y-3 min-w-0">
+            <AuthSelect label="País del teléfono" {...register("phoneCountry")}>
+              {phoneCountries.map(country => <option key={country.code} value={country.code}>{country.name} (+{country.dial})</option>)}
+            </AuthSelect>
+            <AuthField
+              label="WhatsApp"
+              type="tel"
+              placeholder="Tu número de teléfono"
+              inputMode="tel"
+              autoComplete="tel-national"
+              hint="Escribe tu número local o pega el número completo con + y su lada."
+              error={errors.phone?.message}
+              {...register("phone")}
+            />
+          </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
