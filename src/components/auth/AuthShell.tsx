@@ -60,7 +60,7 @@ export type AuthShellProps = {
   brandPhotoAlt?: string;
   brandTint?: Tint;
   brandEyebrow: string;
-  brandHeadline: ReactNode;
+  brandHeadline?: ReactNode;
   brandHeadlineItalic?: string;
   brandSubline?: string;
   brandList?: { label: string }[];
@@ -130,7 +130,7 @@ export const AuthShell = ({
             <span className="text-[0.75rem] font-medium uppercase tracking-[0.32em] text-ink-muted">
               {brandEyebrow}
             </span>
-            <h2
+            {(brandHeadline || brandHeadlineItalic) && <h2
               className="font-display mt-4 leading-[0.96] text-ink"
               style={{ fontSize: "clamp(2.1rem, 4.4vw, 3.8rem)" }}
             >
@@ -143,7 +143,7 @@ export const AuthShell = ({
                   {brandHeadlineItalic}
                 </span>
               )}
-            </h2>
+            </h2>}
             {brandSubline && (
               <p className="mt-5 text-[0.95rem] leading-[1.7] max-w-[34ch] text-ink-muted">
                 {brandSubline}

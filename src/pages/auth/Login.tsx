@@ -87,8 +87,6 @@ const Login = () => {
       <AuthShell
         brandTint="berry"
         brandEyebrow="Bienvenida/o de vuelta"
-        brandHeadline={<>Pasa,</>}
-        brandHeadlineItalic="te estábamos esperando."
         brandSubline="Tu cuenta guarda tus reservas, tu progreso y los recordatorios de cada clase."
         brandQuote="Aquí el movimiento te regresa a ti."
         formEyebrow="Iniciar sesión"
