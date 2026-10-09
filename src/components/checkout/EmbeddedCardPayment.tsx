@@ -77,7 +77,7 @@ export function EmbeddedCardPayment({ orderId, onClose }: { orderId: string; onC
 
   const challenge = session?.payment?.statusDetail === "pending_challenge" && session.payment.threeDS;
   const closed = session && ["approved", "cancelled", "expired", "rejected"].includes(session.orderStatus);
-  const kind = !closed && challenge ? "statusScreen" : !closed && !session?.payment && wallet ? "wallet" : !closed && !walletSelected && session?.canSubmit && !submitted.current && !session.payment ? "cardPayment" : null;
+  const kind = !closed && challenge ? "statusScreen" : !closed && !session?.payment && session?.walletAvailable !== false && wallet ? "wallet" : !closed && !walletSelected && session?.canSubmit && !submitted.current && !session.payment ? "cardPayment" : null;
   const preferenceId = wallet?.preferenceId;
 
   const selectWallet = async () => {
@@ -119,8 +119,7 @@ export function EmbeddedCardPayment({ orderId, onClose }: { orderId: string; onC
           callbacks: {
             onReady: () => { window.clearTimeout(timeout); if (!cancelled) { setReady(true); setError(""); } },
             onError: () => { window.clearTimeout(timeout); if (!cancelled) setError("No pudimos cargar el formulario seguro. Consulta el estado antes de reintentar."); },
-            onSubmit: async (form: CardForm) => {
-              if (kind === "wallet") return;
+            ...(kind === "cardPayment" ? {onSubmit: async (form: CardForm) => {
               if (submitted.current || cancelled || walletRequest.current) return;
               submitted.current = true;
               submitting.current = true;
@@ -135,7 +134,7 @@ export function EmbeddedCardPayment({ orderId, onClose }: { orderId: string; onC
               }
               submitting.current = false;
               void refresh.current();
-            },
+            }} : {}),
           },
         });
         if (cancelled) await controller.unmount();
@@ -166,12 +165,16 @@ export function EmbeddedCardPayment({ orderId, onClose }: { orderId: string; onC
 
     {session && <p className="nums text-xl text-ink">{session.amount.toLocaleString("es-MX", {style: "currency", currency: session.currency || "MXN"})}</p>}
     {!closed && !session?.payment && session?.canSubmit && session.walletAvailable !== false && !walletSelected && <Button variant="outline" className="w-full" onClick={() => void selectWallet()}>Pagar con mi cuenta de Mercado Pago</Button>}
-    {walletSelected && !wallet && !walletLoading && !closed && !session?.payment && <Button onClick={() => void selectWallet()}>Continuar con mi cuenta de Mercado Pago</Button>}
+    {walletSelected && !wallet && !walletLoading && !closed && !session?.payment && session?.walletAvailable !== false && <Button onClick={() => void selectWallet()}>Continuar con mi cuenta de Mercado Pago</Button>}
     {walletLoading && <p role="status">Preparando pago con tu cuenta…</p>}
     <p role="status" className="text-sm text-ink-muted">{statusText}</p>
     {error && <p role="alert" className="text-sm text-danger">{error}</p>}
     {kind && !ready && !error && <p role="status" className="text-sm text-ink-muted">Cargando formulario seguro…</p>}
     <div id={host} className={kind ? "min-h-[280px]" : ""} />
+    {kind === "wallet" && preferenceId && <div className="space-y-2 text-sm">
+      <p className="text-ink-muted">Si no se abre la otra ventana, puedes continuar en esta pestaña.</p>
+      <a href={`https://www.mercadopago.com.mx/checkout/v1/redirect?pref_id=${encodeURIComponent(preferenceId)}`} className="inline-flex min-h-11 items-center font-bold text-accent-strong">Abrir Mercado Pago en esta pestaña</a>
+    </div>}
     {error && <Button variant="outline" onClick={() => { if (walletSelected && !wallet && !walletLoading) void selectWallet(); else { void refresh.current(); if (!submitted.current) setRetry(v => v + 1); } }}>Consultar / volver a cargar</Button>}
     <Link onClick={onClose} to={`/app/orders/${encodeURIComponent(orderId)}`} className="inline-flex min-h-11 items-center text-sm font-bold text-accent-strong">Ver mi orden</Link>
     <p className="text-xs text-ink-muted">Puedes retomar esta misma orden desde Mis órdenes. Este pago no autoriza cargos mensuales automáticos.</p>

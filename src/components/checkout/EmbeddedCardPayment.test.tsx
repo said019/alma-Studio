@@ -87,7 +87,9 @@ it('ofrece cuenta Mercado Pago y abre Wallet Brick sin enviar tarjeta ni crear o
  expect(api.post).toHaveBeenCalledWith('/orders/same-order/mercadopago/wallet');
  expect(screen.getByText(/la misma que usas en Mercado Libre/)).toBeInTheDocument();
  expect(screen.queryByRole('button',{name:'Pagar con mi cuenta de Mercado Pago'})).not.toBeInTheDocument();
- await act(async()=>{await settings.callbacks.onSubmit();});
+ expect(settings.callbacks).not.toHaveProperty("onSubmit");
+ expect(screen.getByRole("link", {name:"Abrir Mercado Pago en esta pestaña"})).toHaveAttribute("href", "https://www.mercadopago.com.mx/checkout/v1/redirect?pref_id=pref-wallet");
+ expect(screen.getByRole("link", {name:"Abrir Mercado Pago en esta pestaña"})).not.toHaveAttribute("target");
  expect(api.post).toHaveBeenCalledTimes(1);
 });
 
@@ -134,5 +136,18 @@ it('mantiene Wallet al consultar sin pago y al volver detecta aprobación sin of
  expect(await screen.findByText('Pago confirmado. Tu compra está lista.')).toBeInTheDocument();
  await waitFor(()=>expect(unmount).toHaveBeenCalled());
  expect(screen.queryByRole('button',{name:/mi cuenta de Mercado Pago/})).not.toBeInTheDocument();
+ expect(create).toHaveBeenCalledTimes(1);
+});
+
+it('retira Wallet y acceso alternativo cuando el servidor deja de permitir la preferencia', async () => {
+ const walletSession={...session,canSubmit:false,paymentChoice:'wallet',walletAvailable:true,walletPreferenceId:'pref/reserved?1',payment:null};
+ vi.mocked(api.get).mockResolvedValue({data:{data:walletSession}});
+ mount(); await waitFor(()=>expect(create).toHaveBeenCalledWith('wallet',expect.any(String),expect.anything()));
+ expect(settings.callbacks).not.toHaveProperty('onSubmit');
+ expect(screen.getByRole('link',{name:'Abrir Mercado Pago en esta pestaña'})).toHaveAttribute('href','https://www.mercadopago.com.mx/checkout/v1/redirect?pref_id=pref%2Freserved%3F1');
+ vi.mocked(api.post).mockResolvedValueOnce({data:{data:{...walletSession,walletAvailable:false,walletPreferenceId:null}}});
+ fireEvent.focus(window);
+ await waitFor(()=>expect(unmount).toHaveBeenCalled());
+ expect(screen.queryByRole('link',{name:'Abrir Mercado Pago en esta pestaña'})).not.toBeInTheDocument();
  expect(create).toHaveBeenCalledTimes(1);
 });
