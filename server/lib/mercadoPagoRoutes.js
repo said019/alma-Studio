@@ -146,14 +146,52 @@ export function registerMercadoPago(app,{pool,auth,owner,finalizeOrder,afterPaym
  }));
  const session=wrap(async(req,res)=>{
   const {order,account}=await load(req);const {attempt,payment}=await recover(order,account);
-  const fresh=(await pool.query('SELECT status,refund_status,refunded_amount FROM orders WHERE id=$1',[order.id])).rows[0];
+  const fresh=(await pool.query('SELECT status,refund_status,refunded_amount,mp_payment_choice,mp_wallet_preference_id FROM orders WHERE id=$1',[order.id])).rows[0];
   const state=fresh?.status;
-  res.json({data:{orderId:order.id,amount:Number(order.total_amount),currency:'MXN',publicKey:account.publicKey,email:order.user_email,orderStatus:state,refundStatus:fresh?.refund_status||null,refundedAmount:Number(fresh?.refunded_amount||0),payment,canSubmit:!attempt&&state==='pending_payment'&&(!order.expires_at||new Date(order.expires_at)>new Date()),recurringSupported:false}});
+  const available=state==='pending_payment'&&Boolean(order.expires_at)&&new Date(order.expires_at)>new Date()&&!payment?.paymentId;
+  const choice=fresh?.mp_payment_choice||(attempt?'card':null);
+  res.json({data:{paymentChoice:choice,walletAvailable:available&&(!attempt||choice==='wallet'&&Boolean(fresh.mp_wallet_preference_id)),walletPreferenceId:available&&choice==='wallet'?fresh.mp_wallet_preference_id:null,orderId:order.id,amount:Number(order.total_amount),currency:'MXN',publicKey:account.publicKey,email:order.user_email,orderStatus:state,refundStatus:fresh?.refund_status||null,refundedAmount:Number(fresh?.refunded_amount||0),payment:choice==='wallet'&&available&&fresh?.mp_wallet_preference_id&&!payment?.paymentId?null:payment,canSubmit:!attempt&&state==='pending_payment'&&(!order.expires_at||new Date(order.expires_at)>new Date()),recurringSupported:false}});
  });
  app.get('/api/payments/card-readiness',(_req,res)=>res.json({data:{ready:config().ready,provider:'mercadopago',recurringSupported:false,message:config().ready?null:'El pago integrado con tarjeta todavía no está disponible.'}}));
  app.get('/api/public/payment-config',(_req,res)=>res.json({data:{cardEnabled:config().ready,provider:'mercadopago'}}));
  app.get('/api/orders/:id/card-payment-session',auth,session);
  app.post('/api/orders/:id/card-payment-sync',auth,session);
+ app.post('/api/orders/:id/mercadopago/wallet',auth,wrap(async(req,res)=>{
+  const {order,account}=await load(req);
+  const recovered=await recover(order,account);
+  const db=await pool.connect();let attempt,existing;
+  try{
+   await db.query('BEGIN');
+   const locked=(await db.query('SELECT * FROM orders WHERE id=$1 FOR UPDATE',[order.id])).rows[0];
+   if(locked.status!=='pending_payment'||!locked.expires_at||new Date(locked.expires_at)<=new Date()||locked.mp_payment_id||recovered.payment?.paymentId)throw mpError('Esta orden ya no acepta pagos.',409);
+   if(hasWaiver&&!(await hasWaiver(db,order.user_id)))throw mpError('Firma la responsiva antes de pagar.',403);
+   const plan=(await db.query('SELECT * FROM plans WHERE id=$1',[order.plan_id])).rows[0];
+   if(plan?.rules?.auto_renew)throw mpError('Este plan anual conserva su enlace de contratación externo.',409);
+   const conflict=await purchaseConflict?.({userId:order.user_id,plan,excludeOrderId:order.id,client:db});if(conflict)throw mpError(conflict.message,409);
+   existing=(await db.query('SELECT * FROM mp_card_attempts WHERE order_id=$1',[order.id])).rows[0];
+   if(existing){
+    if(locked.mp_payment_choice!=='wallet'||!locked.mp_wallet_preference_id||existing.payment_id)throw mpError('Ya existe un intento. Consulta su estado antes de volver a pagar.',409);
+    await db.query('COMMIT');return res.json({data:{preferenceId:locked.mp_wallet_preference_id,publicKey:account.publicKey}});
+   }
+   attempt=(await db.query("INSERT INTO mp_card_attempts(order_id,idempotency_key,status) VALUES($1,$2,'processing') RETURNING *",[order.id,crypto.randomUUID()])).rows[0];
+   await db.query("UPDATE orders SET mp_payment_choice='wallet' WHERE id=$1",[order.id]);
+   await db.query('COMMIT');
+  }catch(e){await db.query('ROLLBACK').catch(()=>{});throw e;}finally{db.release();}
+  // Persist the exclusive attempt before the network request. An ambiguous
+  // creation is never POSTed again: a second preference could collect twice.
+  const returnUrl=`${account.baseUrl}/app/orders/${order.id}`;
+  const body={purpose:'wallet_purchase',items:[{id:order.plan_id,title:order.plan_name||'HIVE Pilates Studio',quantity:1,currency_id:'MXN',unit_price:Number(order.total_amount)}],
+   payer:{email:order.user_email},external_reference:order.id,notification_url:account.webhookUrl,
+   expires:true,expiration_date_to:new Date(order.expires_at).toISOString(),
+   payment_methods:{installments:1,excluded_payment_types:[{id:'ticket'},{id:'bank_transfer'},{id:'atm'}]},
+   back_urls:{success:returnUrl,pending:returnUrl,failure:returnUrl},auto_return:'approved'};
+  if(!Number.isFinite(body.items[0].unit_price)||body.items[0].unit_price<=0)throw mpError('Importe de orden inválido.',409);
+  const preference=await request('/checkout/preferences',account,{method:'POST',headers:{'Content-Type':'application/json','X-Idempotency-Key':attempt.idempotency_key},body:JSON.stringify(body)});
+  if(typeof preference.id!=='string'||!preference.id||String(preference.collector_id)!==account.collectorId||preference.external_reference!==order.id)throw mpError('La preferencia requiere revisión del estudio.',409);
+  const saved=await pool.query("UPDATE orders SET mp_wallet_preference_id=$2,updated_at=NOW() WHERE id=$1 AND mp_payment_choice='wallet' AND mp_wallet_preference_id IS NULL AND mp_payment_id IS NULL AND status='pending_payment' AND expires_at>NOW() RETURNING id",[order.id,preference.id]);
+  if(!saved.rowCount)throw mpError('Consulta el estado de la orden antes de pagar.',409);
+  return res.json({data:{preferenceId:preference.id,publicKey:account.publicKey}});
+ }));
  app.post('/api/orders/:id/card-payment',auth,wrap(async(req,res)=>{
   const {order,account}=await load(req);
   if(order.status!=='pending_payment'||order.expires_at&&new Date(order.expires_at)<=new Date())throw mpError('Esta orden ya no acepta pagos.',409);
@@ -167,6 +205,7 @@ export function registerMercadoPago(app,{pool,auth,owner,finalizeOrder,afterPaym
    if(plan?.rules?.auto_renew)throw mpError('Este plan anual conserva su enlace de contratación externo.',409);
    const conflict=await purchaseConflict?.({userId:order.user_id,plan,excludeOrderId:order.id,client:db});if(conflict)throw mpError(conflict.message,409);
    attempt=(await db.query("INSERT INTO mp_card_attempts(order_id,idempotency_key,status) VALUES($1,$2,'processing') ON CONFLICT(order_id) DO NOTHING RETURNING *",[order.id,crypto.randomUUID()])).rows[0];
+   if(attempt)await db.query("UPDATE orders SET mp_payment_choice='card' WHERE id=$1",[order.id]);
    await db.query('COMMIT');
   }catch(e){await db.query('ROLLBACK').catch(()=>{});throw e;}finally{db.release();}
   if(!attempt)return res.status(202).json({data:{status:'processing',message:'Ya existe un intento. Consulta su estado; no vuelvas a pagar.'}});

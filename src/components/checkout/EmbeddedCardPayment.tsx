@@ -21,6 +21,10 @@ export function EmbeddedCardPayment({ orderId, onClose }: { orderId: string; onC
   const error = sessionError || formError;
   const [retry, setRetry] = useState(0);
   const [ready, setReady] = useState(false);
+  const [wallet, setWallet] = useState<{preferenceId: string; publicKey: string} | null>(null);
+  const [walletSelected, setWalletSelected] = useState(false);
+  const [walletLoading, setWalletLoading] = useState(false);
+  const walletRequest = useRef(false);
   const submitted = useRef(false);
   const submitting = useRef(false);
   const hasAttempt = useRef(false);
@@ -32,6 +36,8 @@ export function EmbeddedCardPayment({ orderId, onClose }: { orderId: string; onC
     submitted.current = false;
     hasAttempt.current = false;
     setSession(null);
+    setWallet(null);
+    setWalletSelected(false);
     setSessionError("");
     setError("");
     refresh.current = async () => {
@@ -44,8 +50,10 @@ export function EmbeddedCardPayment({ orderId, onClose }: { orderId: string; onC
           : await api.get(`/orders/${orderId}/card-payment-session`);
         const next = (response.data.data ?? response.data) as CardSession;
         if (alive) {
-          hasAttempt.current = hasAttempt.current || Boolean(next.payment);
+          hasAttempt.current = hasAttempt.current || Boolean(next.payment || next.walletPreferenceId);
           if (checkingAttempt && !submitting.current && submitted.current && next.canSubmit && !next.payment) { submitted.current = false; setRetry(v => v + 1); }
+          if (next.paymentChoice === "wallet") setWalletSelected(true);
+          if (next.walletPreferenceId) { setWallet({preferenceId: next.walletPreferenceId, publicKey: next.publicKey}); setWalletSelected(true); }
           setSession(next);
           setSessionError("");
           if (next.orderStatus === "approved") setError("");
@@ -69,8 +77,27 @@ export function EmbeddedCardPayment({ orderId, onClose }: { orderId: string; onC
 
   const challenge = session?.payment?.statusDetail === "pending_challenge" && session.payment.threeDS;
   const closed = session && ["approved", "cancelled", "expired", "rejected"].includes(session.orderStatus);
-  const kind = !closed && challenge ? "statusScreen" : !closed && session?.canSubmit && !submitted.current && !session.payment ? "cardPayment" : null;
-  const publicKey = session?.publicKey, amount = session?.amount, email = session?.email;
+  const kind = !closed && challenge ? "statusScreen" : !closed && !session?.payment && wallet ? "wallet" : !closed && !walletSelected && session?.canSubmit && !submitted.current && !session.payment ? "cardPayment" : null;
+  const preferenceId = wallet?.preferenceId;
+
+  const selectWallet = async () => {
+    if (walletRequest.current || submitted.current || session?.payment || closed) return;
+    walletRequest.current = true;
+    setWalletSelected(true);
+    setWalletLoading(true);
+    setError("");
+    try {
+      const response = await api.post(`/orders/${orderId}/mercadopago/wallet`);
+      const next = response.data.data ?? response.data;
+      if (!next.preferenceId || !next.publicKey) throw new Error("Missing wallet preference");
+      setWallet(next);
+      hasAttempt.current = true;
+    } catch (e: any) {
+      setError(e?.response?.data?.message || "No pudimos preparar el pago con tu cuenta. Consulta el estado antes de reintentar.");
+      void refresh.current();
+    } finally { walletRequest.current = false; setWalletLoading(false); }
+  };
+  const publicKey = wallet?.publicKey ?? session?.publicKey, amount = session?.amount, email = session?.email;
   const paymentId = session?.payment?.paymentId;
   const challengeURL = challenge ? challenge.external_resource_url : undefined;
   const creq = challenge ? challenge.creq : undefined;
@@ -87,13 +114,14 @@ export function EmbeddedCardPayment({ orderId, onClose }: { orderId: string; onC
         const Sdk = await loadMercadoPagoSdk() as SDK;
         if (cancelled) return;
         controller = await new Sdk(publicKey, {locale: "es-MX"}).bricks().create(kind, host, {
-          initialization: kind === "cardPayment" ? {amount, payer: {email}} : {paymentId, additionalInfo: {externalResourceURL: challengeURL, creq}},
+          initialization: kind === "wallet" ? {preferenceId, redirectMode: "blank"} : kind === "cardPayment" ? {amount, payer: {email}} : {paymentId, additionalInfo: {externalResourceURL: challengeURL, creq}},
           customization: kind === "cardPayment" ? {paymentMethods: {maxInstallments: 1, minInstallments: 1}} : undefined,
           callbacks: {
             onReady: () => { window.clearTimeout(timeout); if (!cancelled) { setReady(true); setError(""); } },
             onError: () => { window.clearTimeout(timeout); if (!cancelled) setError("No pudimos cargar el formulario seguro. Consulta el estado antes de reintentar."); },
             onSubmit: async (form: CardForm) => {
-              if (submitted.current || cancelled) return;
+              if (kind === "wallet") return;
+              if (submitted.current || cancelled || walletRequest.current) return;
               submitted.current = true;
               submitting.current = true;
               hasAttempt.current = true;
@@ -118,7 +146,7 @@ export function EmbeddedCardPayment({ orderId, onClose }: { orderId: string; onC
       window.clearTimeout(timeout);
       if (controller) queue.current = queue.current.then(() => controller?.unmount()).then(() => {});
     };
-  }, [kind, publicKey, amount, email, paymentId, challengeURL, creq, host, orderId, retry]);
+  }, [kind, publicKey, amount, email, paymentId, challengeURL, creq, host, orderId, retry, preferenceId]);
 
   const statusText = session?.payment?.status === "charged_back" ? "El pago tiene un contracargo. Consulta al estudio el estado de tu membresía."
     : session?.payment?.status === "refunded" || session?.refundStatus === "refunded" ? "El pago fue reembolsado. Esta compra ya no activa tu membresía."
@@ -130,17 +158,21 @@ export function EmbeddedCardPayment({ orderId, onClose }: { orderId: string; onC
     : session?.orderStatus === "rejected" || session?.payment?.status === "rejected" ? "El pago fue rechazado. Revisa esta orden antes de iniciar otra compra."
     : !session ? "Consultando tu orden…"
     : kind === "statusScreen" ? "Completa la verificación de tu banco en esta página."
+    : walletSelected && !session?.payment ? "Usa tu cuenta de Mercado Pago, la misma que usas en Mercado Libre. El pago seguro se abre en otra ventana y HIVE permanece abierto."
     : !kind ? "Estamos verificando el pago. No vuelvas a pagar esta orden."
     : "Introduce tu tarjeta en el formulario seguro de Mercado Pago.";
-  return <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}><DialogContent className="max-w-xl" onPointerDownOutside={(event) => event.preventDefault()}><DialogTitle>Pagar con Mercado Pago</DialogTitle><section aria-label="Pago con tarjeta" className="w-full min-w-0 space-y-5 py-2">
+  return <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}><DialogContent className="max-w-xl" onPointerDownOutside={(event) => event.preventDefault()}><DialogTitle>Pagar con Mercado Pago</DialogTitle><section aria-label="Opciones de pago" className="w-full min-w-0 space-y-5 py-2">
     <Button variant="outline" onClick={onClose}>Volver a mi orden</Button>
 
     {session && <p className="nums text-xl text-ink">{session.amount.toLocaleString("es-MX", {style: "currency", currency: session.currency || "MXN"})}</p>}
+    {!closed && !session?.payment && session?.canSubmit && session.walletAvailable !== false && !walletSelected && <Button variant="outline" className="w-full" onClick={() => void selectWallet()}>Pagar con mi cuenta de Mercado Pago</Button>}
+    {walletSelected && !wallet && !walletLoading && !closed && !session?.payment && <Button onClick={() => void selectWallet()}>Continuar con mi cuenta de Mercado Pago</Button>}
+    {walletLoading && <p role="status">Preparando pago con tu cuenta…</p>}
     <p role="status" className="text-sm text-ink-muted">{statusText}</p>
     {error && <p role="alert" className="text-sm text-danger">{error}</p>}
-    {kind && !ready && !error && <p role="status" className="text-sm text-ink-muted">Cargando formulario de tarjeta…</p>}
+    {kind && !ready && !error && <p role="status" className="text-sm text-ink-muted">Cargando formulario seguro…</p>}
     <div id={host} className={kind ? "min-h-[280px]" : ""} />
-    {error && <Button variant="outline" onClick={() => { void refresh.current(); if (!submitted.current) setRetry(v => v + 1); }}>Consultar / volver a cargar</Button>}
+    {error && <Button variant="outline" onClick={() => { if (walletSelected && !wallet && !walletLoading) void selectWallet(); else { void refresh.current(); if (!submitted.current) setRetry(v => v + 1); } }}>Consultar / volver a cargar</Button>}
     <Link onClick={onClose} to={`/app/orders/${encodeURIComponent(orderId)}`} className="inline-flex min-h-11 items-center text-sm font-bold text-accent-strong">Ver mi orden</Link>
     <p className="text-xs text-ink-muted">Puedes retomar esta misma orden desde Mis órdenes. Este pago no autoriza cargos mensuales automáticos.</p>
   </section></DialogContent></Dialog>;

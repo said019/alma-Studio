@@ -78,3 +78,61 @@ it.each([
  vi.mocked(api.get).mockResolvedValue({data:{data:{...session,orderStatus:'approved',canSubmit:false,payment:{status},refundStatus}}});
  mount();expect(await screen.findByText(message)).toBeInTheDocument();expect(screen.queryByText('Pago confirmado. Tu compra está lista.')).not.toBeInTheDocument();expect(create).not.toHaveBeenCalled();
 });
+
+it('ofrece cuenta Mercado Pago y abre Wallet Brick sin enviar tarjeta ni crear otra orden', async () => {
+ vi.mocked(api.post).mockResolvedValue({data:{data:{preferenceId:'pref-wallet', publicKey:'TEST-public'}}});
+ mount(); await waitFor(()=>expect(create).toHaveBeenCalledWith('cardPayment',expect.any(String),expect.anything()));
+ fireEvent.click(screen.getByRole('button',{name:'Pagar con mi cuenta de Mercado Pago'}));
+ await waitFor(()=>expect(create).toHaveBeenCalledWith('wallet',expect.any(String),expect.objectContaining({initialization:{preferenceId:'pref-wallet',redirectMode:'blank'}})));
+ expect(api.post).toHaveBeenCalledWith('/orders/same-order/mercadopago/wallet');
+ expect(screen.getByText(/la misma que usas en Mercado Libre/)).toBeInTheDocument();
+ expect(screen.queryByRole('button',{name:'Pagar con mi cuenta de Mercado Pago'})).not.toBeInTheDocument();
+ await act(async()=>{await settings.callbacks.onSubmit();});
+ expect(api.post).toHaveBeenCalledTimes(1);
+});
+
+it('reanuda wallet reservado sin mostrar tarjeta ni crear preferencia nueva', async () => {
+ vi.mocked(api.get).mockResolvedValue({data:{data:{...session,canSubmit:false,paymentChoice:'wallet',walletPreferenceId:'existing-pref'}}});
+ mount(); await waitFor(()=>expect(create).toHaveBeenCalledWith('wallet',expect.any(String),expect.objectContaining({initialization:{preferenceId:'existing-pref',redirectMode:'blank'}})));
+ expect(api.post).not.toHaveBeenCalled();
+ expect(create.mock.calls.some(([kind])=>kind==='cardPayment')).toBe(false);
+});
+
+it('no ofrece cambiar de método con un pago de tarjeta en proceso', async () => {
+ vi.mocked(api.get).mockResolvedValue({data:{data:{...session,canSubmit:false,payment:{status:'in_process',paymentId:'existing'}}}});
+ mount(); await screen.findByText('Estamos verificando el pago. No vuelvas a pagar esta orden.');
+ expect(screen.queryByRole('button',{name:'Pagar con mi cuenta de Mercado Pago'})).not.toBeInTheDocument();
+ expect(create).not.toHaveBeenCalled();
+});
+
+it('bloquea doble elección y permite recuperar preferencia tras error', async () => {
+ let reject!: (error:Error)=>void;
+ vi.mocked(api.post).mockImplementationOnce(()=>new Promise((_resolve,rej)=>{reject=rej;}));
+ mount(); await waitFor(()=>expect(create).toHaveBeenCalled());
+ const button=screen.getByRole('button',{name:'Pagar con mi cuenta de Mercado Pago'});
+ fireEvent.click(button); fireEvent.click(button);
+ expect(api.post).toHaveBeenCalledTimes(1);
+ await act(async()=>reject(new Error('timeout')));
+ expect(await screen.findByRole('alert')).toHaveTextContent('No pudimos preparar');
+ vi.mocked(api.post).mockResolvedValueOnce({data:{data:{preferenceId:'recovered',publicKey:'TEST-public'}}});
+ fireEvent.click(screen.getByRole('button',{name:'Continuar con mi cuenta de Mercado Pago'}));
+ await waitFor(()=>expect(create).toHaveBeenCalledWith('wallet',expect.any(String),expect.objectContaining({initialization:{preferenceId:'recovered',redirectMode:'blank'}})));
+ expect(create.mock.calls.filter(([kind])=>kind==='cardPayment')).toHaveLength(1);
+});
+
+it('mantiene Wallet al consultar sin pago y al volver detecta aprobación sin ofrecer otro cobro', async () => {
+ const walletSession={...session,canSubmit:false,paymentChoice:'wallet',walletAvailable:true,walletPreferenceId:'existing-pref',payment:null};
+ vi.mocked(api.get).mockResolvedValue({data:{data:walletSession}});
+ vi.mocked(api.post).mockResolvedValueOnce({data:{data:walletSession}});
+ mount();await waitFor(()=>expect(create).toHaveBeenCalledWith('wallet',expect.any(String),expect.anything()));
+ fireEvent.focus(window);
+ await waitFor(()=>expect(api.post).toHaveBeenCalledWith('/orders/same-order/card-payment-sync'));
+ expect(create).toHaveBeenCalledTimes(1);
+ expect(unmount).not.toHaveBeenCalled();
+ vi.mocked(api.post).mockResolvedValueOnce({data:{data:{...walletSession,walletPreferenceId:null,walletAvailable:false,orderStatus:'approved',payment:{paymentId:'paid',status:'approved'}}}});
+ fireEvent.focus(window);
+ expect(await screen.findByText('Pago confirmado. Tu compra está lista.')).toBeInTheDocument();
+ await waitFor(()=>expect(unmount).toHaveBeenCalled());
+ expect(screen.queryByRole('button',{name:/mi cuenta de Mercado Pago/})).not.toBeInTheDocument();
+ expect(create).toHaveBeenCalledTimes(1);
+});

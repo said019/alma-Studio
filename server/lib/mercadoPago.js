@@ -13,7 +13,7 @@ export function assertMpPayment(order,payment,config) {
  if(order.payment_provider!=='mercadopago'||order.mp_checkout_mode!=='embedded'||order.payment_method!=='card'||order.mp_collector_id!==config.collectorId)throw mpError('La cuenta de cobro no corresponde a la orden.',409);
  if(!/^\d+$/.test(String(payment.id||''))||String(payment.external_reference)!==order.id||String(payment.collector_id)!==config.collectorId)throw mpError('Referencia o receptor del pago incompatible.',409);
  if(payment.currency_id!=='MXN'||!Number.isFinite(Number(payment.transaction_amount))||Number(payment.transaction_amount)<=0||Math.round(Number(payment.transaction_amount)*100)!==Math.round(Number(order.total_amount)*100))throw mpError('El importe o la moneda del pago no coincide.',409);
- if(!['credit_card','debit_card','prepaid_card'].includes(payment.payment_type_id))throw mpError('El pago no corresponde a una tarjeta.',409);
+ if(!['credit_card','debit_card','prepaid_card',...(order.mp_payment_choice==='wallet'?['account_money']:[])].includes(payment.payment_type_id))throw mpError('El método de pago no corresponde al intento de la orden.',409);
  if(order.mp_payment_id&&String(payment.id)!==order.mp_payment_id)throw mpError('La orden ya está asociada a otro pago.',409);
 }
 export function buildMpPayment(order,form,config) {
@@ -38,6 +38,8 @@ export function verifyMpSignature({signature,requestId,dataId,secret,now=Date.no
  return crypto.timingSafeEqual(expected,Buffer.from(v1,'hex'));
 }
 export const MP_SCHEMA=`
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS mp_payment_choice TEXT CHECK (mp_payment_choice IN ('card','wallet'));
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS mp_wallet_preference_id TEXT;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS mp_checkout_mode TEXT;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS mp_collector_id TEXT;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS mp_external_checkout_url TEXT;

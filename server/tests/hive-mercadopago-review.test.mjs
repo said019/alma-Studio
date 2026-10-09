@@ -31,11 +31,11 @@ async function fixture(options={}) {
  await pool.query('INSERT INTO plans(id,name) VALUES($1,$2)',[planId,'QA HIVE']);
  await pool.query(`INSERT INTO orders(id,user_id,plan_id,total_amount,mp_checkout_mode,mp_collector_id) VALUES($1,$2,$3,330,'embedded','100')`,[orderId,userId,planId]);
  let providerPosts=0,activations=0,syncs=0;const freed=[];
- const account={ready:true,accessToken:'test-not-a-token',publicKey:'test-public',collectorId:'100',webhookSecret:'test-only-secret',webhookUrl:'https://hive.example.test/api/mercadopago/webhook'};
+ const account={ready:true,accessToken:'test-not-a-token',publicKey:'test-public',collectorId:'100',webhookSecret:'test-only-secret',baseUrl:'https://hive.example.test',webhookUrl:'https://hive.example.test/api/mercadopago/webhook'};
  const payment={id:String(Date.now())+String(Math.floor(Math.random()*100000)),external_reference:orderId,collector_id:100,currency_id:'MXN',transaction_amount:330,payment_type_id:'credit_card',status:'approved',status_detail:'accredited',...options.payment};
  const routes={};
  const app={get:(url,...handlers)=>routes[`GET ${url}`]=handlers.at(-1),post:(url,...handlers)=>routes[`POST ${url}`]=handlers.at(-1)};
- const registered=registerMercadoPago(app,{pool,auth(){},config:()=>account,hasWaiver:async()=>options.waiver!==false,purchaseConflict:async()=>null,finalizeOrder:async(db,id)=>{
+ const registered=registerMercadoPago(app,{pool,auth(){},config:()=>account,hasWaiver:async()=>options.waiver!==false,purchaseConflict:async()=>options.conflict||null,finalizeOrder:async(db,id)=>{
   activations++;
   await db.query("UPDATE orders SET status='approved' WHERE id=$1",[id]);
   await db.query("INSERT INTO memberships(order_id,status) VALUES($1,'active')",[id]);
@@ -43,6 +43,11 @@ async function fixture(options={}) {
   if(init.method==='POST'){
    providerPosts++;
    const body=JSON.parse(init.body);
+   if(url.endsWith('/checkout/preferences')){
+    assert.equal(body.purpose,'wallet_purchase');assert.equal(body.items[0].unit_price,330);assert.equal(body.external_reference,orderId);assert.equal(body.expires,true);assert.ok(body.expiration_date_to);
+    if(options.timeout)throw new Error('ambiguous preference timeout');
+    return {ok:true,json:async()=>({id:'qa-preference-'+orderId,collector_id:100,external_reference:orderId})};
+   }
    assert.equal(body.transaction_amount,330);assert.equal(body.external_reference,orderId);
    assert.ok(init.headers['X-Idempotency-Key']);
    if(options.beforeResponse)await options.beforeResponse();
@@ -176,4 +181,51 @@ test('late POST cannot replace canonical attempt already fixed by authenticated 
  const attempt=(await pool.query('SELECT payment_id FROM mp_card_attempts WHERE order_id=$1',[f.orderId])).rows[0];
  assert.equal(attempt.payment_id,'887700001');assert.equal((await f.row()).mp_payment_id,'887700001');assert.equal(f.activations(),1);
  assert.equal((await pool.query('SELECT COUNT(*)::int n FROM mp_payment_reviews WHERE order_id=$1',[f.orderId])).rows[0].n,1);
+});
+
+async function walletFixture(options={}) {
+ const f=await fixture({searchEmpty:true,...options});
+ await pool.query("UPDATE orders SET expires_at=NOW()+INTERVAL '1 hour' WHERE id=$1",[f.orderId]);
+ return f;
+}
+test('wallet preference is durable, repeatable and exclusive with card submission',async()=>{
+ const f=await walletFixture();const first=await f.call('POST','mercadopago/wallet');assert.equal(first.code,200,JSON.stringify(first.body));
+ const second=await f.call('POST','mercadopago/wallet');assert.equal(second.body.data.preferenceId,first.body.data.preferenceId);assert.equal(f.posts(),1);
+ await f.submit();assert.equal(f.posts(),1);
+ const state=(await f.call()).body.data;assert.equal(state.payment,null);assert.equal(state.paymentChoice,'wallet');assert.equal(state.canSubmit,false);assert.equal(state.walletAvailable,true);assert.equal(state.walletPreferenceId,first.body.data.preferenceId);
+});
+test('concurrent card and wallet creation reserves only one provider request',async()=>{
+ const f=await walletFixture();await Promise.all([f.submit(),f.call('POST','mercadopago/wallet')]);assert.equal(f.posts(),1);
+});
+test('ambiguous wallet preference creation fails closed on retry',async()=>{
+ const f=await walletFixture({timeout:true});assert.equal((await f.call('POST','mercadopago/wallet')).code,503);
+ assert.equal((await f.call('POST','mercadopago/wallet')).code,409);assert.equal(f.posts(),1);assert.equal((await f.call()).body.data.walletAvailable,false);
+});
+test('wallet owner, waiver and expiry checks prevent preference creation',async()=>{
+ const f=await walletFixture();assert.equal((await f.call('POST','mercadopago/wallet',{},crypto.randomUUID())).code,404);
+ await pool.query("UPDATE orders SET expires_at=NOW()-INTERVAL '1 minute' WHERE id=$1",[f.orderId]);assert.equal((await f.call('POST','mercadopago/wallet')).code,409);assert.equal(f.posts(),0);
+ const unsigned=await walletFixture({waiver:false});assert.equal((await unsigned.call('POST','mercadopago/wallet')).code,403);assert.equal(unsigned.posts(),0);
+});
+test('account balance activates once only after wallet choice; wrong collector rejected',async()=>{
+ const f=await walletFixture();await f.call('POST','mercadopago/wallet');
+ await assert.rejects(()=>f.apply({...f.payment,payment_type_id:'account_money',collector_id:200},f.account));assert.equal(f.activations(),0);
+ await f.apply({...f.payment,payment_type_id:'account_money'},f.account);await f.apply({...f.payment,payment_type_id:'account_money'},f.account);assert.equal(f.activations(),1);
+ const state=(await f.call()).body.data;assert.equal(state.walletAvailable,false);assert.equal(state.walletPreferenceId,null);
+ const card=await fixture();await card.submit();await assert.rejects(()=>card.apply({...card.payment,payment_type_id:'account_money'},card.account));assert.equal(card.activations(),0);
+});
+test('cancelled wallet order sends late payment to review without activation',async()=>{
+ const f=await walletFixture();await f.call('POST','mercadopago/wallet');await pool.query("UPDATE orders SET status='cancelled' WHERE id=$1",[f.orderId]);
+ await assert.rejects(()=>f.apply({...f.payment,payment_type_id:'account_money'},f.account));assert.equal(f.activations(),0);assert.equal((await f.call('POST','mercadopago/wallet')).code,409);
+});
+
+test('wallet rejects annual contracts and purchase conflicts without provider traffic',async()=>{
+ const annual=await walletFixture();await pool.query(`UPDATE plans SET rules='{"auto_renew":true}' WHERE id=(SELECT plan_id FROM orders WHERE id=$1)`,[annual.orderId]);
+ assert.equal((await annual.call('POST','mercadopago/wallet')).code,409);assert.equal(annual.posts(),0);
+ const conflict=await walletFixture({conflict:{message:'Existing membership'}});assert.equal((await conflict.call('POST','mercadopago/wallet')).code,409);assert.equal(conflict.posts(),0);
+});
+test('pending or rejected provider wallet payment prevents preference reuse',async()=>{
+ for(const status of ['pending','rejected']){
+ const f=await walletFixture();await f.call('POST','mercadopago/wallet');await f.apply({...f.payment,status,payment_type_id:'account_money'},f.account);
+ assert.equal((await f.call('POST','mercadopago/wallet')).code,409);assert.equal(f.posts(),1);
+ }
 });

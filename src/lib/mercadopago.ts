@@ -31,4 +31,4 @@ export function loadMercadoPagoSdk(timeoutMs = 12000): Promise<unknown> {
 
 export type CardReadiness = { ready: boolean; provider: "mercadopago"; recurringSupported: false; message?: string };
 export type CardPayment = { paymentId?: string; status?: string; statusDetail?: string; threeDS?: { external_resource_url: string; creq: string } };
-export type CardSession = { refundStatus?: string | null; refundedAmount?: number; orderId: string; amount: number; currency: string; publicKey: string; email: string; orderStatus: string; canSubmit: boolean; payment?: CardPayment | null };
+export type CardSession = { walletPreferenceId?: string | null; paymentChoice?: "wallet" | "card" | null; walletAvailable?: boolean; refundStatus?: string | null; refundedAmount?: number; orderId: string; amount: number; currency: string; publicKey: string; email: string; orderStatus: string; canSubmit: boolean; payment?: CardPayment | null };

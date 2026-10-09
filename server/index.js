@@ -18430,7 +18430,7 @@ function scheduleEmailCrons() {
 async function bootServer() {
   await ensureSchema();
   // Never serve financial/queued-write routes with a partially applied schema.
-  await pool.query(`SELECT paid_at,provider_synced_at,mp_sync_claim,mp_sync_lease_until,
+  await pool.query(`SELECT mp_payment_choice,mp_wallet_preference_id,paid_at,provider_synced_at,mp_sync_claim,mp_sync_lease_until,
     mp_sync_attempted_at,mp_sync_error,mp_method_id,mp_type_id FROM orders LIMIT 0`);
   await pool.query('SELECT actor_id,intent_key,payload_hash,response FROM manual_sale_intents LIMIT 0');
   await pool.query('SELECT order_id,payment_id,reason,status FROM mp_payment_reviews LIMIT 0');
