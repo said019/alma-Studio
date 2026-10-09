@@ -54,8 +54,12 @@ describe("Membresías", () => {
     fireEvent.change(screen.getByLabelText("Fecha de inicio"), { target: { value: "2026-10-01" } });
     expect(guardar).toBeDisabled();
     fireEvent.change(screen.getByLabelText("Motivo del ajuste"), { target: { value: "Preventa acordada con el usuario" } });
+    expect(screen.getByLabelText("Fecha de fin (vigencia)")).toHaveValue("2026-10-25");
+    fireEvent.change(screen.getByLabelText("Fecha de fin (vigencia)"), { target: { value: "2026-09-30" } });
+    expect(guardar).toBeDisabled();
+    fireEvent.change(screen.getByLabelText("Fecha de fin (vigencia)"), { target: { value: "2026-10-25" } });
     expect(guardar).toBeEnabled();
     fireEvent.click(guardar);
-    await waitFor(() => expect(mockApi.put).toHaveBeenCalledWith("/memberships/m1", { startDate: "2026-10-01", reason: "Preventa acordada con el usuario" }));
+    await waitFor(() => expect(mockApi.put).toHaveBeenCalledWith("/memberships/m1", { startDate: "2026-10-01", endDate: "2026-10-25", reason: "Preventa acordada con el usuario" }));
   });
 });

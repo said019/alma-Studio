@@ -107,14 +107,14 @@ const MembershipTable = ({
   const [editing, setEditing] = useState<Membership | null>(null);
   const [startVal, setStartVal] = useState("");
   const [endVal, setEndVal] = useState("");
-  const [autoEnd, setAutoEnd] = useState(true);
+  const [autoEnd, setAutoEnd] = useState(false);
   const [reasonVal, setReasonVal] = useState("");
 
   const openEdit = (m: Membership) => {
     setEditing(m);
     setStartVal((m.startDate ?? "").slice(0, 10));
     setEndVal((m.endDate ?? "").slice(0, 10));
-    setAutoEnd(true);
+    setAutoEnd(false);
     setReasonVal("");
   };
 
@@ -132,7 +132,10 @@ const MembershipTable = ({
   const submitEdit = () => {
     if (!startVal) { toast({ title: "Elige la fecha de inicio", variant: "destructive" }); return; }
     const body: { startDate?: string; endDate?: string; reason: string } = { startDate: startVal, reason: reasonVal.trim() };
-    if (!autoEnd && endVal) body.endDate = endVal;
+    if (!autoEnd) {
+      if (!endVal || endVal < startVal) { toast({ title: "Elige una fecha de fin igual o posterior al inicio", variant: "destructive" }); return; }
+      body.endDate = endVal;
+    }
     editMutation.mutate(body);
   };
 
@@ -207,12 +210,11 @@ const MembershipTable = ({
               />
               Recalcular el fin con la duración del plan
             </label>
-            {!autoEnd && (
-              <div className="space-y-1.5">
+            <div className="space-y-1.5">
                 <Label htmlFor="m-end">Fecha de fin (vigencia)</Label>
-                <Input id="m-end" type="date" value={endVal} onChange={(e) => setEndVal(e.target.value)} />
+                <Input id="m-end" type="date" min={startVal || undefined} disabled={autoEnd} value={autoEnd ? "" : endVal} onChange={(e) => setEndVal(e.target.value)} />
+                {autoEnd && <p className="text-xs text-ink/60">Se calculará al guardar según la duración del plan.</p>}
               </div>
-            )}
             <div className="space-y-1.5">
               <Label htmlFor="m-reason">Motivo del ajuste</Label>
               <Textarea id="m-reason" rows={2} maxLength={500} value={reasonVal} onChange={(e) => setReasonVal(e.target.value)}
@@ -227,7 +229,7 @@ const MembershipTable = ({
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setEditing(null)}>Cancelar</Button>
-            <Button onClick={submitEdit} disabled={editMutation.isPending || reasonVal.trim().length < REASON_MIN_CHARS}>
+            <Button onClick={submitEdit} disabled={editMutation.isPending || !startVal || (!autoEnd && (!endVal || endVal < startVal)) || reasonVal.trim().length < REASON_MIN_CHARS}>
               {editMutation.isPending ? "Guardando…" : "Guardar vigencia"}
             </Button>
           </DialogFooter>
