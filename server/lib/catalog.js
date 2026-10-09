@@ -4,10 +4,6 @@
 
 export const CATALOG_CLASS_TYPES = [
   { name: "Pilates Reformer", category: "reformer_tower", capacity: 4, duration_min: 50, color: "#76214D", sort_order: 1 },
-  { name: "Pilates Tower",    category: "reformer_tower", capacity: 4, duration_min: 50, color: "#8A4A6B", sort_order: 2 },
-  { name: "Pilates Mat",      category: "studio",         capacity: 8, duration_min: 50, color: "#A48D78", sort_order: 3 },
-  { name: "Barre",            category: "studio",         capacity: 8, duration_min: 50, color: "#9C8E72", sort_order: 4 },
-  { name: "Sculpt",           category: "studio",         capacity: 8, duration_min: 50, color: "#C0A688", sort_order: 5 },
 ];
 
 // Horas de inicio publicadas. De 11 a 16 h LV también hay sesiones especiales.
