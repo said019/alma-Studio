@@ -77,7 +77,15 @@ export function registerMercadoPago(app,{pool,auth,owner,finalizeOrder,afterPaym
  }
  async function recover(order,c,{searchAll=false}={}){
   const a=(await pool.query('SELECT * FROM mp_card_attempts WHERE order_id=$1',[order.id])).rows[0];
-  if(!a)return {attempt:null,payment:null};
+  if(!a){
+   const retired=(await pool.query('SELECT 1 FROM mp_retired_wallet_attempts WHERE order_id=$1 LIMIT 1',[order.id])).rowCount;
+   if(retired){
+    const found=await searchOrderPayments(path=>request(path,c),order.id);
+    for(const p of found)await review(order,p,'Movimiento tardío de una preferencia cerrada; revisar antes de cobrar');
+    if(found.length)throw mpError('El pago necesita revisión del estudio.',409);
+   }
+   return {attempt:null,payment:null};
+  }
   let id=order.mp_payment_id||a.payment_id;
   if(!id||searchAll){
    const found=await searchOrderPayments(path=>request(path,c),order.id);
@@ -107,8 +115,8 @@ export function registerMercadoPago(app,{pool,auth,owner,finalizeOrder,afterPaym
   const claim=crypto.randomUUID();
   const batch=Math.max(1,Math.min(100,Number(limit)||20));
   const claimRows=async(count,urgent)=>(await pool.query(`WITH candidates AS (
-   SELECT o.id FROM orders o JOIN mp_card_attempts a ON a.order_id=o.id
-   WHERE o.payment_provider='mercadopago' AND o.mp_checkout_mode='embedded'
+   SELECT o.id FROM orders o
+   WHERE (EXISTS(SELECT 1 FROM mp_card_attempts a WHERE a.order_id=o.id) OR EXISTS(SELECT 1 FROM mp_retired_wallet_attempts r WHERE r.order_id=o.id)) AND o.payment_provider='mercadopago' AND o.mp_checkout_mode='embedded'
     AND o.mp_collector_id=$1 AND (o.mp_sync_lease_until IS NULL OR o.mp_sync_lease_until<NOW())
     AND (o.status IN ('pending_payment','pending_verification','expired'))=$4
     AND (o.mp_sync_attempted_at IS NULL OR o.mp_sync_attempted_at<NOW()-
@@ -156,6 +164,45 @@ export function registerMercadoPago(app,{pool,auth,owner,finalizeOrder,afterPaym
  app.get('/api/public/payment-config',(_req,res)=>res.json({data:{cardEnabled:config().ready,provider:'mercadopago'}}));
  app.get('/api/orders/:id/card-payment-session',auth,session);
  app.post('/api/orders/:id/card-payment-sync',auth,session);
+ app.post('/api/orders/:id/mercadopago/use-card',auth,wrap(async(req,res)=>{
+  const {order,account}=await load(req);const db=await pool.connect();
+  try{
+   await db.query('BEGIN');
+   const locked=(await db.query('SELECT * FROM orders WHERE id=$1 FOR UPDATE',[order.id])).rows[0];
+   if((await db.query("SELECT 1 FROM mp_payment_reviews WHERE order_id=$1 AND status='needs_review' LIMIT 1",[order.id])).rowCount)throw mpError('El estudio debe revisar los movimientos antes de volver a pagar.',409);
+   if(locked.status!=='pending_payment'||!locked.expires_at||new Date(locked.expires_at)<=new Date()||locked.mp_payment_id)throw mpError('Esta orden ya no acepta cambios de pago.',409);
+   const attempt=(await db.query('SELECT * FROM mp_card_attempts WHERE order_id=$1',[order.id])).rows[0];
+   if(!attempt&&!locked.mp_payment_choice){
+    if((await db.query('SELECT 1 FROM mp_retired_wallet_attempts WHERE order_id=$1 LIMIT 1',[order.id])).rowCount&&(await searchOrderPayments(path=>request(path,account),order.id)).length)throw mpError('Mercado Pago registra un movimiento. Consulta su estado antes de volver a pagar.',409);
+    await db.query('COMMIT');return res.json({data:{paymentChoice:null,canSubmit:true}});
+   }
+   if(locked.mp_payment_choice!=='wallet'||!locked.mp_wallet_preference_id||!attempt||attempt.payment_id)throw mpError('El intento de pago necesita confirmación antes de cambiar.',409);
+   if(hasWaiver&&!(await hasWaiver(db,order.user_id)))throw mpError('Firma la responsiva antes de pagar.',403);
+   const plan=(await db.query('SELECT * FROM plans WHERE id=$1',[order.plan_id])).rows[0];
+   const conflict=await purchaseConflict?.({userId:order.user_id,plan,excludeOrderId:order.id,client:db});if(conflict)throw mpError(conflict.message,409);
+   const ensureNoPayments=async()=>{
+    const found=await searchOrderPayments(path=>request(path,account),order.id);
+    if(found.length)throw mpError('Mercado Pago ya registra un intento. Confirma su estado antes de cambiar.',409);
+   };
+   await ensureNoPayments();
+   const path=`/checkout/preferences/${encodeURIComponent(locked.mp_wallet_preference_id)}`;
+   const matches=p=>p.id===locked.mp_wallet_preference_id&&String(p.collector_id)===account.collectorId&&p.external_reference===order.id&&Array.isArray(p.items)&&p.items.length>0&&p.items.every(i=>i.currency_id==='MXN'&&Number.isFinite(Number(i.unit_price))&&Number(i.unit_price)>0&&Number.isInteger(Number(i.quantity))&&Number(i.quantity)>0)&&Math.round(p.items.reduce((sum,i)=>sum+Number(i.unit_price)*Number(i.quantity),0)*100)===Math.round(Number(order.total_amount)*100);
+   const current=await request(path,account);
+   if(!matches(current))throw mpError('La preferencia requiere revisión del estudio.',409);
+   // The provider documents expiration fields on PUT. A timeout leaves the
+   // reservation intact; retry verifies state instead of opening another payment.
+   await request(path,account,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({expires:true,expiration_date_to:new Date(Date.now()-60000).toISOString()})});
+   const expired=await request(path,account);
+   if(!matches(expired)||expired.preference_expired!==true||!Number.isFinite(Date.parse(expired.expiration_date_to))||Date.parse(expired.expiration_date_to)>Date.now()-1000)throw mpError('No se confirmó el cierre de Mercado Pago. Intenta nuevamente.',503);
+   await ensureNoPayments();
+   // All local submitters/webhooks acquire this same order lock. Only a
+   // provider-confirmed closed and unused preference releases the reservation.
+   await db.query('INSERT INTO mp_retired_wallet_attempts(order_id,preference_id,idempotency_key) VALUES($1,$2,$3) ON CONFLICT DO NOTHING',[order.id,locked.mp_wallet_preference_id,attempt.idempotency_key]);
+   await db.query('DELETE FROM mp_card_attempts WHERE order_id=$1 AND idempotency_key=$2',[order.id,attempt.idempotency_key]);
+   await db.query('UPDATE orders SET mp_payment_choice=NULL,mp_wallet_preference_id=NULL,updated_at=NOW() WHERE id=$1',[order.id]);
+   await db.query('COMMIT');return res.json({data:{paymentChoice:null,canSubmit:true}});
+  }catch(e){await db.query('ROLLBACK').catch(()=>{});throw e;}finally{db.release();}
+ }));
  app.post('/api/orders/:id/mercadopago/wallet',auth,wrap(async(req,res)=>{
   const {order,account}=await load(req);
   const recovered=await recover(order,account);
@@ -163,6 +210,7 @@ export function registerMercadoPago(app,{pool,auth,owner,finalizeOrder,afterPaym
   try{
    await db.query('BEGIN');
    const locked=(await db.query('SELECT * FROM orders WHERE id=$1 FOR UPDATE',[order.id])).rows[0];
+   if((await db.query("SELECT 1 FROM mp_payment_reviews WHERE order_id=$1 AND status='needs_review' LIMIT 1",[order.id])).rowCount)throw mpError('El estudio debe revisar los movimientos antes de volver a pagar.',409);
    if(locked.status!=='pending_payment'||!locked.expires_at||new Date(locked.expires_at)<=new Date()||locked.mp_payment_id||recovered.payment?.paymentId)throw mpError('Esta orden ya no acepta pagos.',409);
    if(hasWaiver&&!(await hasWaiver(db,order.user_id)))throw mpError('Firma la responsiva antes de pagar.',403);
    const plan=(await db.query('SELECT * FROM plans WHERE id=$1',[order.plan_id])).rows[0];
@@ -199,11 +247,14 @@ export function registerMercadoPago(app,{pool,auth,owner,finalizeOrder,afterPaym
   const db=await pool.connect();let attempt;
   try{
    await db.query('BEGIN');const locked=(await db.query('SELECT * FROM orders WHERE id=$1 FOR UPDATE',[order.id])).rows[0];
+   if((await db.query("SELECT 1 FROM mp_payment_reviews WHERE order_id=$1 AND status='needs_review' LIMIT 1",[order.id])).rowCount)throw mpError('El estudio debe revisar los movimientos antes de volver a pagar.',409);
    if(locked.status!=='pending_payment'||locked.expires_at&&new Date(locked.expires_at)<=new Date())throw mpError('Esta orden ya no acepta pagos.',409);
    if(hasWaiver&&!(await hasWaiver(db,order.user_id)))throw mpError('Firma la responsiva antes de pagar.',403);
    const plan=(await db.query('SELECT * FROM plans WHERE id=$1',[order.plan_id])).rows[0];
    if(plan?.rules?.auto_renew)throw mpError('Este plan anual conserva su enlace de contratación externo.',409);
    const conflict=await purchaseConflict?.({userId:order.user_id,plan,excludeOrderId:order.id,client:db});if(conflict)throw mpError(conflict.message,409);
+   const retired=(await db.query('SELECT 1 FROM mp_retired_wallet_attempts WHERE order_id=$1 LIMIT 1',[order.id])).rowCount;
+   if(retired&&(await searchOrderPayments(path=>request(path,account),order.id)).length)throw mpError('Mercado Pago registra un movimiento. Consulta su estado antes de volver a pagar.',409);
    attempt=(await db.query("INSERT INTO mp_card_attempts(order_id,idempotency_key,status) VALUES($1,$2,'processing') ON CONFLICT(order_id) DO NOTHING RETURNING *",[order.id,crypto.randomUUID()])).rows[0];
    if(attempt)await db.query("UPDATE orders SET mp_payment_choice='card' WHERE id=$1",[order.id]);
    await db.query('COMMIT');

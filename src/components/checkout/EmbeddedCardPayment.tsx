@@ -25,6 +25,8 @@ export function EmbeddedCardPayment({ orderId, onClose }: { orderId: string; onC
   const [walletSelected, setWalletSelected] = useState(false);
   const [walletLoading, setWalletLoading] = useState(false);
   const walletRequest = useRef(false);
+  const [switchingToCard, setSwitchingToCard] = useState(false);
+  const methodVersion = useRef(0);
   const submitted = useRef(false);
   const submitting = useRef(false);
   const hasAttempt = useRef(false);
@@ -32,7 +34,7 @@ export function EmbeddedCardPayment({ orderId, onClose }: { orderId: string; onC
   const refresh = useRef<() => Promise<void>>(async () => {});
 
   useEffect(() => {
-    let alive = true, busy = false;
+    let alive = true, busy = false, refreshQueued = false;
     submitted.current = false;
     hasAttempt.current = false;
     setSession(null);
@@ -41,15 +43,17 @@ export function EmbeddedCardPayment({ orderId, onClose }: { orderId: string; onC
     setSessionError("");
     setError("");
     refresh.current = async () => {
-      if (busy || !alive) return;
+      if (!alive || walletRequest.current) return;
+      if (busy) { refreshQueued = true; return; }
       busy = true;
+      const version = methodVersion.current;
       try {
         const checkingAttempt = hasAttempt.current;
         const response = checkingAttempt
           ? await api.post(`/orders/${orderId}/card-payment-sync`)
           : await api.get(`/orders/${orderId}/card-payment-session`);
         const next = (response.data.data ?? response.data) as CardSession;
-        if (alive) {
+        if (alive && version === methodVersion.current) {
           hasAttempt.current = hasAttempt.current || Boolean(next.payment || next.walletPreferenceId);
           if (checkingAttempt && !submitting.current && submitted.current && next.canSubmit && !next.payment) { submitted.current = false; setRetry(v => v + 1); }
           if (next.paymentChoice === "wallet") setWalletSelected(true);
@@ -59,8 +63,8 @@ export function EmbeddedCardPayment({ orderId, onClose }: { orderId: string; onC
           if (next.orderStatus === "approved") setError("");
         }
       } catch (e: any) {
-        if (alive) setSessionError(e?.response?.data?.message || "No pudimos consultar tu pago. Revisa el estado de esta orden antes de volver a pagar.");
-      } finally { busy = false; }
+        if (alive && version === methodVersion.current) setSessionError(e?.response?.data?.message || "No pudimos consultar tu pago. Revisa el estado de esta orden antes de volver a pagar.");
+      } finally { busy = false; if (refreshQueued && alive) { refreshQueued = false; void refresh.current(); } }
     };
     void refresh.current();
     const timer = window.setInterval(() => { if (!document.hidden) void refresh.current(); }, 5000);
@@ -77,12 +81,13 @@ export function EmbeddedCardPayment({ orderId, onClose }: { orderId: string; onC
 
   const challenge = session?.payment?.statusDetail === "pending_challenge" && session.payment.threeDS;
   const closed = session && ["approved", "cancelled", "expired", "rejected"].includes(session.orderStatus);
-  const kind = !closed && challenge ? "statusScreen" : !closed && !session?.payment && session?.walletAvailable !== false && wallet ? "wallet" : !closed && !walletSelected && session?.canSubmit && !submitted.current && !session.payment ? "cardPayment" : null;
+  const kind = switchingToCard ? null : !closed && challenge ? "statusScreen" : !closed && !session?.payment && session?.walletAvailable !== false && wallet ? "wallet" : !closed && !walletSelected && session?.canSubmit && !submitted.current && !session.payment ? "cardPayment" : null;
   const preferenceId = wallet?.preferenceId;
 
   const selectWallet = async () => {
     if (walletRequest.current || submitted.current || session?.payment || closed) return;
     walletRequest.current = true;
+    methodVersion.current += 1;
     setWalletSelected(true);
     setWalletLoading(true);
     setError("");
@@ -96,6 +101,32 @@ export function EmbeddedCardPayment({ orderId, onClose }: { orderId: string; onC
       setError(e?.response?.data?.message || "No pudimos preparar el pago con tu cuenta. Consulta el estado antes de reintentar.");
       void refresh.current();
     } finally { walletRequest.current = false; setWalletLoading(false); }
+  };
+  const selectCard = async () => {
+    if (walletRequest.current || submitted.current || session?.payment || closed || !wallet) return;
+    walletRequest.current = true;
+    methodVersion.current += 1;
+    setSwitchingToCard(true);
+    setError("");
+    setSessionError("");
+    let changed = false;
+    try {
+      await api.post(`/orders/${orderId}/mercadopago/use-card`);
+      methodVersion.current += 1;
+      setWallet(null);
+      setWalletSelected(false);
+      submitted.current = false;
+      submitting.current = false;
+      hasAttempt.current = false;
+      setSession(null);
+      changed = true;
+    } catch (e: any) {
+      setSessionError(e?.response?.data?.message || "No pudimos cambiar a tarjeta. Consulta el estado de tu orden antes de reintentar.");
+    } finally {
+      walletRequest.current = false;
+      setSwitchingToCard(false);
+      if (changed) void refresh.current();
+    }
   };
   const publicKey = wallet?.publicKey ?? session?.publicKey, amount = session?.amount, email = session?.email;
   const paymentId = session?.payment?.paymentId;
@@ -155,6 +186,7 @@ export function EmbeddedCardPayment({ orderId, onClose }: { orderId: string; onC
     : session?.orderStatus === "cancelled" ? "Esta orden está cancelada. No se puede pagar."
     : session?.orderStatus === "expired" ? "Esta orden venció. Consulta tus órdenes antes de iniciar otra compra."
     : session?.orderStatus === "rejected" || session?.payment?.status === "rejected" ? "El pago fue rechazado. Revisa esta orden antes de iniciar otra compra."
+    : switchingToCard ? "Preparando el pago con tarjeta…"
     : !session ? "Consultando tu orden…"
     : kind === "statusScreen" ? "Completa la verificación de tu banco en esta página."
     : walletSelected && !session?.payment ? "Usa tu cuenta de Mercado Pago, la misma que usas en Mercado Libre. El pago seguro se abre en otra ventana y HIVE permanece abierto."
@@ -166,6 +198,7 @@ export function EmbeddedCardPayment({ orderId, onClose }: { orderId: string; onC
     {session && <p className="nums text-xl text-ink">{session.amount.toLocaleString("es-MX", {style: "currency", currency: session.currency || "MXN"})}</p>}
     {!closed && !session?.payment && session?.canSubmit && session.walletAvailable !== false && !walletSelected && <Button variant="outline" className="w-full" onClick={() => void selectWallet()}>Pagar con mi cuenta de Mercado Pago</Button>}
     {walletSelected && !wallet && !walletLoading && !closed && !session?.payment && session?.walletAvailable !== false && <Button onClick={() => void selectWallet()}>Continuar con mi cuenta de Mercado Pago</Button>}
+    {walletSelected && wallet && !closed && !session?.payment && session?.walletAvailable !== false && <Button variant="outline" className="w-full" disabled={switchingToCard || walletLoading} onClick={() => void selectCard()}>{switchingToCard ? "Preparando tarjeta…" : "Pagar con tarjeta"}</Button>}
     {walletLoading && <p role="status">Preparando pago con tu cuenta…</p>}
     <p role="status" className="text-sm text-ink-muted">{statusText}</p>
     {error && <p role="alert" className="text-sm text-danger">{error}</p>}

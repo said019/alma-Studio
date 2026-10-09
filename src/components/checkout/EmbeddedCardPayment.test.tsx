@@ -151,3 +151,50 @@ it('retira Wallet y acceso alternativo cuando el servidor deja de permitir la pr
  expect(screen.queryByRole('link',{name:'Abrir Mercado Pago en esta pestaña'})).not.toBeInTheDocument();
  expect(create).toHaveBeenCalledTimes(1);
 });
+
+it('cambia Wallet a tarjeta una sola vez y espera confirmación del servidor', async () => {
+ const walletSession={...session,canSubmit:false,paymentChoice:'wallet',walletAvailable:true,walletPreferenceId:'pref-existing',payment:null};
+ vi.mocked(api.get).mockResolvedValueOnce({data:{data:walletSession}}).mockResolvedValue({data:{data:{...session,walletAvailable:true}}});
+ let resolve!: (response:unknown)=>void;
+ vi.mocked(api.post).mockImplementationOnce(()=>new Promise(r=>{resolve=r;}));
+ mount();await waitFor(()=>expect(create).toHaveBeenCalledWith('wallet',expect.any(String),expect.anything()));
+ const button=screen.getByRole('button',{name:'Pagar con tarjeta'});
+ fireEvent.click(button);fireEvent.click(button);
+ expect(api.post).toHaveBeenCalledTimes(1);
+ expect(api.post).toHaveBeenCalledWith('/orders/same-order/mercadopago/use-card');
+ expect(screen.getByRole('button',{name:'Preparando tarjeta…'})).toBeDisabled();
+ expect(screen.queryByRole('link',{name:'Abrir Mercado Pago en esta pestaña'})).not.toBeInTheDocument();
+ expect(create.mock.calls.some(([kind])=>kind==='cardPayment')).toBe(false);
+ await act(async()=>resolve({data:{data:{canSubmit:true}}}));
+ await waitFor(()=>expect(create).toHaveBeenCalledWith('cardPayment',expect.any(String),expect.anything()));
+ expect(settings.callbacks.onSubmit).toBeTypeOf('function');
+ expect(screen.getByRole('button',{name:'Pagar con mi cuenta de Mercado Pago'})).toBeInTheDocument();
+});
+
+it('conserva Wallet y muestra el error del servidor si no permite cambiar a tarjeta', async () => {
+ vi.mocked(api.get).mockResolvedValue({data:{data:{...session,canSubmit:false,paymentChoice:'wallet',walletAvailable:true,walletPreferenceId:'pref-existing',payment:null}}});
+ vi.mocked(api.post).mockRejectedValueOnce({response:{data:{message:'El pago ya está en proceso.'}}});
+ mount();await waitFor(()=>expect(create).toHaveBeenCalled());
+ fireEvent.click(screen.getByRole('button',{name:'Pagar con tarjeta'}));
+ expect(await screen.findByRole('alert')).toHaveTextContent('El pago ya está en proceso.');
+ expect(await screen.findByRole('link',{name:'Abrir Mercado Pago en esta pestaña'})).toHaveAttribute('href','https://www.mercadopago.com.mx/checkout/v1/redirect?pref_id=pref-existing');
+ expect(create.mock.calls.some(([kind])=>kind==='cardPayment')).toBe(false);
+});
+
+it('descarta consulta Wallet anterior al cambio y vuelve a consultar tarjeta', async () => {
+ const walletSession={...session,canSubmit:false,paymentChoice:'wallet',walletAvailable:true,walletPreferenceId:'pref-old',payment:null};
+ vi.mocked(api.get).mockResolvedValueOnce({data:{data:walletSession}}).mockResolvedValue({data:{data:session}});
+ let oldSync!: (response:unknown)=>void;
+ vi.mocked(api.post).mockImplementation(async(url)=>{
+  if(url.endsWith('card-payment-sync')) return new Promise(r=>{oldSync=r;});
+  return {data:{data:{canSubmit:true}}};
+ });
+ mount();await waitFor(()=>expect(create).toHaveBeenCalled());
+ fireEvent.focus(window);await waitFor(()=>expect(api.post).toHaveBeenCalledWith('/orders/same-order/card-payment-sync'));
+ fireEvent.click(screen.getByRole('button',{name:'Pagar con tarjeta'}));
+ await waitFor(()=>expect(screen.getByText('Consultando tu orden…')).toBeInTheDocument());
+ await act(async()=>oldSync({data:{data:walletSession}}));
+ await waitFor(()=>expect(create).toHaveBeenCalledWith('cardPayment',expect.any(String),expect.anything()));
+ expect(screen.queryByRole('link',{name:'Abrir Mercado Pago en esta pestaña'})).not.toBeInTheDocument();
+ expect(create.mock.calls.filter(([kind])=>kind==='wallet')).toHaveLength(1);
+});

@@ -30,7 +30,7 @@ async function fixture(options={}) {
  await pool.query('INSERT INTO users(id,email) VALUES($1,$2)',[userId,'qa@example.test']);
  await pool.query('INSERT INTO plans(id,name) VALUES($1,$2)',[planId,'QA HIVE']);
  await pool.query(`INSERT INTO orders(id,user_id,plan_id,total_amount,mp_checkout_mode,mp_collector_id) VALUES($1,$2,$3,330,'embedded','100')`,[orderId,userId,planId]);
- let providerPosts=0,activations=0,syncs=0;const freed=[];
+ let providerPosts=0,activations=0,syncs=0,preference=null,puts=0,searches=0;const freed=[];
  const account={ready:true,accessToken:'test-not-a-token',publicKey:'test-public',collectorId:'100',webhookSecret:'test-only-secret',baseUrl:'https://hive.example.test',webhookUrl:'https://hive.example.test/api/mercadopago/webhook'};
  const payment={id:String(Date.now())+String(Math.floor(Math.random()*100000)),external_reference:orderId,collector_id:100,currency_id:'MXN',transaction_amount:330,payment_type_id:'credit_card',status:'approved',status_detail:'accredited',...options.payment};
  const routes={};
@@ -40,13 +40,23 @@ async function fixture(options={}) {
   await db.query("UPDATE orders SET status='approved' WHERE id=$1",[id]);
   await db.query("INSERT INTO memberships(order_id,status) VALUES($1,'active')",[id]);
  },afterPayment:()=>{syncs++;},afterReversal:ids=>{freed.push(...ids);},fetchImpl:async(url,init)=>{
+  if(url.includes('/checkout/preferences/')){
+   if(init.method==='PUT'){
+    puts++;
+    if(options.switchTimeout)throw new Error('uncertain expiration');
+    if(options.switchDelay)await new Promise(r=>setTimeout(r,40));
+    preference={...preference,...JSON.parse(init.body),preference_expired:!options.expirationUnconfirmed};
+   }
+   return {ok:true,json:async()=>({...preference,...(options.preferenceMismatch?{items:[{currency_id:'MXN',quantity:1,unit_price:1}]}:{})})};
+  }
   if(init.method==='POST'){
    providerPosts++;
    const body=JSON.parse(init.body);
    if(url.endsWith('/checkout/preferences')){
     assert.equal(body.purpose,'wallet_purchase');assert.equal(body.items[0].unit_price,330);assert.equal(body.external_reference,orderId);assert.equal(body.expires,true);assert.ok(body.expiration_date_to);
     if(options.timeout)throw new Error('ambiguous preference timeout');
-    return {ok:true,json:async()=>({id:'qa-preference-'+orderId,collector_id:100,external_reference:orderId})};
+    preference={id:'qa-preference-'+orderId,collector_id:100,external_reference:orderId,items:body.items,expires:true,expiration_date_to:body.expiration_date_to};
+    return {ok:true,json:async()=>preference};
    }
    assert.equal(body.transaction_amount,330);assert.equal(body.external_reference,orderId);
    assert.ok(init.headers['X-Idempotency-Key']);
@@ -55,8 +65,10 @@ async function fixture(options={}) {
   }
   return {ok:true,json:async()=>{
    if(url.includes('/search?')){
+    searches++;
     const all=options.payments||[payment];const offset=Number(new URL(url).searchParams.get('offset')||0);
-    return {results:options.searchEmpty?[]:all.slice(offset,offset+50),paging:{total:options.searchEmpty?0:all.length}};
+    const empty=options.searchEmpty&&!(options.paymentAfterExpire&&puts>0);
+    return {results:empty?[]:all.slice(offset,offset+50),paging:{total:empty?0:all.length}};
    }
    return options.payments?.find(p=>url.endsWith('/'+p.id))||payment;
   }};
@@ -67,7 +79,7 @@ async function fixture(options={}) {
  };
  const submit=()=>call('POST','card-payment',{token:'test-token',payment_method_id:'visa',installments:1});
  const row=async()=> (await pool.query('SELECT * FROM orders WHERE id=$1',[orderId])).rows[0];
- return {orderId,userId,account,payment,call,submit,row,apply:registered.processVerifiedPayment,reconcile:registered.reconcile,posts:()=>providerPosts,activations:()=>activations,syncs:()=>syncs,freed};
+ return {orderId,userId,account,payment,call,submit,row,apply:registered.processVerifiedPayment,reconcile:registered.reconcile,puts:()=>puts,posts:()=>providerPosts,activations:()=>activations,syncs:()=>syncs,freed};
 }
 
 test('same-order concurrent submissions and confirmations charge and activate once',async()=>{
@@ -228,4 +240,39 @@ test('pending or rejected provider wallet payment prevents preference reuse',asy
  const f=await walletFixture();await f.call('POST','mercadopago/wallet');await f.apply({...f.payment,status,payment_type_id:'account_money'},f.account);
  assert.equal((await f.call('POST','mercadopago/wallet')).code,409);assert.equal(f.posts(),1);
  }
+});
+
+test('wallet can switch to card only after confirmed preference expiration and archives history',async()=>{
+ const f=await walletFixture();await f.call('POST','mercadopago/wallet');
+ const result=await f.call('POST','mercadopago/use-card');assert.equal(result.code,200,JSON.stringify(result.body));assert.equal(result.body.data.canSubmit,true);assert.equal(f.puts(),1);
+ assert.equal((await f.row()).mp_payment_choice,null);assert.equal((await pool.query('SELECT count(*)::int n FROM mp_retired_wallet_attempts WHERE order_id=$1',[f.orderId])).rows[0].n,1);
+ assert.equal((await f.call()).body.data.canSubmit,true);assert.equal((await f.submit()).code,202);assert.equal(f.posts(),2);
+});
+test('wallet switch fails closed on uncertain, mismatched or unconfirmed provider expiration',async()=>{
+ for(const options of [{switchTimeout:true},{expirationUnconfirmed:true},{preferenceMismatch:true},{paymentAfterExpire:true}]){
+  const f=await walletFixture(options);await f.call('POST','mercadopago/wallet');const result=await f.call('POST','mercadopago/use-card');assert.ok([409,503].includes(result.code),JSON.stringify(result.body));
+  assert.equal((await f.row()).mp_payment_choice,'wallet');assert.equal((await pool.query('SELECT count(*)::int n FROM mp_card_attempts WHERE order_id=$1',[f.orderId])).rows[0].n,1);
+ }
+});
+test('wallet switch respects owner and expiry; concurrent switches release once',async()=>{
+ const f=await walletFixture({switchDelay:true});await f.call('POST','mercadopago/wallet');assert.equal((await f.call('POST','mercadopago/use-card',{},crypto.randomUUID())).code,404);
+ const results=await Promise.all([f.call('POST','mercadopago/use-card'),f.call('POST','mercadopago/use-card')]);assert.ok(results.every(r=>r.code===200));assert.equal(f.puts(),1);
+ const expired=await walletFixture();await expired.call('POST','mercadopago/wallet');await pool.query("UPDATE orders SET expires_at=NOW()-INTERVAL '1 minute' WHERE id=$1",[expired.orderId]);assert.equal((await expired.call('POST','mercadopago/use-card')).code,409);assert.equal(expired.puts(),0);
+});
+test('wallet switch never releases an attempt already associated with a payment',async()=>{
+ const f=await walletFixture();await f.call('POST','mercadopago/wallet');await f.apply({...f.payment,status:'rejected'},f.account);
+ assert.equal((await f.call('POST','mercadopago/use-card')).code,409);assert.equal(f.puts(),0);
+});
+test('retired wallet attempts remain reconciled and late money enters review without access',async()=>{
+ const options={searchEmpty:true};const f=await fixture(options);await pool.query("UPDATE orders SET expires_at=NOW()+INTERVAL '1 hour' WHERE id=$1",[f.orderId]);
+ await f.call('POST','mercadopago/wallet');assert.equal((await f.call('POST','mercadopago/use-card')).code,200);
+ options.searchEmpty=false;f.payment.payment_type_id='account_money';
+ await f.reconcile({limit:100});
+ assert.equal((await pool.query('SELECT count(*)::int n FROM mp_payment_reviews WHERE order_id=$1',[f.orderId])).rows[0].n,1);assert.equal(f.activations(),0);
+ assert.equal((await f.submit()).code,409);assert.equal(f.posts(),1);
+});
+test('existing manual review blocks direct card, wallet and repeated switch calls',async()=>{
+ const f=await walletFixture();await f.call('POST','mercadopago/wallet');await f.call('POST','mercadopago/use-card');
+ await pool.query("INSERT INTO mp_payment_reviews(order_id,payment_id,reason) VALUES($1,'999999','needs review')",[f.orderId]);
+ assert.equal((await f.submit()).code,409);assert.equal((await f.call('POST','mercadopago/use-card')).code,409);assert.equal((await f.call('POST','mercadopago/wallet')).code,409);assert.equal(f.posts(),1);
 });
