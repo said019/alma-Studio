@@ -694,8 +694,7 @@ export {
 
 // Owner-composed communications. Unlike optional transactional notices, callers
 // need provider failures to be reported rather than counted as successful sends.
-export async function sendCustomBroadcast({to,name,subject,body,headline,ctaUrl,ctaText,idempotencyKey}) {
-  if (!resend) throw new Error("Correo no configurado");
+export function renderCustomBroadcast({to,name,subject,body,headline,ctaUrl,ctaText}) {
   const first=firstNameOf(name);
   const replace=(value)=>String(value||"").replace(/\{name\}/gi,first);
   let safeUrl;
@@ -708,7 +707,13 @@ export async function sendCustomBroadcast({to,name,subject,body,headline,ctaUrl,
     title:esc(replace(headline||"Hola, {name}")),
     content:replace(body).split(/\n\n/).map(line=>p(esc(line).replace(/\n/g,"<br>"))).join(""),
     ctaUrl:safeUrl,ctaText:ctaText?replace(ctaText):undefined});
-  const result=await resend.emails.send({from:FROM_EMAIL,to:[to],subject:replace(subject),html},idempotencyKey?{idempotencyKey}:undefined);
+  return {from:FROM_EMAIL,to:[to],subject:replace(subject),html};
+}
+
+export async function sendCustomBroadcast(options) {
+  if (!resend) throw new Error("Correo no configurado");
+  const {idempotencyKey}=options;
+  const result=await resend.emails.send(renderCustomBroadcast(options),idempotencyKey?{idempotencyKey}:undefined);
   if (result.error) throw new Error(result.error.message||"El proveedor rechazó el correo");
   return result.data;
 }

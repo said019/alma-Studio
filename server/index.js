@@ -3342,7 +3342,7 @@ function mapUser(u) {
 
 // POST /api/auth/register
 app.post("/api/auth/register", async (req, res) => {
-  const { email, password, displayName, phone, gender, dateOfBirth, acceptsTerms, acceptsCommunications, healthConsent } = req.body;
+  const { email, password, displayName, phone, gender, dateOfBirth, acceptsTerms, acceptsCommunications, healthConsent, receivePromotions } = req.body;
   const registration = validateRegistration(req.body);
   if (!registration.data) return res.status(400).json({ message: registration.message });
   const normalizedDob = registration.data.dateOfBirth;
@@ -3359,13 +3359,13 @@ app.post("/api/auth/register", async (req, res) => {
     const versionSalud = healthConsent === true ? PRIVACY_NOTICE_VERSION : null;
     const result = await pool.query(
       `INSERT INTO users (display_name, email, phone, gender, date_of_birth, password_hash, accepts_terms, accepts_communications, role,
-                          privacy_notice_version, privacy_accepted_at, health_consent_version, health_consent_at)
+                          privacy_notice_version, privacy_accepted_at, health_consent_version, health_consent_at, receive_promotions)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'client',
                $9::varchar, CASE WHEN $9::varchar IS NULL THEN NULL ELSE NOW() END,
-               $10::varchar, CASE WHEN $10::varchar IS NULL THEN NULL ELSE NOW() END)
+               $10::varchar, CASE WHEN $10::varchar IS NULL THEN NULL ELSE NOW() END, $11)
        RETURNING *`,
       [displayName.trim(), email.toLowerCase().trim(), registration.data.phone, gender, normalizedDob, passwordHash,
-       acceptsTerms ?? false, acceptsCommunications ?? false, versionAviso, versionSalud]
+       acceptsTerms ?? false, acceptsCommunications ?? false, versionAviso, versionSalud, receivePromotions === true]
     );
     const user = result.rows[0];
     // Auto-create referral code (best-effort: nunca debe tirar el registro).

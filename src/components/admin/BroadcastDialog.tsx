@@ -60,6 +60,15 @@ export function BroadcastDialog({ open, onOpenChange, emailOnly = false }: { ope
   const [ctaText, setCtaText] = useState("");
   const [waMessage, setWaMessage] = useState("");
   const [confirmStep, setConfirmStep] = useState(false);
+  const [previewName, setPreviewName] = useState("María");
+  const [preview, setPreview] = useState<{subject:string;html:string;key:string}|null>(null);
+  const previewKey = JSON.stringify({subject,headline,body,ctaUrl,ctaText,name:previewName});
+  const previewMutation = useMutation({
+    mutationFn: async () => ({...(await api.post("/admin/broadcast/email-preview", {subject,headline,body,ctaUrl,ctaText,name:previewName})).data.data,key:previewKey}),
+    onSuccess: setPreview,
+    onError: (err: any) => toast({title:"No se pudo generar la vista previa",description:err?.response?.data?.message ?? "Intenta nuevamente",variant:"destructive"}),
+  });
+  useEffect(() => { setPreview(null); setConfirmStep(false); }, [subject,headline,body,ctaUrl,ctaText,previewName,audience]);
 
   // Seed fields when template changes
   useEffect(() => {
@@ -189,6 +198,13 @@ export function BroadcastDialog({ open, onOpenChange, emailOnly = false }: { ope
                 )}</span>
               </p>
             )}
+            {countKnown && audienceCount === 0 && (
+              <div role="status" className="rounded-xl border border-line bg-canvas p-4 text-sm leading-relaxed text-ink-muted">
+                No hay personas suscritas por correo en esta audiencia.
+                {typeof countData?.data?.totalClients === "number" && <p className="mt-2">Clientes registrados: {countData.data.totalClients}. Sin suscripción por correo: {countData.data.unsubscribed}.</p>}
+                <p className="mt-2">Cada cliente puede activar «Novedades del estudio» en su perfil, en Preferencias. Aceptar WhatsApp no activa los correos.</p>
+              </div>
+            )}
           </div>
 
           </div><div className="space-y-4 border-t border-line pt-7"><h3 className="text-base font-semibold text-ink">2. Prepara el mensaje</h3>
@@ -238,6 +254,17 @@ export function BroadcastDialog({ open, onOpenChange, emailOnly = false }: { ope
                 </div>
               </div>
               </div>
+              <section className="space-y-4 border-t border-line pt-5" aria-label="Vista previa del correo">
+                <h3 className="text-base font-semibold">3. Revisa cómo se enviará</h3>
+                <p className="text-sm text-ink-muted">La vista previa usa la misma plantilla del envío. El nombre de ejemplo se sustituirá por el de cada destinatario.</p>
+                <Label htmlFor="preview-name">Nombre de ejemplo</Label>
+                <Input id="preview-name" value={previewName} maxLength={100} disabled={previewMutation.isPending} onChange={e=>setPreviewName(e.target.value)} />
+                <Button type="button" variant="outline" disabled={previewMutation.isPending} onClick={()=>previewMutation.mutate()}>{previewMutation.isPending ? "Generando…" : "Ver vista previa"}</Button>
+                {preview && preview.key === previewKey && <div className="overflow-hidden rounded-xl border border-line">
+                  <p className="border-b border-line bg-canvas p-4 text-sm break-words"><strong>Asunto:</strong> {preview.subject}</p>
+                  <iframe title="Vista previa del correo personalizado" sandbox="" referrerPolicy="no-referrer" srcDoc={preview.html} className="h-[560px] w-full border-0 bg-white" />
+                </div>}
+              </section>
             </TabsContent>
 
             <TabsContent value="whatsapp" className="space-y-3 mt-4">

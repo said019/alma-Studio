@@ -48,6 +48,7 @@ const schema = z.object({
   confirmPassword: z.string(),
   acceptsTerms: z.boolean().refine((v) => v, "Debes aceptar los términos"),
   acceptsCommunications: z.boolean().default(false),
+  receivePromotions: z.boolean().default(false),
   healthConsent: z.boolean().default(false),
 }).refine((d) => Boolean(internationalPhone(d.phone, d.phoneCountry)), { message: "Ingresa un número válido para el país seleccionado", path: ["phone"] }).refine((d) => d.password === d.confirmPassword, {
   message: "Las contraseñas no coinciden",
@@ -65,6 +66,7 @@ type FormValues = {
   confirmPassword: string;
   acceptsTerms: boolean;
   acceptsCommunications: boolean;
+  receivePromotions: boolean;
   healthConsent: boolean;
 };
 
@@ -79,7 +81,7 @@ const Register = () => {
 
   const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { phoneCountry: "MX", acceptsTerms: false, acceptsCommunications: false, healthConsent: false },
+    defaultValues: { phoneCountry: "MX", acceptsTerms: false, acceptsCommunications: false, receivePromotions: false, healthConsent: false },
   });
 
   const acceptsTerms = watch("acceptsTerms");
@@ -102,6 +104,7 @@ const Register = () => {
         dateOfBirth: data.dateOfBirth,
         acceptsTerms: data.acceptsTerms,
         acceptsCommunications: data.acceptsCommunications,
+        receivePromotions: data.receivePromotions,
         healthConsent: data.healthConsent,
         ...(refCode ? { referralCode: refCode } : {}),
       } as any);
@@ -270,6 +273,10 @@ const Register = () => {
             onChange={(v) => setValue("acceptsCommunications", v)}
           >
             Quiero recibir recordatorios y novedades por WhatsApp.
+          </AuthCheckbox>
+
+          <AuthCheckbox checked={watch("receivePromotions")} onChange={(v) => setValue("receivePromotions", v)}>
+            Quiero recibir novedades y promociones por correo electrónico.
           </AuthCheckbox>
 
           {/* Consentimiento expreso para datos de salud (LFPDPPP, auditoría

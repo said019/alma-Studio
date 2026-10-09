@@ -61,6 +61,21 @@ it('mantiene revisión antes de enviar y bloquea si no puede contar audiencia',a
  vi.mocked(api.get).mockRejectedValue(new Error('offline'));
  fireEvent.change(screen.getByLabelText('Destinatarios'),{target:{value:'with_active_membership'}});
  expect(await screen.findByText(/No se pudo contar a los destinatarios/)).toBeInTheDocument();
- expect(screen.getByRole('button',{name:/Confirmar y enviar/})).toBeDisabled();
+ expect(screen.getByRole('button',{name:"Enviar"})).toBeDisabled();
  expect(api.post).not.toHaveBeenCalled();
+});
+
+it('explica cero suscritos y muestra la plantilla sin enviar correos',async()=>{
+ vi.mocked(api.get).mockImplementation(async(url:any)=>({data:{data:url==='/admin/broadcast/campaigns'?[]:{count:0,totalClients:4,unsubscribed:4}}}) as any);
+ vi.mocked(api.post).mockResolvedValue({data:{data:{subject:'Hola María',html:'<h1>Hola María</h1>'}}});
+ loginAs('admin');renderAdmin(<CampaignsPage/>,{route:'/admin/campaigns'});
+ fireEvent.click(await screen.findByRole('button',{name:'Nueva campaña por correo'}));
+ expect(await screen.findByText(/Clientes registrados: 4/)).toBeInTheDocument();
+ expect(screen.getByRole('button',{name:'Enviar'})).toBeDisabled();
+ fireEvent.click(screen.getByRole('button',{name:'Ver vista previa'}));
+ expect(await screen.findByTitle('Vista previa del correo personalizado')).toHaveAttribute('srcdoc','<h1>Hola María</h1>');
+ expect(api.post).toHaveBeenCalledTimes(1);
+ expect(api.post).toHaveBeenCalledWith('/admin/broadcast/email-preview',expect.objectContaining({name:'María'}));
+ fireEvent.change(screen.getByLabelText('Mensaje'),{target:{value:'Nuevo texto'}});
+ expect(screen.queryByTitle('Vista previa del correo personalizado')).not.toBeInTheDocument();
 });

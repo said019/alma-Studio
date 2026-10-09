@@ -62,6 +62,7 @@ export interface RegisterData {
   dateOfBirth?: string;
   acceptsTerms: boolean;
   acceptsCommunications: boolean;
+  receivePromotions?: boolean;
   healthConsent?: boolean;
 }
 

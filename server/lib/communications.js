@@ -1,6 +1,6 @@
 import { enqueueCampaign, drainCampaigns } from './campaignOutbox.js';
 import crypto from "node:crypto";
-import { sendCustomBroadcast } from "../emailService.js";
+import { sendCustomBroadcast, renderCustomBroadcast } from "../emailService.js";
 export function registerCommunications(app,{pool,ownerMiddleware,queueWhatsAppSend,normalisePhone,whatsappChannelState,appPublicUrl,recordAudit}) {
   app.post("/api/admin/users/:id/reset-password",ownerMiddleware,async(req,res)=>{
     if(!process.env.RESEND_API_KEY)return res.status(503).json({message:"Correo no configurado"});
@@ -28,7 +28,17 @@ export function registerCommunications(app,{pool,ownerMiddleware,queueWhatsAppSe
   };
   app.get("/api/admin/broadcast/audience-count",ownerMiddleware,async(req,res)=>{
     if(!audiences.has(req.query.audience))return res.status(400).json({message:"Audiencia inválida"});
-    try{res.json({data:{count:(await resolve(req.query.audience)).length}});}catch{res.status(500).json({message:"No se pudo contar la audiencia"});}
+    try{
+      const recipients=await resolve(req.query.audience);
+      const summary=(await pool.query("SELECT count(*)::int total, count(*) FILTER (WHERE receive_promotions IS NOT TRUE)::int unsubscribed FROM users WHERE role='client' AND is_active IS NOT FALSE")).rows[0];
+      res.json({data:{count:recipients.filter(u=>u.email?.trim()).length,totalClients:summary.total,unsubscribed:summary.unsubscribed}});
+    }catch{res.status(500).json({message:"No se pudo contar la audiencia"});}
+  });
+  app.post("/api/admin/broadcast/email-preview",ownerMiddleware,(req,res)=>{
+    const {subject="",body="",headline="",ctaUrl="",ctaText="",name="María"}=req.body??{};
+    if([subject,body,headline,ctaUrl,ctaText,name].some(v=>typeof v!=="string") || subject.length>300 || body.length>20000 || headline.length>1000 || ctaUrl.length>2000 || ctaText.length>300 || name.length>100) return res.status(400).json({message:"Revisa la longitud del mensaje"});
+    try {const preview=renderCustomBroadcast({to:"preview@example.invalid",name,subject,body,headline,ctaUrl,ctaText});res.json({data:{subject:preview.subject,html:preview.html}});}
+    catch {res.status(400).json({message:"Revisa el enlace del botón: debe empezar con https:// o http://"});}
   });
   for(const channel of ["email","whatsapp"]) {
     app.post(`/api/admin/broadcast/${channel}`,ownerMiddleware,async(req,res)=>{
