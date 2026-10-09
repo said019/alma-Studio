@@ -37,7 +37,6 @@ const NAV_GROUPS = [
     label: "Más",
     collapsible: false,
     items: [
-      { path: "/admin/visitas", label: "Visitas", icon: Users, feature: "visits" },
       { path: "/admin/memberships", label: "Membresías", icon: CreditCard },
       { path: "/admin/plans", label: "Planes", icon: Package },
       { path: "/admin/pos", label: "Tienda", icon: ShoppingCart, feature: "pos" },
