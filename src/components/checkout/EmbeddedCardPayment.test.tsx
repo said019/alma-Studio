@@ -84,7 +84,7 @@ it('ofrece cuenta Mercado Pago y abre Wallet Brick sin enviar tarjeta ni crear o
  mount(); await waitFor(()=>expect(create).toHaveBeenCalledWith('cardPayment',expect.any(String),expect.anything()));
  fireEvent.click(screen.getByRole('button',{name:'Pagar con mi cuenta de Mercado Pago'}));
  await waitFor(()=>expect(create).toHaveBeenCalledWith('wallet',expect.any(String),expect.objectContaining({initialization:{preferenceId:'pref-wallet',redirectMode:'blank'}})));
- expect(api.post).toHaveBeenCalledWith('/orders/same-order/mercadopago/wallet');
+ expect(api.post).toHaveBeenCalledWith('/orders/same-order/mercadopago/wallet', {returnOrigin:window.location.origin});
  expect(screen.getByText(/la misma que usas en Mercado Libre/)).toBeInTheDocument();
  expect(screen.queryByRole('button',{name:'Pagar con mi cuenta de Mercado Pago'})).not.toBeInTheDocument();
  expect(settings.callbacks).not.toHaveProperty("onSubmit");
@@ -197,4 +197,19 @@ it('descarta consulta Wallet anterior al cambio y vuelve a consultar tarjeta', a
  await waitFor(()=>expect(create).toHaveBeenCalledWith('cardPayment',expect.any(String),expect.anything()));
  expect(screen.queryByRole('link',{name:'Abrir Mercado Pago en esta pestaña'})).not.toBeInTheDocument();
  expect(create.mock.calls.filter(([kind])=>kind==='wallet')).toHaveLength(1);
+});
+
+it('solo una señal del origen y orden correctos consulta el servidor, nunca acepta status del mensaje', async () => {
+ vi.spyOn(window,'focus').mockImplementation(()=>{});
+ const orderId='a4163ece-8589-431d-9e7e-e6399e44e844';
+ vi.mocked(api.get).mockResolvedValue({data:{data:{...session,orderId}}});
+ renderPage(<EmbeddedCardPayment orderId={orderId} onClose={()=>{}}/>,'/app/checkout');
+ await waitFor(()=>expect(create).toHaveBeenCalled());
+ const message={type:'hive-payment-return',orderId,status:'approved'};
+ await act(async()=>window.dispatchEvent(new MessageEvent('message',{origin:'https://evil.test',data:message})));
+ await act(async()=>window.dispatchEvent(new MessageEvent('message',{origin:window.location.origin,data:{...message,orderId:'another'}})));
+ expect(api.get).toHaveBeenCalledTimes(1);
+ await act(async()=>window.dispatchEvent(new MessageEvent('message',{origin:window.location.origin,data:message})));
+ await waitFor(()=>expect(api.get).toHaveBeenCalledTimes(2));
+ expect(screen.queryByText('Pago confirmado. Tu compra está lista.')).not.toBeInTheDocument();
 });

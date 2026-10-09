@@ -1,3 +1,5 @@
+import PaymentReturn from "@/pages/client/PaymentReturn";
+import { PendingPaymentRecovery } from "@/components/checkout/PendingPaymentRecovery";
 import { Toaster } from "@/components/ui/toaster";
 import { FEATURES } from "@/config/features";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -94,9 +96,11 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AppInit />
+        <PendingPaymentRecovery />
         <UpdateBanner />
         <RouteTheme />
         <Routes>
+          <Route path="/app/payment-return/:orderId" element={<PaymentReturn />} />
           {/* Public landing */}
           <Route path="/" element={<Landing />} />
 

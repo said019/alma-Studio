@@ -1,3 +1,5 @@
+import { useAuthStore } from "@/stores/authStore";
+import { PAYMENT_RETURN_CHANNEL, isPaymentReturn, rememberPayment, clearPendingPayment } from "@/lib/paymentReturn";
 import { useEffect, useId, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
@@ -57,7 +59,8 @@ export function EmbeddedCardPayment({ orderId, onClose }: { orderId: string; onC
           hasAttempt.current = hasAttempt.current || Boolean(next.payment || next.walletPreferenceId);
           if (checkingAttempt && !submitting.current && submitted.current && next.canSubmit && !next.payment) { submitted.current = false; setRetry(v => v + 1); }
           if (next.paymentChoice === "wallet") setWalletSelected(true);
-          if (next.walletPreferenceId) { setWallet({preferenceId: next.walletPreferenceId, publicKey: next.publicKey}); setWalletSelected(true); }
+          if (next.walletPreferenceId) { rememberPayment(orderId, useAuthStore.getState().user?.id); setWallet({preferenceId: next.walletPreferenceId, publicKey: next.publicKey}); setWalletSelected(true); }
+          if (["approved", "cancelled", "expired", "rejected"].includes(next.orderStatus)) clearPendingPayment(orderId);
           setSession(next);
           setSessionError("");
           if (next.orderStatus === "approved") setError("");
@@ -73,6 +76,15 @@ export function EmbeddedCardPayment({ orderId, onClose }: { orderId: string; onC
     document.addEventListener("visibilitychange", resume);
     return () => { alive = false; window.clearInterval(timer); window.removeEventListener("focus", resume); document.removeEventListener("visibilitychange", resume); };
   }, [orderId]);
+
+  useEffect(() => {
+    const receive=(data: unknown)=>{if(isPaymentReturn(data,orderId)) { void refresh.current(); try {window.focus();} catch { /* Best effort only. */ } }};
+    const message=(event:MessageEvent)=>{if(event.origin===window.location.origin) receive(event.data);};
+    window.addEventListener("message",message);
+    let channel:BroadcastChannel | undefined;
+    try {channel=new BroadcastChannel(PAYMENT_RETURN_CHANNEL);channel.onmessage=event=>receive(event.data);} catch { /* Polling/focus still works. */ }
+    return ()=>{window.removeEventListener("message",message);channel?.close();};
+  },[orderId]);
 
   useEffect(() => {
     if (session?.orderStatus !== "approved" && !["refunded", "charged_back", "cancelled"].includes(session?.payment?.status ?? "")) return;
@@ -92,9 +104,10 @@ export function EmbeddedCardPayment({ orderId, onClose }: { orderId: string; onC
     setWalletLoading(true);
     setError("");
     try {
-      const response = await api.post(`/orders/${orderId}/mercadopago/wallet`);
+      const response = await api.post(`/orders/${orderId}/mercadopago/wallet`, {returnOrigin: window.location.origin});
       const next = response.data.data ?? response.data;
       if (!next.preferenceId || !next.publicKey) throw new Error("Missing wallet preference");
+      rememberPayment(orderId, useAuthStore.getState().user?.id);
       setWallet(next);
       hasAttempt.current = true;
     } catch (e: any) {

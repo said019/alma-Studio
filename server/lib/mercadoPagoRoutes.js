@@ -1,3 +1,4 @@
+import { paymentReturnUrl } from './paymentReturn.js';
 import { searchOrderPayments, canonicalPayment } from './mpReconciliation.js';
 import { resolveEffectivePrice, resolvePlanPaymentUrl } from "./pricing.js";
 import crypto from 'node:crypto';
@@ -227,7 +228,7 @@ export function registerMercadoPago(app,{pool,auth,owner,finalizeOrder,afterPaym
   }catch(e){await db.query('ROLLBACK').catch(()=>{});throw e;}finally{db.release();}
   // Persist the exclusive attempt before the network request. An ambiguous
   // creation is never POSTed again: a second preference could collect twice.
-  const returnUrl=`${account.baseUrl}/app/orders/${order.id}`;
+  const returnUrl=paymentReturnUrl(account.baseUrl,req.body?.returnOrigin,order.id);
   const body={purpose:'wallet_purchase',items:[{id:order.plan_id,title:order.plan_name||'HIVE Pilates Studio',quantity:1,currency_id:'MXN',unit_price:Number(order.total_amount)}],
    payer:{email:order.user_email},external_reference:order.id,notification_url:account.webhookUrl,
    expires:true,expiration_date_to:new Date(order.expires_at).toISOString(),

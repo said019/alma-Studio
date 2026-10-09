@@ -30,8 +30,8 @@ async function fixture(options={}) {
  await pool.query('INSERT INTO users(id,email) VALUES($1,$2)',[userId,'qa@example.test']);
  await pool.query('INSERT INTO plans(id,name) VALUES($1,$2)',[planId,'QA HIVE']);
  await pool.query(`INSERT INTO orders(id,user_id,plan_id,total_amount,mp_checkout_mode,mp_collector_id) VALUES($1,$2,$3,330,'embedded','100')`,[orderId,userId,planId]);
- let providerPosts=0,activations=0,syncs=0,preference=null,puts=0,searches=0;const freed=[];
- const account={ready:true,accessToken:'test-not-a-token',publicKey:'test-public',collectorId:'100',webhookSecret:'test-only-secret',baseUrl:'https://hive.example.test',webhookUrl:'https://hive.example.test/api/mercadopago/webhook'};
+ let providerPosts=0,activations=0,syncs=0,preference=null,preferenceBody=null,puts=0,searches=0;const freed=[];
+ const account={ready:true,accessToken:'test-not-a-token',publicKey:'test-public',collectorId:'100',webhookSecret:'test-only-secret',baseUrl:options.baseUrl||'https://hive.example.test',webhookUrl:'https://hive.example.test/api/mercadopago/webhook'};
  const payment={id:String(Date.now())+String(Math.floor(Math.random()*100000)),external_reference:orderId,collector_id:100,currency_id:'MXN',transaction_amount:330,payment_type_id:'credit_card',status:'approved',status_detail:'accredited',...options.payment};
  const routes={};
  const app={get:(url,...handlers)=>routes[`GET ${url}`]=handlers.at(-1),post:(url,...handlers)=>routes[`POST ${url}`]=handlers.at(-1)};
@@ -53,6 +53,10 @@ async function fixture(options={}) {
    providerPosts++;
    const body=JSON.parse(init.body);
    if(url.endsWith('/checkout/preferences')){
+    preferenceBody=body;
+    const expectedReturn=`${options.expectedReturnOrigin||account.baseUrl}/app/payment-return/${orderId}`;
+    assert.deepEqual(body.back_urls,{success:expectedReturn,pending:expectedReturn,failure:expectedReturn});
+    assert.equal(body.auto_return,'approved');
     assert.equal(body.purpose,'wallet_purchase');assert.equal(body.items[0].unit_price,330);assert.equal(body.external_reference,orderId);assert.equal(body.expires,true);assert.ok(body.expiration_date_to);
     if(options.timeout)throw new Error('ambiguous preference timeout');
     preference={id:'qa-preference-'+orderId,collector_id:100,external_reference:orderId,items:body.items,expires:true,expiration_date_to:body.expiration_date_to};
@@ -79,7 +83,7 @@ async function fixture(options={}) {
  };
  const submit=()=>call('POST','card-payment',{token:'test-token',payment_method_id:'visa',installments:1});
  const row=async()=> (await pool.query('SELECT * FROM orders WHERE id=$1',[orderId])).rows[0];
- return {orderId,userId,account,payment,call,submit,row,apply:registered.processVerifiedPayment,reconcile:registered.reconcile,puts:()=>puts,posts:()=>providerPosts,activations:()=>activations,syncs:()=>syncs,freed};
+ return {orderId,userId,account,payment,call,submit,row,apply:registered.processVerifiedPayment,reconcile:registered.reconcile,preferenceBody:()=>preferenceBody,puts:()=>puts,posts:()=>providerPosts,activations:()=>activations,syncs:()=>syncs,freed};
 }
 
 test('same-order concurrent submissions and confirmations charge and activate once',async()=>{
@@ -275,4 +279,17 @@ test('existing manual review blocks direct card, wallet and repeated switch call
  const f=await walletFixture();await f.call('POST','mercadopago/wallet');await f.call('POST','mercadopago/use-card');
  await pool.query("INSERT INTO mp_payment_reviews(order_id,payment_id,reason) VALUES($1,'999999','needs review')",[f.orderId]);
  assert.equal((await f.submit()).code,409);assert.equal((await f.call('POST','mercadopago/use-card')).code,409);assert.equal((await f.call('POST','mercadopago/wallet')).code,409);assert.equal(f.posts(),1);
+});
+
+test('wallet uses the requested allowed HIVE origin for all checkout return URLs',async()=>{
+ const f=await walletFixture({baseUrl:'https://hivestudio.com.mx',expectedReturnOrigin:'https://www.hivestudio.com.mx'});
+ const result=await f.call('POST','mercadopago/wallet',{returnOrigin:'https://www.hivestudio.com.mx'});assert.equal(result.code,200,JSON.stringify(result.body));
+ assert.deepEqual(Object.values(f.preferenceBody().back_urls),Array(3).fill(`https://www.hivestudio.com.mx/app/payment-return/${f.orderId}`));
+});
+test('wallet never passes an untrusted return origin to Mercado Pago',async()=>{
+ for(const origin of ['https://evil.test','https://hivestudio.com.mx.evil.test','https://evil@hivestudio.com.mx','http://hivestudio.com.mx','https://hivestudio.com.mx/app',{},null]){
+ const f=await walletFixture({baseUrl:'https://hivestudio.com.mx'});
+ const result=await f.call('POST','mercadopago/wallet',{returnOrigin:origin});assert.equal(result.code,200,JSON.stringify(result.body));
+ assert.deepEqual(Object.values(f.preferenceBody().back_urls),Array(3).fill(`https://hivestudio.com.mx/app/payment-return/${f.orderId}`));
+ }
 });
