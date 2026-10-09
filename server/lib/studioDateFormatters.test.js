@@ -79,7 +79,8 @@ test('morning keeps en-US hour24/lastHour semantics; afternoon keeps current inc
       equivalent(a, b, 'isWithinAfternoonWindow', [date, zone]);
     }
   }
-  assert.equal(b.isWithinMorningWindow('2026-10-02T00:00:00-06:00'), false, 'native en-US hour24 is not normalized to hour0');
+  // ICU versions differ in whether en-US midnight is00 or24; preserve the native baseline on both runtimes.
+  assert.equal(b.isWithinMorningWindow('2026-10-02T00:00:00-06:00'), a.isWithinMorningWindow('2026-10-02T00:00:00-06:00'), 'native midnight semantics are preserved');
 });
 
 test('invalid dates, falsy inputs, lastHour coercion and native timeZone errors remain identical', () => {

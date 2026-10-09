@@ -25,6 +25,11 @@ export const sql = async (q, p = []) => (await pool.query(q, p)).rows;
 export const closeDb = () => pool.end();
 
 export async function api(method, route, { token, body, raw, headers = {} } = {}) {
+  // A fixture call models a new sale unless a test explicitly supplies the
+  // same intention key to exercise transport retries.
+  if (method === "POST" && route === "/api/memberships" && body && body.idempotencyKey === undefined) {
+    body = { ...body, idempotencyKey: crypto.randomUUID() };
+  }
   const h = { ...headers };
   if (token) h.Authorization = `Bearer ${token}`;
   let payload;

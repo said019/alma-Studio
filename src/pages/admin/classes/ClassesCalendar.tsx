@@ -644,6 +644,7 @@ function CalendarView({
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader><DialogTitle>{editingId ? "Editar clase" : "Nueva clase"}</DialogTitle></DialogHeader>
+          {editingId && <p className="text-sm text-ink-muted">Si hay reservas, sólo puedes cambiar cupo, notas y disponibilidad. Para cambiar fecha, horario, disciplina o coach, cancela la clase con devolución de créditos y crea una nueva.</p>}
           <form onSubmit={form.handleSubmit((d) => editingId ? editMutation.mutate({ id: editingId, d }) : createMutation.mutate(d))} className="space-y-5">
             <fieldset className="space-y-3">
               <legend className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-ink">Clase</legend>

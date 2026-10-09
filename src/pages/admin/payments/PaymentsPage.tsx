@@ -1,3 +1,4 @@
+import { manualSaleKey, completeManualSale } from "@/lib/manual-sale-intent";
 import { useEffect, useState, useRef, type ReactNode } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format, addDays } from "date-fns";
@@ -130,8 +131,8 @@ function CashAssignment() {
   const reasonOk = reason.trim().length >= REASON_MIN_CHARS;
 
   const assignMutation = useMutation({
-    mutationFn: () =>
-      api.post("/memberships", {
+    mutationFn: () => {
+      const payload = {
         userId: selectedUser!.id,
         planId: selectedPlan!.id,
         paymentMethod,
@@ -140,8 +141,11 @@ function CashAssignment() {
         ...(appliedCoupon ? {discountCode:appliedCoupon} : {}),
         ...(paymentReference.trim() ? { paymentReference: paymentReference.trim() } : {}),
         ...(needsReason ? { reason: reason.trim() } : {}),
-      }),
+      };
+      return api.post("/memberships", {...payload,idempotencyKey:manualSaleKey(payload)});
+    },
     onSuccess: () => {
+      completeManualSale();
       qc.invalidateQueries({ queryKey: ["memberships"] });
       qc.invalidateQueries({ queryKey: ["payments"] });
       toast({ title: "Membresía activada" });

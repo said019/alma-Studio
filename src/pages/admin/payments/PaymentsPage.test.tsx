@@ -55,6 +55,7 @@ describe("Cobros · Cobrar", () => {
     expect(within(resumen).getByText("25 sep – 25 oct")).toBeInTheDocument();
     fireEvent.click(confirmar);
     await waitFor(() => expect(mockApi.post).toHaveBeenCalledWith("/memberships", {
+      idempotencyKey: expect.any(String),
       userId: "u1", planId: "p8", paymentMethod: "card", startDate: "2026-09-25", amount: 1450,
     }));
   });
@@ -75,6 +76,7 @@ describe("Cobros · Cobrar", () => {
     expect(within(resumen).getByText("$1,200")).toBeInTheDocument();
     fireEvent.click(confirmar);
     await waitFor(() => expect(mockApi.post).toHaveBeenCalledWith("/memberships", {
+      idempotencyKey: expect.any(String),
       userId: "u1", planId: "p8", paymentMethod: "cash", startDate: "2026-09-25", amount: 1200, reason: "Descuento de amiga",
     }));
   });

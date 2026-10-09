@@ -1,3 +1,4 @@
+import { enqueueCampaign, drainCampaigns } from './campaignOutbox.js';
 import crypto from "node:crypto";
 import { sendCustomBroadcast } from "../emailService.js";
 export function registerCommunications(app,{pool,ownerMiddleware,queueWhatsAppSend,normalisePhone,whatsappChannelState,appPublicUrl,recordAudit}) {
@@ -19,7 +20,7 @@ export function registerCommunications(app,{pool,ownerMiddleware,queueWhatsAppSe
   });
   const audiences=new Set(["all","with_active_membership","without_membership","accepts_communications"]);
   const resolve=async(audience)=>{
-    let where="u.role='client' AND u.is_active IS NOT FALSE";
+    let where="u.role='client' AND u.is_active IS NOT FALSE AND u.receive_promotions=true";
     if(audience==="accepts_communications")where+=" AND u.receive_promotions=true";
     if(audience==="with_active_membership")where+=" AND EXISTS(SELECT 1 FROM memberships m WHERE m.user_id=u.id AND m.status='active' AND (m.end_date IS NULL OR m.end_date>=CURRENT_DATE))";
     if(audience==="without_membership")where+=" AND NOT EXISTS(SELECT 1 FROM memberships m WHERE m.user_id=u.id AND m.status='active' AND (m.end_date IS NULL OR m.end_date>=CURRENT_DATE))";
@@ -37,6 +38,14 @@ export function registerCommunications(app,{pool,ownerMiddleware,queueWhatsAppSe
       if(channel==="whatsapp"&&!(await whatsappChannelState()).connected)return res.status(503).json({message:"WhatsApp está desconectado"});
       try {
         const recipients=await resolve(audience);
+        if(channel==='email'){
+          const key=req.body.idempotencyKey;
+          if(!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(key||''))return res.status(400).json({message:'Identificador de envío inválido.'});
+          if(typeof subject!=='string'||subject.length>300||typeof body!=='string'||body.length>20000)return res.status(400).json({message:'El asunto o mensaje es demasiado largo.'});
+          if(ctaUrl){try{if(!['https:','http:'].includes(new URL(ctaUrl).protocol))throw new Error();}catch{return res.status(400).json({message:'Enlace inválido'});}}
+          const data=await enqueueCampaign(pool,{actorId:req.userId,key,payload:{audience,subject,body,headline:headline||'',ctaUrl:ctaUrl||'',ctaText:ctaText||''},recipients:recipients.filter(u=>u.email)});
+          return res.status(202).json({data});
+        }
         let sent=0,failed=0;
         for(const u of recipients) {
           try {
@@ -47,7 +56,7 @@ export function registerCommunications(app,{pool,ownerMiddleware,queueWhatsAppSe
           if(channel==="email")await new Promise(resolve=>setTimeout(resolve,550));
         }
         res.json({data:{sent,failed,total:recipients.length}});
-      }catch{res.status(500).json({message:"No se pudo enviar el comunicado"});}
+      }catch(e){res.status(e.status||500).json({message:e.status?e.message:"No se pudo guardar el comunicado"});}
     });
   }
   app.post("/api/admin/birthdays/:userId/greet",ownerMiddleware,async(req,res)=>{
@@ -62,4 +71,33 @@ export function registerCommunications(app,{pool,ownerMiddleware,queueWhatsAppSe
       res.json({data:results});
     }catch{res.status(500).json({message:"No se pudo enviar la felicitación"});}
   });
+  app.get('/api/admin/broadcast/campaigns',ownerMiddleware,async(_req,res)=>{
+    try{
+      const data=(await pool.query(`SELECT c.id,c.payload->>'subject' AS subject,c.created_at,
+       COUNT(d.id)::int total,COUNT(*) FILTER(WHERE d.status='accepted')::int accepted,
+       COUNT(*) FILTER(WHERE d.status IN ('queued','retry','sending'))::int pending,
+       COUNT(*) FILTER(WHERE d.status='needs_review')::int needs_review,
+       COUNT(*) FILTER(WHERE d.status='skipped')::int skipped
+       FROM email_campaigns c LEFT JOIN email_campaign_deliveries d ON d.campaign_id=c.id
+       GROUP BY c.id ORDER BY c.created_at DESC LIMIT 100`)).rows;
+      res.json({data});
+    }catch{res.status(503).json({message:'No se pudo consultar el historial de campañas'});}
+  });
+  app.get('/api/admin/broadcast/campaigns/:id',ownerMiddleware,async(req,res)=>{
+    if(!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(req.params.id))return res.status(400).json({message:'Campaña inválida'});
+    const offset=Math.max(0,Math.min(10000000,Number.parseInt(String(req.query.offset||'0'),10)||0));
+    const limit=Math.max(1,Math.min(100,Number.parseInt(String(req.query.limit||'100'),10)||100));
+    try{
+      const campaign=(await pool.query("SELECT id,payload->>'subject' AS subject FROM email_campaigns WHERE id=$1",[req.params.id])).rows[0];
+      if(!campaign)return res.status(404).json({message:'Campaña no encontrada'});
+      const result=(await pool.query(`WITH deliveries AS (
+        SELECT id,recipient,status,attempts,provider_id,last_error,updated_at FROM email_campaign_deliveries WHERE campaign_id=$1
+      ), page AS (SELECT * FROM deliveries ORDER BY CASE WHEN status IN ('needs_review','failed') THEN 0 ELSE 1 END,id LIMIT $2 OFFSET $3)
+      SELECT COALESCE((SELECT json_agg(page ORDER BY CASE WHEN status IN ('needs_review','failed') THEN 0 ELSE 1 END,id) FROM page),'[]') AS rows,
+       (SELECT COUNT(*)::int FROM deliveries) AS total`,[req.params.id,limit,offset])).rows[0];
+      res.json({data:{campaign,deliveries:result.rows,pagination:{limit,offset,total:result.total,hasMore:offset+limit<result.total}}});
+    }catch{res.status(503).json({message:'No se pudo consultar el detalle de la campaña'});}
+  });
+  return {drain:()=>process.env.RESEND_API_KEY?drainCampaigns(pool,sendCustomBroadcast):Promise.resolve(0)};
+
 }

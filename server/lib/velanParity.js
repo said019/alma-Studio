@@ -179,7 +179,7 @@ export function registerVelanParity(app, deps) {
             ORDER BY c.id,b.id FOR UPDATE OF b,c`, [member.id]);
           for (const booking of bookings.rows) {
             await client.query("UPDATE bookings SET status='cancelled', cancelled_at=NOW(), cancellation_reason='Membresía congelada', updated_at=NOW() WHERE id=$1", [booking.id]);
-            if (booking.status === "confirmed") await restoreMembershipCredit(client, member.id, booking.class_id);
+            if (booking.status === "confirmed") await restoreMembershipCredit(client, member.id, booking.class_id, booking.id);
             freed.push(booking.class_id);
           }
           updated = (await client.query(`UPDATE memberships SET status='paused', paused_at=NOW(),
@@ -243,7 +243,13 @@ export function registerVelanParity(app, deps) {
     try {
       await client.query("BEGIN");
       // Serialize overlapping duplicate requests. Existing slots remain untouched.
-      await client.query("SELECT pg_advisory_xact_lock(814207)");
+      await client.query("SELECT pg_advisory_xact_lock(72901837)");
+      const refs=await client.query("SELECT DISTINCT instructor_id,class_type_id FROM classes WHERE date BETWEEN $1::date AND $1::date+6 AND status<>'cancelled'",[sourceStart]);
+      for(const ref of refs.rows.sort((a,b)=>String(a.instructor_id).localeCompare(String(b.instructor_id)))) {
+        const coach=await client.query("SELECT id FROM instructors WHERE id=$1 AND is_active=true AND deleted_at IS NULL FOR SHARE",[ref.instructor_id]);
+        const type=await client.query("SELECT id FROM class_types WHERE id=$1 AND is_active=true FOR SHARE",[ref.class_type_id]);
+        if(!coach.rowCount||!type.rowCount){await client.query("ROLLBACK");return res.status(409).json({message:"La semana contiene una coach o disciplina inactiva. Corrige la agenda antes de copiarla."});}
+      }
       const result = await client.query(`INSERT INTO classes (class_type_id,instructor_id,date,start_time,end_time,max_capacity,status)
         SELECT c.class_type_id,c.instructor_id,($2::date+(c.date-$1::date)),c.start_time,c.end_time,c.max_capacity,'scheduled'
         FROM classes c WHERE c.date BETWEEN $1::date AND $1::date+6 AND c.status<>'cancelled'

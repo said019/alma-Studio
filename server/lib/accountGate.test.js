@@ -23,11 +23,11 @@ test("una cuenta dada de baja queda bloqueada; forget() obliga a volver a consul
   assert.equal(calls, 2);
 });
 
-test("si la base falla, no bloquea (y no guarda el error)", async () => {
+test("si la base falla, propaga el error sin permitir acceso ni cachearlo", async () => {
   let calls = 0;
   const gate = createAccountGate({ lookup: async () => { calls++; throw new Error("ECONNREFUSED"); } });
-  assert.equal(await gate.isDisabled("u3"), false);
-  assert.equal(await gate.isDisabled("u3"), false);
+  await assert.rejects(gate.isDisabled("u3"), /ECONNREFUSED/);
+  await assert.rejects(gate.isDisabled("u3"), /ECONNREFUSED/);
   assert.equal(calls, 2);
 });
 

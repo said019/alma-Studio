@@ -45,9 +45,16 @@ async function fixture(options={}) {
    const body=JSON.parse(init.body);
    assert.equal(body.transaction_amount,330);assert.equal(body.external_reference,orderId);
    assert.ok(init.headers['X-Idempotency-Key']);
+   if(options.beforeResponse)await options.beforeResponse();
    if(options.timeout)throw new Error('simulated timeout after provider accepted payment');
   }
-  return {ok:true,json:async()=>url.includes('/search?')?{results:options.searchEmpty?[]:[payment]}:payment};
+  return {ok:true,json:async()=>{
+   if(url.includes('/search?')){
+    const all=options.payments||[payment];const offset=Number(new URL(url).searchParams.get('offset')||0);
+    return {results:options.searchEmpty?[]:all.slice(offset,offset+50),paging:{total:options.searchEmpty?0:all.length}};
+   }
+   return options.payments?.find(p=>url.endsWith('/'+p.id))||payment;
+  }};
  }});
  const call=async(method='GET',suffix='card-payment-session',body={},user=userId)=>{
   const res={code:200,status(n){this.code=n;return this;},json(data){this.body=data;return this;}};
@@ -55,7 +62,7 @@ async function fixture(options={}) {
  };
  const submit=()=>call('POST','card-payment',{token:'test-token',payment_method_id:'visa',installments:1});
  const row=async()=> (await pool.query('SELECT * FROM orders WHERE id=$1',[orderId])).rows[0];
- return {orderId,userId,account,payment,call,submit,row,apply:registered.processVerifiedPayment,posts:()=>providerPosts,activations:()=>activations,syncs:()=>syncs,freed};
+ return {orderId,userId,account,payment,call,submit,row,apply:registered.processVerifiedPayment,reconcile:registered.reconcile,posts:()=>providerPosts,activations:()=>activations,syncs:()=>syncs,freed};
 }
 
 test('same-order concurrent submissions and confirmations charge and activate once',async()=>{
@@ -121,4 +128,52 @@ test('partial refunds followed by full refund keep a single cumulative financial
  await f.apply({...f.payment,status:'refunded',transaction_amount_refunded:330},f.account);
  const totals=(await pool.query('SELECT count(*)::int n,sum(amount)::numeric total FROM refunds WHERE order_id=$1',[f.orderId])).rows[0];
  assert.equal(totals.n,2);assert.equal(Number(totals.total),330);
+});
+
+async function isolateSweep(f){
+ await pool.query("UPDATE orders SET mp_sync_attempted_at=NOW()+INTERVAL '1 day'");
+ await pool.query('UPDATE orders SET mp_sync_attempted_at=NULL WHERE id=$1',[f.orderId]);
+}
+test('background sweep recovers missing webhook without client return and keeps provider paid_at',async()=>{
+ const f=await fixture({timeout:true,payment:{date_approved:'2026-10-07T19:03:00Z',payment_method_id:'visa'}});
+ await f.submit();await isolateSweep(f);
+ const results=await Promise.all([f.reconcile({limit:1}),f.reconcile({limit:1})]);
+ assert.equal(results.reduce((n,r)=>n+r.checked,0),1);assert.equal(f.activations(),1);
+ const row=await f.row();assert.equal(row.status,'approved');assert.ok(row.provider_synced_at);assert.equal(row.mp_sync_claim,null);
+ assert.equal(row.paid_at.toISOString(),'2026-10-07T19:03:00.000Z');assert.equal(row.mp_method_id,'visa');
+});
+test('full search records50extra movements and preserves the canonical payment',async()=>{
+ const options={timeout:true,payments:[]};const f=await fixture(options);
+ options.payments.push(...Array.from({length:51},(_,i)=>({...f.payment,id:String(900000000+i),status:i===50?'approved':'rejected'})));
+ await f.submit();await isolateSweep(f);assert.equal((await f.reconcile()).failed,0);
+ assert.equal(f.activations(),1);assert.equal((await f.row()).mp_payment_id,'900000050');
+ assert.equal((await pool.query('SELECT COUNT(*)::int n FROM mp_payment_reviews WHERE order_id=$1',[f.orderId])).rows[0].n,50);
+ options.payments[0].status='approved';await isolateSweep(f);await f.reconcile();
+ assert.equal((await f.row()).mp_payment_id,'900000050');assert.equal(f.activations(),1);
+});
+test('failed sweeps release lease and rotate instead of starving other orders',async()=>{
+ const f=await fixture({timeout:true,payment:{currency_id:'USD'}});await f.submit();await isolateSweep(f);
+ assert.equal((await f.reconcile({limit:1})).failed,1);
+ const row=await f.row();assert.ok(row.mp_sync_attempted_at);assert.ok(row.mp_sync_error);assert.equal(row.mp_sync_lease_until,null);assert.equal(row.provider_synced_at,null);
+ assert.equal((await f.reconcile({limit:1})).checked,0);
+});
+test('cancellation rechecks provider and blocks late approval on previously rejected attempt',async()=>{
+ const f=await fixture({payment:{status:'rejected'}});await f.submit();await f.call();
+ f.payment.status='approved';const result=await f.call('POST','cancel');
+ assert.equal(result.code,409);assert.equal((await f.row()).status,'approved');assert.equal(f.activations(),1);
+});
+
+test('first observed full refund records gross and reversal without granting access',async()=>{
+ const f=await fixture({timeout:true,payment:{status:'refunded',date_approved:'2026-10-07T19:03:00Z'}});await f.submit();await isolateSweep(f);await f.reconcile();
+ const row=await f.row();assert.equal(row.status,'approved');assert.equal(row.refund_status,'refunded');assert.equal(f.activations(),0);
+ const refund=(await pool.query('SELECT SUM(amount)::numeric n FROM refunds WHERE order_id=$1',[f.orderId])).rows[0];
+ assert.equal(Number(row.total_amount)-Number(refund.n),0);assert.ok(row.paid_at);
+});
+test('late POST cannot replace canonical attempt already fixed by authenticated webhook',async()=>{
+ const options={};const f=await fixture(options);
+ options.beforeResponse=async()=>{await f.apply({...f.payment,id:'887700001'},f.account);};
+ assert.equal((await f.submit()).code,409);
+ const attempt=(await pool.query('SELECT payment_id FROM mp_card_attempts WHERE order_id=$1',[f.orderId])).rows[0];
+ assert.equal(attempt.payment_id,'887700001');assert.equal((await f.row()).mp_payment_id,'887700001');assert.equal(f.activations(),1);
+ assert.equal((await pool.query('SELECT COUNT(*)::int n FROM mp_payment_reviews WHERE order_id=$1',[f.orderId])).rows[0].n,1);
 });

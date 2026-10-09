@@ -1,3 +1,4 @@
+import { assertClassActor } from './classAdminWrites.js';
 import { isUuid } from './validate.js';
 
 const FIELDS = { classTypeId: 'class_type_id', instructorId: 'instructor_id', maxCapacity: 'max_capacity', startTime: 'start_time', endTime: 'end_time', notes: 'notes', status: 'status' };
@@ -32,7 +33,7 @@ export function assessBulkClasses({ ids, rows, changes, now, occupied = {}, rese
     if (!timeValid(after.start_time) || !timeValid(after.end_time) || after.end_time <= after.start_time) conflict(id, 'La hora final debe ser posterior a la inicial, dentro del mismo día.');
     if (`${after.date}T${after.start_time}:00` <= now) conflict(id, 'El nuevo horario debe ser futuro.');
     if (after.max_capacity < before.current_bookings) conflict(id, `Hay ${before.current_bookings} reservas activas; no puedes reducir el cupo a ${after.max_capacity}.`);
-    if (Number(reserved[id] ?? before.current_bookings) > 0 && (before.start_time !== after.start_time || before.end_time !== after.end_time || before.class_type_id !== after.class_type_id)) conflict(id, 'Tiene reservas: no puedes cambiar horario ni disciplina.');
+    if (Number(reserved[id] ?? before.current_bookings) > 0 && (before.start_time !== after.start_time || before.end_time !== after.end_time || before.class_type_id !== after.class_type_id || before.instructor_id !== after.instructor_id)) conflict(id, 'Tiene reservas: no puedes cambiar horario, disciplina ni coach. Cancela con devolución y crea una nueva clase.');
     candidates.push({ ...after, before, after });
   }
   for (const candidate of candidates) {
@@ -65,6 +66,8 @@ export function registerBulkClasses(app, { pool, adminMiddleware, recordAudit, o
           ct.name AS class_type_name, i.display_name AS instructor_name
         FROM classes c LEFT JOIN class_types ct ON ct.id=c.class_type_id LEFT JOIN instructors i ON i.id=c.instructor_id
         WHERE c.id=ANY($1::uuid[]) ORDER BY c.id ${preview ? '' : 'FOR UPDATE OF c'}`, [ids])).rows;
+      for (const row of rows) await assertClassActor(db,req,row.instructor_id,!preview);
+      if(changes.instructor_id) await assertClassActor(db,req,changes.instructor_id,!preview);
       const expectedVersions = Object.fromEntries(rows.map(row => [row.id, row.revision]));
       if (!preview) {
         const revisions = req.body.expectedVersions;

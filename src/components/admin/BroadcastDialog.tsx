@@ -1,5 +1,6 @@
+import { campaignKey, completeCampaign } from '@/lib/campaign-intent';
 import { useEffect, useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,9 +27,9 @@ type Audience =
 
 const AUDIENCES: { value: Audience; label: string; hint: string }[] = [
   { value: "accepts_communications", label: "Aceptan comunicación", hint: "Solo usuarios que marcaron recibir promociones" },
-  { value: "with_active_membership", label: "Con membresía activa", hint: "Solo usuarios con paquete vigente" },
-  { value: "without_membership",     label: "Sin membresía activa", hint: "Para reactivar / promoción" },
-  { value: "all",                    label: "Todos los usuarios",    hint: "Todas las cuentas de usuario" },
+  { value: "with_active_membership", label: "Con membresía activa", hint: "Con paquete vigente y autorización para promociones" },
+  { value: "without_membership",     label: "Sin membresía activa", hint: "Sin paquete y con autorización para promociones" },
+  { value: "all",                    label: "Todos los suscritos",    hint: "Solo personas que aceptan promociones" },
 ];
 
 interface Template {
@@ -49,6 +50,7 @@ const TEMPLATES: Template[] = [
 
 export function BroadcastDialog({ open, onOpenChange, emailOnly = false }: { open: boolean; onOpenChange: (v: boolean) => void; emailOnly?: boolean }) {
   const { toast } = useToast();
+  const queryClient=useQueryClient();
   const [tab, setTab] = useState<"email" | "whatsapp">("email");
   const [audience, setAudience] = useState<Audience>("accepts_communications");
   const [templateId, setTemplateId] = useState<string>("weekly");
@@ -94,10 +96,15 @@ export function BroadcastDialog({ open, onOpenChange, emailOnly = false }: { ope
   // conteo de enviados/fallidos ya lo trae el propio aviso, y el conteo de
   // audiencia (broadcast-audience) no cambia por haber enviado el mensaje.
   const emailMutation = useMutation({
-    mutationFn: () => api.post("/admin/broadcast/email", { audience, subject, headline, body, ctaUrl, ctaText }),
+    mutationFn: () => {
+      const payload={audience,subject,headline,body,ctaUrl,ctaText};
+      return api.post("/admin/broadcast/email",{...payload,idempotencyKey:campaignKey(payload)});
+    },
     onSuccess: (res: any) => {
       const d = res?.data?.data ?? res?.data;
-      toast({ title: `Emails enviados`, description: `${d?.sent ?? 0} ok · ${d?.failed ?? 0} fallaron · ${d?.total ?? 0} totales` });
+      toast({ title: "Campaña guardada", description: `${d?.total ?? 0} destinatarios. Puedes consultar el avance en el historial.` });
+      completeCampaign();
+      void queryClient.invalidateQueries({queryKey:["email-campaigns"]});
       setConfirmStep(false);
       onOpenChange(false);
     },

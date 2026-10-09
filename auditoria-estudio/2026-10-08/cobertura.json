@@ -1,0 +1,1130 @@
+[
+  {
+    "id": "A1",
+    "dominio": "A",
+    "escenario": "Quiere crear su cuenta desde el celular",
+    "severidad": "🟠",
+    "estado": "⚠️",
+    "evidencia": "Navegador registro país/día/mes/año correcto; API acepta teléfono inválido/terms=false/password débil. identidad-seguridad.md ID01."
+  },
+  {
+    "id": "A2",
+    "dominio": "A",
+    "escenario": "Olvidó su contraseña o cambió de dispositivo",
+    "severidad": "🟠",
+    "estado": "❓",
+    "evidencia": "Sin prueba integral en este corte; requiere fixture y recorrido correspondiente."
+  },
+  {
+    "id": "A3",
+    "dominio": "A",
+    "escenario": "Cambió de teléfono o email",
+    "severidad": "🟠",
+    "estado": "⚠️",
+    "evidencia": "41 regresiones API/PG identidad pasan: perfil, consentimiento/retirada y anonimización; entrega externa y recorrido completo de usuario no certificados. identity-api-retry.log."
+  },
+  {
+    "id": "A4",
+    "dominio": "A",
+    "escenario": "Tiene una lesión, está embarazada o condición médica relevante",
+    "severidad": "🟠",
+    "estado": "⚠️",
+    "evidencia": "41 regresiones API/PG identidad pasan: perfil, consentimiento/retirada y anonimización; entrega externa y recorrido completo de usuario no certificados. identity-api-retry.log."
+  },
+  {
+    "id": "A5",
+    "dominio": "A",
+    "escenario": "El estudio requiere deslinde de responsabilidad",
+    "severidad": "🟡",
+    "estado": "⚠️",
+    "evidencia": "Navegador registro país/día/mes/año correcto; API acepta teléfono inválido/terms=false/password débil. identidad-seguridad.md ID01."
+  },
+  {
+    "id": "A6",
+    "dominio": "A",
+    "escenario": "Es menor de edad",
+    "severidad": "🟡",
+    "estado": "❓",
+    "evidencia": "Registro de menor201 demostrado; falta política explícita del estudio/tutor para evaluar corrección."
+  },
+  {
+    "id": "A7",
+    "dominio": "A",
+    "escenario": "Una clienta llega y no quiere/puede registrarse sola",
+    "severidad": "🟠",
+    "estado": "❓",
+    "evidencia": "Sin prueba integral en este corte; requiere fixture y recorrido correspondiente."
+  },
+  {
+    "id": "A8",
+    "dominio": "A",
+    "escenario": "Quiere probar antes de comprar un paquete",
+    "severidad": "🟡",
+    "estado": "➖",
+    "evidencia": "Trial no forma parte del catálogo actual solicitado; paquetes anteriores eliminados por instrucción del usuario."
+  },
+  {
+    "id": "A9",
+    "dominio": "A",
+    "escenario": "Ejerce su derecho de cancelación de datos (ARCO)",
+    "severidad": "🟡",
+    "estado": "⚠️",
+    "evidencia": "41 regresiones API/PG identidad pasan: perfil, consentimiento/retirada y anonimización; entrega externa y recorrido completo de usuario no certificados. identity-api-retry.log."
+  },
+  {
+    "id": "A10",
+    "dominio": "A",
+    "escenario": "La misma persona quedó registrada dos veces (con y sin acento, dos teléfonos)",
+    "severidad": "🟡",
+    "estado": "❓",
+    "evidencia": "Sin prueba integral en este corte; requiere fixture y recorrido correspondiente."
+  },
+  {
+    "id": "B1",
+    "dominio": "B",
+    "escenario": "Quiere ver qué clases hay esta semana",
+    "severidad": "🔴",
+    "estado": "⚠️",
+    "evidencia": "Contadores DB coinciden al final; no realtime navegador Ver reservas-creditos.md."
+  },
+  {
+    "id": "B2",
+    "dominio": "B",
+    "escenario": "Reserva una clase teniendo paquete vigente",
+    "severidad": "🔴",
+    "estado": "✅",
+    "evidencia": "Reserva, rechazo sin paquete y asignación admin/recepción con saldo Ver reservas-creditos.md."
+  },
+  {
+    "id": "B3",
+    "dominio": "B",
+    "escenario": "El estudio es de reformer con camas numeradas",
+    "severidad": "🟠",
+    "estado": "❓",
+    "evidencia": "No se asume cama numerada Ver reservas-creditos.md."
+  },
+  {
+    "id": "B4",
+    "dominio": "B",
+    "escenario": "La clase que quiere está llena",
+    "severidad": "🟠",
+    "estado": "⚠️",
+    "evidencia": "Último cupo genera waitlist; posición visible no ejercida Ver reservas-creditos.md."
+  },
+  {
+    "id": "B5",
+    "dominio": "B",
+    "escenario": "Se libera un lugar en una clase con waitlist",
+    "severidad": "🟠",
+    "estado": "⚠️",
+    "evidencia": "Promoción automática una vez verificada en API; entrega durable del aviso no certificada. No se exige aceptación según política actual."
+  },
+  {
+    "id": "B6",
+    "dominio": "B",
+    "escenario": "Quiere controlar con cuánta anticipación se puede reservar",
+    "severidad": "🟡",
+    "estado": "⚠️",
+    "evidencia": "Cierre BOOKING_LEAD_HOURS; configurabilidad completa no ejercida Ver reservas-creditos.md."
+  },
+  {
+    "id": "B7",
+    "dominio": "B",
+    "escenario": "Una clienta acapara lugares",
+    "severidad": "🟡",
+    "estado": "⚠️",
+    "evidencia": "Reglas de horario rechazadas; límite diario protegido trigger; empalmes no probados Ver reservas-creditos.md."
+  },
+  {
+    "id": "B8",
+    "dominio": "B",
+    "escenario": "Intenta reservar sin clases disponibles o con paquete vencido",
+    "severidad": "🔴",
+    "estado": "⚠️",
+    "evidencia": "API bloquea sinpaquete403 y futuro/horario inválido; CTA renovación navegador no certificado."
+  },
+  {
+    "id": "B9",
+    "dominio": "B",
+    "escenario": "Quiere traer a una amiga",
+    "severidad": "🟡",
+    "estado": "⚠️",
+    "evidencia": "RC-02 y RC-03 Ver reservas-creditos.md."
+  },
+  {
+    "id": "B10",
+    "dominio": "B",
+    "escenario": "Toma la misma clase todos los martes",
+    "severidad": "⚪",
+    "estado": "❓",
+    "evidencia": "Recurrencia no ejercida Ver reservas-creditos.md."
+  },
+  {
+    "id": "B11",
+    "dominio": "B",
+    "escenario": "Una clienta acumula no-shows repetidos",
+    "severidad": "🟡",
+    "estado": "❌",
+    "evidencia": "No-show aceptado3días antes y desde waitlist, RC01 reproducido API/PG."
+  },
+  {
+    "id": "B12",
+    "dominio": "B",
+    "escenario": "Quiere ver sus próximas clases y su historial",
+    "severidad": "🟠",
+    "estado": "⚠️",
+    "evidencia": "DOM cancelación pasa; navegación/historial real no probado Ver reservas-creditos.md."
+  },
+  {
+    "id": "B13",
+    "dominio": "B",
+    "escenario": "Una clienta llama por teléfono para reservar",
+    "severidad": "🟠",
+    "estado": "✅",
+    "evidencia": "Reserva, rechazo sin paquete y asignación admin/recepción con saldo Ver reservas-creditos.md."
+  },
+  {
+    "id": "B14",
+    "dominio": "B",
+    "escenario": "La operación tiene sucursales separadas",
+    "severidad": "🔴",
+    "estado": "❓",
+    "evidencia": "Operación HIVE tratada como unestudio; no certificar multi-tenant/multisucursal ni marcar NA sólo por no ver segundasede."
+  },
+  {
+    "id": "C1",
+    "dominio": "C",
+    "escenario": "Cancela con anticipación suficiente",
+    "severidad": "🔴",
+    "estado": "✅",
+    "evidencia": "Dos DELETE concurrentes200/400; devolución una vez; siguiente waitlist confirmado Ver reservas-creditos.md."
+  },
+  {
+    "id": "C2",
+    "dominio": "C",
+    "escenario": "Cancela fuera de la ventana (late cancel)",
+    "severidad": "🟠",
+    "estado": "⚠️",
+    "evidencia": "Unitarias y código, no tiempo real límite API Ver reservas-creditos.md."
+  },
+  {
+    "id": "C3",
+    "dominio": "C",
+    "escenario": "La clienta simplemente no llegó (no-show)",
+    "severidad": "🟠",
+    "estado": "❌",
+    "evidencia": "No-show aceptado3días antes y desde waitlist, RC01 reproducido API/PG."
+  },
+  {
+    "id": "C4",
+    "dominio": "C",
+    "escenario": "Quiere cambiarse a otra clase",
+    "severidad": "🟡",
+    "estado": "✅",
+    "evidencia": "Reagendado con saldo0 conserva0, nuevo confirmed y origen cancelled Ver reservas-creditos.md."
+  },
+  {
+    "id": "C5",
+    "dominio": "C",
+    "escenario": "El estudio cancela una clase (instructora enferma, festivo)",
+    "severidad": "🔴",
+    "estado": "⚠️",
+    "evidencia": "Clase con booking confirmado: delete409, cancel devuelve crédito3→4, retry mantiene4; no entrega externa ni alternativas probadas. Ver clases-coaches.md."
+  },
+  {
+    "id": "C6",
+    "dominio": "C",
+    "escenario": "Cambia la instructora de una clase ya reservada",
+    "severidad": "🟡",
+    "estado": "⚠️",
+    "evidencia": "Reasignación actualiza sin notificación en ruta individual. Ver clases-coaches.md."
+  },
+  {
+    "id": "C7",
+    "dominio": "C",
+    "escenario": "Mueve de horario una clase con reservas existentes",
+    "severidad": "🟠",
+    "estado": "⚠️",
+    "evidencia": "Horario reservado actualiza sin consentimiento ni aviso, CC06. Ver clases-coaches.md."
+  },
+  {
+    "id": "C8",
+    "dominio": "C",
+    "escenario": "Está en waitlist y ya no le interesa",
+    "severidad": "⚪",
+    "estado": "⚠️",
+    "evidencia": "Unitarias waitlist; salida API no ejercida Ver reservas-creditos.md."
+  },
+  {
+    "id": "D1",
+    "dominio": "D",
+    "escenario": "Quiere saber qué paquetes hay y cuánto cuestan",
+    "severidad": "🟠",
+    "estado": "⚠️",
+    "evidencia": "Plan sintético creado/catalogado y precio usado API; UI Cobrar prueba precio efectivo. No se revisaron exhaustivamente nueve tarjetas checkout ni restricciones visibles. Ver ventas-ingresos.md."
+  },
+  {
+    "id": "D2",
+    "dominio": "D",
+    "escenario": "Compra un paquete en línea",
+    "severidad": "🔴",
+    "estado": "⚠️",
+    "evidencia": "MP ficticio activa una vez tras consulta autoritativa; webhooks externos/cargo real/aviso final no certificados y conciliación autónoma pendiente. Ver ventas-ingresos.md."
+  },
+  {
+    "id": "D3",
+    "dominio": "D",
+    "escenario": "Quiere saber cuántas clases le quedan y cuándo vence",
+    "severidad": "🔴",
+    "estado": "⚠️",
+    "evidencia": "ClientDetail tests32-suite incluye saldo/membresía; persistencia tras devolución comprobada. No saldo wallet/WhatsApp/PWA. Ver ventas-ingresos.md."
+  },
+  {
+    "id": "D4",
+    "dominio": "D",
+    "escenario": "El paquete está por vencer (por fecha o por clases)",
+    "severidad": "🟠",
+    "estado": "❓",
+    "evidencia": "No se ejecutó recordatorio de vencimiento ni outbox en este ámbito. Ver ventas-ingresos.md."
+  },
+  {
+    "id": "D5",
+    "dominio": "D",
+    "escenario": "El paquete venció con clases sin usar",
+    "severidad": "🟠",
+    "estado": "❓",
+    "evidencia": "No se ejerció paquete vencido/con saldo ni comunicación de política. Ver ventas-ingresos.md."
+  },
+  {
+    "id": "D6",
+    "dominio": "D",
+    "escenario": "Quiere renovar",
+    "severidad": "🟠",
+    "estado": "⚠️",
+    "evidencia": "ClientDetail tests botón Renovar y enlace Cobrar; API permite compra repetida. No política de stacking ni navegación completa. Ver ventas-ingresos.md."
+  },
+  {
+    "id": "D7",
+    "dominio": "D",
+    "escenario": "Se va de viaje o se lesionó",
+    "severidad": "🟡",
+    "estado": "❓",
+    "evidencia": "Congelación/pausa con reservas futuras no ejercida por este agente. Ver ventas-ingresos.md."
+  },
+  {
+    "id": "D8",
+    "dominio": "D",
+    "escenario": "La clienta pagó en efectivo o transferencia **antes de existir en el sistema**",
+    "severidad": "🔴",
+    "estado": "⚠️",
+    "evidencia": "Venta manual con clienta preexistente+waiver crea paquete/orden/ingreso; reintento sin clave pendiente, alta nueva y fecha real retroactiva no completas. Ver ventas-ingresos.md."
+  },
+  {
+    "id": "D9",
+    "dominio": "D",
+    "escenario": "Una clienta tiene dos paquetes activos (compró antes de que venciera el anterior)",
+    "severidad": "🟠",
+    "estado": "❓",
+    "evidencia": "No comparadas dos membresías elegibles para débito entre todos los canales. Ver ventas-ingresos.md."
+  },
+  {
+    "id": "D10",
+    "dominio": "D",
+    "escenario": "Quiere regalar clases o una gift card",
+    "severidad": "⚪",
+    "estado": "❓",
+    "evidencia": "Gift card/conversión/transferencia no ejercidas; no se presume requisito operativo. Ver ventas-ingresos.md."
+  },
+  {
+    "id": "D11",
+    "dominio": "D",
+    "escenario": "Lanza una promo o precio especial (estudiante, fundadora)",
+    "severidad": "🟡",
+    "estado": "⚠️",
+    "evidencia": "Precio de apertura y motivo manual cubiertos por PaymentsPage tests; esta ejecución no probó cupón concurrente/último uso/segmento. Ver ventas-ingresos.md."
+  },
+  {
+    "id": "D12",
+    "dominio": "D",
+    "escenario": "Quiere dar cortesía: extender vigencia o regalar una clase",
+    "severidad": "🟠",
+    "estado": "⚠️",
+    "evidencia": "Cortesía exige motivo y no inventa ingreso; helper membershipAdmin cubre ajustes. No se ejerció reconciliación posterior de todos ajustes. Ver ventas-ingresos.md."
+  },
+  {
+    "id": "D13",
+    "dominio": "D",
+    "escenario": "Quiere subir de paquete a mitad de vigencia",
+    "severidad": "⚪",
+    "estado": "❓",
+    "evidencia": "Upgrade/prorrateo no ejercido ni política confirmada. Ver ventas-ingresos.md."
+  },
+  {
+    "id": "E1",
+    "dominio": "E",
+    "escenario": "Paga en línea",
+    "severidad": "🔴",
+    "estado": "⚠️",
+    "evidencia": "Monto/moneda/colector/propiedad/waiver/3DS simulados y protegidos; cobro real y retorno físico no probados. Ver ventas-ingresos.md."
+  },
+  {
+    "id": "E2",
+    "dominio": "E",
+    "escenario": "Recibe efectivo o transferencia en mostrador",
+    "severidad": "🔴",
+    "estado": "⚠️",
+    "evidencia": "Venta efectivo/transferencia/referencia y orden auditable verificadas; misma intención sin idempotencia puede duplicar. Ver ventas-ingresos.md."
+  },
+  {
+    "id": "E3",
+    "dominio": "E",
+    "escenario": "El webhook se duplica o el mismo recurso pasa `pending → approved`",
+    "severidad": "🔴",
+    "estado": "⚠️",
+    "evidencia": "Concurrencia misma orden, transición pendiente→aprobado y duplicados de devolución protegidos en PG; no entrega de webhook real, fallo intermedio+retry transaccional exhaustivo no ejercido. Ver ventas-ingresos.md."
+  },
+  {
+    "id": "E4",
+    "dominio": "E",
+    "escenario": "El pago se aprobó pero el webhook nunca llegó, o dos pagos se aprobaron para la misma orden",
+    "severidad": "🔴",
+    "estado": "⚠️",
+    "evidencia": "Recuperación por consulta tras timeout pasa; sin reconciliador autónomo y búsqueda paginada completa, P0-2. Ver ventas-ingresos.md."
+  },
+  {
+    "id": "E5",
+    "dominio": "E",
+    "escenario": "Su pago fue rechazado o quedó incierto",
+    "severidad": "🟠",
+    "estado": "⚠️",
+    "evidencia": "Intento incierto bloquea nuevo POST y conserva intento; 3DS simulado no da acceso anticipado. No tarjeta real/red móvil. Ver ventas-ingresos.md."
+  },
+  {
+    "id": "E6",
+    "dominio": "E",
+    "escenario": "Necesita revisar/reembolsar un cobro total, parcial o duplicado",
+    "severidad": "🟠",
+    "estado": "⚠️",
+    "evidencia": "Total/parcial concurrente y registro negativo pasan, UI dialog tests pasan; auditoría de múltiples transacciones del proveedor y devolución bancaria real no certificadas. Ver ventas-ingresos.md."
+  },
+  {
+    "id": "E7",
+    "dominio": "E",
+    "escenario": "Llega un contracargo (chargeback)",
+    "severidad": "🟡",
+    "estado": "⚠️",
+    "evidencia": "Código apply incluye charged_back y cancela acceso/refleja devolución; prueba actual ejerció refunded, no contracargo ni alerta a dueña. Ver ventas-ingresos.md."
+  },
+  {
+    "id": "E8",
+    "dominio": "E",
+    "escenario": "Quiere su comprobante",
+    "severidad": "🟡",
+    "estado": "❓",
+    "evidencia": "No envío externo; llamadas a correo en verificación/venta no prueban recibo aceptado/entregado. Ver ventas-ingresos.md."
+  },
+  {
+    "id": "E9",
+    "dominio": "E",
+    "escenario": "Necesita factura (CFDI)",
+    "severidad": "⚪",
+    "estado": "❓",
+    "evidencia": "Captura de CFDI no ejercida. Ver ventas-ingresos.md."
+  },
+  {
+    "id": "E10",
+    "dominio": "E",
+    "escenario": "Plataforma multi-tenant que cobra comisión",
+    "severidad": "🟠",
+    "estado": "➖",
+    "evidencia": "HIVE usa cuenta propia según instrucciones, no plataforma que cobre comisión/split; no se requiere OAuth multicomercio para este alcance. Ver ventas-ingresos.md."
+  },
+  {
+    "id": "F1",
+    "dominio": "F",
+    "escenario": "Llega a clase y presenta su QR (wallet pass o app)",
+    "severidad": "🔴",
+    "estado": "⚠️",
+    "evidencia": "Manual con último crédito consumido:0→0, dos PUT200 segundo alreadyCheckedIn; QR/lector físico no ejercidos Ver reservas-creditos.md."
+  },
+  {
+    "id": "F2",
+    "dominio": "F",
+    "escenario": "La clienta no trae celular / el QR no jala",
+    "severidad": "🔴",
+    "estado": "⚠️",
+    "evidencia": "Manual con último crédito consumido:0→0, dos PUT200 segundo alreadyCheckedIn; QR/lector físico no ejercidos Ver reservas-creditos.md."
+  },
+  {
+    "id": "F3",
+    "dominio": "F",
+    "escenario": "Se confirma la asistencia",
+    "severidad": "🔴",
+    "estado": "⚠️",
+    "evidencia": "Manual con último crédito consumido:0→0, dos PUT200 segundo alreadyCheckedIn; QR/lector físico no ejercidos Ver reservas-creditos.md."
+  },
+  {
+    "id": "F4",
+    "dominio": "F",
+    "escenario": "Llega sin reserva y hay lugar (walk-in)",
+    "severidad": "🟠",
+    "estado": "⚠️",
+    "evidencia": "Venta/asignación funciona; variante invitada RC-02/03; no alta+asistencia en un único flujo visual Ver reservas-creditos.md."
+  },
+  {
+    "id": "F5",
+    "dominio": "F",
+    "escenario": "Llega tarde",
+    "severidad": "🟡",
+    "estado": "⚠️",
+    "evidencia": "checkinRule sólo abre90min antes y mismo día; no cierre tardío configurable, política comercial por confirmar Ver reservas-creditos.md."
+  },
+  {
+    "id": "F6",
+    "dominio": "F",
+    "escenario": "Viene por TotalPass/Wellhub/Fitpass",
+    "severidad": "🟠",
+    "estado": "❓",
+    "evidencia": "Excluido por usuario: Wellhub desconfigurado/oculto; no probar ni reactivar agregadores."
+  },
+  {
+    "id": "F7",
+    "dominio": "F",
+    "escenario": "Se fue el internet o la luz",
+    "severidad": "🟡",
+    "estado": "❓",
+    "evidencia": "Offline y vista coach no ejercidos Ver reservas-creditos.md."
+  },
+  {
+    "id": "F8",
+    "dominio": "F",
+    "escenario": "El mismo QR se escanea dos veces",
+    "severidad": "🔴",
+    "estado": "⚠️",
+    "evidencia": "Manual con último crédito consumido:0→0, dos PUT200 segundo alreadyCheckedIn; QR/lector físico no ejercidos Ver reservas-creditos.md."
+  },
+  {
+    "id": "F9",
+    "dominio": "F",
+    "escenario": "Quiere saber quién ya llegó",
+    "severidad": "🟡",
+    "estado": "❓",
+    "evidencia": "Offline y vista coach no ejercidos Ver reservas-creditos.md."
+  },
+  {
+    "id": "G1",
+    "dominio": "G",
+    "escenario": "Activa su paquete/membresía",
+    "severidad": "🟠",
+    "estado": "❓",
+    "evidencia": "Excluido por usuario: botones Apple/Google Wallet ocultos; no probar integración externa. Exclusión no equivale a NA del producto."
+  },
+  {
+    "id": "G2",
+    "dominio": "G",
+    "escenario": "Tiene iPhone / tiene Android",
+    "severidad": "🟠",
+    "estado": "❓",
+    "evidencia": "Excluido por usuario: botones Apple/Google Wallet ocultos; no probar integración externa. Exclusión no equivale a NA del producto."
+  },
+  {
+    "id": "G3",
+    "dominio": "G",
+    "escenario": "Cambia su saldo, su próxima clase o su vencimiento",
+    "severidad": "🟠",
+    "estado": "❓",
+    "evidencia": "Excluido por usuario: botones Apple/Google Wallet ocultos; no probar integración externa. Exclusión no equivale a NA del producto."
+  },
+  {
+    "id": "G4",
+    "dominio": "G",
+    "escenario": "Hay novedad relevante (recordatorio, por vencer)",
+    "severidad": "🟡",
+    "estado": "❓",
+    "evidencia": "Excluido por usuario: botones Apple/Google Wallet ocultos; no probar integración externa. Exclusión no equivale a NA del producto."
+  },
+  {
+    "id": "G5",
+    "dominio": "G",
+    "escenario": "Borró el pass sin querer",
+    "severidad": "🟡",
+    "estado": "❓",
+    "evidencia": "Excluido por usuario: botones Apple/Google Wallet ocultos; no probar integración externa. Exclusión no equivale a NA del producto."
+  },
+  {
+    "id": "G6",
+    "dominio": "G",
+    "escenario": "El paquete venció",
+    "severidad": "🟡",
+    "estado": "❓",
+    "evidencia": "Excluido por usuario: botones Apple/Google Wallet ocultos; no probar integración externa. Exclusión no equivale a NA del producto."
+  },
+  {
+    "id": "G7",
+    "dominio": "G",
+    "escenario": "Su dispositivo no soporta wallet",
+    "severidad": "🟡",
+    "estado": "⚠️",
+    "evidencia": "QR web presente en código/UI tests globales; no lector físico ni recorrido de escaneo navegador con API real."
+  },
+  {
+    "id": "H1",
+    "dominio": "H",
+    "escenario": "Acaba de reservar",
+    "severidad": "🟠",
+    "estado": "⚠️",
+    "evidencia": "Hooks y pruebas existentes en suite; cancelación/promoción/API funcionan. No entrega externa ni validación durable completa por destinatario."
+  },
+  {
+    "id": "H2",
+    "dominio": "H",
+    "escenario": "Su clase es mañana / en 2 horas",
+    "severidad": "🟠",
+    "estado": "❓",
+    "evidencia": "Sin prueba integral en este corte; requiere fixture y recorrido correspondiente."
+  },
+  {
+    "id": "H3",
+    "dominio": "H",
+    "escenario": "El estudio canceló su clase",
+    "severidad": "🔴",
+    "estado": "⚠️",
+    "evidencia": "Hooks y pruebas existentes en suite; cancelación/promoción/API funcionan. No entrega externa ni validación durable completa por destinatario."
+  },
+  {
+    "id": "H4",
+    "dominio": "H",
+    "escenario": "Se liberó su lugar en waitlist",
+    "severidad": "🟠",
+    "estado": "⚠️",
+    "evidencia": "Hooks y pruebas existentes en suite; cancelación/promoción/API funcionan. No entrega externa ni validación durable completa por destinatario."
+  },
+  {
+    "id": "H5",
+    "dominio": "H",
+    "escenario": "Su paquete está por vencer",
+    "severidad": "🟠",
+    "estado": "❓",
+    "evidencia": "Sin prueba integral en este corte; requiere fixture y recorrido correspondiente."
+  },
+  {
+    "id": "H6",
+    "dominio": "H",
+    "escenario": "Acaba de registrarse / activó su primer paquete",
+    "severidad": "🟡",
+    "estado": "⚠️",
+    "evidencia": "Hooks y pruebas existentes en suite; cancelación/promoción/API funcionan. No entrega externa ni validación durable completa por destinatario."
+  },
+  {
+    "id": "H7",
+    "dominio": "H",
+    "escenario": "Lleva 2–3 semanas sin venir",
+    "severidad": "⚪",
+    "estado": "❓",
+    "evidencia": "Sin prueba integral en este corte; requiere fixture y recorrido correspondiente."
+  },
+  {
+    "id": "H8",
+    "dominio": "H",
+    "escenario": "Es su cumpleaños",
+    "severidad": "⚪",
+    "estado": "❓",
+    "evidencia": "Sin prueba integral en este corte; requiere fixture y recorrido correspondiente."
+  },
+  {
+    "id": "H9",
+    "dominio": "H",
+    "escenario": "No quiere ciertos mensajes",
+    "severidad": "🟡",
+    "estado": "❌",
+    "evidencia": "Audiencias all/with_active_membership/without_membership omiten receive_promotions; gap de código CO01."
+  },
+  {
+    "id": "H10",
+    "dominio": "H",
+    "escenario": "Un mensaje no se pudo entregar (número inválido, WhatsApp inexistente)",
+    "severidad": "🟡",
+    "estado": "⚠️",
+    "evidencia": "Campañas enviadas en bucle de request sin outbox durable por destinatario CO02; no extrapolar a todos canales."
+  },
+  {
+    "id": "I1",
+    "dominio": "I",
+    "escenario": "Configura su operación",
+    "severidad": "🔴",
+    "estado": "❌",
+    "evidencia": "CC01 cupo1 con2reservas; CC02 generación duplicada; CC05 horarios/cupos inválidos. Clases-coaches API/PG."
+  },
+  {
+    "id": "I2",
+    "dominio": "I",
+    "escenario": "Empieza el día",
+    "severidad": "🟠",
+    "estado": "❓",
+    "evidencia": "Código vista diaria staff existe; flujo recepción completo con pagos pendientes no ejecutado. Ver clases-coaches.md."
+  },
+  {
+    "id": "I3",
+    "dominio": "I",
+    "escenario": "Busca a una clienta",
+    "severidad": "🔴",
+    "estado": "⚠️",
+    "evidencia": "ClientDetail DOM y asignación API verifican saldo y venta; búsqueda completa por teléfono/historial UI no ejercida."
+  },
+  {
+    "id": "I4",
+    "dominio": "I",
+    "escenario": "Vende un paquete en mostrador",
+    "severidad": "🔴",
+    "estado": "⚠️",
+    "evidencia": "Venta existente→paquete→reserva funciona API admin/recepción; retry duplica venta P0. Alta reclamada y retroactividad no completas."
+  },
+  {
+    "id": "I5",
+    "dominio": "I",
+    "escenario": "Necesita corregir un saldo o vigencia",
+    "severidad": "🟠",
+    "estado": "⚠️",
+    "evidencia": "Cortesía exige motivo y pruebas membershipAdmin pasan; ajustes completos/ledger no ejercidos por navegador."
+  },
+  {
+    "id": "I6",
+    "dominio": "I",
+    "escenario": "Viene un festivo o cierre",
+    "severidad": "🟠",
+    "estado": "⚠️",
+    "evidencia": "Cancelación clase devuelve crédito una vez y preserva historial; semana/rango no ejecutados en este script. Ver clases-coaches.md."
+  },
+  {
+    "id": "I7",
+    "dominio": "I",
+    "escenario": "Tiene recepcionistas e instructoras con acceso",
+    "severidad": "🟠",
+    "estado": "⚠️",
+    "evidencia": "Recepción no ve finanzas (41regresiones pasan); instructor opera clase ajena y coach eliminada mantiene acceso CC03/04. Política de roles amplia requiere decisión."
+  },
+  {
+    "id": "I8",
+    "dominio": "I",
+    "escenario": "Algo raro pasó con un saldo",
+    "severidad": "🟠",
+    "estado": "⚠️",
+    "evidencia": "Bulk prueba fila audit por clase; cancel/delete implementan auditoría. CRUD simple coach/clase no demuestra todos eventos. Ver clases-coaches.md."
+  },
+  {
+    "id": "I9",
+    "dominio": "I",
+    "escenario": "Quiere cambiar una política (ventana de cancelación, tolerancia, penalizaciones)",
+    "severidad": "🟡",
+    "estado": "⚠️",
+    "evidencia": "Producción setting max_cancellations=0; editor completo y todos límites no ejercidos; no se aplicó pedido cancelado de3h."
+  },
+  {
+    "id": "I10",
+    "dominio": "I",
+    "escenario": "Opera más de una sucursal",
+    "severidad": "🔴",
+    "estado": "❓",
+    "evidencia": "Operación HIVE tratada como unestudio; no certificar multi-tenant/multisucursal ni marcar NA sólo por no ver segundasede."
+  },
+  {
+    "id": "I11",
+    "dominio": "I",
+    "escenario": "Una clienta pregunta \"¿por qué me descontaron esta clase?\"",
+    "severidad": "🟠",
+    "estado": "⚠️",
+    "evidencia": "Refund en cancelación verificado en saldo, ledger reconstruible completo delegado. Ver clases-coaches.md."
+  },
+  {
+    "id": "J1",
+    "dominio": "J",
+    "escenario": "Empieza su día",
+    "severidad": "🟠",
+    "estado": "⚠️",
+    "evidencia": "Rutas scoped existen; baja sigue autorizada CC03; no navegador real. Ver clases-coaches.md."
+  },
+  {
+    "id": "J2",
+    "dominio": "J",
+    "escenario": "Va a dar una clase",
+    "severidad": "🟠",
+    "estado": "⚠️",
+    "evidencia": "Proyección roster acotada/attentionNote por rol inspeccionada; primera visita no consta; coach eliminada accede. Ver clases-coaches.md."
+  },
+  {
+    "id": "J3",
+    "dominio": "J",
+    "escenario": "Termina la clase",
+    "severidad": "🟡",
+    "estado": "⚠️",
+    "evidencia": "Check-in de coach borrada demuestra fallo; paso activo integral delegado al equipo. Ver clases-coaches.md."
+  },
+  {
+    "id": "J4",
+    "dominio": "J",
+    "escenario": "Una instructora no puede dar su clase",
+    "severidad": "🟡",
+    "estado": "⚠️",
+    "evidencia": "Reasignación disponible; no aviso en PUT simple (CC06). Ver clases-coaches.md."
+  },
+  {
+    "id": "J5",
+    "dominio": "J",
+    "escenario": "Paga a instructoras por clase",
+    "severidad": "⚪",
+    "estado": "❓",
+    "evidencia": "Nómina/conteo instructor por periodo no ejercido. Ver clases-coaches.md."
+  },
+  {
+    "id": "K1",
+    "dominio": "K",
+    "escenario": "¿Cuánto entró este mes?",
+    "severidad": "🟠",
+    "estado": "⚠️",
+    "evidencia": "Neto total/parcial correcto en laboratorio; P1 límite200 y mes creación vs cobro reproducidos. Ver ventas-ingresos.md."
+  },
+  {
+    "id": "K2",
+    "dominio": "K",
+    "escenario": "¿Qué horarios se llenan y cuáles no?",
+    "severidad": "🟠",
+    "estado": "❓",
+    "evidencia": "Ocupación por horario/día/instructora no auditada aquí; no confundir con ingresos. Ver ventas-ingresos.md."
+  },
+  {
+    "id": "K3",
+    "dominio": "K",
+    "escenario": "¿Estoy reteniendo clientas?",
+    "severidad": "🟠",
+    "estado": "❓",
+    "evidencia": "Existe `/reports/retention`, no contrastado contra población sintética por este agente. Ver ventas-ingresos.md."
+  },
+  {
+    "id": "K4",
+    "dominio": "K",
+    "escenario": "¿A quién le vence pronto?",
+    "severidad": "🟠",
+    "estado": "❓",
+    "evidencia": "Lista accionable de vencimientos no ejercida. Ver ventas-ingresos.md."
+  },
+  {
+    "id": "K5",
+    "dominio": "K",
+    "escenario": "¿Quiénes faltan mucho?",
+    "severidad": "🟡",
+    "estado": "❓",
+    "evidencia": "Reporte agregado faltas/cancelaciones por clienta-periodo no ejercido. Ver ventas-ingresos.md."
+  },
+  {
+    "id": "K6",
+    "dominio": "K",
+    "escenario": "¿Cuánto viene de agregadores?",
+    "severidad": "🟡",
+    "estado": "❓",
+    "evidencia": "Excluido por usuario: Wellhub desconfigurado/oculto; no probar ni reactivar agregadores."
+  },
+  {
+    "id": "K7",
+    "dominio": "K",
+    "escenario": "Quiere llevarse los datos",
+    "severidad": "🟡",
+    "estado": "❓",
+    "evidencia": "Exportaciones CSV no ejercidas. Ver ventas-ingresos.md."
+  },
+  {
+    "id": "L1",
+    "dominio": "L",
+    "escenario": "Plataforma multi-tenant",
+    "severidad": "🔴",
+    "estado": "❓",
+    "evidencia": "Operación HIVE tratada como unestudio; no certificar multi-tenant/multisucursal ni marcar NA sólo por no ver segundasede."
+  },
+  {
+    "id": "L2",
+    "dominio": "L",
+    "escenario": "Entregó datos de salud (A4)",
+    "severidad": "🟠",
+    "estado": "⚠️",
+    "evidencia": "41 regresiones API/PG identidad pasan: perfil, consentimiento/retirada y anonimización; entrega externa y recorrido completo de usuario no certificados. identity-api-retry.log."
+  },
+  {
+    "id": "L3",
+    "dominio": "L",
+    "escenario": "Ejerce derechos ARCO",
+    "severidad": "🟡",
+    "estado": "⚠️",
+    "evidencia": "41 regresiones API/PG identidad pasan: perfil, consentimiento/retirada y anonimización; entrega externa y recorrido completo de usuario no certificados. identity-api-retry.log."
+  },
+  {
+    "id": "L4",
+    "dominio": "L",
+    "escenario": "Endpoints públicos (registro, checkout, webhook)",
+    "severidad": "🟠",
+    "estado": "⚠️",
+    "evidencia": "Rate limit devolvió429 durante primer harness; límites elevados sólo en repetición local. No prueba distribuida/abuso completa."
+  },
+  {
+    "id": "L5",
+    "dominio": "L",
+    "escenario": "Cualquier input de usuario",
+    "severidad": "🟠",
+    "estado": "❌",
+    "evidencia": "Registro débil/teléfonoabc201; fecha imposible500; clases cupo negativo/horas invertidas201. ID01/CC05."
+  },
+  {
+    "id": "L6",
+    "dominio": "L",
+    "escenario": "Llega un webhook",
+    "severidad": "🔴",
+    "estado": "⚠️",
+    "evidencia": "Firma/monto/moneda/propietario y estados MP probados con proveedor ficticio; webhook real no enviado.ventas-ingresos.md."
+  },
+  {
+    "id": "L7",
+    "dominio": "L",
+    "escenario": "\"¿Y si se borra todo?\"",
+    "severidad": "🟠",
+    "estado": "❓",
+    "evidencia": "Sin prueba integral en este corte; requiere fixture y recorrido correspondiente."
+  },
+  {
+    "id": "L8",
+    "dominio": "L",
+    "escenario": "Guarda credenciales de terceros (MP OAuth, APNs, Google Wallet)",
+    "severidad": "🔴",
+    "estado": "⚠️",
+    "evidencia": "Variables de proveedor configuradas en servidor; chequeos estáticos credenciales pasan. No auditoría completa de almacenes/cifrado/logs históricos."
+  },
+  {
+    "id": "EC1",
+    "dominio": "EC",
+    "escenario": "La última cama",
+    "severidad": "🔴",
+    "estado": "✅",
+    "evidencia": "Dos clientes una plaza:1confirmed+1waitlist, saldo total7 de8 Ver reservas-creditos.md."
+  },
+  {
+    "id": "EC2",
+    "dominio": "EC",
+    "escenario": "Doble descuento de crédito",
+    "severidad": "🔴",
+    "estado": "⚠️",
+    "evidencia": "Cancelación doble y checkin doble pasan; todas rutas concurrentes no probadas Ver reservas-creditos.md."
+  },
+  {
+    "id": "EC3",
+    "dominio": "EC",
+    "escenario": "Compra simultánea del último cupo de promo",
+    "severidad": "🟡",
+    "estado": "❓",
+    "evidencia": "Último uso de promo concurrente no ejercido por este agente. Ver ventas-ingresos.md."
+  },
+  {
+    "id": "EC4",
+    "dominio": "EC",
+    "escenario": "El paquete vence entre la reserva y la clase",
+    "severidad": "🟠",
+    "estado": "⚠️",
+    "evidencia": "Membresía futura rechazada; vencimiento entre reserva/clase no ejecutado explícitamente Ver reservas-creditos.md."
+  },
+  {
+    "id": "EC5",
+    "dominio": "EC",
+    "escenario": "Congelación con reservas futuras",
+    "severidad": "🟡",
+    "estado": "❓",
+    "evidencia": "Sin prueba específica suficiente en este corte."
+  },
+  {
+    "id": "EC6",
+    "dominio": "EC",
+    "escenario": "Zona horaria y horario de verano",
+    "severidad": "🟡",
+    "estado": "⚠️",
+    "evidencia": "Zona estudio API/CDMX verificada; conexión DB administrativaUTC no es zona pool app. Test medianoche falla local Node25.9; no certifica todosjobs."
+  },
+  {
+    "id": "EC7",
+    "dominio": "EC",
+    "escenario": "Reserva de medianoche / clase de 6:00 a.m.",
+    "severidad": "🟡",
+    "estado": "❓",
+    "evidencia": "Sin prueba específica suficiente en este corte."
+  },
+  {
+    "id": "EC8",
+    "dominio": "EC",
+    "escenario": "Activación manual retroactiva",
+    "severidad": "🟠",
+    "estado": "⚠️",
+    "evidencia": "API acepta startDate y helpers validan/cuentan días; Cobrar envía fecha actual fija, sin selector retroactivo en esa pantalla; fecha real del dinero no se conserva al aprobar transferencia (P1-2). Ver ventas-ingresos.md."
+  },
+  {
+    "id": "EC9",
+    "dominio": "EC",
+    "escenario": "Webhook duplicado",
+    "severidad": "🔴",
+    "estado": "⚠️",
+    "evidencia": "Duplicados/confirmaciones concurrentes y pending→approved probados con proveedor ficticio; no entrega real ni todos errores de esquema/claim. Ver ventas-ingresos.md."
+  },
+  {
+    "id": "EC10",
+    "dominio": "EC",
+    "escenario": "Pago aprobado, webhook perdido",
+    "severidad": "🔴",
+    "estado": "⚠️",
+    "evidencia": "Reabrir recupera pago sin volver a cobrar; recuperación autónoma/paginación pendientes P0-2. Ver ventas-ingresos.md."
+  },
+  {
+    "id": "EC11",
+    "dominio": "EC",
+    "escenario": "Reembolso de paquete parcialmente usado",
+    "severidad": "🟠",
+    "estado": "⚠️",
+    "evidencia": "Devolución parcial250 reduce saldo4→3 y neto1000→750; total tras cancelación deja0. No fixture con asistencias históricas reales ni política exacta por clase consumida. Ver ventas-ingresos.md."
+  },
+  {
+    "id": "EC12",
+    "dominio": "EC",
+    "escenario": "Contracargo con paquete ya consumido",
+    "severidad": "🟡",
+    "estado": "⚠️",
+    "evidencia": "Rama charged_back en código cancela restantes; no ejecución con paquete consumido ni alerta a dueña. Ver ventas-ingresos.md."
+  },
+  {
+    "id": "EC13",
+    "dominio": "EC",
+    "escenario": "¿De cuál paquete descuento?",
+    "severidad": "🟠",
+    "estado": "❓",
+    "evidencia": "Selector determinista inspeccionado, múltiples paquetes no ejercidos Ver reservas-creditos.md."
+  },
+  {
+    "id": "EC14",
+    "dominio": "EC",
+    "escenario": "Clase trial que se vuelve compra",
+    "severidad": "🟡",
+    "estado": "➖",
+    "evidencia": "Trial no forma parte del catálogo actual solicitado; paquetes anteriores eliminados por instrucción del usuario."
+  },
+  {
+    "id": "EC15",
+    "dominio": "EC",
+    "escenario": "Eliminar cuenta con paquete activo",
+    "severidad": "🟡",
+    "estado": "✅",
+    "evidencia": "API/PG: baja con membresía activa/reserva futura409 sin cambios; baja sin compromisos anonimiza y preserva contabilidad.41regresiones identidad."
+  },
+  {
+    "id": "EC16",
+    "dominio": "EC",
+    "escenario": "Sin internet en la puerta",
+    "severidad": "🟡",
+    "estado": "❓",
+    "evidencia": "Sin prueba específica suficiente en este corte."
+  },
+  {
+    "id": "EC17",
+    "dominio": "EC",
+    "escenario": "Pass desactualizado",
+    "severidad": "🟠",
+    "estado": "❓",
+    "evidencia": "Excluido por usuario: botones Apple/Google Wallet ocultos; no probar integración externa. Exclusión no equivale a NA del producto."
+  },
+  {
+    "id": "EC18",
+    "dominio": "EC",
+    "escenario": "QR compartido/reenviado",
+    "severidad": "🟡",
+    "estado": "❓",
+    "evidencia": "Sin prueba específica suficiente en este corte."
+  },
+  {
+    "id": "EC19",
+    "dominio": "EC",
+    "escenario": "Check-in de agregador sin cupo de canal",
+    "severidad": "🟠",
+    "estado": "❓",
+    "evidencia": "Excluido por usuario: Wellhub desconfigurado/oculto; no probar ni reactivar agregadores."
+  },
+  {
+    "id": "EC20",
+    "dominio": "EC",
+    "escenario": "RLS leak",
+    "severidad": "🔴",
+    "estado": "❓",
+    "evidencia": "Operación HIVE tratada como unestudio; no certificar multi-tenant/multisucursal ni marcar NA sólo por no ver segundasede."
+  },
+  {
+    "id": "EC21",
+    "dominio": "EC",
+    "escenario": "El teléfono cambió y nadie se enteró",
+    "severidad": "🟡",
+    "estado": "❓",
+    "evidencia": "Sin prueba específica suficiente en este corte."
+  },
+  {
+    "id": "EC22",
+    "dominio": "EC",
+    "escenario": "Instructora que también es clienta",
+    "severidad": "🟡",
+    "estado": "❓",
+    "evidencia": "Sin prueba específica suficiente en este corte."
+  },
+  {
+    "id": "EC23",
+    "dominio": "EC",
+    "escenario": "\"Yo pagué, checa tus mensajes\"",
+    "severidad": "🟠",
+    "estado": "⚠️",
+    "evidencia": "Transferencia crea orden pending y no ingreso, admin verifica una vez; no se ejerció adjuntar comprobante ni nota manual de recepción/sin registro. Ver ventas-ingresos.md."
+  },
+  {
+    "id": "EC24",
+    "dominio": "EC",
+    "escenario": "Se equivocó de sucursal u horario",
+    "severidad": "🟡",
+    "estado": "❓",
+    "evidencia": "Operación HIVE tratada como unestudio; no certificar multi-tenant/multisucursal ni marcar NA sólo por no ver segundasede."
+  },
+  {
+    "id": "EC25",
+    "dominio": "EC",
+    "escenario": "Embarazo o lesión a media vigencia",
+    "severidad": "🟡",
+    "estado": "❓",
+    "evidencia": "Sin prueba específica suficiente en este corte."
+  },
+  {
+    "id": "EC26",
+    "dominio": "EC",
+    "escenario": "El redeploy pisa configuración operativa",
+    "severidad": "🔴",
+    "estado": "⚠️",
+    "evidencia": "Regresión seed no sobrescribe password y ediciónpromociones pasan; reinicio con valores operativos personalizados no ejercido completo."
+  },
+  {
+    "id": "EC27",
+    "dominio": "EC",
+    "escenario": "El contador de cupo deriva del estado real",
+    "severidad": "🔴",
+    "estado": "✅",
+    "evidencia": "Query mismatches current_bookings versus confirmed/checked_in=[] Ver reservas-creditos.md."
+  },
+  {
+    "id": "EC28",
+    "dominio": "EC",
+    "escenario": "La mutación funciona pero la UI muestra caché vieja",
+    "severidad": "🟡",
+    "estado": "❓",
+    "evidencia": "No navegador con caché preexistente Ver reservas-creditos.md."
+  },
+  {
+    "id": "EC29",
+    "dominio": "EC",
+    "escenario": "Sucursal modelada como sala o texto decorativo",
+    "severidad": "🔴",
+    "estado": "❓",
+    "evidencia": "Operación HIVE tratada como unestudio; no certificar multi-tenant/multisucursal ni marcar NA sólo por no ver segundasede."
+  }
+]

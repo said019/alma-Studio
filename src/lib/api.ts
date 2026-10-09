@@ -14,7 +14,10 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (r) => r,
   (err) => {
-    if (err.response?.status === 401) {
+    const requestAuthorization = err.config?.headers?.Authorization;
+    const currentToken = localStorage.getItem("auth_token");
+    // A delayed response from a previous session must not sign out a newer login.
+    if (err.response?.status === 401 && currentToken && requestAuthorization === `Bearer ${currentToken}`) {
       localStorage.removeItem("auth_token");
       const path = window.location.pathname;
       if (path.startsWith("/app") || path.startsWith("/admin") || path.startsWith("/staff")) {

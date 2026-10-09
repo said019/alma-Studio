@@ -76,7 +76,7 @@ interface AuthState {
 
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       user: null,
       token: null,
       isAuthenticated: false,
@@ -142,12 +142,17 @@ export const useAuthStore = create<AuthState>()(
         // 2026-09-27, riesgo 3). Sólo un 401 real cierra la sesión.
         const waits = [1000, 2000, 4000];
         for (let attempt = 0; ; attempt++) {
+          if (localStorage.getItem("auth_token") !== token) return;
           try {
             const res = await api.get<{ user: User }>("/auth/me");
+            if (localStorage.getItem("auth_token") !== token) return;
             set({ user: res.data.user, token, isAuthenticated: true, isLoading: false, sessionCheck: "ok" });
             return;
           } catch (err: any) {
             const status = err?.response?.status;
+            // The interceptor may already have removed this exact token.
+            const currentToken = localStorage.getItem("auth_token");
+            if (currentToken !== token && !(status === 401 && currentToken === null && get().token === token)) return;
             if (status === 401) {
               localStorage.removeItem("auth_token");
               set({ user: null, token: null, isAuthenticated: false, isLoading: false, sessionCheck: "unauthorized" });
@@ -171,7 +176,7 @@ export const useAuthStore = create<AuthState>()(
 
       setAuth: (user, token) => {
         localStorage.setItem("auth_token", token);
-        set({ user, token, isAuthenticated: true });
+        set({ user, token, isAuthenticated: true, isLoading: false, sessionCheck: "ok" });
       },
     }),
     {

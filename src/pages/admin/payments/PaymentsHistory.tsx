@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import CobrosTabs from "./CobrosTabs";
 import { summarizePayments, type PaymentRow } from "./payments-summary";
 import RefundDialog from "./RefundDialog";
+import MercadoPagoReview from "./MercadoPagoReview";
 import { REFUND_METHOD_LABEL, type RefundablePayment } from "./refund-math";
 
 const METHOD: Record<string, string> = { cash: "Efectivo", card: "Tarjeta", transfer: "Transferencia" };
@@ -58,14 +59,15 @@ export default function PaymentsHistoryPage() {
 }
 
 function PaymentsHistoryContent() {
-  const { data, isLoading, isError, refetch } = useQuery<{ data: Payment[] }>({
-    queryKey: ["payments"],
-    queryFn: async () => (await api.get("/payments")).data,
+  const [offset, setOffset] = useState(0);
+  const { data, isLoading, isError, refetch } = useQuery<{ data: Payment[]; summary?: ReturnType<typeof summarizePayments>; pagination?: {limit:number;offset:number;totalCount:number;hasMore:boolean} }>({
+    queryKey: ["payments", offset],
+    queryFn: async () => (await api.get(offset ? `/payments?offset=${offset}` : "/payments")).data,
   });
   const payments = Array.isArray(data?.data) ? data!.data : [];
   const [reembolso, setReembolso] = useState<Payment | null>(null);
   const now = new Date();
-  const s = summarizePayments(payments, now);
+  const s = data?.summary ?? summarizePayments(payments, now);
   const byMethod = Object.entries(s.byMethod)
     .map(([k, v]) => `${METHOD[k] ?? k} ${formatMXN(v)}`)
     .join(" · ") || "—";
@@ -74,6 +76,7 @@ function PaymentsHistoryContent() {
     <AdminLayout>
       <AdminPage>
         <AdminPageHeader kicker="Cobros" title="Historial" subtitle="Órdenes aprobadas, membresías asignadas en mostrador y reembolsos." actions={<CobrosTabs />} />
+        <MercadoPagoReview />
         {isLoading ? (
           <div className="space-y-2">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-[56px] w-full rounded-xl" />)}</div>
         ) : isError ? (
@@ -127,6 +130,11 @@ function PaymentsHistoryContent() {
                   ))}
                 </TableBody>
               </Table>
+              {data?.pagination && <nav aria-label="Páginas del historial" className="flex items-center justify-between gap-3 border-t p-4">
+                <Button variant="outline" disabled={offset===0} onClick={()=>setOffset(Math.max(0,offset-data.pagination!.limit))}>Anterior</Button>
+                <span className="text-sm">{offset+1}–{Math.min(offset+payments.length,data.pagination.totalCount)} de {data.pagination.totalCount} movimientos</span>
+                <Button variant="outline" disabled={!data.pagination.hasMore} onClick={()=>setOffset(offset+data.pagination!.limit)}>Siguiente</Button>
+              </nav>}
             </Panel>
           </>
         )}

@@ -111,3 +111,33 @@ describe("logout — limpia también sessionCheck", () => {
     expect(localStorage.getItem("auth_token")).toBeNull();
   });
 });
+
+
+describe("checkAuth — respuestas de sesiones anteriores", () => {
+  it.each([200, 401, 503])("ignora respuesta tardía %s después de otro login", async (status) => {
+    let finish!: (value: any) => void;
+    mockGet.mockImplementationOnce(() => new Promise((resolve, reject) => {
+      finish = status === 200 ? resolve : reject;
+    }));
+    const pending = useAuthStore.getState().checkAuth();
+    const newer = { id: "new-user", role: "client" } as any;
+    useAuthStore.getState().setAuth(newer, "new-token");
+    finish(status === 200 ? { data: { user: { id: "old-user" } } } : { response: { status } });
+    await pending;
+    expect(localStorage.getItem("auth_token")).toBe("new-token");
+    expect(useAuthStore.getState().user).toEqual(newer);
+    expect(useAuthStore.getState().isLoading).toBe(false);
+    expect(useAuthStore.getState().isAuthenticated).toBe(true);
+    expect(mockGet).toHaveBeenCalledTimes(1);
+  });
+  it("no resucita una sesión cerrada mientras llega auth/me", async () => {
+    let finish!: (value: any) => void;
+    mockGet.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    const pending = useAuthStore.getState().checkAuth();
+    useAuthStore.getState().logout();
+    finish({ data: { user: { id: "old-user" } } });
+    await pending;
+    expect(useAuthStore.getState().isAuthenticated).toBe(false);
+    expect(localStorage.getItem("auth_token")).toBeNull();
+  });
+});

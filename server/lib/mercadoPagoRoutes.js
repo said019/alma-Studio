@@ -1,9 +1,10 @@
+import { searchOrderPayments, canonicalPayment } from './mpReconciliation.js';
 import { resolveEffectivePrice, resolvePlanPaymentUrl } from "./pricing.js";
 import crypto from 'node:crypto';
 import {mpConfig,mpError,assertMpPayment,buildMpPayment,verifyMpSignature} from './mercadoPago.js';
 const uuid=s=>/^[a-f\d]{8}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{12}$/i.test(String(s));
 const publicPayment=p=>({paymentId:String(p.id),status:p.status,statusDetail:p.status_detail,refundedAmount:Number(p.transaction_amount_refunded||(['refunded','charged_back'].includes(p.status)?p.transaction_amount:0)),...(p.status_detail==='pending_challenge'?{threeDS:p.three_ds_info}:{})});
-export function registerMercadoPago(app,{pool,auth,finalizeOrder,afterPayment=()=>{},afterReversal=()=>{},purchaseConflict,hasWaiver,fetchImpl=fetch,config=()=>mpConfig()}) {
+export function registerMercadoPago(app,{pool,auth,owner,finalizeOrder,afterPayment=()=>{},afterReversal=()=>{},purchaseConflict,hasWaiver,fetchImpl=fetch,config=()=>mpConfig()}) {
  const wrap=fn=>async(req,res,next)=>{try{return await fn(req,res,next);}catch(e){return res.status(e.status||503).json({message:e.status?e.message:'No pudimos confirmar el pago. Consulta su estado antes de volver a pagar.'});}};
  const ready=()=>{const c=config();if(!c.ready)throw mpError('El pago integrado con tarjeta todavía no está disponible.',503);return c;};
  const request=async(path,c,init={})=>{
@@ -30,10 +31,19 @@ export function registerMercadoPago(app,{pool,auth,finalizeOrder,afterPayment=()
    // Ignore stale intermediate notifications after a terminal provider result.
    if(['refunded','charged_back','cancelled'].includes(order.mp_payment_status)&&payment.status!==order.mp_payment_status){await db.query('ROLLBACK');return;}
    if(order.mp_payment_status==='approved'&&['pending','in_process','authorized','rejected'].includes(payment.status)){await db.query('ROLLBACK');return;}
-   await db.query('UPDATE orders SET mp_payment_id=$2,mp_payment_status=$3,updated_at=NOW() WHERE id=$1',[order.id,String(payment.id),payment.status]);
+   await db.query(`UPDATE orders SET mp_payment_id=$2,mp_payment_status=$3,
+    mp_method_id=$4,mp_type_id=$5,
+    paid_at=CASE WHEN $3 IN ('approved','refunded','charged_back') THEN COALESCE(paid_at,$6::timestamptz,NOW()) ELSE paid_at END,
+    updated_at=NOW() WHERE id=$1`,[order.id,String(payment.id),payment.status,payment.payment_method_id||null,payment.payment_type_id,
+    payment.date_approved && Number.isFinite(Date.parse(payment.date_approved)) ? payment.date_approved : null]);
    await db.query('UPDATE mp_card_attempts SET payment_id=$2,status=$3,updated_at=NOW() WHERE order_id=$1',[order.id,String(payment.id),payment.status]);
    const providerRefunded = ['refunded','charged_back'].includes(payment.status) ? Number(order.total_amount) : Number(payment.transaction_amount_refunded||0);
    if(!Number.isFinite(providerRefunded)||providerRefunded<0||providerRefunded>Number(order.total_amount))throw mpError('Importe de devolución incompatible.',409);
+   if(['refunded','charged_back'].includes(payment.status)&&order.status!=='approved'){
+    // A reversal proves both the original collection and its return. Recognize
+    // the gross receipt without granting access, so net revenue remains zero.
+    await db.query("UPDATE orders SET status='approved',updated_at=NOW() WHERE id=$1",[order.id]);
+   }
    if(payment.status==='approved'&&order.status!=='approved'){
     if(!['pending_payment','pending_verification','expired'].includes(order.status)||Number(order.refunded_amount||0)>0||providerRefunded>0)throw mpError('El pago necesita revisión del estudio; la orden no permite activación.',409);
     await finalizeOrder(db,order.id);activated=true;
@@ -58,21 +68,82 @@ export function registerMercadoPago(app,{pool,auth,finalizeOrder,afterPayment=()
   if(activated||reversed)await afterPayment(order.user_id);
   if(freedClasses.length)await afterReversal(freedClasses);
  }
- async function recover(order,c){
+ async function review(order,payment,reason) {
+  await pool.query(`INSERT INTO mp_payment_reviews(order_id,payment_id,reason,provider_status,amount,currency)
+   VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(order_id,payment_id) DO UPDATE SET
+   reason=EXCLUDED.reason,provider_status=EXCLUDED.provider_status,amount=EXCLUDED.amount,
+   currency=EXCLUDED.currency,last_seen_at=NOW()`,[order.id,String(payment.id),reason,payment.status,
+   Number.isFinite(Number(payment.transaction_amount))?Number(payment.transaction_amount):null,payment.currency_id]);
+ }
+ async function recover(order,c,{searchAll=false}={}){
   const a=(await pool.query('SELECT * FROM mp_card_attempts WHERE order_id=$1',[order.id])).rows[0];
   if(!a)return {attempt:null,payment:null};
-  let id=a.payment_id;
-  if(!id){
-   const data=await request(`/v1/payments/search?external_reference=${encodeURIComponent(order.id)}&sort=date_created&criteria=desc`,c);
-   const found=(data.results||[]).filter(p=>p.external_reference===order.id);
-   if(found.length>1)throw mpError('Hay más de un movimiento asociado. El estudio debe revisar el pago.',409);
-   if(!found.length)return {attempt:a,payment:{status:'processing'}};
-   id=String(found[0].id);
+  let id=order.mp_payment_id||a.payment_id;
+  if(!id||searchAll){
+   const found=await searchOrderPayments(path=>request(path,c),order.id);
+   const valid=[];
+   for(const candidate of found){
+    try {assertMpPayment({...order,mp_payment_id:null},candidate,c);valid.push(candidate);}
+    catch(e){await review(order,candidate,'Referencia, importe, moneda o receptor incompatible');}
+   }
+   const chosen=canonicalPayment(valid,id);
+   for(const extra of valid)if(chosen?String(extra.id)!==String(chosen.id):id&&String(extra.id)!==String(id))
+    await review(order,extra,'Movimiento adicional: revisar en Mercado Pago; no se activa ni reembolsa automáticamente');
+   if(!id&&chosen)id=String(chosen.id);
+   if(!id){
+    if(found.length)throw mpError('El pago necesita revisión del estudio.',409);
+    return {attempt:a,payment:{status:'processing'}};
+   }
   }
   if(!/^\d+$/.test(String(id)))throw mpError('Identificador de pago inválido.',409);
-  const p=await request(`/v1/payments/${id}`,c);assertMpPayment(order,p,c);await apply(p,c);
+  const p=await request(`/v1/payments/${id}`,c);
+  try {assertMpPayment(order,p,c);await apply(p,c);}
+  catch(e){if(e.status===409)await review(order,p,'El pago necesita revisión antes de modificar la orden');throw e;}
   return {attempt:a,payment:publicPayment(p)};
  }
+ async function reconcile({limit=20}={}) {
+  const c=config();if(!c.ready)return {checked:0,failed:0};
+  // A persisted lease coordinates processes; attempted_at rotates even failures.
+  const claim=crypto.randomUUID();
+  const batch=Math.max(1,Math.min(100,Number(limit)||20));
+  const claimRows=async(count,urgent)=>(await pool.query(`WITH candidates AS (
+   SELECT o.id FROM orders o JOIN mp_card_attempts a ON a.order_id=o.id
+   WHERE o.payment_provider='mercadopago' AND o.mp_checkout_mode='embedded'
+    AND o.mp_collector_id=$1 AND (o.mp_sync_lease_until IS NULL OR o.mp_sync_lease_until<NOW())
+    AND (o.status IN ('pending_payment','pending_verification','expired'))=$4
+    AND (o.mp_sync_attempted_at IS NULL OR o.mp_sync_attempted_at<NOW()-
+      CASE WHEN $4 THEN INTERVAL '2 minutes' ELSE INTERVAL '6 hours' END)
+   ORDER BY o.mp_sync_attempted_at NULLS FIRST,o.id LIMIT $2 FOR UPDATE OF o SKIP LOCKED
+  ) UPDATE orders o SET mp_sync_claim=$3,mp_sync_lease_until=NOW()+INTERVAL '15 minutes',
+    mp_sync_attempted_at=NOW() FROM candidates c WHERE o.id=c.id RETURNING o.*`,
+   [c.collectorId,count,claim,urgent])).rows;
+  // Reserve most of each batch for unresolved purchases, but keep historical
+  // approvals/cancellations rotating to detect late reversals and extra charges.
+  const claimed=await claimRows(Math.max(1,Math.ceil(batch*.75)),true);
+  claimed.push(...await claimRows(batch-claimed.length,false));
+  let failed=0;
+  for(const order of claimed){
+   try{
+    await recover(order,c,{searchAll:true});
+    await pool.query(`UPDATE orders SET provider_synced_at=NOW(),mp_sync_error=NULL,
+     mp_sync_lease_until=NULL,mp_sync_claim=NULL WHERE id=$1 AND mp_sync_claim=$2`,[order.id,claim]);
+   }catch(e){
+    failed++;
+    // Never persist raw provider errors or credentials.
+    await pool.query(`UPDATE orders SET mp_sync_error=$3,mp_sync_lease_until=NULL,
+     mp_sync_claim=NULL WHERE id=$1 AND mp_sync_claim=$2`,[order.id,claim,
+     e.status===409?'Revisión manual requerida':'Proveedor temporalmente no disponible; se reintentará']);
+   }
+  }
+  return {checked:claimed.length,failed};
+ }
+ if(owner)app.get('/api/admin/payments/mercadopago-review',owner,wrap(async(_req,res)=>{
+  const reviews=(await pool.query(`SELECT r.*,o.order_number FROM mp_payment_reviews r JOIN orders o ON o.id=r.order_id
+   WHERE r.status='needs_review' ORDER BY r.last_seen_at DESC LIMIT 200`)).rows;
+  const syncErrors=(await pool.query(`SELECT id,order_number,mp_sync_error,mp_sync_attempted_at FROM orders
+   WHERE mp_sync_error IS NOT NULL ORDER BY mp_sync_attempted_at DESC LIMIT 200`)).rows;
+  res.json({data:{reviews,syncErrors}});
+ }));
  const session=wrap(async(req,res)=>{
   const {order,account}=await load(req);const {attempt,payment}=await recover(order,account);
   const fresh=(await pool.query('SELECT status,refund_status,refunded_amount FROM orders WHERE id=$1',[order.id])).rows[0];
@@ -102,7 +173,13 @@ export function registerMercadoPago(app,{pool,auth,finalizeOrder,afterPayment=()
   // Never retry POST on timeout or ambiguous failure. The reserved attempt survives.
   const p=await request('/v1/payments',account,{method:'POST',headers:{'Content-Type':'application/json','X-Idempotency-Key':attempt.idempotency_key},body:JSON.stringify(body)});
   assertMpPayment(order,p,account);
-  await pool.query('UPDATE mp_card_attempts SET payment_id=$2,status=$3,updated_at=NOW() WHERE order_id=$1',[order.id,String(p.id),p.status]);
+  const assigned=await pool.query(`UPDATE mp_card_attempts SET payment_id=$2,
+   status=CASE WHEN payment_id IS NULL THEN $3 ELSE status END,updated_at=NOW()
+   WHERE order_id=$1 AND (payment_id IS NULL OR payment_id=$2) RETURNING order_id`,[order.id,String(p.id),p.status]);
+  if(!assigned.rowCount){
+   await review(order,p,'Respuesta tardía: otro movimiento ya fue asociado a la orden');
+   throw mpError('El estudio debe revisar este movimiento adicional.',409);
+  }
   // Browser submission never activates access; a subsequent authenticated GET does.
   return res.status(202).json({data:publicPayment(p)});
  }));
@@ -110,7 +187,14 @@ export function registerMercadoPago(app,{pool,auth,finalizeOrder,afterPayment=()
   const c=ready();const id=req.query['data.id'];
   if(req.body?.data?.id!=null&&String(req.body.data.id)!==String(id))throw mpError('Notificación incompatible.',401);
   if(!verifyMpSignature({signature:req.headers['x-signature'],requestId:req.headers['x-request-id'],dataId:id,secret:c.webhookSecret}))throw mpError('Firma de notificación inválida.',401);
-  const p=await request(`/v1/payments/${id}`,c);await apply(p,c);return res.json({received:true});
+  const p=await request(`/v1/payments/${id}`,c);
+  try{await apply(p,c);}catch(e){
+   if(e.status!==409)throw e;
+   const order=(await pool.query('SELECT * FROM orders WHERE id=$1',[uuid(p.external_reference)?p.external_reference:null])).rows[0];
+   if(!order)throw e;
+   await review(order,p,'Notificación requiere revisión; no se modificó el pago principal');
+  }
+  return res.json({received:true});
  }));
  // Intercept before the legacy Stripe routes. Existing provider sessions are immutable.
  app.post('/api/orders/:id/pay-with-card',auth,wrap(async(req,res)=>{
@@ -141,7 +225,14 @@ export function registerMercadoPago(app,{pool,auth,finalizeOrder,afterPayment=()
   }catch(e){await db.query('ROLLBACK').catch(()=>{});throw e;}finally{db.release();}
  }));
  app.post('/api/orders/:id/cancel',auth,wrap(async(req,res,next)=>{
-  if(!uuid(req.params.id))throw mpError('Orden inválida.');const db=await pool.connect();
+  if(!uuid(req.params.id))throw mpError('Orden inválida.');
+  const before=(await pool.query('SELECT * FROM orders WHERE id=$1 AND user_id=$2',[req.params.id,req.userId])).rows[0];
+  if(before?.mp_checkout_mode==='embedded'){
+   await recover(before,ready(),{searchAll:true});
+   const reviewNeeded=await pool.query("SELECT 1 FROM mp_payment_reviews WHERE order_id=$1 AND status='needs_review' LIMIT 1",[before.id]);
+   if(reviewNeeded.rowCount)throw mpError('El estudio debe revisar los movimientos antes de cancelar.',409);
+  }
+  const db=await pool.connect();
   try{
    await db.query('BEGIN');const o=(await db.query('SELECT * FROM orders WHERE id=$1 AND user_id=$2 FOR UPDATE',[req.params.id,req.userId])).rows[0];
    if(!o||o.mp_checkout_mode!=='embedded'){await db.query('ROLLBACK');return next();}
@@ -150,5 +241,5 @@ export function registerMercadoPago(app,{pool,auth,finalizeOrder,afterPayment=()
    await db.query("UPDATE orders SET status='cancelled',updated_at=NOW() WHERE id=$1",[o.id]);await db.query('COMMIT');return res.json({message:'Orden cancelada'});
   }catch(e){await db.query('ROLLBACK').catch(()=>{});throw e;}finally{db.release();}
  }));
- return {processVerifiedPayment:apply};
+ return {processVerifiedPayment:apply,reconcile};
 }

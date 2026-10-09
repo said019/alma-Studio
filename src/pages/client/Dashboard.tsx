@@ -181,7 +181,7 @@ const Dashboard = () => {
         {waiverData !== undefined && !waiver && (
           <div className="mt-4 rounded-2xl border border-accent-strong/40 bg-accent-soft/20 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
             <div className="space-y-0.5">
-              <p className="text-[0.72rem] font-bold uppercase tracking-[0.16em] text-accent-strong">
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-accent-strong">
                 Paso pendiente
               </p>
               <p className="font-semibold text-ink text-sm sm:text-base">

@@ -12,7 +12,7 @@ let A;
 
 const registrar = (key, extra = {}) => api("POST", "/api/auth/register", { body: {
   email: `${PFX}_${key}@qa.local`, password: "QaPass!2026", displayName: `QA ${key}`,
-  phone: "+525500000000", acceptsTerms: true, acceptsCommunications: false, ...extra,
+  phone: "+525512345678", gender: "other", dateOfBirth: "1990-05-05", acceptsTerms: true, acceptsCommunications: false, ...extra,
 } });
 const editar = (c, body) => api("PUT", `/api/users/${c.id}`, { token: c.token, body });
 const salud = async (id) => (await sql(

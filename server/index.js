@@ -1,5 +1,8 @@
+import { CAMPAIGN_SCHEMA } from './lib/campaignOutbox.js';
+import { MANUAL_SALE_INTENT_SCHEMA, saleIntentHash } from "./lib/manualSaleIntent.js";
 import { ORDER_PAYMENT_WINDOW_MS, expireUnpaidOrders } from "./lib/orderExpiration.js";
 import { registerBulkClasses } from "./lib/bulkClasses.js";
+import { registerClassAdminWrites, assertClassActor } from "./lib/classAdminWrites.js";
 import { studioDateTimeFormatter } from "./lib/studioDateFormatters.js";
 import { applyHiveStudioSettings } from "./lib/hiveStudioSettings.js";
 import { registerCommunications } from "./lib/communications.js";
@@ -91,6 +94,7 @@ import { validateWellhubVisit as wellhubValidateVisit } from "./lib/wellhub/api.
 import { handleBookingRequested, handleCheckin, handleCancel, handlePlanChange } from "./lib/wellhub/flows.js";
 import { wellhubMonthRange, summarizeWellhubMonth } from "./lib/wellhub/reconcile.js";
 import { isUuid, isDay, signatureProblem } from "./lib/validate.js";
+import { validateRegistration } from "./lib/registrationValidation.js";
 import { checkinRule, noShowCorrectionRule } from "./lib/checkin.js";
 import { responsivaDocument, waiverVersionProblem } from "./lib/responsiva.js";
 import { normalizeWaiverIntake, waiverWithIntake, WAIVER_INTAKE_LABELS, WAIVER_HEALTH_FIELDS } from "./lib/waiverIntake.js";
@@ -1674,6 +1678,7 @@ async function ensureSchema() {
     `).catch(() => { });
 
     await pool.query(MP_SCHEMA);
+    await pool.query(CAMPAIGN_SCHEMA);
 
     // ── Wellhub / partner channels ──────────────────────────────────────────
     await pool.query(`CREATE TABLE IF NOT EXISTS platform_credentials (
@@ -1748,6 +1753,9 @@ async function ensureSchema() {
     await pool.query(`DROP TRIGGER IF EXISTS trg_channel_inventory ON bookings`).catch(() => { });
     await pool.query(`CREATE TRIGGER trg_channel_inventory AFTER INSERT OR UPDATE OR DELETE ON bookings
       FOR EACH ROW EXECUTE FUNCTION fn_update_channel_inventory()`).catch((e) => console.warn("[schema] inv trg:", e.message));
+
+    // Durable receipt for retries of the same manual sale; fail startup if absent.
+    await pool.query(MANUAL_SALE_INTENT_SCHEMA);
 
     // ── Bitácora de acciones del personal (auditoría 2026-09-27, bloque 2) ──
     // Sin llaves foráneas a propósito: la bitácora sobrevive a la persona y a la
@@ -2469,7 +2477,11 @@ async function consumeMembershipCredit(client, membershipId, classId) {
   );
 }
 
-async function restoreMembershipCredit(client, membershipId, classId) {
+async function restoreMembershipCredit(client, membershipId, classId, bookingId = null) {
+  if (bookingId) {
+    const b = (await client.query("SELECT partner_metadata FROM bookings WHERE id=$1", [bookingId])).rows[0];
+    if (b?.partner_metadata?.hive_guest_pass === true) return false;
+  }
   await client.query(
     `UPDATE memberships m
         SET classes_remaining = m.classes_remaining + 1,
@@ -3235,9 +3247,9 @@ const accountGate = createAccountGate({
 
 // Venta o asignación a una clienta dada de baja: 409 antes de abrir cualquier
 // transacción, para no reactivarla por accidente.
-async function anonymizedSaleConflict(userId) {
+async function anonymizedSaleConflict(userId, queryable = pool) {
   if (!isUuid(userId)) return null;
-  const r = await pool.query("SELECT anonymized_at FROM users WHERE id = $1", [userId]);
+  const r = await queryable.query("SELECT anonymized_at FROM users WHERE id = $1", [userId]);
   if (r.rows.length && r.rows[0].anonymized_at) {
     return { code: "ACCOUNT_ANONYMIZED", message: "Este usuario fue dado de baja." };
   }
@@ -3254,8 +3266,13 @@ async function authMiddleware(req, res, next) {
     return res.status(401).json({ message: "Token inválido" });
   }
   req.userId = payload.sub;
-  if (await accountGate.isDisabled(req.userId)) {
-    return res.status(401).json({ code: "ACCOUNT_DISABLED", message: "Esta cuenta fue dada de baja." });
+  try {
+    if (await accountGate.isDisabled(req.userId)) {
+      return res.status(401).json({ code: "ACCOUNT_DISABLED", message: "Esta cuenta fue dada de baja." });
+    }
+  } catch (error) {
+    console.error("[auth] Account status lookup failed:", error.message);
+    return res.status(503).json({ code: "ACCOUNT_STATUS_UNAVAILABLE", message: "No se pudo verificar tu sesión. Intenta nuevamente." });
   }
   next();
 }
@@ -3268,6 +3285,10 @@ function roleGuard(allowed) {
         const role = r.rows[0]?.role;
         if (!role || !allowed.includes(role)) {
           return res.status(403).json({ message: "Acceso restringido" });
+        }
+        if (role === "instructor") {
+          const activeCoach = await pool.query("SELECT id FROM instructors WHERE user_id=$1 AND is_active=true AND deleted_at IS NULL LIMIT 1", [req.userId]);
+          if (!activeCoach.rowCount) return res.status(403).json({ message: "Tu acceso como coach ya no está activo." });
         }
         req.userRole = role;
         next();
@@ -3322,24 +3343,11 @@ function mapUser(u) {
 // POST /api/auth/register
 app.post("/api/auth/register", async (req, res) => {
   const { email, password, displayName, phone, gender, dateOfBirth, acceptsTerms, acceptsCommunications, healthConsent } = req.body;
-  if (!email || !password || !displayName) {
-    return res.status(400).json({ message: "Nombre, email y contraseña son requeridos" });
-  }
-  // Normalize/validate dateOfBirth: YYYY-MM-DD or null. Reject impossible dates.
-  let normalizedDob = null;
-  if (dateOfBirth) {
-    const m = String(dateOfBirth).match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    if (!m) return res.status(400).json({ message: "Fecha de nacimiento inválida (YYYY-MM-DD)" });
-    const year = Number(m[1]);
-    const dt = new Date(dateOfBirth + "T00:00:00Z");
-    const now = new Date();
-    if (Number.isNaN(dt.getTime()) || year < 1900 || dt > now) {
-      return res.status(400).json({ message: "Fecha de nacimiento inválida" });
-    }
-    normalizedDob = dateOfBirth;
-  }
+  const registration = validateRegistration(req.body);
+  if (!registration.data) return res.status(400).json({ message: registration.message });
+  const normalizedDob = registration.data.dateOfBirth;
   try {
-    const exists = await pool.query("SELECT id FROM users WHERE email = $1", [email.toLowerCase()]);
+    const exists = await pool.query("SELECT id FROM users WHERE email = $1", [email.toLowerCase().trim()]);
     if (exists.rows.length > 0) {
       return res.status(409).json({ message: "Este email ya está registrado" });
     }
@@ -3356,7 +3364,7 @@ app.post("/api/auth/register", async (req, res) => {
                $9::varchar, CASE WHEN $9::varchar IS NULL THEN NULL ELSE NOW() END,
                $10::varchar, CASE WHEN $10::varchar IS NULL THEN NULL ELSE NOW() END)
        RETURNING *`,
-      [displayName.trim(), email.toLowerCase().trim(), phone || null, gender || null, normalizedDob, passwordHash,
+      [displayName.trim(), email.toLowerCase().trim(), registration.data.phone, gender, normalizedDob, passwordHash,
        acceptsTerms ?? false, acceptsCommunications ?? false, versionAviso, versionSalud]
     );
     const user = result.rows[0];
@@ -4688,7 +4696,7 @@ app.delete("/api/bookings/:id", authMiddleware, async (req, res) => {
       used = Number(up.rows[0]?.cancellations_used ?? used + 1);
       // A tiempo: la clase regresa al paquete (si tiene tope). Tarde: se pierde.
       if (!isLate && !isUnlimitedClasses(membership.classes_remaining)) {
-        await restoreMembershipCredit(client, membership.id, booking.class_id);
+        await restoreMembershipCredit(client, membership.id, booking.class_id, booking.id);
       }
     }
     const creditRestored = decision.countsTowardQuota && !isLate;
@@ -4992,8 +5000,8 @@ async function finalizeStripeOrder(client, orderId) {
   triggerWalletPassSync(order.user_id, "stripe_payment_completed");
 }
 
-registerMercadoPago(app, {
-  pool, auth: authMiddleware, finalizeOrder: finalizeStripeOrder,
+const mercadoPagoService = registerMercadoPago(app, {
+  pool, owner: ownerMiddleware, auth: authMiddleware, finalizeOrder: finalizeStripeOrder,
   afterPayment: (userId) => triggerWalletPassSync(userId, "mercadopago_payment_updated"),
   afterReversal: (ids) => onSeatReleased(ids, {source:"mercadopago_reversal"}),
   purchaseConflict: findPlanPurchaseConflict, hasWaiver: hasSignedWaiver,
@@ -5330,7 +5338,7 @@ app.post("/api/orders/:id/proof", authMiddleware, upload.any(), async (req, res)
       );
     }
     await proofDb.query(
-      "UPDATE orders SET status = 'pending_verification', paid_at = COALESCE(paid_at, NOW()) WHERE id = $1",
+      "UPDATE orders SET status = 'pending_verification' WHERE id = $1",
       [req.params.id]
     );
       await proofDb.query("COMMIT");
@@ -7418,10 +7426,8 @@ async function pickMotivationTemplate(userId) {
   // Asistencia por semana (últimas 12 semanas) derivada directo de bookings.
   // Cada fila = una semana con check-ins; week_offset 0 es la semana actual.
   const weeksRes = await pool.query(
-    `SELECT FLOOR(EXTRACT(EPOCH FROM (
-              date_trunc('week', NOW() AT TIME ZONE '${STUDIO_TIMEZONE}')::date
-              - date_trunc('week', (checked_in_at AT TIME ZONE '${STUDIO_TIMEZONE}'))::date
-            )) / 604800)::int AS week_offset,
+    `SELECT ((date_trunc('week', NOW() AT TIME ZONE '${STUDIO_TIMEZONE}')::date
+              - date_trunc('week', (checked_in_at AT TIME ZONE '${STUDIO_TIMEZONE}'))::date) / 7)::int AS week_offset,
             COUNT(*)::int AS classes
        FROM bookings
       WHERE user_id = $1
@@ -9854,41 +9860,8 @@ app.delete("/api/class-types/:id", adminMiddleware, async (req, res) => {
 });
 
 // POST /api/classes — admin creates a class (alias)
-app.post("/api/classes", adminMiddleware, async (req, res) => {
-  try {
-    const { classTypeId, instructorId, startTime, endTime, maxCapacity, capacity, notes } = req.body;
-    if (!classTypeId) return res.status(400).json({ message: "classTypeId requerido" });
-    if (!instructorId) return res.status(400).json({ message: "instructorId requerido" });
-
-    // startTime may come as a full ISO/datetime-local string "YYYY-MM-DDTHH:mm"
-    // The classes table uses separate DATE and TIME columns
-    let dateStr, startTimeStr, endTimeStr;
-    if (startTime && startTime.includes("T")) {
-      const [d, t] = startTime.split("T");
-      dateStr = d;
-      startTimeStr = t.slice(0, 5); // "HH:mm"
-    } else {
-      return res.status(400).json({ message: "startTime debe ser datetime (YYYY-MM-DDTHH:mm)" });
-    }
-    if (endTime && endTime.includes("T")) {
-      endTimeStr = endTime.split("T")[1].slice(0, 5);
-    } else if (endTime && endTime.length === 5) {
-      endTimeStr = endTime; // already "HH:mm"
-    } else {
-      // default +55 min
-      const [h, m] = startTimeStr.split(":").map(Number);
-      const total = h * 60 + m + 55;
-      endTimeStr = String(Math.floor(total / 60)).padStart(2, "0") + ":" + String(total % 60).padStart(2, "0");
-    }
-    const cap = maxCapacity ?? capacity ?? 5;
-    const r = await pool.query(
-      `INSERT INTO classes (class_type_id, instructor_id, date, start_time, end_time, max_capacity, notes, status)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,'scheduled') RETURNING *`,
-      [classTypeId, instructorId, dateStr, startTimeStr, endTimeStr, cap, notes || null]
-    );
-    return res.status(201).json({ data: r.rows[0] });
-  } catch (err) { console.error("POST /classes error:", err); return res.status(500).json({ message: "Error interno" }); }
-});
+registerBulkClasses(app, { pool, adminMiddleware, recordAudit, onSeatReleased, classEditReleasesSeats, studioTimezone: STUDIO_TIMEZONE });
+registerClassAdminWrites(app, { pool, adminMiddleware, recordAudit, onSeatReleased, classEditReleasesSeats });
 
 // PUT /api/classes/:id/cancel
 /**
@@ -9932,8 +9905,8 @@ async function applyCancellationRollback(client, booking, opts = {}) {
 
   if (shouldRefundCredit) {
     // Devuelve total y, si es mixto, el bucket del área de la clase.
-    await restoreMembershipCredit(client, booking.membership_id, booking.class_id);
-    result.creditRestored = true;
+    const restored = await restoreMembershipCredit(client, booking.membership_id, booking.class_id, booking.id);
+    result.creditRestored = restored !== false;
   }
   // Tanto confirmadas como checked_in ocupaban lugar, ambos deben restarse del
   // cupo cuando se cancelan.
@@ -10011,7 +9984,7 @@ async function cancelClassInTx(client, classId, { actorId, reason, source = "man
       [b.id, actor, why],
     );
     if (b.status === "no_show" && includeNoShows) {
-      if (b.membership_id) { await restoreMembershipCredit(client,b.membership_id,b.class_id); creditsRestored++; }
+      if (b.membership_id) { if (await restoreMembershipCredit(client,b.membership_id,b.class_id,b.id) !== false) creditsRestored++; }
       if (b.falta_recorded_at && b.user_id && !b.guest_profile_id) {
         const cfg=await getLoyaltyConfig(client);
         const count=(await client.query("SELECT COALESCE(faltas_count,0)::int AS n FROM users WHERE id=$1 FOR UPDATE",[b.user_id])).rows[0]?.n??0;
@@ -10093,6 +10066,8 @@ app.put("/api/classes/:id/cancel", adminMiddleware, async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
+    const scoped = (await client.query("SELECT instructor_id FROM classes WHERE id=$1 FOR UPDATE", [req.params.id])).rows[0];
+    if (scoped) await assertClassActor(client, req, scoped.instructor_id);
     const done = await cancelClassInTx(client, req.params.id, { actorId: req.userId, reason: why, source: "manual" });
     if (!done) {
       await client.query("ROLLBACK");
@@ -10117,7 +10092,7 @@ app.put("/api/classes/:id/cancel", adminMiddleware, async (req, res) => {
   } catch (err) {
     await client.query("ROLLBACK").catch(() => {});
     console.error("[PUT /classes/:id/cancel]", err.message);
-    return res.status(500).json({ message: "Error interno" });
+    return res.status(err.status || 500).json({ message: err.status ? err.message : "Error interno" });
   } finally {
     client.release();
   }
@@ -10131,8 +10106,9 @@ app.put("/api/classes/:id/close", adminMiddleware, async (req, res) => {
     const r = await pool.query(
       `UPDATE classes SET status='closed', updated_at=NOW()
         WHERE id=$1 AND status='scheduled'
+        AND ($2::text<>'instructor' OR EXISTS (SELECT 1 FROM instructors i WHERE i.id=classes.instructor_id AND i.user_id=$3 AND i.is_active=true AND i.deleted_at IS NULL))
         RETURNING id, status`,
-      [req.params.id],
+      [req.params.id, req.userRole, req.userId],
     );
     if (!r.rows.length) {
       return res.status(404).json({ message: "Clase no encontrada o no está abierta" });
@@ -10150,8 +10126,9 @@ app.put("/api/classes/:id/reopen", adminMiddleware, async (req, res) => {
     const r = await pool.query(
       `UPDATE classes SET status='scheduled', updated_at=NOW()
         WHERE id=$1 AND status='closed'
+        AND ($2::text<>'instructor' OR EXISTS (SELECT 1 FROM instructors i WHERE i.id=classes.instructor_id AND i.user_id=$3 AND i.is_active=true AND i.deleted_at IS NULL))
         RETURNING id, status`,
-      [req.params.id],
+      [req.params.id, req.userRole, req.userId],
     );
     if (!r.rows.length) {
       return res.status(404).json({ message: "Clase no encontrada o no está cerrada" });
@@ -10749,18 +10726,7 @@ app.post("/api/admin/classes/:id/walkin-visit", adminMiddleware, async (req, res
     let memRow = null;
     let chargedHostUserId = null;
     if (hostUserId) {
-      const hostPackRes = await dbClient.query(
-        `SELECT m.id, m.classes_remaining
-           FROM memberships m
-           JOIN plans p ON p.id = m.plan_id
-          WHERE m.user_id = $1 AND m.status = 'active'
-            AND (p.is_visit_pack = true OR COALESCE((p.rules->>'guest_passes')::int,0)>0)
-            AND (m.end_date IS NULL OR m.end_date >= CURRENT_DATE)
-            AND (m.classes_remaining IS NULL OR m.classes_remaining > 0)
-          ORDER BY m.created_at DESC LIMIT 1
-          FOR UPDATE`,
-        [hostUserId]
-      );
+      const hostPackRes = await selectGuestMembershipForClass(dbClient, hostUserId, classId);
       if (hostPackRes.rows.length) {
         memRow = hostPackRes.rows[0];
         chargedHostUserId = hostUserId;
@@ -10833,7 +10799,8 @@ app.post("/api/admin/classes/:id/walkin-visit", adminMiddleware, async (req, res
        VALUES ($1, $2, $3, $4, 'confirmed') RETURNING *`,
       [classId, user.id, memRow.id, guest.id]
     );
-    if (memRow.classes_remaining !== null) {
+    if (chargedHostUserId && memRow.rules?.guest_passes > 0) await dbClient.query("UPDATE bookings SET partner_metadata=partner_metadata || '{\"hive_guest_pass\":true}'::jsonb WHERE id=$1", [bookingIns.rows[0].id]);
+    if (memRow.classes_remaining !== null && !(chargedHostUserId && memRow.rules?.guest_passes > 0)) {
       await dbClient.query(
         "UPDATE memberships SET classes_remaining = GREATEST(classes_remaining - 1, 0), updated_at = NOW() WHERE id = $1",
         [memRow.id]
@@ -10855,6 +10822,7 @@ app.post("/api/admin/classes/:id/walkin-visit", adminMiddleware, async (req, res
   } catch (err) {
     await dbClient.query("ROLLBACK").catch(() => {});
     console.error("[POST /admin/classes/:id/walkin-visit]", err.message);
+    if (String(err.message).startsWith("HIVE_PLAN:")) return res.status(403).json({ message: err.message.replace("HIVE_PLAN: ", "") });
     return res.status(500).json({ message: "Error interno" });
   } finally {
     dbClient.release();
@@ -10888,7 +10856,7 @@ async function selectGuestMembershipForClass(client,userId,classId) {
   if(!cls)return {rows:[]};
   const memberships=await client.query(`SELECT m.*,p.rules,p.is_visit_pack,p.class_category,p.morning_only,p.afternoon_only,p.personal_only FROM memberships m JOIN plans p ON p.id=m.plan_id
     WHERE m.user_id=$1 AND m.status='active' AND (p.is_visit_pack=true OR COALESCE((p.rules->>'guest_passes')::int,0)>0)
-      AND (m.classes_remaining IS NULL OR m.classes_remaining>0)
+      AND (m.classes_remaining IS NULL OR m.classes_remaining>0 OR COALESCE((p.rules->>'guest_passes')::int,0)>0)
     ORDER BY m.end_date ASC NULLS LAST,m.created_at ASC FOR UPDATE OF m`,[userId]);
   for(const m of memberships.rows) {
     if(!membershipAllowsSession(m,cls.starts_at,cls.max_capacity) || !isMembershipCategoryCompatible(m.class_category,cls.class_category))continue;
@@ -11001,6 +10969,7 @@ app.post("/api/bookings/with-guest", authMiddleware, async (req, res) => {
        VALUES ($1, $2, $3, $4, 'confirmed') RETURNING *`,
       [classId, guestUser.id, pack.id, guestProfile.id]
     );
+    if (pack.rules?.guest_passes > 0) await dbClient.query("UPDATE bookings SET partner_metadata=partner_metadata || '{\"hive_guest_pass\":true}'::jsonb WHERE id=$1", [bookingIns.rows[0].id]);
     // Descontar 1 del pack de la socia (si no es ilimitado).
     if (pack.classes_remaining !== null && !(pack.rules?.guest_passes > 0)) {
       await dbClient.query(
@@ -11036,7 +11005,7 @@ app.post("/api/bookings/with-guest", authMiddleware, async (req, res) => {
       );
     } catch (_) { /* no romper el flujo si la notif falla */ }
 
-    const remaining = pack.classes_remaining === null ? null : Math.max(0, pack.classes_remaining - 1);
+    const remaining = pack.classes_remaining === null ? null : Math.max(0, pack.classes_remaining - (pack.rules?.guest_passes > 0 ? 0 : 1));
     return res.status(201).json({
       data: {
         booking: bookingIns.rows[0],
@@ -11061,7 +11030,7 @@ app.post("/api/bookings/with-guest", authMiddleware, async (req, res) => {
 // cancelar clase (devuelve créditos y avisa); las que ya empezaron no se tocan.
 // Sin force, si hay reservas activas responde 409 con el resumen; con force
 // exige motivo porque cancela reservas.
-app.delete("/api/classes/week", adminMiddleware, async (req, res) => {
+app.delete("/api/classes/week", ownerMiddleware, async (req, res) => {
   const { startDate, endDate, force, reason } = req.body || {};
   const start = typeof startDate === "string" ? startDate.slice(0, 10) : null;
   const end = typeof endDate === "string" ? endDate.slice(0, 10) : null;
@@ -11083,6 +11052,12 @@ app.delete("/api/classes/week", adminMiddleware, async (req, res) => {
         ORDER BY c.date, c.start_time`,
       [start, end],
     )).rows;
+    if (req.userRole === "instructor") {
+      for (const row of rows) {
+        const assigned=(await client.query("SELECT instructor_id FROM classes WHERE id=$1",[row.id])).rows[0];
+        await assertClassActor(client,req,assigned.instructor_id);
+      }
+    }
     const plan = planWeekClear(rows);
     if (plan.activeBookings > 0 && !force) {
       await client.query("ROLLBACK");
@@ -11160,7 +11135,7 @@ app.delete("/api/classes/week", adminMiddleware, async (req, res) => {
       return res.status(409).json({ message: "Alguna clase tiene registros ligados: cancélala en lugar de borrarla." });
     }
     console.error("[DELETE /classes/week]", err.message);
-    return res.status(500).json({ message: "Error interno" });
+    return res.status(err.status || 500).json({ message: err.status ? err.message : "Error interno" });
   } finally {
     client.release();
   }
@@ -11201,99 +11176,6 @@ function parseTimeSlotTo24Hour(timeValue) {
 
 // POST /api/classes/generate — bulk generate (transaccional: o se crean todas
 // o ninguna; antes un fallo a mitad dejaba clases a medias y respondía 500).
-app.post("/api/classes/generate", adminMiddleware, async (req, res) => {
-  const { startDate, endDate, classTypeId, instructorId, daysOfWeek, startTime, endTime, maxCapacity = 5 } = req.body;
-  if (!startDate || !endDate) return res.status(400).json({ message: "startDate y endDate requeridos" });
-  if (!classTypeId) return res.status(400).json({ message: "classTypeId requerido" });
-  if (!instructorId) return res.status(400).json({ message: "instructorId requerido" });
-  if (!Array.isArray(daysOfWeek) || !daysOfWeek.length) return res.status(400).json({ message: "Selecciona al menos un día" });
-  if (!/^\d{2}:\d{2}$/.test(String(startTime || "")) || !/^\d{2}:\d{2}$/.test(String(endTime || ""))) {
-    return res.status(400).json({ message: "startTime y endTime deben tener formato HH:mm" });
-  }
-  if (String(endTime) <= String(startTime)) {
-    return res.status(400).json({ message: "La hora de fin debe ser posterior a la de inicio." });
-  }
-  const cap = Number(maxCapacity);
-  if (!Number.isInteger(cap) || cap < 1) {
-    return res.status(400).json({ message: "El cupo debe ser un entero >= 1" });
-  }
-  // Append T00:00:00 to parse as local midnight (not UTC)
-  const start = new Date(startDate + "T00:00:00");
-  const end = new Date(endDate + "T00:00:00");
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
-    return res.status(400).json({ message: "Fechas inválidas" });
-  }
-  if (end < start) {
-    return res.status(400).json({ message: "La fecha de fin no puede ser anterior a la de inicio." });
-  }
-
-  const client = await pool.connect();
-  try {
-    await client.query("BEGIN");
-    const created = [];
-
-    // Modo formulario (el que usa la app): classTypeId + daysOfWeek + horas.
-    if (classTypeId && Array.isArray(daysOfWeek) && daysOfWeek.length && startTime && endTime) {
-      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-        const jsDay = d.getDay(); // 0=Sun,1=Mon...
-        if (!daysOfWeek.includes(jsDay)) continue;
-        const classDate = toDbDateString(d);
-        const exists = await client.query(
-          "SELECT id FROM classes WHERE date = $1 AND start_time = $2 AND class_type_id = $3",
-          [classDate, startTime, classTypeId]
-        );
-        if (exists.rows.length) continue;
-        const r = await client.query(
-          `INSERT INTO classes (class_type_id, instructor_id, date, start_time, end_time, max_capacity, status)
-           VALUES ($1,$2,$3,$4,$5,$6,'scheduled') RETURNING *`,
-          [classTypeId, instructorId, classDate, startTime, endTime, cap]
-        );
-        created.push(r.rows[0]);
-      }
-      await client.query("COMMIT");
-      return res.json({ created: created.length, data: created });
-    }
-
-    // Fallback: generate from schedule_templates
-    const slotsRes = await client.query("SELECT * FROM schedule_templates WHERE is_active = true");
-    const classTypeRes = await client.query("SELECT id, name, category FROM class_types WHERE is_active = true");
-    const classTypes = classTypeRes.rows;
-    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-      const dayOfWeek = d.getDay() === 0 ? 7 : d.getDay();
-      const daySlots = slotsRes.rows.filter(s => s.day_of_week === dayOfWeek);
-      for (const slot of daySlots) {
-        const startTimeValue = parseTimeSlotTo24Hour(slot.time_slot);
-        if (!startTimeValue) continue;
-        const classDate = toDbDateString(d);
-        const endTimeValue = addMinutesToTimeString(startTimeValue, 55);
-        const label = slot.class_label?.toLowerCase();
-        let ct = classTypes.find(c => c.category?.toLowerCase() === label || (label && c.name?.toLowerCase().includes(label)));
-        if (!ct) ct = classTypes[0];
-        if (!ct) continue;
-        const exists = await client.query(
-          "SELECT id FROM classes WHERE date = $1 AND start_time = $2 AND class_type_id = $3",
-          [classDate, startTimeValue, ct.id]
-        );
-        if (exists.rows.length) continue;
-        const r = await client.query(
-          `INSERT INTO classes (class_type_id, instructor_id, date, start_time, end_time, max_capacity, status)
-           VALUES ($1,$2,$3,$4,$5,10,'scheduled') RETURNING *`,
-          [ct.id, instructorId, classDate, startTimeValue, endTimeValue]
-        );
-        created.push(r.rows[0]);
-      }
-    }
-    await client.query("COMMIT");
-    return res.json({ created: created.length, data: created });
-  } catch (err) {
-    await client.query("ROLLBACK").catch(() => {});
-    console.error("generate classes error:", err);
-    return res.status(500).json({ message: "Error interno" });
-  } finally {
-    client.release();
-  }
-});
-
 // ─── Schedules (schedule_slots) CRUD ────────────────────────────────────────
 
 // GET /api/schedules
@@ -12139,7 +12021,7 @@ function pctChange(curr, prev) {
 // el rango (auditoría 2026-09-27, P1-12). Un reembolso resta en su fecha: no
 // reescribe meses cerrados.
 const NET_REVENUE_SQL = `SELECT
-    (SELECT COALESCE(SUM(total_amount), 0) FROM orders WHERE status = 'approved' AND created_at BETWEEN $1 AND $2) AS gross,
+    (SELECT COALESCE(SUM(total_amount), 0) FROM orders WHERE status = 'approved' AND COALESCE(paid_at,verified_at,approved_at,created_at) BETWEEN $1 AND $2) AS gross,
     (SELECT COALESCE(SUM(amount), 0) FROM refunds WHERE created_at BETWEEN $1 AND $2) AS refunds`;
 
 app.get("/api/reports/overview", ownerMiddleware, async (req, res) => {
@@ -12281,7 +12163,7 @@ app.get("/api/reports/revenue-sparkline", ownerMiddleware, async (req, res) => {
         FROM generate_series(0, 11) AS gs(n)
       ),
       sales AS (
-        SELECT DATE_TRUNC('week', created_at) AS week_start, SUM(total_amount) AS amount
+        SELECT DATE_TRUNC('week', COALESCE(paid_at,verified_at,approved_at,created_at)) AS week_start, SUM(total_amount) AS amount
           FROM orders WHERE status = 'approved' GROUP BY 1
       ),
       refunded AS (
@@ -12307,7 +12189,7 @@ app.get("/api/reports/revenue", ownerMiddleware, async (req, res) => {
          FROM generate_series(0, 11) AS gs(n)
        ),
        orders_by_month AS (
-         SELECT DATE_TRUNC('month', created_at) AS month_start,
+         SELECT DATE_TRUNC('month', COALESCE(paid_at,verified_at,approved_at,created_at)) AS month_start,
                 COALESCE(SUM(total_amount), 0) AS total,
                 COUNT(*) AS count
            FROM orders
@@ -12667,8 +12549,8 @@ const PUBLIC_SETTINGS_KEYS = new Set([
   "policies_settings",
 ]);
 
-async function getSettingValueWithDefaults(key) {
-  const r = await pool.query("SELECT value FROM settings WHERE key=$1", [key]);
+async function getSettingValueWithDefaults(key, queryable = pool) {
+  const r = await queryable.query("SELECT value FROM settings WHERE key=$1", [key]);
   const raw = r.rows.length ? r.rows[0].value : null;
   return mergeSettingsWithDefaults(key, raw);
 }
@@ -13828,7 +13710,7 @@ app.get("/api/admin/stats", adminMiddleware, async (req, res) => {
       pool.query(`SELECT COUNT(*) FROM memberships WHERE status = 'active' AND (end_date IS NULL OR end_date >= (NOW() AT TIME ZONE '${STUDIO_TIMEZONE}')::date)`),
       // Neto: ventas del mes − reembolsos del mes (auditoría 2026-09-27, P1-12).
       pool.query(
-        `SELECT (SELECT COALESCE(SUM(total_amount), 0) FROM orders WHERE status = 'approved' AND created_at >= $1)
+        `SELECT (SELECT COALESCE(SUM(total_amount), 0) FROM orders WHERE status = 'approved' AND COALESCE(paid_at,verified_at,approved_at,created_at) >= $1)
               - (SELECT COALESCE(SUM(amount), 0) FROM refunds WHERE created_at >= $1) AS total`,
         [monthStart],
       ),
@@ -14021,6 +13903,12 @@ app.delete("/api/users/:id", ownerMiddleware, async (req, res) => {
     if (cols.campaign_logs.has("user_id") && cols.campaign_logs.has("phone")) {
       await client.query("UPDATE campaign_logs SET phone = NULL WHERE user_id = $1", [id]);
     }
+    // Remove copied contact data from the durable campaign queue as well.
+    await client.query(`UPDATE email_campaign_deliveries
+      SET recipient = '', recipient_name = NULL,
+          status = CASE WHEN status IN ('queued','pending','retry','sending') THEN 'skipped' ELSE status END,
+          claim = NULL, lease_until = NULL, updated_at = NOW()
+      WHERE user_id = $1`, [id]);
     await client.query("UPDATE referral_codes SET is_active = false WHERE user_id = $1", [id]);
     await client.query("DELETE FROM password_reset_tokens WHERE user_id = $1", [id]);
     const serial = buildAppleWalletSerialFromUserId(id);
@@ -14117,12 +14005,23 @@ app.get("/api/memberships", adminMiddleware, async (req, res) => {
 // referencia del pago y, si lo cobrado es $0 o distinto al plan, el motivo
 // obligatorio; todo en la bitácora (auditoría 2026-09-27, P0-3 · E2).
 app.post("/api/memberships", adminMiddleware, async (req, res) => {
+  let saleClient;
   try {
+    const intentKey = req.body?.idempotencyKey;
+    if (!isUuid(intentKey)) return res.status(400).json({code:"SALE_INTENT_REQUIRED",message:"Actualiza la página e inicia una nueva venta: falta el identificador del cobro."});
+    saleClient = await pool.connect();
+    await saleClient.query("BEGIN");
+    const payloadHash = saleIntentHash(req.body);
+    await saleClient.query("INSERT INTO manual_sale_intents(actor_id,intent_key,payload_hash) VALUES($1,$2,$3) ON CONFLICT DO NOTHING",[req.userId,intentKey,payloadHash]);
+    const intent = (await saleClient.query("SELECT payload_hash,response FROM manual_sale_intents WHERE actor_id=$1 AND intent_key=$2 FOR UPDATE",[req.userId,intentKey])).rows[0];
+    if (intent.payload_hash !== payloadHash) return res.status(409).json({code:"SALE_INTENT_CONFLICT",message:"Este intento corresponde a otra venta. Inicia una nueva venta para cambiar sus datos."});
+    if (intent.response) return res.status(201).json({...intent.response,replayed:true});
     const { userId, planId, startDate } = req.body || {};
     if (!userId || !planId) return res.status(400).json({ message: "userId y planId requeridos" });
     if (!isUuid(userId) || !isUuid(planId)) return res.status(400).json({ message: "Identificador inválido" });
-    if (!(await hasSignedWaiver(pool, userId))) return res.status(403).json({ code: "WAIVER_REQUIRED", message: WAIVER_REQUIRED_MSG });
-    const anonConflict = await anonymizedSaleConflict(userId);
+    await saleClient.query("SELECT id FROM users WHERE id=$1 FOR UPDATE",[userId]);
+    if (!(await hasSignedWaiver(saleClient, userId))) return res.status(403).json({ code: "WAIVER_REQUIRED", message: WAIVER_REQUIRED_MSG });
+    const anonConflict = await anonymizedSaleConflict(userId,saleClient);
     if (anonConflict) return res.status(409).json(anonConflict);
     // El método de pago se exige explícito: el default anterior ("efectivo") ni
     // siquiera era un valor del enum payment_method y reventaba con 500, además
@@ -14145,14 +14044,14 @@ app.post("/api/memberships", adminMiddleware, async (req, res) => {
     const ref = cleanPaymentReference(req.body.paymentReference);
     if (!ref.ok) return res.status(400).json({ message: ref.message });
 
-    const planRes = await pool.query("SELECT * FROM plans WHERE id = $1 AND is_active = true", [planId]);
+    const planRes = await saleClient.query("SELECT * FROM plans WHERE id = $1 AND is_active = true FOR SHARE", [planId]);
     if (!planRes.rows.length) return res.status(404).json({ message: "Plan no encontrado" });
     const plan = planRes.rows[0];
-    const _gen = await getSettingValueWithDefaults("general_settings");
+    const _gen = await getSettingValueWithDefaults("general_settings",saleClient);
     const _eff = resolveEffectivePrice(plan, _gen?.opening_pricing_active !== false);
     let sale = saleAmountPlan({ listPrice: _eff ?? 0, amount: req.body.amount, reason: req.body.discountCode ? `Cupón ${req.body.discountCode}` : req.body.reason });
     if (!sale.ok) return res.status(400).json({ ...(sale.code ? { code: sale.code } : {}), message: sale.message });
-    const nonRepeatableConflict = await findPlanPurchaseConflict({ userId, plan });
+    const nonRepeatableConflict = await findPlanPurchaseConflict({ userId, plan, client:saleClient });
     if (nonRepeatableConflict) {
       return res.status(409).json({ message: nonRepeatableConflict.message });
     }
@@ -14161,10 +14060,8 @@ app.post("/api/memberships", adminMiddleware, async (req, res) => {
 
     // Membresía, orden, referencia y bitácora en la misma transacción: los
     // ingresos se calculan sobre `orders` (auditoría 2026-09-08, P0-3).
-    const saleClient = await pool.connect();
     let r;
     try {
-      await saleClient.query("BEGIN");
       let coupon = null;
       if (req.body.discountCode) {
         const result = await findApplicableDiscountCode({ code: req.body.discountCode, userId, planId, subtotal: Number(_eff), classCategory: plan.class_category, channel: "membership", client: saleClient, lock: true });
@@ -14204,12 +14101,14 @@ app.post("/api/memberships", adminMiddleware, async (req, res) => {
         }),
         meta: { source: "mostrador", courtesy: sale.courtesy, price_differs: sale.priceDiffers },
       });
+      await saleClient.query("UPDATE manual_sale_intents SET response=$3 WHERE actor_id=$1 AND intent_key=$2",[req.userId,intentKey,JSON.stringify({data:r.rows[0]})]);
       await saleClient.query("COMMIT");
     } catch (saleErr) {
       await saleClient.query("ROLLBACK").catch(() => { });
       throw saleErr;
     } finally {
       saleClient.release();
+      saleClient = null;
     }
 
     // ── Email: membership activated ──────────────────────────────────────
@@ -14268,6 +14167,8 @@ app.post("/api/memberships", adminMiddleware, async (req, res) => {
   } catch (err) {
     console.error("POST /memberships error:", err);
     return res.status(err.status || 500).json({ message: err.status ? err.message : "Error interno" });
+  } finally {
+    if (saleClient) { await saleClient.query("ROLLBACK").catch(()=>{}); saleClient.release(); }
   }
 });
 
@@ -14816,7 +14717,7 @@ function mapStaffClass(row) {
 
 async function selectStaffClasses({ userId, role, from, to }) {
   const roleFilter = role === "instructor"
-    ? "AND i.user_id = $1"
+    ? "AND i.user_id = $1 AND i.is_active=true AND i.deleted_at IS NULL"
     : "";
   const params = role === "instructor" ? [userId, from, to] : [from, to];
   const fromIndex = role === "instructor" ? 2 : 1;
@@ -14846,7 +14747,7 @@ async function selectScopedStaffClass({ classId, userId, role }) {
   let scopeSql = "";
   if (role === "instructor") {
     params.push(userId);
-    scopeSql = `AND i.user_id = $2`;
+    scopeSql = `AND i.user_id = $2 AND i.is_active=true AND i.deleted_at IS NULL`;
   } else if (role === "reception") {
     params.push(todayInStudio());
     scopeSql = `AND c.date = $2::date`;
@@ -14971,12 +14872,13 @@ app.put("/api/staff/bookings/:id/check-in", staffOperationsMiddleware, async (re
   try {
     await client.query("BEGIN");
     const current=(await client.query(
-      `SELECT b.*,c.status AS class_status,c.date::text AS class_date,c.start_time
+      `SELECT b.*,c.instructor_id,c.status AS class_status,c.date::text AS class_date,c.start_time
        FROM bookings b JOIN classes c ON c.id=b.class_id JOIN instructors i ON i.id=c.instructor_id
        WHERE b.id=$1 AND c.status<>'cancelled' AND c.date=$4::date
-       AND ($3='reception' OR ($3='instructor' AND i.user_id=$2)) FOR UPDATE OF b,c`,
+       AND ($3='reception' OR ($3='instructor' AND i.user_id=$2 AND i.is_active=true AND i.deleted_at IS NULL)) FOR UPDATE OF b,c`,
       [req.params.id,req.userId,req.userRole,todayInStudio()])).rows[0];
     if(!current){await client.query("ROLLBACK");return res.status(404).json({message:"Reserva no encontrada"});}
+    await assertClassActor(client,req,current.instructor_id);
     const rule=checkinRule({bookingStatus:current.status,classStatus:current.class_status,classDate:current.class_date,startTime:String(current.start_time),...(await studioNow(client))});
     if(!rule.ok){await client.query("ROLLBACK");return res.status(409).json({message:rule.message});}
     if(current.status==='checked_in'){await client.query("COMMIT");return res.json({data:{bookingId:current.id,status:current.status,already:true}});}
@@ -15215,6 +15117,7 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
       // ── Resolver de dónde sale el crédito de la acompañante ──────────
       // Modo A (default): pack de visitas de la socia.
       // Modo B (`guestSale`): venderle clase suelta / pack a la acompañante.
+      let guestUsesIncludedPass = false;
       let guestMembershipId = null;
       let guestMembershipCreditsAfter = null;
       let guestSaleOrder = null;
@@ -15285,10 +15188,11 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
           });
         }
         const pack = packRes.rows[0];
+        guestUsesIncludedPass = pack.rules?.guest_passes > 0;
         guestMembershipId = pack.id;
         guestMembershipCreditsAfter = pack.classes_remaining === null
           ? null
-          : Math.max(0, pack.classes_remaining - 1);
+          : Math.max(0, pack.classes_remaining - (guestUsesIncludedPass ? 0 : 1));
         if (pack.classes_remaining !== null && !(pack.rules?.guest_passes > 0)) {
           await client.query(
             "UPDATE memberships SET classes_remaining = GREATEST(classes_remaining - 1, 0), updated_at = NOW() WHERE id = $1",
@@ -15303,6 +15207,7 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
         [classId, guestUser.id, guestMembershipId, guestProfile.id]
       );
       // Cupo: lo mantiene el trigger update_class_booking_count (auditoría 2026-09-08, P1-6).
+      if (guestUsesIncludedPass) await client.query("UPDATE bookings SET partner_metadata=partner_metadata || '{\"hive_guest_pass\":true}'::jsonb WHERE id=$1", [guestBookingIns.rows[0].id]);
       guestData = {
         booking: guestBookingIns.rows[0],
         guestProfile,
@@ -15625,16 +15530,24 @@ app.post(["/api/admin/checkin/scan", "/api/staff/reception/checkin/scan"], (req,
 // queda en la bitácora (auditoría 2026-09-27, bloque 2).
 app.put("/api/bookings/:id/no-show", adminMiddleware, async (req, res) => {
   try {
-    const r = await pool.query(
-      `WITH prev AS (SELECT id, status::text AS status FROM bookings WHERE id = $1 FOR UPDATE)
-       UPDATE bookings b SET status = 'no_show'
-         FROM prev
-        WHERE b.id = prev.id AND prev.status NOT IN ('cancelled', 'no_show')
-       RETURNING b.*, prev.status AS prev_status`,
-      [req.params.id]
-    );
-    if (!r.rows.length) return res.status(404).json({ message: "Reserva no encontrada o ya procesada" });
-    const { prev_status: prevStatus, ...bk } = r.rows[0];
+    const client = await pool.connect();
+    let bk, prevStatus;
+    try {
+      await client.query("BEGIN");
+      // Lock the class first, then the booking, matching reservation creation.
+      const lookup = await client.query("SELECT class_id FROM bookings WHERE id=$1", [req.params.id]);
+      if (!lookup.rows.length) { await client.query("ROLLBACK"); return res.status(404).json({message:"Reserva no encontrada"}); }
+      const cls = (await client.query(`SELECT status, (date+start_time) AT TIME ZONE '${STUDIO_TIMEZONE}' AS starts_at FROM classes WHERE id=$1 FOR UPDATE`, [lookup.rows[0].class_id])).rows[0];
+      const current = (await client.query("SELECT * FROM bookings WHERE id=$1 FOR UPDATE", [req.params.id])).rows[0];
+      if (!current || current.class_id !== lookup.rows[0].class_id || cls?.status === 'cancelled') { await client.query("ROLLBACK"); return res.status(409).json({message:"La reserva o la clase ya cambió."}); }
+      if (current.status === 'no_show') { await client.query("ROLLBACK"); return res.json({data:current,alreadyNoShow:true}); }
+      if (!['confirmed','checked_in'].includes(current.status)) { await client.query("ROLLBACK"); return res.status(409).json({message:"Sólo se puede marcar falta en una reserva confirmada o con asistencia."}); }
+      if (!cls?.starts_at || new Date(cls.starts_at).getTime() > Date.now()) { await client.query("ROLLBACK"); return res.status(409).json({message:"No puedes marcar falta antes de que comience la clase."}); }
+      prevStatus = current.status;
+      bk = (await client.query("UPDATE bookings SET status='no_show' WHERE id=$1 RETURNING *", [current.id])).rows[0];
+      await client.query("COMMIT");
+    } catch (error) { await client.query("ROLLBACK").catch(()=>{}); throw error; }
+    finally { client.release(); }
     triggerWalletPassSync(bk.user_id, "booking_no_show");
     // Registrar falta por no-show (excluye invitadas con guest_profile_id).
     let falta = null;
@@ -16030,7 +15943,7 @@ app.put("/api/admin/orders/:id/verify", adminMiddleware, async (req, res) => {
       }
 
       const approvedRes = await client.query(
-        "UPDATE orders SET status = 'approved', verified_at = NOW(), verified_by = $1 WHERE id = $2 RETURNING *",
+        "UPDATE orders SET status = 'approved', verified_at = NOW(), verified_by = $1, paid_at = NOW(), approved_at = NOW(), approved_by = $1 WHERE id = $2 RETURNING *",
         [req.userId, req.params.id]
       );
       order = approvedRes.rows[0];
@@ -16235,6 +16148,7 @@ app.get("/api/payments", ownerMiddleware, async (req, res) => {
       if (d && !isDay(d)) return res.status(400).json({ message: "Fecha inválida (usa AAAA-MM-DD)." });
     }
     const limit = Math.min(1000, Math.max(1, Number.parseInt(String(req.query.limit ?? "200"), 10) || 200));
+    const offset = Math.max(0, Math.min(10000000, Number.parseInt(String(req.query.offset ?? "0"), 10) || 0));
     const params = [];
     const filtros = (col, userCol) => {
       let w = "";
@@ -16250,7 +16164,7 @@ app.get("/api/payments", ownerMiddleware, async (req, res) => {
     const ordenes = `
       SELECT o.id, o.user_id, u.display_name AS user_name, p.name AS plan_name,
              o.total_amount::numeric AS total_amount, o.payment_method::text AS method, o.status::text AS status,
-             o.created_at, 'order'::text AS source, o.id AS order_id, o.channel::text AS channel,
+             COALESCE(o.paid_at,o.verified_at,o.approved_at,o.created_at) AS created_at, 'order'::text AS source, o.id AS order_id, o.channel::text AS channel,
              COALESCE(o.refunded_amount, 0)::numeric AS refunded_amount, o.refund_status::text AS refund_status,
              mm.id AS membership_id, mm.status::text AS membership_status, mm.classes_remaining, p.class_limit,
              NULL::text AS reason
@@ -16261,7 +16175,7 @@ app.get("/api/payments", ownerMiddleware, async (req, res) => {
           SELECT m.id, m.status, m.classes_remaining FROM memberships m
            WHERE m.order_id = o.id ORDER BY m.created_at ASC LIMIT 1
         ) mm ON true
-       WHERE o.status = 'approved'${filtros("o.created_at", "o.user_id")}`;
+       WHERE o.status = 'approved'${filtros("COALESCE(o.paid_at,o.verified_at,o.approved_at,o.created_at)", "o.user_id")}`;
     const membresias = `
       SELECT m.id, m.user_id, u.display_name AS user_name, p.name AS plan_name,
              p.price::numeric AS total_amount, m.payment_method::text AS method, m.status::text AS status,
@@ -16285,13 +16199,27 @@ app.get("/api/payments", ownerMiddleware, async (req, res) => {
         LEFT JOIN orders o ON o.id = r.order_id
         LEFT JOIN plans p ON p.id = o.plan_id
        WHERE true${filtros("r.created_at", "r.user_id")}`;
-    params.push(limit);
-    const r = await pool.query(
-      `(${ordenes}) UNION ALL (${membresias}) UNION ALL (${reembolsos}) ORDER BY created_at DESC LIMIT $${params.length}`,
-      params,
-    );
-    const total = round2(r.rows.reduce((sum, o) => sum + parseFloat(o.total_amount || 0), 0));
-    const refundsTotal = round2(r.rows.filter((o) => o.source === "refund").reduce((sum, o) => sum + parseFloat(o.refunded_amount || 0), 0));
+    params.push(limit, offset);
+    // All aggregates use the complete filtered ledger; pagination affects rows only.
+    const result = await pool.query(`WITH ledger AS (
+      (${ordenes}) UNION ALL (${membresias}) UNION ALL (${reembolsos})
+    ), page AS (SELECT * FROM ledger ORDER BY created_at DESC,id DESC,source LIMIT $${params.length-1} OFFSET $${params.length}),
+    monthly AS (SELECT * FROM ledger WHERE created_at >= DATE_TRUNC('month',NOW()) AND created_at < DATE_TRUNC('month',NOW())+INTERVAL '1 month'),
+    weekly AS (SELECT * FROM ledger WHERE created_at >= DATE_TRUNC('week',NOW()) AND created_at <= NOW())
+    SELECT COALESCE((SELECT json_agg(page ORDER BY created_at DESC,id DESC,source) FROM page),'[]') AS rows,
+      (SELECT COUNT(*)::int FROM ledger) AS count,
+      COALESCE((SELECT SUM(total_amount) FROM ledger),0) AS total,
+      COALESCE((SELECT SUM(refunded_amount) FROM ledger WHERE source='refund'),0) AS refunds_total,
+      json_build_object(
+        'week',json_build_object('amount',COALESCE((SELECT SUM(total_amount) FROM weekly),0),'count',(SELECT COUNT(*) FROM weekly WHERE total_amount>=0)),
+        'month',json_build_object('amount',COALESCE((SELECT SUM(total_amount) FROM monthly),0),'count',(SELECT COUNT(*) FROM monthly WHERE total_amount>=0)),
+        'refunds',json_build_object('amount',COALESCE((SELECT -SUM(total_amount) FROM monthly WHERE total_amount<0),0),'count',(SELECT COUNT(*) FROM monthly WHERE total_amount<0)),
+        'byMethod',COALESCE((SELECT json_object_agg(method,amount) FROM (SELECT COALESCE(method,'otro') AS method,SUM(total_amount) AS amount FROM monthly GROUP BY 1) methods),'{}')
+      ) AS summary`,params);
+    const aggregate = result.rows[0];
+    const r = {rows:aggregate.rows};
+    const total = round2(aggregate.total);
+    const refundsTotal = round2(aggregate.refunds_total);
     return res.json({
       data: r.rows.map((o) => ({
         ...o,
@@ -16309,6 +16237,8 @@ app.get("/api/payments", ownerMiddleware, async (req, res) => {
       })),
       total,
       refundsTotal,
+      summary: aggregate.summary,
+      pagination: {limit,offset,totalCount:aggregate.count,hasMore:offset+limit<aggregate.count},
     });
   } catch (err) {
     console.error("[GET /payments]", err);
@@ -16521,7 +16451,7 @@ app.post("/api/admin/orders/:id/refunds", ownerMiddleware, async (req, res) => {
   }
 });
 
-registerCommunications(app, { pool, ownerMiddleware, queueWhatsAppSend, normalisePhone, whatsappChannelState, appPublicUrl: APP_PUBLIC_URL, recordAudit });
+const communicationService = registerCommunications(app, { pool, ownerMiddleware, queueWhatsAppSend, normalisePhone, whatsappChannelState, appPublicUrl: APP_PUBLIC_URL, recordAudit });
 registerVelanParity(app, { pool, ownerMiddleware, authMiddleware, restoreMembershipCredit,
   recordAudit, triggerWalletPassSync, onSeatReleased, camelRow, isDay, reasonProblem, getBookingPolicy, bookingLeadHours: BOOKING_LEAD_HOURS, cancelClassInTx, notifyClassCancelled, applyCancellationRollback });
 
@@ -16981,7 +16911,7 @@ app.get("/api/instructors", adminMiddleware, async (req, res) => {
 });
 
 // POST /api/instructors
-app.post("/api/instructors", adminMiddleware, async (req, res) => {
+app.post("/api/instructors", ownerMiddleware, async (req, res) => {
   try {
     const { displayName, email, phone, bio, specialties, isActive = true, photoFocusX = 50, photoFocusY = 50 } = req.body;
     if (!displayName) return res.status(400).json({ message: "Nombre requerido" });
@@ -16999,7 +16929,7 @@ app.post("/api/instructors", adminMiddleware, async (req, res) => {
 });
 
 // PUT /api/instructors/:id
-app.put("/api/instructors/:id", adminMiddleware, async (req, res) => {
+app.put("/api/instructors/:id", ownerMiddleware, async (req, res) => {
   try {
     // PUT parcial: un cuerpo que no menciona un campo NO debe borrarlo. Antes
     // este UPDATE era de reemplazo y cambiar sólo el nombre dejaba email,
@@ -17039,7 +16969,7 @@ app.put("/api/instructors/:id", adminMiddleware, async (req, res) => {
 });
 
 // DELETE /api/instructors/:id
-app.delete("/api/instructors/:id", adminMiddleware, async (req, res) => {
+app.delete("/api/instructors/:id", ownerMiddleware, async (req, res) => {
   try {
     const result = await pool.query("UPDATE instructors SET is_active=false, deleted_at=COALESCE(deleted_at,NOW()), updated_at=NOW() WHERE id=$1 RETURNING id", [req.params.id]);
     if (!result.rowCount) return res.status(404).json({message:"Instructor no encontrado"});
@@ -17060,7 +16990,7 @@ app.post("/api/photos/upload", adminMiddleware, upload.single("photo"), async (r
 });
 
 // POST /api/instructors/:id/photo — upload instructor photo to Google Drive
-app.post("/api/instructors/:id/photo", adminMiddleware, upload.single("photo"), async (req, res) => {
+app.post("/api/instructors/:id/photo", ownerMiddleware, upload.single("photo"), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ message: "No se envió archivo" });
     const instructorId = req.params.id;
@@ -17083,7 +17013,7 @@ app.post("/api/instructors/:id/photo", adminMiddleware, upload.single("photo"), 
 });
 
 // POST /api/instructors/:id/magic-link — generate a one-time login link for an instructor
-app.post("/api/instructors/:id/magic-link", adminMiddleware, async (req, res) => {
+app.post("/api/instructors/:id/magic-link", ownerMiddleware, async (req, res) => {
   try {
     const r = await pool.query("SELECT * FROM instructors WHERE id = $1", [req.params.id]);
     if (!r.rows.length) return res.status(404).json({ message: "Instructor no encontrado" });
@@ -17134,6 +17064,7 @@ app.get("/api/admin/classes", adminMiddleware, async (req, res) => {
     if (startDate) { params.push(startDate); q += ` AND c.date >= $${params.length}`; }
     if (endDate) { params.push(endDate); q += ` AND c.date <= $${params.length}`; }
     if (instructorId) { params.push(instructorId); q += ` AND c.instructor_id = $${params.length}`; }
+    if (req.userRole === "instructor") { params.push(req.userId); q += ` AND EXISTS (SELECT 1 FROM instructors own WHERE own.id=c.instructor_id AND own.user_id=$${params.length} AND own.is_active=true AND own.deleted_at IS NULL)`; }
     q += " ORDER BY c.date ASC, c.start_time ASC LIMIT 200";
     const r = await pool.query(q, params);
     return res.json({ data: r.rows });
@@ -17143,20 +17074,7 @@ app.get("/api/admin/classes", adminMiddleware, async (req, res) => {
 });
 
 // POST /api/admin/classes — create a class
-app.post("/api/admin/classes", adminMiddleware, async (req, res) => {
-  try {
-    const { classTypeId, instructorId, startTime, endTime, capacity = 5, location, notes } = req.body;
-    if (!classTypeId || !startTime) return res.status(400).json({ message: "classTypeId y startTime requeridos" });
-    const r = await pool.query(
-      `INSERT INTO classes (class_type_id, instructor_id, start_time, end_time, capacity, location, notes, status)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,'scheduled') RETURNING *`,
-      [classTypeId, instructorId || null, startTime, endTime || null, capacity, location || null, notes || null]
-    );
-    return res.status(201).json({ data: r.rows[0] });
-  } catch (err) {
-    return res.status(500).json({ message: "Error interno" });
-  }
-});
+app.post("/api/admin/classes", adminMiddleware, (_req, res) => res.status(410).json({ message: "Endpoint obsoleto. Usa POST /api/classes." }));
 
 // PUT /api/admin/classes/:id — actualiza una clase específica (no el tipo).
 // Body: { classTypeId?, instructorId?, startTime?, endTime?, maxCapacity?,
@@ -17164,106 +17082,17 @@ app.post("/api/admin/classes", adminMiddleware, async (req, res) => {
 // Tanto `maxCapacity` como `capacity` se mapean a la columna max_capacity.
 // Si el nuevo max_capacity es MENOR al conteo real de reservas activas, se
 // rechaza para no dejar bookings "fuera del cupo" silenciosamente.
-registerBulkClasses(app, { pool, adminMiddleware, recordAudit, onSeatReleased, classEditReleasesSeats, studioTimezone: STUDIO_TIMEZONE });
 
-app.put("/api/admin/classes/:id", adminMiddleware, async (req, res) => {
-  try {
-    const {
-      classTypeId, instructorId, startTime, endTime,
-      maxCapacity, capacity, status, notes,
-    } = req.body || {};
-
-    // Cancelar tiene su propia cascada (PUT /api/classes/:id/cancel) que
-    // reembolsa y avisa. Por aquí NO se permite, para no dejar reservas activas
-    // en una clase 'cancelled' sin devolver crédito. 'closed' (cerrar) sí.
-    if (status === "cancelled") {
-      return res.status(400).json({
-        message: "Para cancelar usa la opción Cancelar clase (devuelve créditos y avisa a las alumnas).",
-      });
-    }
-
-    // Acepta cualquiera de los dos nombres para no romper consumidores viejos.
-    const newCap = maxCapacity ?? capacity;
-    if (newCap != null) {
-      const capNum = Number(newCap);
-      if (!Number.isFinite(capNum) || capNum < 1) {
-        return res.status(400).json({ message: "El cupo debe ser un número >= 1" });
-      }
-      const occupied = await liveBookingCount(req.params.id);
-      if (capNum < occupied) {
-        return res.status(400).json({
-          message: `No puedes bajar el cupo a ${capNum}: la clase ya tiene ${occupied} reserva${occupied === 1 ? "" : "s"} activa${occupied === 1 ? "" : "s"}.`,
-        });
-      }
-    }
-
-    // startTime/endTime pueden venir como datetime-local "YYYY-MM-DDTHH:mm".
-    // La tabla usa columnas DATE y TIME separadas → hay que separarlas. Antes se
-    // escribía el ISO completo en la columna TIME y nunca se tocaba `date`, por
-    // eso editar (reprogramar) una clase fallaba o corrompía la hora.
-    let dateStr = null, startTimeStr = null, endTimeStr = null;
-    if (startTime) {
-      const s = String(startTime);
-      if (s.includes("T")) { const [d, t] = s.split("T"); dateStr = d; startTimeStr = t.slice(0, 5); }
-      else if (s.length >= 5) { startTimeStr = s.slice(0, 5); }
-    }
-    if (endTime) {
-      const e = String(endTime);
-      endTimeStr = e.includes("T") ? e.split("T")[1].slice(0, 5) : (e.length >= 5 ? e.slice(0, 5) : null);
-    }
-    if (startTimeStr && endTimeStr && endTimeStr <= startTimeStr) {
-      return res.status(400).json({ message: "La hora de fin debe ser posterior a la de inicio." });
-    }
-
-    // Cupo y estado de antes: sólo se sube la fila si la edición libera lugar.
-    const prev = (await pool.query(
-      "SELECT max_capacity, status::text AS status FROM classes WHERE id = $1", [req.params.id],
-    )).rows[0];
-    if (!prev) return res.status(404).json({ message: "Clase no encontrada" });
-
-    const r = await pool.query(
-      `UPDATE classes SET
-         class_type_id = COALESCE($1, class_type_id),
-         instructor_id = COALESCE($2, instructor_id),
-         date          = COALESCE($3, date),
-         start_time    = COALESCE($4, start_time),
-         end_time      = COALESCE($5, end_time),
-         max_capacity  = COALESCE($6, max_capacity),
-         status        = COALESCE($7, status),
-         notes         = COALESCE($8, notes),
-         updated_at    = NOW()
-       WHERE id = $9 RETURNING *`,
-      [
-        classTypeId || null, instructorId || null,
-        dateStr, startTimeStr, endTimeStr,
-        newCap != null ? Number(newCap) : null,
-        status || null, notes ?? null,
-        req.params.id,
-      ]
-    );
-    if (!r.rows.length) return res.status(404).json({ message: "Clase no encontrada" });
-    // Sube la fila sólo si hay lugares nuevos (el cupo aumentó) o la clase
-    // pasó de 'closed' a 'scheduled'. Cambiar la coach, la hora o las notas no
-    // libera nada: no debe inscribir a nadie ni descontarle una clase.
-    const promoted = classEditReleasesSeats({ before: prev, after: r.rows[0] })
-      ? await onSeatReleased([req.params.id], { source: "capacity" })
-      : [];
-    return res.json({ data: r.rows[0], waitlist_promoted: promoted });
-  } catch (err) {
-    console.error("[PUT /admin/classes/:id]", err.message);
-    return res.status(500).json({ message: "Error interno" });
-  }
-});
 
 // DELETE /api/admin/classes/:id — sólo borra una clase sin ninguna reserva (de
 // ningún estado): borrarla con reservas se llevaba su historial en cascada. Con
 // reservas se cancela (PUT /api/classes/:id/cancel). Auditoría 2026-09-27, P1-5.
-app.delete("/api/admin/classes/:id", adminMiddleware, async (req, res) => {
+app.delete("/api/admin/classes/:id", ownerMiddleware, async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
     const cur = await client.query(
-      `SELECT c.id, to_char(c.date, 'YYYY-MM-DD') AS day, c.start_time, c.status::text AS status
+      `SELECT c.id, c.instructor_id, to_char(c.date, 'YYYY-MM-DD') AS day, c.start_time, c.status::text AS status
          FROM classes c WHERE c.id = $1 FOR UPDATE`,
       [req.params.id],
     );
@@ -17272,6 +17101,7 @@ app.delete("/api/admin/classes/:id", adminMiddleware, async (req, res) => {
       return res.status(404).json({ message: "Clase no encontrada" });
     }
     const cls = cur.rows[0];
+    await assertClassActor(client, req, cls.instructor_id);
     // NOT EXISTS dentro del propio DELETE (no un SELECT COUNT aparte): si algo
     // reserva la clase entre el SELECT de arriba y aquí, esta consulta ya no
     // borra nada — nunca una foto vieja del conteo.
@@ -17296,7 +17126,7 @@ app.delete("/api/admin/classes/:id", adminMiddleware, async (req, res) => {
       return res.status(409).json({ code: "CLASS_HAS_BOOKINGS", message: "La clase tiene registros ligados: cancélala en lugar de borrarla." });
     }
     console.error("[DELETE /admin/classes/:id]", err.message);
-    return res.status(500).json({ message: "Error interno" });
+    return res.status(err.status || 500).json({ message: err.status ? err.message : "Error interno" });
   } finally {
     client.release();
   }
@@ -18487,6 +18317,25 @@ async function runClassReminderCron() {
 }
 
 function scheduleEmailCrons() {
+  let campaignRunning=false;
+  const drainCampaigns=async()=>{
+    if(campaignRunning)return;
+    campaignRunning=true;
+    try{await communicationService.drain();}catch{console.error('[Campaigns] Se reintentará el procesamiento.');}
+    finally{campaignRunning=false;}
+  };
+  void drainCampaigns();
+  setInterval(drainCampaigns,60_000).unref();
+  let mpReconcileRunning = false;
+  const reconcilePayments = async () => {
+    if (mpReconcileRunning) return;
+    mpReconcileRunning = true;
+    try { await mercadoPagoService.reconcile(); }
+    catch { console.error("[MP reconciliation] No se pudo completar el barrido; se reintentará."); }
+    finally { mpReconcileRunning = false; }
+  };
+  void reconcilePayments();
+  setInterval(reconcilePayments, 60_000).unref();
   const expireOrders = () => expireUnpaidOrders(pool).catch((err) => console.error("[Orders expiration]", err.message));
   void expireOrders();
   setInterval(expireOrders, 60_000).unref();
@@ -18580,6 +18429,13 @@ function scheduleEmailCrons() {
 // ─── Start ───────────────────────────────────────────────────────────────────
 async function bootServer() {
   await ensureSchema();
+  // Never serve financial/queued-write routes with a partially applied schema.
+  await pool.query(`SELECT paid_at,provider_synced_at,mp_sync_claim,mp_sync_lease_until,
+    mp_sync_attempted_at,mp_sync_error,mp_method_id,mp_type_id FROM orders LIMIT 0`);
+  await pool.query('SELECT actor_id,intent_key,payload_hash,response FROM manual_sale_intents LIMIT 0');
+  await pool.query('SELECT order_id,payment_id,reason,status FROM mp_payment_reviews LIMIT 0');
+  await pool.query('SELECT actor_id,request_key,request_hash,payload FROM email_campaigns LIMIT 0');
+  await pool.query('SELECT claim,lease_until,first_attempt_at,status FROM email_campaign_deliveries LIMIT 0');
   await applyHiveStudioSettings(pool);
   scheduleEmailCrons();
   // Initialize Google Wallet loyalty class if configured

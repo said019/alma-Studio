@@ -9,6 +9,7 @@ const PFX = "rgbaja";
 let A, adminId, f;
 const bajas = [];
 const eventIds = [];
+const campaignIds = [];
 
 before(async () => {
   const l = await login(ADMIN.email, ADMIN.password);
@@ -17,6 +18,10 @@ before(async () => {
   f = await studioFixtures(PFX, A);
 });
 after(async () => {
+  if (campaignIds.length) {
+    await sql('DELETE FROM email_campaign_deliveries WHERE campaign_id=ANY($1::uuid[])', [campaignIds]);
+    await sql('DELETE FROM email_campaigns WHERE id=ANY($1::uuid[])', [campaignIds]);
+  }
   // Los eventos se borran por id: en cascada se llevan sus inscripciones y pases.
   if (eventIds.length) {
     await sql(`DELETE FROM events WHERE id = ANY($1::uuid[])`, [eventIds]);
@@ -79,6 +84,14 @@ test("dar de baja: borra datos personales y de salud, conserva historial y cierr
   assert.ok(hist.b > 0, "debe haber al menos una reserva conservada");
   assert.ok(hist.e > 0, "debe haber al menos una inscripción a evento conservada");
 
+  for (const status of ['queued','retry','sending','accepted']) {
+    const [campaign] = await sql(`INSERT INTO email_campaigns(id,actor_id,request_key,request_hash,payload)
+      VALUES(uuid_generate_v4(),$1,uuid_generate_v4(),'qa','{}') RETURNING id`,[adminId]);
+    campaignIds.push(campaign.id);
+    await sql(`INSERT INTO email_campaign_deliveries(id,campaign_id,user_id,recipient,recipient_name,status,claim,lease_until,next_attempt_at)
+      VALUES(uuid_generate_v4(),$1,$2,$3,'Personal name',$4,uuid_generate_v4(),NOW()+interval '1 hour',NOW()+interval '1 day')`,
+      [campaign.id,c.id,c.email,status]);
+  }
   const r = await api("DELETE", `/api/users/${c.id}`, { token: A, body: { reason: "Lo pidió por WhatsApp" } });
   assert.equal(r.status, 200, JSON.stringify(r.body).slice(0, 200));
   bajas.push(c.id);
@@ -112,6 +125,15 @@ test("dar de baja: borra datos personales y de salud, conserva historial y cierr
   assert.equal(evReg.name, "Clienta dada de baja");
   assert.notEqual(evReg.email, antes.email);
   assert.equal(evReg.phone, null);
+
+  const deliveries = await sql('SELECT recipient,recipient_name,status,claim,lease_until FROM email_campaign_deliveries WHERE user_id=$1',[c.id]);
+  assert.equal(deliveries.length,4);
+  assert.equal(deliveries.filter(d=>d.status==='accepted').length,1);
+  assert.equal(deliveries.filter(d=>d.status==='skipped').length,3);
+  for (const delivery of deliveries) {
+    assert.equal(delivery.recipient,''); assert.equal(delivery.recipient_name,null);
+    assert.equal(delivery.claim,null); assert.equal(delivery.lease_until,null);
+  }
 
   // Acceso cerrado: el token viejo ya no sirve y no puede volver a entrar.
   const me = await api("GET", "/api/auth/me", { token: c.token });
@@ -154,7 +176,7 @@ test("con membresía activa o reservas próximas → 409 y no cambia nada", asyn
 
   // Una reserva próxima sin membresía activa también debe bloquear la baja.
   const c2 = await makeClient(PFX, "resfutura");
-  const classId = await makeClass(A, f, { date: day(5) });
+  const classId = await makeClass(A, f, { date: day(5), start: "07:00", end: "08:00" });
   await sql(`INSERT INTO bookings (class_id, user_id, status) VALUES ($1, $2, 'confirmed')`, [classId, c2.id]);
   const r2 = await api("DELETE", `/api/users/${c2.id}`, { token: A, body: {} });
   assert.equal(r2.status, 409);
@@ -190,7 +212,7 @@ test("un id con otra mayúscula/minúscula anonimiza igual y el token viejo qued
 
 test("la baja cancela sus lugares en listas de espera de clases futuras, sin devolver crédito", async () => {
   const c = await makeClient(PFX, "espera");
-  const classId = await makeClass(A, f, { date: day(5) });
+  const classId = await makeClass(A, f, { date: day(5), start: "09:00", end: "10:00" });
   const [booking] = await sql(
     `INSERT INTO bookings (class_id, user_id, status) VALUES ($1, $2, 'waitlist') RETURNING id`,
     [classId, c.id],
@@ -219,7 +241,7 @@ test("clienta dada de baja: ni se le vende ni se le asigna → 409", async () =>
   assert.equal(venta.status, 409);
   assert.equal(venta.body.code, "ACCOUNT_ANONYMIZED");
 
-  const classId = await makeClass(A, f, { date: day(5) });
+  const classId = await makeClass(A, f, { date: day(5), start: "11:00", end: "12:00" });
   const assign = await api("POST", "/api/admin/bookings/assign", { token: A, body: { classId, userId: c.id } });
   assert.equal(assign.status, 409);
   assert.equal(assign.body.code, "ACCOUNT_ANONYMIZED");

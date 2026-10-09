@@ -28,9 +28,12 @@ test('real occupancy includes guest rows, never trusts stale current_bookings', 
   assert.equal(result.conflicts.length, 0);
   assert.equal(result.data.classes[0].current_bookings, 3);
 });
-test('reservations and waitlist forbid time/type changes, permit coach/capacity/notes/closing', () => {
-  for (const changes of [{ start_time: '09:00' }, { end_time: '11:00' }, { class_type_id: id(81) }]) assert.ok(assess(changes, [row()], { reserved: { [id(1)]: 1 } }).conflicts.length);
-  assert.equal(assess({ instructor_id: id(91), max_capacity: 8, notes: '', status: 'closed' }, [row()], { occupied: { [id(1)]: 2 }, reserved: { [id(1)]: 2 } }).conflicts.length, 0);
+test('reservations and waitlist forbid time/type/coach changes, permit capacity/notes/closing', () => {
+  for (const changes of [{ start_time: '09:00' }, { end_time: '11:00' }, { class_type_id: id(81) }, { instructor_id: id(91) }]) assert.ok(assess(changes, [row()], { reserved: { [id(1)]: 1 } }).conflicts.length);
+  assert.equal(assess({ max_capacity: 8, notes: '', status: 'closed' }, [row()], { occupied: { [id(1)]: 2 }, reserved: { [id(1)]: 2 } }).conflicts.length, 0);
+});
+test('an empty class permits coach reassignment', () => {
+  assert.equal(assess({ instructor_id: id(91) }, [row()], { occupied: { [id(1)]: 0 }, reserved: { [id(1)]: 0 } }).conflicts.length, 0);
 });
 test('instructor overlaps checked against final batch and existing rows, adjacent slots allowed', () => {
   const second = row(2, { start_time: '12:00', end_time: '12:50' });
