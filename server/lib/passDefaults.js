@@ -8,7 +8,7 @@ export const PASS_DEFAULT_TEXTS = {
   // Google Wallet: nombre del emisor / del programa de lealtad.
   issuerName: "HIVE Pilates Studio",
   programName: "HIVE Club",
-  programNameTranslated: "HIVE Club — Pilates · Barre · Reformer/Tower",
+  programNameTranslated: "HIVE Club — Pilates Reformer",
   logoDescription: "HIVE Pilates Studio",
   heroDescription: "HIVE Pilates Studio",
 

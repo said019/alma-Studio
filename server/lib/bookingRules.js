@@ -18,7 +18,7 @@ export function isMembershipCategoryCompatible(membershipCategory, classCategory
 export function categoryLabel(category) {
   switch (normalizeClassCategory(category)) {
     case "studio": return "Studio";
-    case "reformer_tower": return "Reformer/Tower";
+    case "reformer_tower": return "Pilates Reformer";
     case "mixto": return "Mixto";
     default: return "HIVE";
   }

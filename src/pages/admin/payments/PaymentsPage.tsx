@@ -35,7 +35,7 @@ const PAYMENT_METHODS = [
 // ── Agrupación de planes por categoría (taxonomía única) ──
 const GROUP_LABELS: Record<string, string> = {
   studio: "Studio",
-  reformer_tower: "Reformer & Tower",
+  reformer_tower: "Pilates Reformer",
   mixto: "Mixtos",
   otro: "Otros paquetes",
 };

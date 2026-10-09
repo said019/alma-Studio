@@ -42,7 +42,7 @@ const STATUS_LABELS: Record<MembershipStatus, string> = {
 // Taxonomía única de categorías (sin color-coding: solo texto).
 const CATEGORY_LABELS: Record<string, string> = {
   studio: "Studio",
-  reformer_tower: "Reformer/Tower",
+  reformer_tower: "Pilates Reformer",
   mixto: "Mixto",
 };
 

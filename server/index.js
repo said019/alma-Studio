@@ -903,7 +903,7 @@ async function ensureSchema() {
     await seedPlansIfEmpty(pool, CATALOG_PLANS);
     // Planes de muestra/visita heredados eliminados: el catálogo inicial define
     // "Studio Intro" como única clase muestra y las clases únicas Studio /
-    // Reformer-Tower como sesiones sueltas. Ver server/lib/catalog.js.
+    // Pilates Reformer como sesiones sueltas. Ver server/lib/catalog.js.
     // (Si la dueña requiere un pack de visitas/invitadas lo crea desde el admin
     //  con is_visit_pack=true.)
     // ── Products table ─────────────────────────────────────────────────────
@@ -1350,7 +1350,7 @@ async function ensureSchema() {
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `);
-    // Cupo por disciplina: lo fija el seed de class_types (Reformer/Tower = 4,
+    // Cupo por disciplina: lo fija el seed de class_types (Pilates Reformer = 4,
     // Studio = 8). El admin puede editar el cupo por clase libremente.
     await pool.query(
       `INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO NOTHING`,
@@ -2513,7 +2513,7 @@ async function resyncMixtoBuckets(client, membershipId) {
 }
 
 const COUPON_CLASS_CATEGORIES = ["studio", "reformer_tower", "mixto", "all"];
-const COUPON_CATEGORY_MESSAGE = "Elige Studio, Reformer/Tower, Mixto o Todas.";
+const COUPON_CATEGORY_MESSAGE = "Elige Studio, Pilates Reformer, Mixto o Todas.";
 const COUPON_EMPTY_UPDATE_MESSAGE = "Envía al menos un campo del cupón.";
 function couponValidationError(message) {
   const err = new Error(message);
@@ -6803,7 +6803,7 @@ function truncateWalletField(value, max = 26) {
 function getWalletCategoryLabel(category) {
   const normalized = normalizeClassCategory(category, "all");
   if (normalized === "studio") return "Studio";
-  if (normalized === "reformer_tower") return "Reformer/Tower";
+  if (normalized === "reformer_tower") return "Pilates Reformer";
   if (normalized === "mixto") return "Mixto";
   if (normalized === "all") return "Todas las disciplinas";
   return "Pilates";
@@ -15016,7 +15016,7 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
 
     if (!isMembershipCategoryCompatible(membership.class_category, clsCategory)) {
       await client.query("ROLLBACK");
-      const label = clsCategory === "studio" ? "Studio" : clsCategory === "reformer_tower" ? "Reformer/Tower" : "esta disciplina";
+      const label = clsCategory === "studio" ? "Studio" : clsCategory === "reformer_tower" ? "Pilates Reformer" : "esta disciplina";
       return res.status(403).json({
         message: `La membresía del usuario no incluye clases de ${label}.`,
       });

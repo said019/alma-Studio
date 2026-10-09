@@ -25,7 +25,7 @@ describe("Tipos de clase", () => {
   it("la tabla muestra la muestra del bloque, la categoría y el estado", async () => {
     renderAdmin(<ClassTypesList />, { route: "/admin/class-types" });
     expect(await screen.findByText("Reformer Intermedio")).toBeInTheDocument();
-    expect(screen.getByText("Reformer/Tower")).toBeInTheDocument();
+    expect(screen.getByText("Pilates Reformer")).toBeInTheDocument();
     expect(screen.getByText("Inactivo")).toBeInTheDocument();
   });
 

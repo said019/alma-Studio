@@ -11,7 +11,7 @@ export type ClassCategory = "studio" | "reformer_tower" | "mixto";
 
 export const CATEGORY_OPTIONS: { value: ClassCategory; label: string }[] = [
   { value: "studio", label: "Studio" },
-  { value: "reformer_tower", label: "Reformer/Tower" },
+  { value: "reformer_tower", label: "Pilates Reformer" },
   { value: "mixto", label: "Mixto" },
 ];
 

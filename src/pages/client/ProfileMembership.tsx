@@ -32,7 +32,7 @@ const STATUS: Record<string, { label: string; tone: Tone }> = {
 
 const CATEGORY_LABEL: Record<string, string> = {
   studio: "Studio",
-  reformer_tower: "Reformer/Tower",
+  reformer_tower: "Pilates Reformer",
   mixto: "Mixto",
   all: "Todas las disciplinas",
 };
@@ -181,7 +181,7 @@ const ProfileMembership = () => {
                       {Number(membership.rtRemaining ?? 0)}
                     </div>
                     <div className="text-[0.75rem] uppercase tracking-[0.16em] mt-1 text-ink-muted">
-                      Reformer · Tower
+                      Pilates Reformer
                     </div>
                   </div>
                 </div>

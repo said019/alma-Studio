@@ -57,7 +57,7 @@ describe("Reservar: la clase llena se atenúa sin apagar su acción (I1)", () =>
   it("las pills de la fila (categoría) y los botones Reservar quedan a opacidad completa", async () => {
     renderPage(<BookClasses />, "/app/classes");
     await screen.findAllByRole("button", { name: /Lista de espera/ });
-    const pills = screen.getAllByText("Reformer/Tower").filter((el) => el.className.includes("rounded-full"));
+    const pills = screen.getAllByText("Pilates Reformer").filter((el) => el.className.includes("rounded-full"));
     expect(pills.length).toBeGreaterThan(0);
     for (const p of pills) expect(atenuadoPor(p)).toEqual([]);
     for (const b of screen.getAllByRole("button", { name: /Reservar$/ })) expect(atenuadoPor(b)).toEqual([]);

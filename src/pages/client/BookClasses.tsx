@@ -37,7 +37,7 @@ const DAY_LABELS = ["lun", "mar", "mié", "jue", "vie", "sáb", "dom"];
 type ClassCat = "studio" | "reformer_tower" | "mixto" | "all";
 const CAT_LABEL: Record<ClassCat, string> = {
   studio: "Studio",
-  reformer_tower: "Reformer/Tower",
+  reformer_tower: "Pilates Reformer",
   mixto: "Mixto",
   all: "Todas",
 };
@@ -88,7 +88,7 @@ function decorateClass(cls: ScheduleClass): DecoratedClass {
   const end = cls.end_time ? safeParse(cls.end_time) : null;
   const name = cls.class_type_name ?? "Clase";
   const classCat = cls.class_category ?? inferClassCat(name);
-  // Cupo real del backend; si falta, se deriva del área: Reformer/Tower 4, Studio 8.
+  // Cupo real del backend; si falta, se deriva del área: Pilates Reformer 4, Studio 8.
   const areaFallback = classCat === "reformer_tower" ? 4 : 8;
   const capacity = Number(cls.max_capacity ?? cls.capacity ?? areaFallback);
   const booked = Number(cls.current_bookings ?? 0);
