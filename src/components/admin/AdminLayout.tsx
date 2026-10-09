@@ -1,3 +1,4 @@
+import AdminNotificationBell from "./AdminNotificationBell";
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -10,7 +11,7 @@ import { canSeeFinance, roleLabel } from "@/lib/roles";
 import {
   LayoutDashboard, Package, CreditCard, Users, CalendarDays,
   BookOpen, DollarSign,
-  ShoppingCart, BarChart2, Bell, MessageCircle, Award, Percent,
+  ShoppingCart, BarChart2, MessageCircle, Award, Percent,
   Settings, ChevronLeft, ArrowLeft, LogOut, Globe, Menu, X, Search,
   ScrollText,
 } from "lucide-react";
@@ -37,7 +38,6 @@ const NAV_GROUPS = [
     collapsible: false,
     items: [
       { path: "/admin/visitas", label: "Visitas", icon: Users, feature: "visits" },
-      { path: "/admin/notifications", label: "Bandeja", icon: Bell, feature: "adminInbox" },
       { path: "/admin/memberships", label: "Membresías", icon: CreditCard },
       { path: "/admin/plans", label: "Planes", icon: Package },
       { path: "/admin/pos", label: "Tienda", icon: ShoppingCart, feature: "pos" },
@@ -253,7 +253,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <AdminTopBar className="hidden lg:flex" />
+        <AdminTopBar className="hidden lg:flex" unreadCount={unreadCount} />
 
         <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-2 border-b border-line bg-surface px-3 lg:hidden">
           {isClientFile ? (
@@ -267,7 +267,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
           )}
           {!isClientFile && <BrandLogo variant="mark" size={26} />}
           <span className="min-w-0 truncate text-[17px] font-extrabold text-ink">
-            {isClientFile ? "Ficha de usuario" : currentItem?.label ?? "Panel"}
+            {isClientFile ? "Ficha de usuario" : currentItem?.label ?? (location.pathname.startsWith("/admin/notifications") ? "Notificaciones" : "Panel")}
           </span>
           <button
             type="button"
@@ -278,6 +278,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
           >
             <Search size={18} />
           </button>
+          {FEATURES.adminInbox && <AdminNotificationBell count={unreadCount} />}
           <Avatar name={userName} size={36} />
         </header>
         {searchOpen && (

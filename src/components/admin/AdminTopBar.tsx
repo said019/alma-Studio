@@ -1,3 +1,5 @@
+import AdminNotificationBell from "./AdminNotificationBell";
+import { FEATURES } from "@/config/features";
 import { useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Plus, ScanLine } from "lucide-react";
@@ -9,7 +11,7 @@ import ClientSearch from "./ClientSearch";
 /* Barra superior de escritorio (spec §4.2): buscador de clientas con ⌘K,
    "Pasar lista" y, para la dueña, "Cobrar". Sin migaja: el encabezado de
    cada pantalla ya dice dónde estás. */
-export default function AdminTopBar({ className }: { className?: string }) {
+export default function AdminTopBar({ className, unreadCount = 0 }: { className?: string; unreadCount?: number }) {
   const navigate = useNavigate();
   const inputRef = useRef<HTMLInputElement>(null);
   const showFinance = useCanSeeFinance();
@@ -34,6 +36,7 @@ export default function AdminTopBar({ className }: { className?: string }) {
         onSelect={(c) => navigate(`/admin/clients/${c.id}`)}
       />
       <div className="ml-auto flex items-center gap-2.5">
+        {FEATURES.adminInbox && <AdminNotificationBell count={unreadCount} />}
         <Link to="/admin/pasar-lista" className={cn(buttonVariants({ variant: "outline" }), "no-underline")}>
           <ScanLine size={16} aria-hidden="true" />
           Pasar lista

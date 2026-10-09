@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
@@ -142,20 +141,22 @@ export function BroadcastDialog({ open, onOpenChange, emailOnly = false }: { ope
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!isPending) { setConfirmStep(false); onOpenChange(v); } }}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Enviar comunicado</DialogTitle>
-          <DialogDescription>{emailOnly ? "Envía un correo a tus usuarios." : "Envía un email o WhatsApp a tus usuarios."} Usa <code className="text-ink-muted">{"{name}"}</code> para personalizar con el nombre.</DialogDescription>
+      <DialogContent className="flex max-h-[92dvh] w-[calc(100%_-_2rem)] max-w-3xl flex-col gap-0 overflow-hidden rounded-2xl border-line bg-surface p-0 text-ink">
+        <DialogHeader className="shrink-0 border-b border-line px-6 py-6 text-left sm:px-8">
+          <DialogTitle className="font-display text-2xl">{emailOnly ? "Nueva campaña por correo" : "Enviar comunicado"}</DialogTitle>
+          <DialogDescription className="mt-2 max-w-xl text-sm leading-relaxed text-ink-muted">{emailOnly ? "Envía un correo a tus usuarios." : "Envía un email o WhatsApp a tus usuarios."} Usa <code className="text-ink-muted">{"{name}"}</code> para personalizar con el nombre.</DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="min-h-0 flex-1 space-y-8 overflow-y-auto px-6 py-7 sm:px-8">
+          <div className="space-y-4"><h3 className="text-base font-semibold text-ink">1. Elige tu audiencia</h3>
           {/* Audience */}
           <div className="space-y-1.5">
-            <Label className="text-xs uppercase tracking-widest text-muted-foreground font-medium">Audiencia</Label>
+            <Label htmlFor="campaign-audience" className="text-sm font-medium text-ink">Destinatarios</Label>
             <select
+              id="campaign-audience"
               value={audience}
               onChange={(e) => setAudience(e.target.value as Audience)}
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              className="min-h-12 w-full rounded-xl border border-line bg-canvas px-4 py-3 text-sm text-ink"
             >
               {AUDIENCES.map((a) => (
                 <option key={a.value} value={a.value}>{a.label}</option>
@@ -176,27 +177,29 @@ export function BroadcastDialog({ open, onOpenChange, emailOnly = false }: { ope
                 </Button>
               </div>
             ) : (
-              <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-                <Users size={12} />
-                {AUDIENCES.find((a) => a.value === audience)?.hint} ·{" "}
+              <p className="flex items-start gap-2 pt-2 text-sm leading-relaxed text-ink-muted">
+                <Users size={16} className="mt-0.5 shrink-0" />
+                <span>{AUDIENCES.find((a) => a.value === audience)?.hint} ·{" "}
                 {countKnown ? (
                   <>
                     <strong>{audienceCount}</strong> {recipientsLabel(audienceCount)}
                   </>
                 ) : (
                   <span>Contando destinatarios…</span>
-                )}
+                )}</span>
               </p>
             )}
           </div>
 
+          </div><div className="space-y-4 border-t border-line pt-7"><h3 className="text-base font-semibold text-ink">2. Prepara el mensaje</h3>
           {/* Template */}
           <div className="space-y-1.5">
-            <Label className="text-xs uppercase tracking-widest text-muted-foreground font-medium">Plantilla</Label>
+            <Label htmlFor="campaign-template" className="text-sm font-medium text-ink">Empieza con una plantilla</Label>
             <select
+              id="campaign-template"
               value={templateId}
               onChange={(e) => setTemplateId(e.target.value)}
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              className="min-h-12 w-full rounded-xl border border-line bg-canvas px-4 py-3 text-sm text-ink"
             >
               {TEMPLATES.map((t) => (
                 <option key={t.id} value={t.id}>{t.label}</option>
@@ -211,34 +214,35 @@ export function BroadcastDialog({ open, onOpenChange, emailOnly = false }: { ope
               {!emailOnly && <TabsTrigger value="whatsapp" className="flex-1"><MessageSquare size={13} className="mr-1.5" />WhatsApp</TabsTrigger>}
             </TabsList>
 
-            <TabsContent value="email" className="space-y-3 mt-4">
+            <TabsContent value="email" className="mt-5 space-y-5">
               <div className="space-y-1.5">
-                <Label className="text-xs uppercase tracking-widest text-muted-foreground font-medium">Asunto</Label>
-                <Input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Asunto del email" />
+                <Label htmlFor="campaign-subject" className="text-sm font-medium text-ink">Asunto</Label>
+                <Input id="campaign-subject" className="min-h-12 rounded-xl border-line bg-canvas" value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Asunto del email" />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs uppercase tracking-widest text-muted-foreground font-medium">Encabezado (h1)</Label>
-                <Input value={headline} onChange={(e) => setHeadline(e.target.value)} placeholder="Hola, {name}" />
+                <Label htmlFor="campaign-headline" className="text-sm font-medium text-ink">Saludo o título</Label>
+                <Input id="campaign-headline" className="min-h-12 rounded-xl border-line bg-canvas" value={headline} onChange={(e) => setHeadline(e.target.value)} placeholder="Hola, {name}" />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs uppercase tracking-widest text-muted-foreground font-medium">Cuerpo</Label>
-                <Textarea value={body} onChange={(e) => setBody(e.target.value)} rows={9} placeholder="Tu mensaje. Usa salto de línea doble para separar párrafos." />
+                <Label htmlFor="campaign-body" className="text-sm font-medium text-ink">Mensaje</Label>
+                <Textarea id="campaign-body" className="min-h-48 rounded-xl border-line bg-canvas p-4 leading-relaxed" value={body} onChange={(e) => setBody(e.target.value)} rows={9} placeholder="Tu mensaje. Usa salto de línea doble para separar párrafos." />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-4 rounded-xl border border-line bg-canvas p-4 sm:p-5"><div><h4 className="text-sm font-semibold text-ink">Botón del correo · opcional</h4><p className="mt-1 text-sm leading-relaxed text-ink-muted">Añade un enlace para que puedan reservar o consultar tus novedades.</p></div><div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <Label className="text-xs uppercase tracking-widest text-muted-foreground font-medium">URL del botón (opcional)</Label>
-                  <Input value={ctaUrl} onChange={(e) => setCtaUrl(e.target.value)} placeholder="https://..." />
+                  <Label htmlFor="campaign-url" className="text-sm font-medium text-ink">URL del botón (opcional)</Label>
+                  <Input id="campaign-url" className="min-h-12 rounded-xl border-line bg-canvas" value={ctaUrl} onChange={(e) => setCtaUrl(e.target.value)} placeholder="https://..." />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs uppercase tracking-widest text-muted-foreground font-medium">Texto del botón</Label>
-                  <Input value={ctaText} onChange={(e) => setCtaText(e.target.value)} placeholder="Reservar clase" />
+                  <Label htmlFor="campaign-button-text" className="text-sm font-medium text-ink">Texto del botón</Label>
+                  <Input id="campaign-button-text" className="min-h-12 rounded-xl border-line bg-canvas" value={ctaText} onChange={(e) => setCtaText(e.target.value)} placeholder="Reservar clase" />
                 </div>
+              </div>
               </div>
             </TabsContent>
 
             <TabsContent value="whatsapp" className="space-y-3 mt-4">
               <div className="space-y-1.5">
-                <Label className="text-xs uppercase tracking-widest text-muted-foreground font-medium">Mensaje</Label>
+                <Label className="text-sm font-medium text-ink">Mensaje</Label>
                 <Textarea value={waMessage} onChange={(e) => setWaMessage(e.target.value)} rows={6} placeholder="Hola {name}, tenemos novedades..." />
                 <p className="text-[11px] text-muted-foreground">{waMessage.length} caracteres · WhatsApp permite hasta ~4000.</p>
               </div>
@@ -246,23 +250,23 @@ export function BroadcastDialog({ open, onOpenChange, emailOnly = false }: { ope
                 Los mensajes se envían de forma gradual. Mantén esta ventana abierta hasta ver el resultado.
               </div>
             </TabsContent>
-          </Tabs>
+          </Tabs></div>
 
           {confirmStep && (
-            <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-xs text-destructive">
+            <div role="status" className="rounded-xl border border-line bg-canvas p-5 text-sm leading-relaxed text-ink">
               Estás por enviar a <strong>{audienceCount}</strong> {recipientsLabel(audienceCount)}. Confirma para proceder.
             </div>
           )}
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="shrink-0 gap-3 border-t border-line bg-surface px-6 py-5 sm:px-8">
           <Button variant="ghost" onClick={() => { setConfirmStep(false); onOpenChange(false); }} disabled={isPending}>
             Cancelar
           </Button>
           <Button
             onClick={handleSend}
             disabled={isPending || !countKnown || countLoading || audienceCount === 0 || (tab === "email" ? !subject || !body : !waMessage.trim())}
-            className="bg-ink hover:bg-ink/90 text-canvas"
+            className="min-h-11 bg-ink px-5 text-canvas hover:bg-ink/90"
           >
             {isPending ? <Loader2 className="animate-spin mr-1.5" size={14} /> : <Send size={14} className="mr-1.5" />}
             {confirmStep ? `Confirmar y enviar a ${audienceCount}` : "Enviar"}

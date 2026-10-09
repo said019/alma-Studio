@@ -65,8 +65,13 @@ describe("AdminLayout · Bandeja con adminInbox encendido (M10, M11)", () => {
       "/admin/notifications/unread-count": { data: { unread_count: 5 } },
     });
     renderAdmin(<AdminLayout><div>contenido</div></AdminLayout>, { route: "/admin/dashboard", path: "/admin/dashboard" });
-    const link = await screen.findByRole("link", { name: /Bandeja/ });
-    expect(await within(link).findByText("5")).toBeInTheDocument();
-    expect(within(link).queryByText(/pagos por verificar/)).toBeNull();
+    const links = await screen.findAllByRole("link", { name: /Notificaciones, 5 sin leer/ });
+    expect(links).toHaveLength(2);
+    for(const link of links){
+      expect(link.closest("header")).not.toBeNull();
+      expect(link).toHaveAttribute("href","/admin/notifications");
+      expect(within(link).getByText("5")).toBeInTheDocument();
+    }
+    expect(within(screen.getByRole("navigation",{name:"Secciones del panel"})).queryByRole("link",{name:/Notificaciones|Bandeja/})).toBeNull();
   });
 });
