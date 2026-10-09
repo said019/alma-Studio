@@ -23,9 +23,9 @@ const FROM_EMAIL = process.env.EMAIL_FROM || "HIVE Pilates Studio <noreply@agend
 const SITE_URL = (process.env.SITE_URL || process.env.APP_URL || "https://hivestudio.com.mx").replace(/\/+$/, "");
 const SITE_LABEL = SITE_URL.replace(/^https?:\/\//, "");
 // Isotipo terracota sobre transparente, a 3× (lo genera scripts/brand-assets.mjs).
-const LOGO_URL = `${SITE_URL}/email/hive-mark.png`;
-const LOGO_W = 40;
-const LOGO_H = 46;
+const LOGO_URL = `${SITE_URL}/api/drive/image/1iW5vQ0pyOGGZvjHjqtNmkDbo9CIb8sT8`;
+const LOGO_W = 208;
+const LOGO_H = 61;
 
 // Datos públicos del estudio. Copia de src/lib/studio.ts (el servidor no
 // importa TypeScript); emailService.test.mjs verifica que sigan iguales.
@@ -178,8 +178,6 @@ function baseLayout({ preheader = "", eyebrow = "", title = "", content = "", ct
           <img src="${LOGO_URL}" width="${LOGO_W}" height="${LOGO_H}" alt="HIVE"
                style="display:block;width:${LOGO_W}px;height:${LOGO_H}px;border:0;margin:0 auto;font-family:${SANS};font-size:14px;font-weight:800;color:${C.onBand};">
         </td></tr>
-        <tr><td align="center" class="hive-display" style="font-family:${DISPLAY};font-size:22px;line-height:26px;font-weight:800;letter-spacing:1px;color:${C.onBand};mso-line-height-rule:exactly;">HIVE</td></tr>
-        <tr><td align="center" style="padding:5px 0 0 3px;font-family:${SANS};font-size:9px;line-height:13px;font-weight:700;letter-spacing:3px;color:${C.onBandMuted};mso-line-height-rule:exactly;">PILATES STUDIO</td></tr>
       </table>
     </td></tr>
 
