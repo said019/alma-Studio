@@ -155,7 +155,7 @@ const CHANNEL_LABEL: Record<string, string> = {
 const CATEGORY_LABEL: Record<string, string> = {
   all: "Todas las categorías",
   studio: "Studio",
-  reformer_tower: "Reformer/Tower",
+  reformer_tower: "Pilates Reformer",
   bienestar: "Bienestar",
   funcional: "Funcional",
   barre: "Barre",
@@ -171,7 +171,7 @@ const CATEGORY_LABEL: Record<string, string> = {
 // reescriben: se siguen listando con su etiqueta, marcados «No aplica», y al
 // editarlos su categoría sigue siendo la opción elegida para que guardar otro
 // cambio no se la mueva sin que nadie lo pida.
-const CATEGORY_OPTIONS = ["all", "studio", "reformer_tower", "mixto"] as const;
+const CATEGORY_OPTIONS = ["all", "reformer_tower"] as const;
 const isRetiredCategory = (value?: string | null) =>
   Boolean(value) && !CATEGORY_OPTIONS.includes(String(value) as (typeof CATEGORY_OPTIONS)[number]);
 const categoryLabel = (value?: string | null) =>
