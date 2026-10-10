@@ -1,3 +1,4 @@
+import { claimRenewalReminder } from "./lib/renewalReminderOnce.js";
 import { CAMPAIGN_SCHEMA } from './lib/campaignOutbox.js';
 import { MANUAL_SALE_INTENT_SCHEMA, saleIntentHash } from "./lib/manualSaleIntent.js";
 import { ORDER_PAYMENT_WINDOW_MS, expireUnpaidOrders } from "./lib/orderExpiration.js";
@@ -18195,18 +18196,22 @@ async function runWeeklyReminderCron() {
 
 /**
  * Runs every day at 9:00 AM.
- * Sends renewal reminder to members with 1 class left OR expiring in ≤7 days.
+ * Sends at most one renewal reminder per membership (low credit or expiry).
  */
 async function runRenewalReminderCron() {
+  if (!process.env.RESEND_API_KEY) return;
   try {
     const res = await pool.query(`
-      SELECT u.id AS user_id, u.email, COALESCE(u.display_name, 'Alumna') AS name,
+      SELECT m.id AS membership_id, u.id AS user_id, u.email, COALESCE(u.display_name, 'Alumna') AS name,
              m.classes_remaining, m.end_date,
              COALESCE(p.name, m.plan_name_override, 'Tu membresía') AS plan_name
       FROM memberships m
       JOIN users u ON m.user_id = u.id
       LEFT JOIN plans p ON m.plan_id = p.id
       WHERE m.status = 'active'
+        AND u.is_active IS NOT FALSE
+        AND u.receive_reminders IS NOT FALSE
+        AND NOT EXISTS (SELECT 1 FROM settings s WHERE s.key = 'renewal_reminder:' || m.id::text)
         AND (m.end_date IS NULL OR m.end_date >= CURRENT_DATE)
         AND (
           m.classes_remaining = 1
@@ -18215,6 +18220,7 @@ async function runRenewalReminderCron() {
     `);
     console.log(`[Cron] Renewal reminder — ${res.rows.length} members`);
     for (const row of res.rows) {
+      if (!(await claimRenewalReminder(pool, row.membership_id))) continue;
       const reason = row.classes_remaining === 1 ? "last_class" : "expiring_soon";
       await sendRenewalReminder({
         to: row.email,
