@@ -1,3 +1,4 @@
+import { registerPaymentNoticeRoute } from "./paymentNoticeRoute.mjs";
 import { claimRenewalReminder } from "./lib/renewalReminderOnce.js";
 import { CAMPAIGN_SCHEMA } from './lib/campaignOutbox.js';
 import { MANUAL_SALE_INTENT_SCHEMA, saleIntentHash } from "./lib/manualSaleIntent.js";
@@ -3309,6 +3310,8 @@ function adminMiddleware(req, res, next) {
 function ownerMiddleware(req, res, next) {
   return roleGuard(OWNER_ROLES)(req, res, next);
 }
+
+registerPaymentNoticeRoute(app, { authMiddleware, pool });
 
 function mapUser(u) {
   return {
