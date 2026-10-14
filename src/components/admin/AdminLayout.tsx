@@ -1,4 +1,5 @@
 import AdminNotificationBell from "./AdminNotificationBell";
+import { PaymentNotice } from "./PaymentNotice";
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -287,6 +288,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
         )}
 
         <WhatsAppBanner />
+        <PaymentNotice role={user?.role} />
 
         <main className="admin-mobile-main flex-1 overflow-auto bg-canvas pb-[96px] lg:pb-0">{children}</main>
 
