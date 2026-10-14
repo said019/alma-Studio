@@ -1,3 +1,4 @@
+import { claimAutomaticEmail, WEEKLY_REMINDER_QUERY } from "./lib/automaticEmailThrottle.js";
 import { claimRenewalReminder } from "./lib/renewalReminderOnce.js";
 import { CAMPAIGN_SCHEMA } from './lib/campaignOutbox.js';
 import { MANUAL_SALE_INTENT_SCHEMA, saleIntentHash } from "./lib/manualSaleIntent.js";
@@ -18169,17 +18170,12 @@ app.use((err, _req, res, next) => {
  * Sends weekly reminder to all users with an active membership.
  */
 async function runWeeklyReminderCron() {
+  if (!process.env.RESEND_API_KEY) return;
   try {
-    const res = await pool.query(`
-      SELECT u.email, COALESCE(u.display_name, 'Alumna') AS name,
-             m.classes_remaining, m.end_date
-      FROM memberships m
-      JOIN users u ON m.user_id = u.id
-      WHERE m.status = 'active'
-        AND (m.end_date IS NULL OR m.end_date >= CURRENT_DATE)
-    `);
+    const res = await pool.query(WEEKLY_REMINDER_QUERY);
     console.log(`[Cron] Weekly reminder — ${res.rows.length} members`);
     for (const row of res.rows) {
+      if (!(await claimAutomaticEmail(pool, row.user_id))) continue;
       await sendWeeklyReminder({
         to: row.email,
         name: row.name,
@@ -18210,6 +18206,8 @@ async function runRenewalReminderCron() {
       LEFT JOIN plans p ON m.plan_id = p.id
       WHERE m.status = 'active'
         AND u.is_active IS NOT FALSE
+        AND NULLIF(TRIM(u.email),'') IS NOT NULL
+        AND (m.start_date IS NULL OR m.start_date <= CURRENT_DATE)
         AND u.receive_reminders IS NOT FALSE
         AND NOT EXISTS (SELECT 1 FROM settings s WHERE s.key = 'renewal_reminder:' || m.id::text)
         AND (m.end_date IS NULL OR m.end_date >= CURRENT_DATE)
@@ -18220,6 +18218,7 @@ async function runRenewalReminderCron() {
     `);
     console.log(`[Cron] Renewal reminder — ${res.rows.length} members`);
     for (const row of res.rows) {
+      if (!(await claimAutomaticEmail(pool, row.user_id))) continue;
       if (!(await claimRenewalReminder(pool, row.membership_id))) continue;
       const reason = row.classes_remaining === 1 ? "last_class" : "expiring_soon";
       await sendRenewalReminder({
