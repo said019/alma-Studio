@@ -237,3 +237,14 @@ describe("Ficha de usuario", () => {
     expect(textos.some((t) => t.includes("Terminal"))).toBe(true);
   });
 });
+
+it("abre la firma presencial desde la tarjeta con los datos de este usuario", async () => {
+  loginAs("admin");
+  routeApi(mockApi, tabla({ "/admin/users/u1/waiver": { data: null } }));
+  renderAdmin(<ClientDetail />, { route: "/admin/clients/u1", path: "/admin/clients/:id" });
+  const card = await screen.findByRole("region", { name: "Responsiva" });
+  fireEvent.click(await within(card).findByRole("button", { name: "Firmar responsiva" }));
+  expect(await screen.findByText("HIVE Pilates Studio — Carta de Consentimiento Informado y Responsiva")).toBeInTheDocument();
+  expect(screen.getByDisplayValue("Camila Torres")).toBeInTheDocument();
+  expect(screen.getByDisplayValue("camila@correo.com")).toBeInTheDocument();
+});

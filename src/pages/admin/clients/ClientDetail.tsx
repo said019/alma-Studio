@@ -1,3 +1,4 @@
+import { ResponsivaDialog } from "@/components/app/ResponsivaDialog";
 import { UserCommunications } from "@/components/admin/UserCommunications";
 import { CreditHistory } from "@/components/admin/CreditHistory";
 import { MembershipPauseButton } from "@/components/admin/MembershipPauseButton";
@@ -327,6 +328,7 @@ const ClientDetail = () => {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["client", id] }); toast({ title: "Verificación estudiantil actualizada" }); },
     onError: (e: any) => toast({ title: e.response?.data?.message || "No se pudo guardar la verificación", variant: "destructive" }),
   });
+  const [signWaiverOpen, setSignWaiverOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [tab, setTab] = useState("profile");
   const [adjPoints, setAdjPoints] = useState("");
@@ -863,7 +865,8 @@ const ClientDetail = () => {
                     <ErrorState title="No pudimos cargar la responsiva" onRetry={() => refetchWaiver()} />
                   ) : !waiver ? (
                     <div className="rounded-xl border border-line bg-sunken p-6 text-sm text-ink/55">
-                      Este usuario aún no ha firmado su responsiva. Debe firmarla al inscribirse o comprar una clase.
+                      <p>Este usuario aún no ha firmado su responsiva. Abre el documento y entrégale el dispositivo para que lo lea y firme.</p>
+                      <Button className="mt-4" onClick={() => setSignWaiverOpen(true)} disabled={waiverLoading}>Firmar responsiva</Button>
                     </div>
                   ) : (
                     <div className="space-y-5">
@@ -945,7 +948,7 @@ const ClientDetail = () => {
                   isError={bookingsError}
                   onRetry={refetchBookings}
                 />
-                <Panel aria-label="Responsiva" className="flex items-center justify-between px-5 py-4">
+                <Panel aria-label="Responsiva" className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
                   <span className="text-sm font-bold">Responsiva</span>
                   {waiverLoading ? (
                     <Skeleton className="h-5 w-20 bg-sunken/60" />
@@ -954,11 +957,17 @@ const ClientDetail = () => {
                   ) : waiver ? (
                     <StatusDot tone="success">Firmada{(waiver.signedAt ?? waiver.signed_at) ? ` ${format(new Date(waiver.signedAt ?? waiver.signed_at), "d MMM", { locale: es })}` : ""}</StatusDot>
                   ) : (
-                    <StatusDot tone="muted">Pendiente</StatusDot>
+                    <div className="flex flex-wrap items-center justify-end gap-3"><StatusDot tone="muted">Pendiente</StatusDot><Button size="sm" onClick={() => setSignWaiverOpen(true)}>Firmar responsiva</Button></div>
                   )}
                 </Panel>
               </aside>
               </div>
+              {signWaiverOpen && id && <ResponsivaDialog
+                key={id} userId={id} open onClose={() => setSignWaiverOpen(false)}
+                onSigned={() => { setSignWaiverOpen(false); void refetchWaiver(); }}
+                defaultName={u.displayName ?? u.display_name ?? ""}
+                defaultEmail={u.email ?? ""} defaultPhone={u.phone ?? ""}
+              />}
               <ClientEditSheet clientId={id ?? null} open={editOpen} onOpenChange={setEditOpen} />
             </>
           )}
