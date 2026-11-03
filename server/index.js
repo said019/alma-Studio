@@ -1380,29 +1380,44 @@ async function ensureSchema() {
         [settingKey, JSON.stringify(defaults)],
       ).catch(() => { });
     }
-    // ── Seed inicial: teléfono de la dueña como destinatario de notificaciones
-    //    admin (nueva reserva, etc.). Solo corre UNA vez (marker en settings);
-    //    si la admin lo borra después desde la UI, NO lo restauramos.
+    // ── Aviso "Nueva reserva" (admin_new_booking) APAGADO ─────────────────
+    //    Le llegaba por WhatsApp a un número que no debía recibirlo (el que
+    //    sembraba antes 'admin_phones_seed_v1'). Corre UNA vez (marker):
+    //    desactiva la plantilla y quita ese número de admin_phones. Si la
+    //    dueña lo vuelve a activar desde Admin → WhatsApp, NO lo apagamos de nuevo.
     await pool.query(`
       DO $$
       BEGIN
-        IF NOT EXISTS (SELECT 1 FROM settings WHERE key = 'admin_phones_seed_v1') THEN
+        IF NOT EXISTS (SELECT 1 FROM settings WHERE key = 'admin_new_booking_off_v1') THEN
           UPDATE settings
              SET value = jsonb_set(
                COALESCE(value, '{}'::jsonb),
+               '{admin_new_booking}',
+               COALESCE(value->'admin_new_booking', '{}'::jsonb) || '{"enabled": false}'::jsonb,
+               true
+             ),
+                 updated_at = NOW()
+           WHERE key = 'notification_templates' AND jsonb_typeof(value) = 'object';
+          INSERT INTO settings (key, value)
+            SELECT 'notification_templates', '{"admin_new_booking": {"enabled": false}}'::jsonb
+             WHERE NOT EXISTS (SELECT 1 FROM settings WHERE key = 'notification_templates');
+          UPDATE settings
+             SET value = jsonb_set(
+               value,
                '{admin_phones}',
-               COALESCE(value->'admin_phones', '[]'::jsonb) || '["+524445082461"]'::jsonb,
+               COALESCE((SELECT jsonb_agg(p) FROM jsonb_array_elements(value->'admin_phones') p
+                          WHERE p <> '"+524445082461"'::jsonb), '[]'::jsonb),
                true
              ),
                  updated_at = NOW()
            WHERE key = 'notification_settings'
-             AND NOT (COALESCE(value->'admin_phones', '[]'::jsonb) @> '["+524445082461"]'::jsonb);
+             AND jsonb_typeof(value->'admin_phones') = 'array';
           INSERT INTO settings (key, value)
-            VALUES ('admin_phones_seed_v1', jsonb_build_object('seeded_at', to_jsonb(NOW())))
+            VALUES ('admin_new_booking_off_v1', jsonb_build_object('applied_at', to_jsonb(NOW())))
             ON CONFLICT (key) DO NOTHING;
         END IF;
       END $$;
-    `).catch(() => { });
+    `).catch((e) => console.warn("[migration admin_new_booking_off_v1]", e?.message));
     // ── Loyalty rewards table ──────────────────────────────────────────────
     await pool.query(`
       CREATE TABLE IF NOT EXISTS loyalty_rewards (
