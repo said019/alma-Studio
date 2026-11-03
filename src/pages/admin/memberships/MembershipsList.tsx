@@ -199,6 +199,7 @@ const MembershipTable = ({
             )}
             <div className="space-y-1.5">
               <Label htmlFor="m-start">Fecha de inicio</Label>
+              {startVal && <p className="text-sm text-ink-muted">{new Intl.DateTimeFormat("es-MX", {day:"numeric",month:"long",year:"numeric",timeZone:"UTC"}).format(new Date(startVal+"T12:00:00Z"))}</p>}
               <Input id="m-start" type="date" value={startVal} onChange={(e) => setStartVal(e.target.value)} />
             </div>
             <label className="flex items-center gap-2 text-sm text-ink/80 cursor-pointer">

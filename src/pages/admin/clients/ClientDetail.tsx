@@ -874,8 +874,9 @@ const ClientDetail = () => {
                         <div className="mb-3 flex items-center justify-between gap-3">
                           <h3 className="text-base font-semibold text-ink">Responsiva y consentimiento informado</h3>
                           <div className="flex items-center gap-2">
-                            <Badge className="border-transparent bg-success/15 text-success hover:bg-success/15">Firmada</Badge>
+                            <Badge className="border-transparent bg-success/15 text-success hover:bg-success/15">{waiver.signature_method === "paper" ? "Firmada en papel" : "Firmada"}</Badge>
                             <Button
+                              disabled={waiver.signature_method === "paper"}
                               size="sm"
                               variant="outline"
                               className="border-line-strong/70 bg-transparent text-ink hover:bg-canvas"
@@ -897,6 +898,7 @@ const ClientDetail = () => {
                         <dl className="grid grid-cols-1 gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
                           {[
                             ["Nombre", waiver.full_name || "—"],
+                            ...(waiver.signature_method === "paper" ? [["Documento físico", waiver.paper_reference], ["Fecha de firma en papel", waiver.paper_signed_on]] : []),
                             ["Correo", waiver.email || "—"],
                             ["Teléfono", waiver.phone || "—"],
                             ["Uso de imagen", waiver.image_consent ? "Sí autorizado" : "No autorizado"],
@@ -955,7 +957,7 @@ const ClientDetail = () => {
                   ) : waiverError ? (
                     <CardError text="No pudimos cargar la responsiva." onRetry={() => refetchWaiver()} />
                   ) : waiver ? (
-                    <StatusDot tone="success">Firmada{(waiver.signedAt ?? waiver.signed_at) ? ` ${format(new Date(waiver.signedAt ?? waiver.signed_at), "d MMM", { locale: es })}` : ""}</StatusDot>
+                    <StatusDot tone="success">{waiver.signature_method === "paper" ? "Firmada en papel" : "Firmada"}{(waiver.signedAt ?? waiver.signed_at) ? ` ${format(new Date(waiver.signedAt ?? waiver.signed_at), "d MMM", { locale: es })}` : ""}</StatusDot>
                   ) : (
                     <div className="flex flex-wrap items-center justify-end gap-3"><StatusDot tone="muted">Pendiente</StatusDot><Button size="sm" onClick={() => setSignWaiverOpen(true)}>Firmar responsiva</Button></div>
                   )}

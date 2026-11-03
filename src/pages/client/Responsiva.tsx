@@ -28,6 +28,8 @@ interface WaiverRow {
   signature_data: string;
   signed_at: string;
   waiver_version?: string | null;
+  signature_method?: string;
+  paper_signed_on?: string;
 }
 
 const Responsiva = () => {
@@ -55,7 +57,7 @@ const Responsiva = () => {
           eyebrow="Documentos"
           title="Mi responsiva."
           subtitle={waiver
-            ? `Tu responsiva y consentimiento informado, en la versión que firmaste (${waiver.waiver_version ?? "v1"}).`
+            ? (waiver.signature_method === "paper" ? "Responsiva física registrada por recepción." : `Tu responsiva y consentimiento informado, en la versión que firmaste (${waiver.waiver_version ?? "v1"}).`)
             : "Tu responsiva y consentimiento informado."}
           actions={
             waiver ? (
@@ -123,6 +125,7 @@ const Responsiva = () => {
             </div>
 
             {/* Signature — baldosa clara (bg-inverse) para que el trazo oscuro se vea en la app oscura. */}
+            {waiver.signature_method === "paper" ? <Section title="Firmada en papel"><p>Tu responsiva firmada se conserva en recepción. Fecha del documento: {waiver.paper_signed_on}. Solicita ahí una copia del original.</p></Section> : <>
             <Section title="Tu firma">
               <div className="inline-block max-w-full rounded-2xl p-4 border border-line bg-inverse">
                 <img
@@ -151,6 +154,7 @@ const Responsiva = () => {
               ))}
               <div className="pt-3 border-t border-line" />
             </Section>
+            </>}
           </>
         )}
       </AppShell>

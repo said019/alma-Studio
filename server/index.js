@@ -3509,6 +3509,25 @@ async function saveSignedWaiver(req, res) {
 }
 app.post("/api/me/waiver", authMiddleware, saveSignedWaiver);
 app.post("/api/admin/users/:userId/waiver", adminMiddleware, saveSignedWaiver);
+app.post("/api/admin/users/:userId/waiver/paper", adminMiddleware, async (req,res) => {
+  const {signedOn,reference,confirmed}=req.body||{};
+  if(!isUuid(req.params.userId) || confirmed!==true || typeof reference!=="string" || reference.trim().length<5 || reference.length>500 || typeof signedOn!=="string" || !/^\d{4}-\d{2}-\d{2}$/.test(signedOn) || Number.isNaN(Date.parse(signedOn)) || new Date(signedOn).toISOString().slice(0,10)!==signedOn) return res.status(400).json({message:"Indica la fecha, dónde se conserva el original firmado y confirma su recepción."});
+  const client=await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const u=(await client.query("SELECT id,display_name,email,phone FROM users WHERE id=$1 AND is_active=true FOR UPDATE",[req.params.userId])).rows[0];
+    if(!u){await client.query("ROLLBACK");return res.status(404).json({message:"Usuario no encontrado"});}
+    const dates=(await client.query("SELECT $1::date <= CURRENT_DATE AS valid",[signedOn])).rows[0];
+    if(!dates.valid){await client.query("ROLLBACK");return res.status(400).json({message:"La fecha de firma no puede ser futura"});}
+    const data={signature_method:"paper",paper_signed_on:signedOn,paper_reference:reference.trim(),recorded_by:req.userId,recorded_at:new Date().toISOString()};
+    const r=await client.query(`INSERT INTO waivers(user_id,full_name,phone,email,image_consent,signature_data,waiver_version,intake_data,signed_at)
+      VALUES($1,$2,$3,$4,false,'','paper',$5::jsonb,NOW()) ON CONFLICT(user_id) DO NOTHING RETURNING *`,[u.id,u.display_name,u.phone,u.email,JSON.stringify(data)]);
+    if(!r.rowCount){await client.query("ROLLBACK");return res.status(409).json({message:"Este usuario ya tiene una responsiva registrada."});}
+    await recordAudit(client,{actorId:req.userId,action:"waiver.paper_recorded",entityType:"user",entityId:u.id,subjectUserId:u.id,after:data});
+    await client.query("COMMIT");res.status(201).json({data:waiverWithIntake(r.rows[0])});
+  }catch(e){await client.query("ROLLBACK").catch(()=>{});res.status(500).json({message:"No se pudo registrar el documento firmado"});}finally{client.release();}
+});
+
 
 // POST /api/auth/change-password — cambiar contraseña estando logueado.
 // Sirve a cualquier rol (cliente, admin, super_admin). Pide la contraseña
@@ -9241,6 +9260,7 @@ app.get("/api/admin/users/:userId/waiver/pdf", adminMiddleware, async (req, res)
     );
     const w = wr.rows[0];
     if (!w) return res.status(404).json({ message: "Sin responsiva firmada" });
+    if(w.intake_data?.signature_method === "paper") return res.status(409).json({message:"Responsiva firmada en papel. Consulta el original conservado en recepción."});
     const documento = responsivaDocument(w.waiver_version);
 
     const { default: PDFDocument } = await import("pdfkit");
@@ -14363,10 +14383,7 @@ app.put("/api/memberships/:id", adminMiddleware, async (req, res) => {
       return res.status(404).json({ message: "Membresía no encontrada" });
     }
     const before = cur.rows[0];
-    if (before.rules?.extendable === false && ((endDate && endDate > before.end_date) || (startDate && startDate !== before.start_date))) {
-      await client.query("ROLLBACK");
-      return res.status(400).json({message:"Este plan no admite prórrogas ni cambios de fecha de compra."});
-    }
+    // Authorized administrative corrections remain audited and require a reason.
     const plan = planMembershipAdjust({ before, input: { status, classesRemaining, startDate, endDate, paymentMethod, cancellationsUsed } });
     if (!plan.ok) {
       await client.query("ROLLBACK");

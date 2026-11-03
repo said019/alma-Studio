@@ -1,3 +1,4 @@
+import { PaperWaiverForm } from "./PaperWaiverForm";
 import { useAuthStore } from "@/stores/authStore";
 import { useState, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -46,6 +47,7 @@ export const ResponsivaDialog = ({
   defaultEmail = "",
   defaultPhone = "",
 }: ResponsivaDialogProps) => {
+  const [paperMode,setPaperMode] = useState(false);
   const { toast } = useToast();
   const qc = useQueryClient();
 
@@ -114,6 +116,7 @@ export const ResponsivaDialog = ({
   });
 
   if (!open) return null;
+  if (paperMode && userId) return <PaperWaiverForm userId={userId} name={defaultName} onClose={onClose} onSigned={onSigned} onBack={()=>setPaperMode(false)} />;
 
   return (
     <div
@@ -178,6 +181,7 @@ export const ResponsivaDialog = ({
             >
               {RESPONSIVA_TITLE}
             </h2>
+            {userId && <button type="button" className="my-4 rounded-xl border border-line p-3 text-sm font-semibold text-ink" onClick={()=>setPaperMode(true)}>Ya firmó en papel · Registrar documento</button>}
           </div>
           <button
             type="button"
