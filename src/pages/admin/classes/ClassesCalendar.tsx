@@ -701,8 +701,8 @@ function CalendarView({
 
       {/* Detail sheet */}
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent className="overflow-y-auto">
-          <SheetHeader>
+        <SheetContent className="overflow-y-auto bg-surface px-6 pb-6 pt-8 sm:max-w-[460px]">
+          <SheetHeader className="border-b border-line pb-5 text-left pr-6">
             <p className="text-[0.75rem] font-bold uppercase tracking-[0.12em] text-ink-muted">
               {selectedClass?.startTime
                 ? `${format(new Date(selectedClass.startTime), "EEEE d · HH:mm", { locale: es })}${selectedClass.endTime ? `–${format(new Date(selectedClass.endTime), "HH:mm")}` : ""}`
@@ -723,7 +723,7 @@ function CalendarView({
               <>
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   <span className="text-sm text-ink-muted">con {selectedClass.instructorName ?? "—"}</span>
-                  {full ? <Badge variant="attention">Llena · {booked}/{cap}</Badge> : <span className="nums text-sm font-bold">{booked}/{cap}</span>}
+                  {full && <Badge variant="attention">Llena · {booked}/{cap}</Badge>}
                   {waiting > 0 && <span className="rounded-full bg-sunken px-2.5 py-1 text-[0.75rem] font-extrabold text-ink">{waiting} en espera</span>}
                 </div>
                 {shownBooked.length > 0 && (
@@ -743,7 +743,7 @@ function CalendarView({
             );
           })()}
           {selectedClass && (
-            <div className="mt-6 space-y-4 text-sm text-ink">
+            <div className="mt-5 space-y-5 text-sm text-ink">
               {/* Cupo editable: +/- en línea para sumar o quitar lugares. */}
               {(() => {
                 const occupied = selectedClass.bookedCount ?? selectedClass.currentBookings ?? 0;
@@ -751,9 +751,9 @@ function CalendarView({
                 const isFull = occupied >= cap;
                 const canShrink = cap > Math.max(1, occupied);
                 return (
-                  <div className="flex items-center justify-between gap-2 rounded-lg border border-line bg-sunken px-3 py-2">
+                  <div className="flex items-center justify-between gap-3 rounded-xl border border-line bg-canvas px-4 py-3">
                     <div>
-                      <span className="font-medium">Cupo:</span>{" "}
+                      <span className="font-medium text-ink-muted">Lugares ocupados</span><br />{" "}
                       <span className={cn("nums", isFull && "font-semibold text-ink")}>
                         {occupied} / {cap || "?"}
                       </span>
@@ -764,7 +764,7 @@ function CalendarView({
                         type="button"
                         onClick={() => capacityMutation.mutate({ id: selectedClass.id, newCap: Math.max(1, cap - 1) })}
                         disabled={!canShrink || capacityMutation.isPending}
-                        className="h-7 w-7 rounded-md border border-line bg-canvas text-sm font-semibold text-ink transition-colors hover:bg-sunken/50 disabled:cursor-not-allowed disabled:opacity-40"
+                        className="h-10 w-10 rounded-xl border border-line bg-canvas text-sm font-semibold text-ink transition-colors hover:bg-sunken/50 disabled:cursor-not-allowed disabled:opacity-40"
                         title="Quitar 1 lugar"
                       >
                         −
@@ -773,7 +773,7 @@ function CalendarView({
                         type="button"
                         onClick={() => capacityMutation.mutate({ id: selectedClass.id, newCap: cap + 1 })}
                         disabled={capacityMutation.isPending}
-                        className="h-7 w-7 rounded-md border border-line bg-canvas text-sm font-semibold text-ink transition-colors hover:bg-sunken/50"
+                        className="h-10 w-10 rounded-xl border border-line bg-canvas text-sm font-semibold text-ink transition-colors hover:bg-sunken/50"
                         title="Agregar 1 lugar"
                       >
                         +
@@ -810,7 +810,7 @@ function CalendarView({
                         </button>
                       </p>
                     ) : roster.length === 0 ? (
-                      <p className="rounded-lg border border-dashed border-line-strong/60 px-3 py-2 text-xs text-ink/55">
+                      <p className="rounded-xl bg-canvas px-4 py-5 text-sm text-ink-muted">
                         Sin reservas aún
                       </p>
                     ) : (
@@ -832,7 +832,7 @@ function CalendarView({
                             : status === "no_show" ? "border-destructive/30 bg-destructive/10 text-destructive"
                             : "border-line bg-sunken/60 text-ink";
                           return (
-                            <li key={r.bookingId ?? r.booking_id ?? i} className="flex items-center justify-between gap-2 rounded-lg border border-line bg-sunken px-3 py-2">
+                            <li key={r.bookingId ?? r.booking_id ?? i} className="flex items-center justify-between gap-3 rounded-xl border border-line bg-canvas px-4 py-3">
                               <div className="min-w-0">
                                 <p className="truncate text-sm font-medium text-ink">{name}</p>
                                 {planLabel && <p className="truncate text-[11px] text-ink/55">{planLabel}</p>}
@@ -845,7 +845,7 @@ function CalendarView({
                         })}
                       </ul>
                     )}
-                    <Button asChild variant="outline" className="mt-3 w-full border-line-strong/70 text-ink">
+                    <Button asChild className="mt-4 w-full rounded-xl">
                       <Link to={`/admin/bookings?clase=${selectedClass.id}`}>
                         Gestionar en Reservas
                         <ArrowRight size={14} className="ml-1.5" />
@@ -854,15 +854,15 @@ function CalendarView({
                   </div>
                 );
               })()}
-              <div className="flex flex-col gap-2 pt-4">
+              <div className="grid grid-cols-2 gap-3 border-t border-line pt-5 [&>div]:col-span-2">
                 {isOwner && !selectedClass.isCancelled && new Date(selectedClass.startTime).getTime() < Date.now() && <ClassOperations classId={selectedClass.id} />}
                 {!selectedClass.isCancelled && !selectedClass.isClosed && (
-                  <Button variant="outline" className="border-line-strong/70 text-ink" onClick={() => openEdit(selectedClass)}>
+                  <Button variant="outline" className="rounded-xl border-line text-ink" onClick={() => openEdit(selectedClass)}>
                     Editar clase
                   </Button>
                 )}
                 {!selectedClass.isCancelled && !selectedClass.isClosed && (
-                  <Button variant="outline" className="border-line-strong/70 text-ink" onClick={handleCloseClass} disabled={closeMutation.isPending}>
+                  <Button variant="outline" className="rounded-xl border-line text-ink" onClick={handleCloseClass} disabled={closeMutation.isPending}>
                     {closeMutation.isPending && <Loader2 size={14} className="mr-2 animate-spin" />}
                     Cerrar clase
                   </Button>
@@ -874,7 +874,7 @@ function CalendarView({
                   </Button>
                 )}
                 {!selectedClass.isCancelled && (
-                  <Button variant="destructive" onClick={handleCancelClass} disabled={cancelMutation.isPending}>
+                  <Button variant="ghost" className="col-span-2 mt-1 justify-start rounded-xl text-destructive hover:bg-destructive/5 hover:text-destructive" onClick={handleCancelClass} disabled={cancelMutation.isPending}>
                     {cancelMutation.isPending && <Loader2 size={14} className="mr-2 animate-spin" />}
                     Cancelar clase
                   </Button>

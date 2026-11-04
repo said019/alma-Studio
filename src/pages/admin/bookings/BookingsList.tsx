@@ -449,15 +449,15 @@ const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: string; onBa
         {isLoading ? (
           <div className="p-6"><SkeletonRow height={72} /></div>
         ) : (
-          <div className="flex flex-col gap-4 p-5 lg:flex-row lg:items-start lg:justify-between lg:p-6">
+          <div className="flex flex-col gap-4 p-5 xl:flex-row xl:items-center xl:justify-between lg:p-6">
             <div className="min-w-0">
               <p className="text-[0.75rem] font-bold uppercase tracking-[0.12em] text-ink-muted">
                 {classInfo?.startsAt ? format(new Date(classInfo.startsAt), "EEEE d 'de' MMMM · HH:mm", { locale: es }) : classInfo?.date ?? "—"}
               </p>
               <h2 className="mt-2 font-display text-[1.375rem] font-semibold leading-tight text-ink">{classInfo?.classTypeName ?? "Clase"}</h2>
-              <p className="mt-1 text-[13px] text-ink-muted">con {classInfo?.instructorName ?? "—"} · se actualiza sola cada 15 s</p>
+              <p className="mt-1 text-[13px] text-ink-muted">con {classInfo?.instructorName ?? "—"}</p>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 [&>button]:rounded-xl">
               <Button onClick={() => setAssignOpen(true)}>
                 <UserPlus size={16} aria-hidden="true" />
                 Asignar socia
@@ -480,11 +480,11 @@ const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: string; onBa
           </div>
         )}
 
-        <dl className="grid grid-cols-2 border-t border-line lg:grid-cols-4">
+        <dl className="grid grid-cols-2 border-t border-line bg-canvas/60 sm:grid-cols-4">
           {([["Confirmadas", confirmed], ["Asistieron", checkedIn], ["En espera", waitlist], ["Faltas", noShow]] as const).map(([label, value], i) => (
-            <div key={label} className={cn("px-5 py-3.5", i % 2 === 1 && "border-l border-line", i >= 2 && "border-t border-line lg:border-t-0", i > 0 && "lg:border-l")}>
+            <div key={label} className={cn("flex items-center justify-between gap-2 px-5 py-3", i % 2 === 1 && "border-l border-line", i >= 2 && "border-t border-line sm:border-t-0", i > 0 && "sm:border-l")}>
               <dt className="text-[0.75rem] font-bold uppercase tracking-[0.12em] text-ink-muted">{label}</dt>
-              <dd className="nums mt-1.5 font-display text-[1.375rem] font-semibold">{value}</dd>
+              <dd className="nums font-display text-xl font-semibold">{value}</dd>
             </div>
           ))}
         </dl>
@@ -506,7 +506,7 @@ const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: string; onBa
                 ? `${entry.planName} · ${unlimited ? "Ilimitado" : `${entry.classesRemaining} ${entry.classesRemaining === 1 ? "restante" : "restantes"}`}`
                 : "Sin plan";
               return (
-                <li key={entry.bookingId} className="grid grid-cols-[40px_minmax(0,1fr)] items-center gap-3 border-t border-line px-5 py-3 2xl:grid-cols-[40px_minmax(0,1fr)_150px_auto] 2xl:gap-4 2xl:px-6">
+                <li key={entry.bookingId} className="grid grid-cols-[40px_minmax(0,1fr)] items-start gap-x-3 gap-y-2 border-t border-line px-5 py-5 lg:grid-cols-[40px_minmax(0,1fr)_auto] lg:gap-x-4 lg:px-6">
                   {entry.status === "checked_in" ? (
                     <span aria-hidden="true" className="grid h-10 w-10 place-items-center rounded-full bg-success text-canvas"><Check size={18} /></span>
                   ) : (
@@ -517,8 +517,8 @@ const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: string; onBa
                     <HealthBadges hasInjury={entry.hasInjury} injuryDetails={entry.injuryDetails} healthNotes={entry.healthNotes} firstVisit={entry.firstVisit} />
                     <span className="block truncate text-xs text-ink-muted">{[plan, entry.phone].filter(Boolean).join(" · ")}</span>
                   </span>
-                  <span className="col-start-2 2xl:col-start-auto"><RosterStatus status={entry.status} /></span>
-                  <span className="col-span-2 flex flex-wrap justify-end gap-1.5 2xl:col-span-1">
+                  <span className="col-start-2 lg:row-start-2"><RosterStatus status={entry.status} /></span>
+                  <span className="col-start-2 flex flex-wrap items-center gap-2 pt-2 lg:col-start-3 lg:row-start-1 lg:row-span-2 lg:self-center lg:pt-0 [&>button]:rounded-xl">
                     {canManageFinance && entry.status === "checked_in" && <ClassOperations bookingId={entry.bookingId} />}
                     {canCheckin && (
                       <Button variant="outline" aria-label={`Check-in de ${entry.displayName}`} onClick={() => checkinMutation.mutate(entry.bookingId)} disabled={checkinMutation.isPending}>
@@ -552,7 +552,7 @@ const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: string; onBa
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line px-5 py-3.5 lg:px-6">
           <p className="text-[13px] text-ink-muted">Cancelar una reserva devuelve el crédito, salvo que elijas lo contrario.</p>
           {confirmed + waitlist > 0 && (
-            <Button variant="outline" className="border-danger text-danger hover:bg-sunken" onClick={handleCancelClass}>Cancelar clase</Button>
+            <Button variant="outline" className="rounded-xl border-line text-danger hover:bg-sunken" onClick={handleCancelClass}>Cancelar clase</Button>
           )}
         </div>
       </Panel>
