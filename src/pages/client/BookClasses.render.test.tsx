@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { screen, fireEvent, within } from "@testing-library/react";
+import { screen, fireEvent, within, waitFor } from "@testing-library/react";
 import api from "@/lib/api";
 import BookClasses from "./BookClasses";
 import { renderPage, respuestas, atenuadoPor } from "@/test/renderPage";
@@ -97,4 +97,13 @@ describe("Reservar: vuelven la marca de hoy y las etiquetas de escasez (M7)", ()
     expect(otro.className).toMatch(/(?:^|\s)text-ink(?:\s|$)/);
     expect(otro.className).not.toMatch(/\bfont-bold\b|text-accent/);
   });
+});
+
+it("permite consultar las semanas tercera y cuarta con sus rangos correctos", async () => {
+  renderPage(<BookClasses />, "/app/classes");
+  fireEvent.click(screen.getByRole("tab", { name: "Semana 3" }));
+  await waitFor(() => expect(api.get).toHaveBeenCalledWith("/classes?start=2026-10-05&end=2026-10-11"));
+  fireEvent.click(screen.getByRole("tab", { name: "Semana 4" }));
+  await waitFor(() => expect(api.get).toHaveBeenCalledWith("/classes?start=2026-10-12&end=2026-10-18"));
+  expect(screen.getByRole("tab", { name: "Semana 4" })).toHaveAttribute("aria-selected", "true");
 });

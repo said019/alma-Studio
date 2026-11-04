@@ -120,8 +120,8 @@ type RowState = {
   interactive: boolean;
 };
 
-type WeekKey = "prev" | "current" | "next";
-const WEEK_OFFSETS: Record<WeekKey, number> = { prev: -1, current: 0, next: 1 };
+type WeekKey = "prev" | "current" | "next" | "third" | "fourth";
+const WEEK_OFFSETS: Record<WeekKey, number> = { prev: -1, current: 0, next: 1, third: 2, fourth: 3 };
 
 const dayKey = (d: Date) => format(d, "yyyy-MM-dd");
 
@@ -312,15 +312,19 @@ const BookClasses = () => {
           title="Reserva tu"
           titleAccent="próxima clase."
           actions={
+            <div className="max-w-full [&>div]:flex-wrap [&>div]:rounded-2xl">
             <SegmentedTabs<WeekKey>
               options={[
                 { value: "prev", label: "Anterior" },
                 { value: "current", label: "Actual" },
                 { value: "next", label: "Siguiente" },
+                { value: "third", label: "Semana 3" },
+                { value: "fourth", label: "Semana 4" },
               ]}
               value={week}
               onChange={handleWeekChange}
             />
+            </div>
           }
         />
 
