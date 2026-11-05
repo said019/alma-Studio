@@ -39,10 +39,10 @@ describe("BookClasses redesign (day-strip + lista editorial)", () => {
     expect(source).toContain("Este día el estudio descansa.");
   });
 
-  it("switcher de semana como pills accesibles", () => {
-    expect(source).toContain("SegmentedTabs");
-    expect(source).toContain("Anterior");
-    expect(source).toContain("Siguiente");
+  it("navegación de semanas con flechas accesibles", () => {
+    expect(source).toContain("Navegar semanas");
+    expect(source).toContain("Semana anterior");
+    expect(source).toContain("Semana siguiente");
   });
 
   it("contexto de membresía inline con link a membresía", () => {

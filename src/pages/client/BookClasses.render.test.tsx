@@ -99,11 +99,11 @@ describe("Reservar: vuelven la marca de hoy y las etiquetas de escasez (M7)", ()
   });
 });
 
-it("permite consultar las semanas tercera y cuarta con sus rangos correctos", async () => {
+it("navega más allá de cuatro semanas y permite retroceder", async () => {
   renderPage(<BookClasses />, "/app/classes");
-  fireEvent.click(screen.getByRole("tab", { name: "Semana 3" }));
-  await waitFor(() => expect(api.get).toHaveBeenCalledWith("/classes?start=2026-10-05&end=2026-10-11"));
-  fireEvent.click(screen.getByRole("tab", { name: "Semana 4" }));
-  await waitFor(() => expect(api.get).toHaveBeenCalledWith("/classes?start=2026-10-12&end=2026-10-18"));
-  expect(screen.getByRole("tab", { name: "Semana 4" })).toHaveAttribute("aria-selected", "true");
+  for(let i=0;i<6;i++) fireEvent.click(screen.getByRole("button", {name:"Semana siguiente"}));
+  await waitFor(() => expect(api.get).toHaveBeenCalledWith("/classes?start=2026-11-02&end=2026-11-08"));
+  fireEvent.click(screen.getByRole("button", {name:"Semana anterior"}));
+  await waitFor(() => expect(api.get).toHaveBeenCalledWith("/classes?start=2026-10-26&end=2026-11-01"));
+  expect(screen.queryByRole("tab", {name:"Semana 4"})).not.toBeInTheDocument();
 });

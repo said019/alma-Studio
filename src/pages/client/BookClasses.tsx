@@ -27,8 +27,8 @@ import {
   SkeletonRow,
   Tag,
 } from "@/components/app/AppShell";
-import { InfoBanner, SegmentedTabs, StatusPill } from "@/components/app/widgets";
-import { CalendarDays, ChevronRight, Moon } from "lucide-react";
+import { InfoBanner, StatusPill } from "@/components/app/widgets";
+import { CalendarDays, ChevronLeft, ChevronRight, Moon } from "lucide-react";
 import type { BookingClient } from "@/types/booking";
 
 /* La semana de la clienta empieza en lunes, como su rutina. */
@@ -120,8 +120,7 @@ type RowState = {
   interactive: boolean;
 };
 
-type WeekKey = "prev" | "current" | "next" | "third" | "fourth";
-const WEEK_OFFSETS: Record<WeekKey, number> = { prev: -1, current: 0, next: 1, third: 2, fourth: 3 };
+
 
 const dayKey = (d: Date) => format(d, "yyyy-MM-dd");
 
@@ -135,9 +134,9 @@ const weekRangeLabel = (start: Date, end: Date) => {
 const BookClasses = () => {
   const navigate = useNavigate();
   const currentWeekStart = useMemo(() => startOfWeek(new Date(), { weekStartsOn: 1 }), []);
-  const [week, setWeek] = useState<WeekKey>("current");
+  const [week, setWeek] = useState(0);
   const weekStart = useMemo(
-    () => addWeeks(currentWeekStart, WEEK_OFFSETS[week]),
+    () => addWeeks(currentWeekStart, week),
     [currentWeekStart, week]
   );
   const weekEnd = endOfWeek(weekStart, { weekStartsOn: 1 });
@@ -237,9 +236,9 @@ const BookClasses = () => {
   const weekIsEmpty = decoratedClasses.length === 0;
   const selectedDayClasses = classesForDay(selectedDay);
 
-  const handleWeekChange = (value: WeekKey) => {
+  const handleWeekChange = (value: number) => {
     setWeek(value);
-    setSelectedDay(value === "current" ? new Date() : addWeeks(currentWeekStart, WEEK_OFFSETS[value]));
+    setSelectedDay(value === 0 ? new Date() : addWeeks(currentWeekStart, value));
   };
 
   /* Day-strip anclado al día elegido (hoy al entrar). */
@@ -312,19 +311,14 @@ const BookClasses = () => {
           title="Reserva tu"
           titleAccent="próxima clase."
           actions={
-            <div className="max-w-full [&>div]:flex-wrap [&>div]:rounded-2xl">
-            <SegmentedTabs<WeekKey>
-              options={[
-                { value: "prev", label: "Anterior" },
-                { value: "current", label: "Actual" },
-                { value: "next", label: "Siguiente" },
-                { value: "third", label: "Semana 3" },
-                { value: "fourth", label: "Semana 4" },
-              ]}
-              value={week}
-              onChange={handleWeekChange}
-            />
-            </div>
+            <nav aria-label="Navegar semanas" className="flex items-center gap-2">
+              <button type="button" aria-label="Semana anterior" onClick={() => handleWeekChange(week - 1)} className="grid h-11 w-11 place-items-center rounded-full border border-line bg-surface text-ink transition-colors hover:bg-sunken focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
+                <ChevronLeft size={20} aria-hidden="true" />
+              </button>
+              <button type="button" aria-label="Semana siguiente" onClick={() => handleWeekChange(week + 1)} className="grid h-11 w-11 place-items-center rounded-full border border-line bg-surface text-ink transition-colors hover:bg-sunken focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
+                <ChevronRight size={20} aria-hidden="true" />
+              </button>
+            </nav>
           }
         />
 
@@ -460,8 +454,8 @@ const BookClasses = () => {
               icon={<CalendarDays size={20} />}
               title="Esta semana aún no hay horarios."
               description="En cuanto el estudio publique sus clases, las verás aquí."
-              ctaLabel={week === "next" ? "Volver a esta semana" : "Ver la semana siguiente"}
-              onCta={() => handleWeekChange(week === "next" ? "current" : week === "prev" ? "current" : "next")}
+              ctaLabel="Ver la semana siguiente"
+              onCta={() => handleWeekChange(week + 1)}
             />
           </div>
         ) : (
