@@ -1,3 +1,4 @@
+import { CashAssignment } from "../payments/PaymentsPage";
 import { ClassOperations } from "@/components/admin/ClassOperations";
 import { useCanSeeFinance } from "@/lib/roles";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -181,6 +182,8 @@ export const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: strin
   const creditWindowHours = Number(loyaltyCfgData?.data?.faltas_cancel_window_hours ?? 12) || 12;
   const [assignOpen, setAssignOpen] = useState(false);
   const [visitOpen, setVisitOpen] = useState(false);
+  const [saleOpen, setSaleOpen] = useState(false);
+  const [saleBusy, setSaleBusy] = useState(false);
   const [memberSearch, setMemberSearch] = useState("");
   const debouncedMemberSearch = useDebounce(memberSearch, 250);
 
@@ -449,6 +452,12 @@ export const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: strin
 
   return (
     <div className="space-y-5">
+      <Dialog open={saleOpen} onOpenChange={(open) => { if (!saleBusy) setSaleOpen(open); }}>
+        <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-5xl" onInteractOutside={(e) => e.preventDefault()}>
+          <DialogHeader><DialogTitle>Vender paquete e inscribir en esta clase</DialogTitle></DialogHeader>
+          {canManageFinance && <CashAssignment classId={classId} onBusyChange={setSaleBusy} onBooked={() => setSaleOpen(false)} />}
+        </DialogContent>
+      </Dialog>
       <Panel aria-label="Lista de la clase" className="overflow-hidden">
         {isLoading ? (
           <div className="p-6"><SkeletonRow height={72} /></div>
@@ -466,6 +475,7 @@ export const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: strin
                 <UserPlus size={16} aria-hidden="true" />
                 Asignar socia
               </Button>
+              {canManageFinance && <Button variant="outline" onClick={() => setSaleOpen(true)}>Vender paquete e inscribir</Button>}
               {FEATURES.visits && (
                 <Button variant="outline" onClick={() => setVisitOpen(true)}>Asignar visitante</Button>
               )}

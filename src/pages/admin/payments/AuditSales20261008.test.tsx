@@ -4,7 +4,7 @@ import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 vi.mock("@/components/app/SignaturePad", () => ({ SignaturePad: () => <div aria-label="Firma manuscrita" /> }));
 vi.mock("@/lib/api", () => ({ default: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() } }));
 import api from "@/lib/api";
-import PaymentsPage from "./PaymentsPage";
+import PaymentsPage, { CashAssignment } from "./PaymentsPage";
 import PaymentsHistoryPage from "./PaymentsHistory";
 import { loginAs, renderAdmin, routeApi } from "@/test/admin-harness";
 
@@ -65,4 +65,40 @@ describe('Auditoría reintento de venta',()=>{
  expect(screen.getAllByText('$2,010').length).toBeGreaterThan(0);
  expect(mockApi.get.mock.calls.filter(([p])=>p==='/payments')).toHaveLength(1);
  });
+});
+
+
+describe("Venta desde la clase", () => {
+  async function sell(onBooked = vi.fn()) {
+    loginAs("admin");
+    renderAdmin(<CashAssignment classId="class-1" onBooked={onBooked} />, { route: "/admin/classes" });
+    fireEvent.change(screen.getByRole("combobox", { name: "Buscar usuario para cobrar" }), { target: { value: "cam" } });
+    fireEvent.click(await screen.findByRole("option", { name: /Camila Torres/ }));
+    fireEvent.click(await screen.findByRole("radio", { name: /Paquete 8 clases/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirmar cobro e inscribir" }));
+    return onBooked;
+  }
+  it("registra el pago antes de inscribir en la clase seleccionada", async () => {
+    const done = await sell();
+    await waitFor(() => expect(done).toHaveBeenCalledOnce());
+    expect(mockApi.post.mock.calls[0][0]).toBe("/memberships");
+    expect(mockApi.post.mock.calls[1]).toEqual(["/admin/bookings/assign", { classId: "class-1", userId: "u1" }]);
+  });
+  it("si falla la reserva, reintenta sin duplicar el pago", async () => {
+    mockApi.post.mockImplementation((url) => url === "/memberships" ? Promise.resolve({ data: {} }) : Promise.reject({ response: { data: { message: "Clase cerrada" } } }));
+    const done = await sell();
+    expect(await screen.findByRole("alert")).toHaveTextContent("Clase cerrada");
+    expect(done).not.toHaveBeenCalled();
+    mockApi.post.mockResolvedValue({ data: { message: "Reserva asignada" } });
+    fireEvent.click(screen.getByRole("button", { name: "Reintentar solo la inscripción" }));
+    await waitFor(() => expect(done).toHaveBeenCalledOnce());
+    expect(mockApi.post.mock.calls.filter(([url]) => url === "/memberships")).toHaveLength(1);
+    expect(mockApi.post.mock.calls.filter(([url]) => url === "/admin/bookings/assign")).toHaveLength(2);
+  });
+  it("no intenta reservar cuando falla el cobro", async () => {
+    mockApi.post.mockRejectedValue({ response: { data: { message: "No se pudo registrar el pago" } } });
+    await sell();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Confirmar cobro e inscribir" })).toBeEnabled());
+    expect(mockApi.post.mock.calls.some(([url]) => url === "/admin/bookings/assign")).toBe(false);
+  });
 });

@@ -76,7 +76,19 @@ function StepTitle({ n, done, children }: { n: number; done: boolean; children: 
   );
 }
 
-function CashAssignment() {
+export function CashAssignment({ classId, onBooked, onBusyChange }: { classId?: string; onBooked?: () => void; onBusyChange?: (busy: boolean) => void } = {}) {
+  const [soldUser, setSoldUser] = useState<SelectedUser | null>(null);
+  const bookingMutation = useMutation({
+    mutationFn: (user: SelectedUser) => api.post("/admin/bookings/assign", { classId, userId: user.id }),
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ["roster", classId] });
+      qc.invalidateQueries({ queryKey: ["classes"] });
+      qc.invalidateQueries({ queryKey: ["admin-classes-week"] });
+      qc.invalidateQueries({ queryKey: ["class-roster-sheet", classId] });
+      toast({ title: res.data?.message ?? "Reserva asignada" });
+      onBooked?.();
+    },
+  });
   const { toast } = useToast();
   const qc = useQueryClient();
   const [clientParam, setClientParam] = useSearchParamState("clienta");
@@ -149,6 +161,11 @@ function CashAssignment() {
       qc.invalidateQueries({ queryKey: ["memberships"] });
       qc.invalidateQueries({ queryKey: ["payments"] });
       toast({ title: "Membresía activada" });
+      if (classId && selectedUser) {
+        setSoldUser(selectedUser);
+        bookingMutation.mutate(selectedUser);
+        return;
+      }
       setSelectedUser(null);
       setSelectedPlan(null);
       setPaymentMethod("cash");
@@ -167,6 +184,10 @@ function CashAssignment() {
     },
   });
 
+  useEffect(() => {
+    onBusyChange?.(assignMutation.isPending || bookingMutation.isPending);
+  }, [assignMutation.isPending, bookingMutation.isPending, onBusyChange]);
+
   const today = new Date();
   const vigencia = selectedPlan?.durationDays
     ? `${format(today, "d MMM", { locale: es })} – ${format(addDays(today, selectedPlan.durationDays), "d MMM", { locale: es })}`
@@ -179,8 +200,19 @@ function CashAssignment() {
     </div>
   );
 
+  if (soldUser) return (
+    <Panel className="space-y-4 p-6" aria-label="Resultado de venta y reserva">
+      <h3 className="text-lg font-bold">Paquete vendido a {soldUser.displayName}</h3>
+      <p>El pago ya quedó registrado. No vuelvas a cobrar este paquete.</p>
+      {bookingMutation.isPending ? <p role="status">Inscribiendo en la clase…</p> : bookingMutation.isError ? <>
+        <p role="alert">No se pudo confirmar la inscripción: {(bookingMutation.error as any)?.response?.data?.message ?? "Revisa la conexión y vuelve a intentar."}</p>
+        <Button onClick={() => bookingMutation.mutate(soldUser)}>Reintentar solo la inscripción</Button>
+      </> : <p>Inscripción procesada.</p>}
+    </Panel>
+  );
+
   return (
-    <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+    <fieldset disabled={assignMutation.isPending} className="grid min-w-0 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
       <div className="flex min-w-0 flex-col gap-4">
         <Panel aria-label="Usuario" className="flex flex-col gap-3.5 p-5 lg:p-6">
           <StepTitle n={1} done={!!selectedUser}>Usuario</StepTitle>
@@ -328,12 +360,12 @@ function CashAssignment() {
           <span className="nums font-display text-[2rem] font-semibold">{selectedPlan && amountValid ? formatMXN(amount) : "—"}</span>
         </div>
         <Button size="lg" className="w-full" disabled={!selectedUser || !selectedPlan || !amountValid || (needsReason && !reasonOk) || assignMutation.isPending} onClick={() => assignMutation.mutate()}>
-          {assignMutation.isPending ? "Activando…" : "Confirmar y activar membresía"}
+          {assignMutation.isPending ? "Activando…" : classId ? "Confirmar cobro e inscribir" : "Confirmar y activar membresía"}
         </Button>
-        <p className="mt-1.5 text-center text-[0.75rem] text-ink-muted">La membresía se activa hoy y el usuario recibe su confirmación.</p>
+        <p className="mt-1.5 text-center text-[0.75rem] text-ink-muted">{classId ? "Registra un pago ya recibido. El paquete se activa hoy; después se asignará esta clase según cupo, vigencia y condiciones del plan." : "La membresía se activa hoy y el usuario recibe su confirmación."}</p>
       </aside>
       {selectedUser && <ResponsivaDialog key={selectedUser.id} userId={selectedUser.id} open={waiverOpen} onClose={() => setWaiverOpen(false)} onSigned={() => setWaiverOpen(false)} defaultName={selectedUser.displayName} defaultEmail={selectedUser.email ?? ""} defaultPhone={selectedUser.phone ?? ""} />}
-    </div>
+    </fieldset>
   );
 }
 
