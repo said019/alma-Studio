@@ -111,7 +111,7 @@ export const useAuthStore = create<AuthState>()(
       register: async (data) => {
         set({ isLoading: true, error: null });
         try {
-          const res = await api.post<AuthResponse>("/auth/register", data);
+          const res = await api.post<AuthResponse>(data.inviteToken ? "/auth/complete-invite" : "/auth/register", data);
           const { user, token } = res.data;
           localStorage.setItem("auth_token", token);
           set({ user, token, isAuthenticated: true, isLoading: false });

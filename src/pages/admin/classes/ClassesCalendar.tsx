@@ -1,3 +1,4 @@
+import { QuickClientInvite } from "@/components/admin/QuickClientInvite";
 import { ClassOperations } from "@/components/admin/ClassOperations";
 import { BulkClassEditor } from "@/components/admin/BulkClassEditor";
 import { DuplicateWeek } from "@/components/admin/DuplicateWeek";
@@ -119,7 +120,7 @@ const ClassesCalendar = () => {
           <AdminPageHeader
             kicker="Clases · calendario semanal"
             title="Clases"
-            actions={<SectionTabs aria-label="Secciones de Clases" tabs={CLASSES_SECTION_TABS} />}
+            actions={<div className="flex flex-wrap items-center gap-3"><QuickClientInvite /><SectionTabs aria-label="Secciones de Clases" tabs={CLASSES_SECTION_TABS} /></div>}
           />
 
           {referenceError ? (

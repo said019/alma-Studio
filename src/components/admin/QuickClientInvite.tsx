@@ -1,0 +1,15 @@
+import {useState} from 'react';
+import {useMutation,useQueryClient} from '@tanstack/react-query';
+import api from '@/lib/api';
+import {Button} from '@/components/ui/button';
+import {Input} from '@/components/ui/input';
+import {Label} from '@/components/ui/label';
+import {Dialog,DialogContent,DialogHeader,DialogTitle} from '@/components/ui/dialog';
+import {internationalPhone,phoneCountries} from '@/lib/internationalPhone';
+export function QuickClientInvite(){
+ const [open,setOpen]=useState(false),[name,setName]=useState(''),[phone,setPhone]=useState(''),[country,setCountry]=useState('MX');const qc=useQueryClient();
+ const invite=useMutation({mutationFn:async()=>(await api.post('/admin/clients/invite',{displayName:name,phone:internationalPhone(phone,country)})).data.data,onSuccess:()=>{void qc.invalidateQueries({queryKey:['clients']});}});
+ return <><Button variant="outline" onClick={()=>{invite.reset();setName('');setPhone('');setOpen(true);}}>Registrar usuario</Button><Dialog open={open} onOpenChange={v=>{if(!invite.isPending)setOpen(v);}}><DialogContent><DialogHeader><DialogTitle>Registro rápido</DialogTitle></DialogHeader>
+ {invite.data?<div className="space-y-4"><p>Usuario registrado. Completará su perfil y creará su contraseña desde el enlace personal.</p><p role="status">{invite.data.delivery==='sent'?'Acceso enviado por WhatsApp.':invite.data.delivery==='failed'?'No se pudo confirmar el envío. Comparte el enlace manualmente.':'WhatsApp automático no está conectado. Comparte el acceso con el usuario.'}</p><p className="text-sm text-ink-muted">Vence en 72 horas. No crea una reserva ni cobra un paquete.</p><Button asChild><a href={invite.data.shareUrl} target="_blank" rel="noopener noreferrer">Compartir por WhatsApp</a></Button><Label htmlFor="invite-link">Enlace personal</Label><Input id="invite-link" readOnly value={invite.data.link} onFocus={e=>e.target.select()}/><Button variant="outline" onClick={()=>setOpen(false)}>Cerrar</Button></div>:<div className="space-y-4"><p className="text-sm text-ink-muted">Captura sus datos y envíale acceso para completar su perfil.</p><Label htmlFor="quick-name">Nombre completo</Label><Input id="quick-name" value={name} maxLength={150} onChange={e=>setName(e.target.value)}/><Label htmlFor="quick-country">País</Label><select id="quick-country" className="w-full rounded-lg border border-line bg-surface p-3" value={country} onChange={e=>setCountry(e.target.value)}>{phoneCountries.map(c=><option key={c.code} value={c.code}>{c.name} (+{c.dial})</option>)}</select><Label htmlFor="quick-phone">Teléfono con WhatsApp</Label><Input id="quick-phone" type="tel" value={phone} onChange={e=>setPhone(e.target.value)}/>{invite.isError&&<p role="alert" className="text-destructive">{(invite.error as any)?.response?.data?.message||'No se pudo registrar. Intenta de nuevo.'}</p>}<Button disabled={invite.isPending||name.trim().length<2||!internationalPhone(phone,country)} onClick={()=>invite.mutate()}>{invite.isPending?'Registrando…':'Registrar y enviar acceso'}</Button></div>}
+ </DialogContent></Dialog></>;
+}

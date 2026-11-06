@@ -1,3 +1,4 @@
+import { registerClientInvites } from "./lib/clientInvites.js";
 import { claimAutomaticEmail, WEEKLY_REMINDER_QUERY } from "./lib/automaticEmailThrottle.js";
 import { registerPaymentNoticeRoute } from "./paymentNoticeRoute.mjs";
 import { claimRenewalReminder } from "./lib/renewalReminderOnce.js";
@@ -2099,6 +2100,8 @@ app.use(createSimpleRateLimiter({
   shouldApply: (req) =>
     req.path === "/api/auth/login" ||
     req.path === "/api/auth/register" ||
+    req.path === "/api/auth/complete-invite" ||
+    req.path === "/api/auth/invite-details" ||
     req.path === "/api/auth/forgot-password" ||
     req.path === "/api/auth/reset-password",
 }));
@@ -16488,6 +16491,7 @@ app.post("/api/admin/orders/:id/refunds", ownerMiddleware, async (req, res) => {
   }
 });
 
+registerClientInvites(app,{pool,adminMiddleware,bcrypt,signToken,mapUser,appPublicUrl:APP_PUBLIC_URL,whatsappChannelState,queueWhatsAppSend,normalisePhone,privacyVersion:PRIVACY_NOTICE_VERSION});
 const communicationService = registerCommunications(app, { pool, ownerMiddleware, queueWhatsAppSend, normalisePhone, whatsappChannelState, appPublicUrl: APP_PUBLIC_URL, recordAudit });
 registerVelanParity(app, { pool, ownerMiddleware, authMiddleware, restoreMembershipCredit,
   recordAudit, triggerWalletPassSync, onSeatReleased, camelRow, isDay, reasonProblem, getBookingPolicy, bookingLeadHours: BOOKING_LEAD_HOURS, cancelClassInTx, notifyClassCancelled, applyCancellationRollback });

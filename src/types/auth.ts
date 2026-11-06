@@ -54,6 +54,7 @@ export interface LoginCredentials {
 }
 
 export interface RegisterData {
+  inviteToken?: string;
   email: string;
   password: string;
   displayName: string;

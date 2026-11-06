@@ -1,5 +1,6 @@
+import api from "@/lib/api";
 import { internationalPhone, phoneCountries } from "@/lib/internationalPhone";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ResponsivaDialog } from "@/components/app/ResponsivaDialog";
 import { useForm } from "react-hook-form";
 import { FEATURES } from "@/config/features";
@@ -84,6 +85,16 @@ const Register = () => {
     defaultValues: { phoneCountry: "MX", acceptsTerms: false, acceptsCommunications: false, receivePromotions: false, healthConsent: false },
   });
 
+  const [inviteError,setInviteError] = useState("");
+  const inviteToken = params.get("invite");
+  useEffect(()=>{
+    if(!inviteToken)return;
+    let active=true;
+    api.post("/auth/invite-details",{inviteToken}).then(r=>{
+      if(!active)return;setValue("displayName",r.data.data.displayName);setValue("phone",r.data.data.phone);setValue("phoneCountry",r.data.data.phoneCountry);
+    }).catch(e=>{if(active)setInviteError(e?.response?.data?.message||"No se pudo consultar tu invitación.");});
+    return ()=>{active=false;};
+  },[inviteToken,setValue]);
   const acceptsTerms = watch("acceptsTerms");
   const acceptsCommunications = watch("acceptsCommunications");
   const healthConsent = watch("healthConsent");
@@ -96,6 +107,7 @@ const Register = () => {
     const phone = internationalPhone(data.phone, data.phoneCountry)!;
     try {
       await registerUser({
+        inviteToken: params.get("invite") || undefined,
         email: data.email,
         password: data.password,
         displayName: data.displayName,
@@ -150,7 +162,7 @@ const Register = () => {
         </div>
       )}
 
-      {error && <AuthErrorBanner message={error} />}
+      {(error || inviteError) && <AuthErrorBanner message={error || inviteError} />}
 
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-5">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
