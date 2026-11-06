@@ -167,7 +167,7 @@ function RosterStatus({ status }: { status: string }) {
 }
 
 // ── Class Roster panel ─────────────────────────────────────────────────────────
-const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: string; onBack: () => void; onClassLoaded?: (date: string) => void }) => {
+export const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: string; onBack: () => void; onClassLoaded?: (date: string) => void }) => {
   const { toast } = useToast();
   const qc = useQueryClient();
   const { confirm, promptText, dialog } = useConfirm();
@@ -275,7 +275,11 @@ const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: string; onBa
   // Las acciones de abajo cambian cupo/lista de espera, que la lista de la
   // semana (panel izquierdo) también muestra — sin esto se queda con números
   // viejos hasta que la ventana recupera el foco (M1).
-  const invalidateWeek = () => qc.invalidateQueries({ queryKey: ["admin-classes-week"] });
+  const invalidateWeek = () => {
+    qc.invalidateQueries({ queryKey: ["admin-classes-week"] });
+    qc.invalidateQueries({ queryKey: ["classes"] });
+    qc.invalidateQueries({ queryKey: ["class-roster-sheet", classId] });
+  };
 
   const checkinMutation = useMutation({
     mutationFn: (id: string) => api.put(`/bookings/${id}/check-in`),

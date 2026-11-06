@@ -1,3 +1,4 @@
+import { ClassRoster } from "../bookings/BookingsList";
 import { QuickClientInvite } from "@/components/admin/QuickClientInvite";
 import { ClassOperations } from "@/components/admin/ClassOperations";
 import { BulkClassEditor } from "@/components/admin/BulkClassEditor";
@@ -158,6 +159,7 @@ function CalendarView({
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
   const [createOpen, setCreateOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [manageClassId, setManageClassId] = useState<string | null>(null);
   const [selectedClass, setSelectedClass] = useState<ClassInstance | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [mobileDay, setMobileDay] = useState(() => format(new Date(), "yyyy-MM-dd"));
@@ -846,11 +848,12 @@ function CalendarView({
                         })}
                       </ul>
                     )}
-                    <Button asChild className="mt-4 w-full rounded-xl">
-                      <Link to={`/admin/bookings?clase=${selectedClass.id}`}>
-                        Gestionar en Reservas
-                        <ArrowRight size={14} className="ml-1.5" />
-                      </Link>
+                    <Button className="mt-4 w-full rounded-xl" onClick={() => {
+                      setManageClassId(selectedClass.id);
+                      setSheetOpen(false);
+                    }}>
+                      Gestionar personas y reservas
+                      <ArrowRight size={14} className="ml-1.5" />
                     </Button>
                   </div>
                 );
@@ -887,6 +890,14 @@ function CalendarView({
           )}
         </SheetContent>
       </Sheet>
+
+      <Dialog open={!!manageClassId} onOpenChange={(open) => { if (!open) setManageClassId(null); }}>
+        <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-5xl">
+          <DialogHeader><DialogTitle>Personas y reservas de la clase</DialogTitle></DialogHeader>
+          <QuickClientInvite />
+          {manageClassId && <ClassRoster key={manageClassId} classId={manageClassId} onBack={() => setManageClassId(null)} />}
+        </DialogContent>
+      </Dialog>
 
       <UnreachedDialog items={unreached} channelOff={unreachedOff} onClose={() => setUnreached([])} />
 
