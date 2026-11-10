@@ -168,7 +168,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
   const { data: unreadData } = useQuery<{ data: { unread_count: number } }>({
     queryKey: ["admin-notifications-unread-count"],
     queryFn: async () => (await api.get("/admin/notifications/unread-count")).data,
-    refetchInterval: 60_000,
+    refetchInterval: 15_000,
     enabled: !!user?.id && FEATURES.adminInbox,
   });
   const unreadCount = unreadData?.data?.unread_count ?? 0;

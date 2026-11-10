@@ -1,12 +1,15 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { sendClassReminders } from "./classReminder.js";
+import { sendClassReminders, reminderLeadMinutes } from "./classReminder.js";
 
 // Bitácora en memoria: sólo las filas propias del recordatorio.
 function memoryLog() {
   const rows = [];
+  const claims = new Set();
   return {
     rows,
+    async claim(userId, reason) {const key=userId+reason;if(claims.has(key))return false;claims.add(key);return true;},
+    async release(userId, reason) {claims.delete(userId+reason);},
     async seen(userId, reason) {
       return new Set(rows.filter((r) => r.userId === userId && r.reason === reason).map((r) => r.status));
     },
@@ -86,4 +89,24 @@ test("avisos apagados por la dueña: sin WhatsApp ni fila failed, con el pase si
   assert.equal(log.rows.filter((r) => r.status === "failed").length, 0, "no se registra failed");
   assert.deepEqual(d.calls.sync, ["u1:class_reminder_b1", "u2:class_reminder_b2"]);
   assert.equal(d.calls.probe, 0, "no hace falta sondear el canal");
+});
+
+test("concurrent runs send only once per booking", async()=>{
+ const log=memoryLog();const d=deps({log,connected:true});
+ await Promise.all([sendClassReminders(ROWS,d.opts),sendClassReminders(ROWS,d.opts)]);
+ assert.deepEqual(d.calls.notify.sort(),['b1','b2']);
+});
+test("ambiguous provider failure is not retried on the next run",async()=>{
+ const log=memoryLog();const d=deps({log,connected:true,sent:false});
+ await sendClassReminders(ROWS,d.opts);await sendClassReminders(ROWS,d.opts);
+ assert.equal(d.calls.notify.length,2);
+});
+test("disabled template can send later when enabled",async()=>{
+ const log=memoryLog();const d=deps({log,connected:true});
+ await sendClassReminders(ROWS,{...d.opts,notify:async()=>({sent:false,reason:'template_disabled'})});
+ await sendClassReminders(ROWS,d.opts);assert.equal(d.calls.notify.length,2);
+});
+test("configured lead time supports one hour and fractional hours",()=>{
+ assert.equal(reminderLeadMinutes(1),60);assert.equal(reminderLeadMinutes(0.5),30);assert.equal(reminderLeadMinutes(2),120);
+ assert.equal(reminderLeadMinutes('invalid'),120);
 });

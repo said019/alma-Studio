@@ -79,7 +79,7 @@ const AdminNotifications = () => {
   const { data, isLoading, isError, refetch } = useQuery<{ data: Notif[]; meta?: { unread_count: number } }>({
     queryKey: ["admin-notifications"],
     queryFn: async () => (await api.get("/admin/notifications?limit=60")).data,
-    refetchInterval: 30_000,
+    refetchInterval: 15_000,
   });
   const items = Array.isArray(data?.data) ? data!.data : [];
 

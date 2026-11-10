@@ -1,6 +1,7 @@
 // Fully isolated integration test: creates its own disposable database and API.
 // Never reads .env, existing DATABASE_URL, mail credentials or production data.
 import pg from 'pg';
+import {pgReminderLog,reminderWindowSql,sendClassReminders} from '../server/lib/classReminder.js';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import assert from 'node:assert/strict';
@@ -83,6 +84,29 @@ check(await request('/admin/whatsapp-templates','PUT',{templates:{booking_confir
 check(await request('/admin/whatsapp-templates','PUT',{templates:{booking_confirmed:{subject:'Nuevo título'}}}));
 const templates=check(await request('/admin/whatsapp-templates')).data.templates;
 assert.equal(templates.booking_confirmed.enabled,false);assert.equal(templates.booking_confirmed.body,'Texto editado {firstName}');assert.ok(templates.client_invite);
+// A real client cancellation appears once in the bell even when retried.
+const booked=(await db.query("SELECT id FROM bookings WHERE user_id=$1 AND class_id=$2",[users.client,first])).rows[0];
+check(await request('/bookings/'+booked.id,'DELETE',undefined,'client'));
+const repeat=await request('/bookings/'+booked.id,'DELETE',undefined,'client');assert.ok(repeat.status>=400);
+const cancelled=(await db.query("SELECT id FROM booking_movements WHERE booking_id=$1 AND status='cancelled'",[booked.id])).rows;
+assert.equal(cancelled.length,1);
+const afterCancel=check(await request('/admin/notifications?limit=100')).data;
+assert.equal(afterCancel.filter(n=>n.id==='booking_'+cancelled[0].id).length,1);
+assert.ok(check(await request('/admin/notifications/unread-count')).data.unread_count>0);
+// Exact SQL used by the scheduler, including a Mexico City midnight boundary.
+const window=reminderWindowSql('America/Mexico_City').replaceAll('NOW()','$2::timestamptz');
+const due=(await db.query(`WITH c(date,start_time) AS (VALUES
+ ('2026-11-11'::date,'00:31'::time),('2026-11-11'::date,'00:30'::time),
+ ('2026-11-11'::date,'00:28'::time),('2026-11-11'::date,'00:27'::time))
+ SELECT start_time::text FROM c WHERE ${window} ORDER BY start_time`,[60,'2026-11-11T05:30:00Z'])).rows;
+assert.deepEqual(due.map(r=>r.start_time),['00:28:00','00:30:00']);
+const log=pgReminderLog(db);let sends=0;
+const reminderRows=[{user_id:users.client,booking_id:booked.id}];
+const opts={log,remindersOn:true,channelState:async()=>({connected:true}),notify:async()=>{sends++;return {sent:true};},syncPass:()=>{},pauseMs:0};
+await Promise.all([sendClassReminders(reminderRows,opts),sendClassReminders(reminderRows,opts)]);
+await sendClassReminders(reminderRows,{...opts,log:pgReminderLog(db)});
+assert.equal(sends,1,'database claim persists across concurrent workers and reconstructed logger');
+console.log('PASS: client cancellation in bell once, unread badge, configured timing across midnight, durable reminder deduplication.');
 // Phone and email resolve the same account; disabled/ambiguous accounts fail closed.
 const hash=await bcrypt.hash('Integration-password-2026',10);
 await db.query('UPDATE users SET phone=$1,password_hash=$2 WHERE id=$3',['+525555000123',hash,users.client]);

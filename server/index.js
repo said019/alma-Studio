@@ -1,3 +1,4 @@
+import {shouldRetryWhatsApp} from "./lib/whatsappRetry.js";
 import {isEssentialNotification,essentialNotificationSettings} from "../src/lib/essentialNotifications.js";
 import {CALENDAR_OPERATIONS_SCHEMA,registerCalendarOperations} from "./lib/calendarOperations.js";
 import {parsePhoneNumberFromString} from "libphonenumber-js";
@@ -105,7 +106,7 @@ import { validateRegistration } from "./lib/registrationValidation.js";
 import { checkinRule, noShowCorrectionRule } from "./lib/checkin.js";
 import { responsivaDocument, waiverVersionProblem } from "./lib/responsiva.js";
 import { normalizeWaiverIntake, waiverWithIntake, WAIVER_INTAKE_LABELS, WAIVER_HEALTH_FIELDS } from "./lib/waiverIntake.js";
-import { pgReminderLog, sendClassReminders } from "./lib/classReminder.js";
+import { REMINDER_CLAIMS_SCHEMA, reminderLeadMinutes, reminderWindowSql, pgReminderLog, sendClassReminders } from "./lib/classReminder.js";
 import { createChannelState } from "./lib/whatsappState.js";
 import { recordAudit, recordAuditBestEffort, reasonProblem, cleanReason, buildAuditQuery, auditRowOut } from "./lib/audit.js";
 import { PRIVACY_NOTICE_VERSION, healthDataChanges, hasCurrentHealthConsent, healthConsentProblem } from "./lib/privacy.js";
@@ -13029,7 +13030,9 @@ async function sendWhatsAppNow(number, text) {
       lastErr = err;
       const errMsg = err?.response?.data?.message ?? err?.message ?? "unknown";
       console.error(`[WA] send attempt ${attempt}/3 to ${number} failed: ${errMsg}`);
-      if (attempt < 3) await sleep(attempt * 5000);
+      // Only retry an explicit rejection. Timeouts/5xx may already have delivered.
+      if (!shouldRetryWhatsApp(err, attempt)) throw err;
+      await sleep(attempt * 5000);
     }
   }
   throw lastErr;
@@ -18318,7 +18321,7 @@ async function runClassReminderCron() {
   try {
     const config = await getSettingsValue("notification_settings",DEFAULT_NOTIFICATION_SETTINGS);
     if(config.whatsapp_reminders===false)return;
-    const leadMinutes = Math.min(4320,Math.max(15,Number(config.reminder_hours_before??2)*60));
+    const leadMinutes = reminderLeadMinutes(config.reminder_hours_before);
     const res = await pool.query(`
       SELECT
         b.id           AS booking_id,
@@ -18334,9 +18337,7 @@ async function runClassReminderCron() {
       WHERE b.status = 'confirmed'
         AND u.receive_reminders IS NOT FALSE
         AND u.phone IS NOT NULL
-        AND (c.date + c.start_time) AT TIME ZONE '${STUDIO_TIMEZONE}'
-              BETWEEN NOW() + ($1::int-2) * INTERVAL '1 minute'
-                  AND NOW() + $1::int * INTERVAL '1 minute'
+        AND ${reminderWindowSql(STUDIO_TIMEZONE)}
     `,[Math.round(leadMinutes)]);
 
     if (res.rows.length === 0) return;
@@ -18485,6 +18486,7 @@ async function bootServer() {
   await ensureSchema();
   // Never serve financial/queued-write routes with a partially applied schema.
   await pool.query(CALENDAR_OPERATIONS_SCHEMA);
+  await pool.query(REMINDER_CLAIMS_SCHEMA);
   await pool.query('SELECT order_id,preference_id,idempotency_key FROM mp_retired_wallet_attempts LIMIT 0');
   await pool.query(`SELECT mp_payment_choice,mp_wallet_preference_id,paid_at,provider_synced_at,mp_sync_claim,mp_sync_lease_until,
     mp_sync_attempted_at,mp_sync_error,mp_method_id,mp_type_id FROM orders LIMIT 0`);
