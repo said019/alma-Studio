@@ -508,12 +508,12 @@ const ClientDetail = () => {
                   </div>
                 </div>
               ) : (
-                <div className="mb-7 flex flex-col gap-5 lg:flex-row lg:items-center">
+                <div className="mb-7 grid grid-cols-[64px_minmax(0,1fr)] items-start gap-x-4 gap-y-5 sm:grid-cols-[88px_minmax(0,1fr)]">
                   <div className="relative shrink-0 self-start">
                     {u?.photoUrl ? (
-                      <ZoomableImage src={u.photoUrl} alt={u.displayName ?? "Usuario"} overlayLabel="Ver" className="h-[88px] w-[88px] overflow-hidden rounded-full" />
+                      <ZoomableImage src={u.photoUrl} alt={u.displayName ?? "Usuario"} overlayLabel="Ver" className="h-16 w-16 sm:h-[88px] sm:w-[88px] overflow-hidden rounded-full" />
                     ) : (
-                      <span className="grid h-[88px] w-[88px] place-items-center rounded-full bg-sunken font-display text-2xl text-ink">
+                      <span className="grid h-16 w-16 sm:h-[88px] sm:w-[88px] place-items-center rounded-full bg-sunken font-display text-2xl text-ink">
                         {initialsOf(u?.displayName)}
                       </span>
                     )}
@@ -532,7 +532,7 @@ const ClientDetail = () => {
                       {u?.createdAt ? `Usuario desde ${format(new Date(u.createdAt), "MMMM yyyy", { locale: es })}` : "Usuario"}
                     </p>
                     <h1 className="mt-2 break-words font-display text-[1.5rem] font-extrabold uppercase leading-[1.05] lg:text-[1.75rem]">{u?.displayName ?? u?.display_name}</h1>
-                    <p className="mt-1.5 text-sm text-ink-muted">{[u?.email, u?.phone].filter(Boolean).join(" · ")}</p>
+                    <p className="mt-1.5 break-words text-sm text-ink-muted">{[u?.email, u?.phone].filter(Boolean).join(" · ")}</p>
                     <div className="mt-2.5 flex flex-wrap items-center gap-2">
                       {activeMem ? (
                         <>
@@ -553,7 +553,7 @@ const ClientDetail = () => {
                       )}
                     </div>
                   </div>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="col-span-2 flex min-w-0 flex-wrap gap-2 [&>button]:max-w-full [&>button]:whitespace-normal [&>button]:h-auto [&>button]:min-h-11">
                     {u?.phone && (
                       <>
                         <Button asChild variant="outline"><a href={`tel:${u.phone}`}><Phone size={16} aria-hidden="true" />Llamar</a></Button>
@@ -569,9 +569,9 @@ const ClientDetail = () => {
                 </div>
               )}
 
-              <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+              <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
               <Tabs value={tab} onValueChange={setTab} className="min-w-0">
-                <TabsList>
+                <TabsList className="h-auto max-w-full flex-wrap justify-start gap-1">
                   <TabsTrigger value="profile">Perfil</TabsTrigger>
                   <TabsTrigger value="memberships">Membresías <span className="nums ml-1 text-ink-muted">{membershipRows.length}</span></TabsTrigger>
                   <TabsTrigger value="bookings">Reservas <span className="nums ml-1 text-ink-muted">{bookingRows.length}</span></TabsTrigger>

@@ -462,7 +462,7 @@ export const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: strin
         {isLoading ? (
           <div className="p-6"><SkeletonRow height={72} /></div>
         ) : (
-          <div className="flex flex-col gap-4 p-5 xl:flex-row xl:items-center xl:justify-between lg:p-6">
+          <div className="flex min-w-0 flex-col gap-4 p-5 lg:p-6">
             <div className="min-w-0">
               <p className="text-[0.75rem] font-bold uppercase tracking-[0.12em] text-ink-muted">
                 {classInfo?.startsAt ? format(new Date(classInfo.startsAt), "EEEE d 'de' MMMM · HH:mm", { locale: es }) : classInfo?.date ?? "—"}
@@ -470,7 +470,7 @@ export const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: strin
               <h2 className="mt-2 font-display text-[1.375rem] font-semibold leading-tight text-ink">{classInfo?.classTypeName ?? "Clase"}</h2>
               <p className="mt-1 text-[13px] text-ink-muted">con {classInfo?.instructorName ?? "—"}</p>
             </div>
-            <div className="flex flex-wrap items-center gap-2 [&>button]:rounded-xl">
+            <div className="flex min-w-0 flex-wrap items-center gap-2 [&>button]:rounded-xl [&>button]:max-w-full [&>button]:whitespace-normal [&>button]:h-auto [&>button]:min-h-11">
               <Button onClick={() => setAssignOpen(true)}>
                 <UserPlus size={16} aria-hidden="true" />
                 Asignar socia
@@ -494,9 +494,9 @@ export const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: strin
           </div>
         )}
 
-        <dl className="grid grid-cols-2 border-t border-line bg-canvas/60 sm:grid-cols-4">
+        <dl className="grid grid-cols-2 border-t border-line bg-canvas/60">
           {([["Confirmadas", confirmed], ["Asistieron", checkedIn], ["En espera", waitlist], ["Faltas", noShow]] as const).map(([label, value], i) => (
-            <div key={label} className={cn("flex items-center justify-between gap-2 px-5 py-3", i % 2 === 1 && "border-l border-line", i >= 2 && "border-t border-line sm:border-t-0", i > 0 && "sm:border-l")}>
+            <div key={label} className={cn("flex min-w-0 flex-col items-start gap-1 px-4 py-3", i % 2 === 1 && "border-l border-line", i >= 2 && "border-t border-line")}>
               <dt className="text-[0.75rem] font-bold uppercase tracking-[0.12em] text-ink-muted">{label}</dt>
               <dd className="nums font-display text-xl font-semibold">{value}</dd>
             </div>
@@ -520,19 +520,19 @@ export const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: strin
                 ? `${entry.planName} · ${unlimited ? "Ilimitado" : `${entry.classesRemaining} ${entry.classesRemaining === 1 ? "restante" : "restantes"}`}`
                 : "Sin plan";
               return (
-                <li key={entry.bookingId} className="grid grid-cols-[40px_minmax(0,1fr)] items-start gap-x-3 gap-y-2 border-t border-line px-5 py-5 lg:grid-cols-[40px_minmax(0,1fr)_auto] lg:gap-x-4 lg:px-6">
+                <li key={entry.bookingId} className="grid grid-cols-[40px_minmax(0,1fr)] items-start gap-x-3 gap-y-2 border-t border-line px-5 py-5 lg:gap-x-4 lg:px-6">
                   {entry.status === "checked_in" ? (
                     <span aria-hidden="true" className="grid h-10 w-10 place-items-center rounded-full bg-success text-canvas"><Check size={18} /></span>
                   ) : (
                     <Avatar name={entry.displayName} size={40} />
                   )}
                   <span className="min-w-0 leading-snug">
-                    <span className="block truncate text-sm font-extrabold">{entry.displayName}</span>
+                    <span className="block break-words text-sm font-extrabold">{entry.displayName}</span>
                     <HealthBadges hasInjury={entry.hasInjury} injuryDetails={entry.injuryDetails} healthNotes={entry.healthNotes} firstVisit={entry.firstVisit} />
-                    <span className="block truncate text-xs text-ink-muted">{[plan, entry.phone].filter(Boolean).join(" · ")}</span>
+                    <span className="block break-words text-xs text-ink-muted">{[plan, entry.phone].filter(Boolean).join(" · ")}</span>
                   </span>
-                  <span className="col-start-2 lg:row-start-2"><RosterStatus status={entry.status} /></span>
-                  <span className="col-start-2 flex flex-wrap items-center gap-2 pt-2 lg:col-start-3 lg:row-start-1 lg:row-span-2 lg:self-center lg:pt-0 [&>button]:rounded-xl">
+                  <span className="col-start-2"><RosterStatus status={entry.status} /></span>
+                  <span className="col-span-2 flex flex-wrap items-center gap-2 pt-2 [&>button]:rounded-xl">
                     {canManageFinance && entry.status === "checked_in" && <ClassOperations bookingId={entry.bookingId} />}
                     {canCheckin && (
                       <Button variant="outline" aria-label={`Check-in de ${entry.displayName}`} onClick={() => checkinMutation.mutate(entry.bookingId)} disabled={checkinMutation.isPending}>
@@ -1013,8 +1013,8 @@ function WeekClassList({ weekStart, day, onDayChange, selectedId, onSelect }: {
                 >
                   <span className={cn("nums text-sm font-extrabold", past ? "text-ink-muted" : "text-ink")}>{hhmm(c.start_time)}</span>
                   <span className="min-w-0 leading-tight">
-                    <span className={cn("block truncate text-sm font-extrabold", past ? "text-ink-muted" : "text-ink")}>{name}</span>
-                    <span className="block truncate text-xs text-ink-muted">
+                    <span className={cn("block break-words text-sm font-extrabold", past ? "text-ink-muted" : "text-ink")}>{name}</span>
+                    <span className="block break-words text-xs text-ink-muted">
                       con {c.instructor_name ?? "—"}{past ? " · terminó" : ""}
                       {Number(c.waitlist_count) > 0 ? ` · ${c.waitlist_count} en espera` : ""}
                     </span>
