@@ -1,3 +1,4 @@
+import {isEssentialNotification} from "@/lib/essentialNotifications.js";
 import { StripeStatus } from "@/components/admin/StripeStatus";
 import { useState, useEffect, useRef } from "react";
 import { FEATURES } from "@/config/features";
@@ -546,7 +547,7 @@ const NotificationTemplates = () => {
     setEditingKey(key);
   };
 
-  const catalog = Object.entries(templates).filter(([key])=>!key.startsWith("admin_")).map(([key,tpl]:[string,any])=>NOTIFICATION_TEMPLATES.find(t=>t.key===key)??{key,label:tpl.subject||key,icon:MessageSquare,hint:"Mensaje automático configurable"});
+  const catalog = Object.entries(templates).filter(([key])=>isEssentialNotification(key)).map(([key,tpl]:[string,any])=>NOTIFICATION_TEMPLATES.find(t=>t.key===key)??{key,label:tpl.subject||key,icon:MessageSquare,hint:"Mensaje automático configurable"});
   const currentTpl = catalog.find((t) => t.key === editingKey);
 
   return (

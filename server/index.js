@@ -1,3 +1,4 @@
+import {isEssentialNotification,essentialNotificationSettings} from "../src/lib/essentialNotifications.js";
 import {CALENDAR_OPERATIONS_SCHEMA,registerCalendarOperations} from "./lib/calendarOperations.js";
 import {parsePhoneNumberFromString} from "libphonenumber-js";
 import { registerClientInvites } from "./lib/clientInvites.js";
@@ -310,7 +311,7 @@ function mergeSettingsWithDefaults(key, rawValue) {
       }
     }
   }
-  return merged;
+  return key === "notification_templates" ? essentialNotificationSettings(merged) : merged;
 }
 
 // ─── File upload (memory storage, max 10 MB) ────────────────────────────────
@@ -13064,6 +13065,7 @@ function renderTemplateVars(template, vars = {}) {
 }
 
 async function sendConfiguredWhatsAppTemplate({ templateKey, phone, vars = {}, fallbackMessage = "" }) {
+  if (!isEssentialNotification(templateKey)) return {sent:false,reason:"nonessential_disabled"};
   if (!phone) return { sent: false, reason: "no_phone" };
   const notificationSettings = await getSettingsValue("notification_settings", DEFAULT_NOTIFICATION_SETTINGS);
   if (notificationSettings?.whatsapp_reminders === false) {

@@ -1,3 +1,4 @@
+import {isEssentialNotification} from "../../src/lib/essentialNotifications.js";
 // Templates en voz HIVE (cercana, casual, con primer nombre).
 // Editables vía system_settings.notification_templates (admin UI).
 // Variables disponibles per-template documentadas en cada body.
@@ -175,3 +176,7 @@ export const DEFAULT_NOTIFICATION_TEMPLATES = {
     body: "Nueva reserva: {clientName} en {class} el {date} a las {time}.",
   },
 };
+
+for (const [key, template] of Object.entries(DEFAULT_NOTIFICATION_TEMPLATES)) {
+  if (!isEssentialNotification(key)) template.enabled = false;
+}

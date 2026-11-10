@@ -1,3 +1,4 @@
+import {isEssentialNotification} from "@/lib/essentialNotifications.js";
 import { useState } from "react";
 import { FEATURES } from "@/config/features";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -436,12 +437,12 @@ const WhatsAppTemplatesPage = () => {
   };
 
   // Agrupar templates no listados explícitamente bajo "Otros"
-  const allKeys = Object.keys(templates).filter(key=>!key.startsWith("admin_"));
+  const allKeys = Object.keys(templates).filter(key=>isEssentialNotification(key));
   const categorized = new Set(CATEGORIES.flatMap((c) => c.keys));
   const others = allKeys.filter((k) => !categorized.has(k));
-  const allCategories = others.length > 0
-    ? [...CATEGORIES, { id: "others", label: "Otros", keys: others }]
-    : CATEGORIES;
+  const allCategories = [...CATEGORIES, {id:"others",label:"Otros",keys:others}]
+    .map(cat=>({...cat,keys:cat.keys.filter(key=>allKeys.includes(key))}))
+    .filter(cat=>cat.keys.length>0);
 
   return (
     <AuthGuard>
