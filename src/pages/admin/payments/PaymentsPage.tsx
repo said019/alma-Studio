@@ -76,7 +76,7 @@ function StepTitle({ n, done, children }: { n: number; done: boolean; children: 
   );
 }
 
-export function CashAssignment({ classId, onBooked, onBusyChange }: { classId?: string; onBooked?: () => void; onBusyChange?: (busy: boolean) => void } = {}) {
+export function CashAssignment({ classId, onBooked, onBusyChange, initialUser }: { initialUser?: SelectedUser; classId?: string; onBooked?: () => void; onBusyChange?: (busy: boolean) => void } = {}) {
   const [soldUser, setSoldUser] = useState<SelectedUser | null>(null);
   const bookingMutation = useMutation({
     mutationFn: (user: SelectedUser) => api.post("/admin/bookings/assign", { classId, userId: user.id }),
@@ -93,7 +93,7 @@ export function CashAssignment({ classId, onBooked, onBusyChange }: { classId?: 
   const qc = useQueryClient();
   const [clientParam, setClientParam] = useSearchParamState("clienta");
   const [waiverOpen, setWaiverOpen] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<SelectedUser | null>(null);
+  const [selectedUser, setSelectedUser] = useState<SelectedUser | null>(initialUser ?? null);
   const [selectedPlan, setSelectedPlan] = useState<SelectedPlan | null>(null);
   const [paymentMethod, setPaymentMethod] = useState("cash");
   // Precio cobrado, referencia y motivo (auditoría 2026-09-27, P0-3).

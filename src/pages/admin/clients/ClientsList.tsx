@@ -1,13 +1,10 @@
-import { BirthDateInput } from "@/components/ui/birth-date-input";
+import {Label} from "@/components/ui/label";
+import {QuickClientInvite} from "@/components/admin/QuickClientInvite";
 import { useState, type ComponentType, type ReactNode } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { ResponsivaDialog } from "@/components/app/ResponsivaDialog";
 import api from "@/lib/api";
 import { AuthGuard } from "@/components/admin/AuthGuard";
 import AdminLayout from "@/components/admin/AdminLayout";
@@ -23,10 +20,8 @@ import { ErrorState } from "@/components/app/AppShell";
 import { formatDate } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { MessageCircle, Cake, MoreHorizontal, Search, SearchX, UserPlus, UsersRound, CreditCard, type LucideProps } from "lucide-react";
@@ -34,30 +29,11 @@ import { useDebounce } from "@/hooks/use-debounce";
 import { cn } from "@/lib/utils";
 import { useCanSeeFinance } from "@/lib/roles";
 
-// ── Schemas ────────────────────────────────────────────────────────────────────
-const manualSchema = z.object({
-  displayName: z.string().min(1, "Nombre requerido"),
-  email: z.string().email("Email inválido"),
-  phone: z.string().optional(),
-  dateOfBirth: z.string().optional(),
-  emergencyContactName: z.string().optional(),
-  emergencyContactPhone: z.string().optional(),
-  startDate: z.string().optional(),
-  notes: z.string().optional(),
-});
-
-type ManualFormData = z.infer<typeof manualSchema>;
-
 type Client = { id: string; displayName: string; email?: string | null; phone?: string | null; role?: string; createdAt?: string };
 
 // ── Clases compartidas de campos (tema claro nativo) ──────────────────────────
-const fieldCls = "bg-canvas border-line-strong/60 text-ink placeholder:text-ink/40";
 const outlineBtnCls = "border-line-strong/70 bg-transparent text-ink hover:bg-sunken hover:text-ink";
 const primaryBtnCls = "bg-inverse text-canvas hover:bg-ink";
-
-const SectionLabel = ({ children }: { children: ReactNode }) => (
-  <p className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-ink mb-3">{children}</p>
-);
 
 const EmptyBlock = ({ Icon, title, description, action }: {
   Icon: ComponentType<LucideProps>;
@@ -92,7 +68,6 @@ const ClientsList = () => {
   const [editId, setEditId] = useState<string | null>(null);
   // Manual registration sheet
   const [manualOpen, setManualOpen] = useState(false);
-  const [newUserToSign, setNewUserToSign] = useState<Client | null>(null);
 
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 300);
@@ -148,39 +123,9 @@ const ClientsList = () => {
     if (reason !== null) deleteMutation.mutate({ id: c.id, reason: reason || undefined });
   };
 
-  // ── Manual registration form ───────────────────────────────────────────────
-  const manualForm = useForm<ManualFormData>({
-    resolver: zodResolver(manualSchema),
-    defaultValues: { startDate: format(new Date(), "yyyy-MM-dd") },
-  });
-  const manualMutation = useMutation({
-    mutationFn: (d: ManualFormData) => api.post("/admin/clients/manual", d),
-    onSuccess: (res) => {
-      qc.invalidateQueries({ queryKey: ["clients"] });
-      setSearch("");
-      setBirthday(null);
-      toast({ title: "Usuario registrado", description: "Ahora debe leer y firmar su responsiva antes de comprar." });
-      if (res.data?.data?.user?.id) setNewUserToSign(res.data.data.user);
-      setManualOpen(false);
-      manualForm.reset({ startDate: format(new Date(), "yyyy-MM-dd") });
-    },
-    onError: (err: any) => {
-      toast({
-        title: "Error al registrar",
-        description: err?.response?.data?.message ?? err?.response?.data?.error ?? "Revisa los datos e intenta de nuevo",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const onManualSubmit = (d: ManualFormData) => manualMutation.mutate(d);
-
-
-
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <AuthGuard>
-      {newUserToSign && <ResponsivaDialog key={newUserToSign.id} userId={newUserToSign.id} open onClose={() => setNewUserToSign(null)} onSigned={() => { const id = newUserToSign.id; setNewUserToSign(null); navigate(canSeeFinance ? `/admin/payments?clienta=${id}` : `/admin/clients/${id}`); }} defaultName={newUserToSign.displayName} defaultEmail={newUserToSign.email ?? ""} defaultPhone={newUserToSign.phone ?? ""} />}
       <AdminLayout>
         <AdminPage>
           <AdminPageHeader
@@ -333,83 +278,7 @@ const ClientsList = () => {
         </AdminPage>
 
         {/* ── Manual registration sheet ────────────────────────────────────── */}
-        <Sheet open={manualOpen} onOpenChange={(v) => { setManualOpen(v); if (!v) manualForm.reset({ startDate: format(new Date(), "yyyy-MM-dd") }); }}>
-          <SheetContent className="w-full sm:max-w-lg overflow-y-auto bg-canvas border-line text-ink">
-            <SheetHeader>
-              <SheetTitle className="font-display text-xl text-ink flex items-center gap-2">
-                <UserPlus size={18} className="text-ink" />
-                Nuevo usuario
-              </SheetTitle>
-              <SheetDescription className="text-ink/55">
-                Registro manual. El usuario recibe su contraseña por email.
-              </SheetDescription>
-            </SheetHeader>
-
-            <form onSubmit={manualForm.handleSubmit(onManualSubmit)} className="mt-6 space-y-6">
-              {/* Datos */}
-              <div>
-                <SectionLabel>Datos</SectionLabel>
-                <div className="space-y-3">
-                  <div className="space-y-1">
-                    <Label className="text-ink/70 text-xs">Nombre completo *</Label>
-                    <Input className={fieldCls} placeholder="Ana García" {...manualForm.register("displayName")} />
-                    {manualForm.formState.errors.displayName && (
-                      <p className="text-xs text-destructive">{manualForm.formState.errors.displayName.message}</p>
-                    )}
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-ink/70 text-xs">Fecha de nacimiento</Label>
-                    <BirthDateInput value={manualForm.watch("dateOfBirth")} onChange={(v) => manualForm.setValue("dateOfBirth", v)} />
-                  </div>
-                </div>
-              </div>
-
-              {/* Contacto */}
-              <div className="border-t border-line pt-5">
-                <SectionLabel>Contacto</SectionLabel>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <Label className="text-ink/70 text-xs">Email *</Label>
-                    <Input type="email" className={fieldCls} placeholder="ana@email.com" {...manualForm.register("email")} />
-                    {manualForm.formState.errors.email && (
-                      <p className="text-xs text-destructive">{manualForm.formState.errors.email.message}</p>
-                    )}
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-ink/70 text-xs">Teléfono</Label>
-                    <Input className={fieldCls} placeholder="55 1234 5678" {...manualForm.register("phone")} />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-ink/70 text-xs">Contacto de emergencia</Label>
-                    <Input className={fieldCls} placeholder="Nombre" {...manualForm.register("emergencyContactName")} />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-ink/70 text-xs">Teléfono emergencia</Label>
-                    <Input className={fieldCls} {...manualForm.register("emergencyContactPhone")} />
-                  </div>
-                </div>
-              </div>
-
-              {/* Salud */}
-              <p className="rounded-xl border border-line p-4 text-sm text-ink-muted">Primero registra al usuario y solicita su firma de consentimiento informado y responsiva. Después podrás seleccionar y cobrar un plan en Cobrar.</p>
-
-              {/* Internal notes */}
-              <div className="border-t border-line pt-5 space-y-1">
-                <Label className="text-ink/70 text-xs">Notas internas</Label>
-                <Input className={fieldCls} placeholder="Referida por, observaciones..." {...manualForm.register("notes")} />
-              </div>
-
-              <div className="flex justify-end gap-2 border-t border-line pt-4">
-                <Button type="button" variant="outline" className={outlineBtnCls} onClick={() => setManualOpen(false)}>
-                  Cancelar
-                </Button>
-                <Button type="submit" disabled={manualMutation.isPending} className={cn(primaryBtnCls, "min-w-[140px]")}>
-                  {manualMutation.isPending ? "Registrando…" : "Registrar y solicitar firma"}
-                </Button>
-              </div>
-            </form>
-          </SheetContent>
-        </Sheet>
+        <QuickClientInvite key={String(manualOpen)} open={manualOpen} onOpenChange={setManualOpen} />
 
         <ClientEditSheet clientId={editId} open={!!editId} onOpenChange={(o) => { if (!o) setEditId(null); }} />
 

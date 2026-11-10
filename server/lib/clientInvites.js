@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import {parsePhoneNumberFromString} from 'libphonenumber-js';
 import {validateRegistration} from './registrationValidation.js';
 const keyFor=t=>'client_invite:'+crypto.createHash('sha256').update(t).digest('hex');
-export function registerClientInvites(app,{pool,adminMiddleware,bcrypt,signToken,mapUser,appPublicUrl,whatsappChannelState,queueWhatsAppSend,normalisePhone,privacyVersion}){
+export function registerClientInvites(app,{pool,adminMiddleware,bcrypt,signToken,mapUser,appPublicUrl,whatsappChannelState,queueWhatsAppSend,normalisePhone,sendConfiguredWhatsAppTemplate,privacyVersion}){
  app.post('/api/admin/clients/invite',adminMiddleware,async(req,res)=>{
   const name=typeof req.body?.displayName==='string'?req.body.displayName.trim():'';
   const phone=typeof req.body?.phone==='string'?parsePhoneNumberFromString(req.body.phone,'MX'):null;
@@ -19,7 +19,7 @@ export function registerClientInvites(app,{pool,adminMiddleware,bcrypt,signToken
    await client.query('COMMIT');
   }catch(e){await client.query('ROLLBACK').catch(()=>{});return res.status(500).json({message:'No se pudo crear la invitación.'});}finally{client.release();}
   const link=`${appPublicUrl}/auth/register?invite=${token}`;const message=`Hola ${name}, HIVE te invita a completar tu perfil y crear tu contraseña: ${link} El enlace es personal y vence en 72 horas.`;
-  let delivery='manual';try{if((await whatsappChannelState()).connected){await queueWhatsAppSend(normalisePhone(phone.number),message);delivery='sent';}}catch{delivery='failed';}
+  let delivery='manual';try{if((await whatsappChannelState()).connected){if(sendConfiguredWhatsAppTemplate){const result=await sendConfiguredWhatsAppTemplate({templateKey:'client_invite',phone:phone.number,vars:{firstName:name,link},fallbackMessage:message});delivery=result.sent?'sent':'manual';}else{await queueWhatsAppSend(normalisePhone(phone.number),message);delivery='sent';}}}catch{delivery='failed';}
   res.status(201).json({data:{userId:user.id,link,delivery,shareUrl:`https://wa.me/${phone.number.slice(1)}?text=${encodeURIComponent(message)}`}});
  });
  app.post('/api/auth/invite-details',async(req,res)=>{

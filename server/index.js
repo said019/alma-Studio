@@ -1,3 +1,5 @@
+import {CALENDAR_OPERATIONS_SCHEMA,registerCalendarOperations} from "./lib/calendarOperations.js";
+import {parsePhoneNumberFromString} from "libphonenumber-js";
 import { registerClientInvites } from "./lib/clientInvites.js";
 import { claimAutomaticEmail, WEEKLY_REMINDER_QUERY } from "./lib/automaticEmailThrottle.js";
 import { registerPaymentNoticeRoute } from "./paymentNoticeRoute.mjs";
@@ -3436,10 +3438,22 @@ app.post("/api/auth/register", async (req, res) => {
 // POST /api/auth/login
 app.post("/api/auth/login", async (req, res) => {
   const { email, password } = req.body;
-  if (!email || !password) return res.status(400).json({ message: "Email y contraseña requeridos" });
+  if (typeof email !== "string" || typeof password !== "string" || !email.trim() || !password) return res.status(400).json({ message: "Correo o teléfono y contraseña requeridos" });
   try {
-    const result = await pool.query("SELECT * FROM users WHERE email = $1", [email.toLowerCase().trim()]);
-    if (result.rows.length === 0) return res.status(401).json({ message: "Credenciales incorrectas" });
+    const identifier = email.trim();
+    let result;
+    if (identifier.includes("@")) {
+      result = await pool.query("SELECT * FROM users WHERE lower(email) = $1 AND is_active=true", [identifier.toLowerCase()]);
+    } else {
+      const phone = parsePhoneNumberFromString(identifier, "MX");
+      if (!phone?.isValid()) return res.status(401).json({ message: "Credenciales incorrectas" });
+      const digits = phone.number.slice(1);
+      const variants = [digits];
+      if (phone.country === "MX") variants.push(phone.nationalNumber, "521" + phone.nationalNumber);
+      result = await pool.query("SELECT * FROM users WHERE is_active=true AND regexp_replace(phone,'[^0-9]','','g') = ANY($1::text[]) AND password_hash IS NOT NULL", [variants]);
+    }
+    // A shared phone must never silently select another person's account.
+    if (result.rows.length !== 1) return res.status(401).json({ message: "Credenciales incorrectas" });
     const user = result.rows[0];
     if (!user.password_hash) return res.status(401).json({ message: "Credenciales incorrectas" });
     const match = await bcrypt.compare(password, user.password_hash);
@@ -4386,7 +4400,6 @@ const runWaitlistSweep = singleFlight(async () => {
 // y /admin/bookings/assign (auditoría 2026-09-27, bloque 1, tarea 5).
 const hasSignedWaiver = async (db, userId) =>
   (await db.query("SELECT 1 FROM waivers WHERE user_id = $1 LIMIT 1", [userId]).catch(() => ({ rows: [] }))).rows.length > 0;
-const WAIVER_REQUIRED_MSG = "Antes de comprar o reservar necesitas leer y firmar la responsiva y consentimiento informado.";
 
 // WhatsApp de una reserva nueva (app y asignación) según su estado final: la que
 // queda en la fila usa su propia llave (bookingNotice, server/lib/waitlist.js),
@@ -4412,10 +4425,6 @@ app.post("/api/bookings", authMiddleware, async (req, res) => {
   const { classId } = req.body;
   if (!classId) return res.status(400).json({ message: "classId requerido" });
   if (!isUuid(classId)) return res.status(400).json({ message: "Identificador inválido" });
-  // Gate: la primera reserva requiere la responsiva y consentimiento firmados.
-  if (!(await hasSignedWaiver(pool, req.userId))) {
-    return res.status(403).json({ code: "WAIVER_REQUIRED", message: WAIVER_REQUIRED_MSG });
-  }
   // La política se lee antes de tomar el cliente de la transacción: con el pool
   // lleno, pedir otra conexión teniendo ésta podía dejar a la petición
   // esperándose a sí misma (misma regla que en DELETE /bookings/:id). De aquí
@@ -4779,10 +4788,12 @@ app.delete("/api/bookings/:id", authMiddleware, async (req, res) => {
               cancelHours: policy.cancelWindowHours,
             }).catch((e) => console.error("[Email] booking cancelled:", e.message));
           }
+          notifyAdminsByTemplate("admin_booking_cancelled",{clientName:u.display_name||"Usuario",class:booking.class_type_name||"Clase",date:booking.date?new Date(booking.date).toLocaleDateString("es-MX"):"",time:String(booking.start_time||"").slice(0,5)}).catch(()=>{});
           sendConfiguredWhatsAppTemplate({
             templateKey: "booking_cancelled",
             phone: u.phone,
             vars: {
+              firstName: firstNameOf(u.display_name,"Alumna"),
               name: u.display_name || "Alumna",
               class: booking.class_type_name || "tu clase",
               date: booking.date ? new Date(booking.date).toLocaleDateString("es-MX") : "",
@@ -5046,7 +5057,7 @@ const mercadoPagoService = registerMercadoPago(app, {
   pool, owner: ownerMiddleware, auth: authMiddleware, finalizeOrder: finalizeStripeOrder,
   afterPayment: (userId) => triggerWalletPassSync(userId, "mercadopago_payment_updated"),
   afterReversal: (ids) => onSeatReleased(ids, {source:"mercadopago_reversal"}),
-  purchaseConflict: findPlanPurchaseConflict, hasWaiver: hasSignedWaiver,
+  purchaseConflict: findPlanPurchaseConflict, hasWaiver: async () => true,
 });
 
 // ── Generate short order number: OPH-YYMM-XXXX ──
@@ -5184,7 +5195,6 @@ async function handleStripeEvent(client, event) {
 
 // POST /api/orders
 app.post("/api/orders", authMiddleware, async (req, res) => {
-  if (!(await hasSignedWaiver(pool, req.userId))) return res.status(403).json({ code: "WAIVER_REQUIRED", message: WAIVER_REQUIRED_MSG });
   const { planId, discountCode, paymentMethod = "transfer" } = req.body;
   if (!planId) return res.status(400).json({ message: "planId requerido" });
   const client = await pool.connect();
@@ -5576,7 +5586,7 @@ app.get("/api/admin/notifications", adminMiddleware, async (req, res) => {
     const lastReadAt = lastReadRes.rows[0]?.admin_notifications_last_read_at;
     const lastReadMs = lastReadAt ? new Date(lastReadAt).getTime() : 0;
 
-    const [users, orders, milestones, checkins, campaigns, rejected, expiring] = await Promise.all([
+    const [users, orders, milestones, checkins, campaigns, rejected, expiring, bookingEvents] = await Promise.all([
       // Nuevas alumnas registradas (últimos 30d)
       pool.query(
         `SELECT id, display_name, email, phone, created_at
@@ -5644,9 +5654,22 @@ app.get("/api/admin/notifications", adminMiddleware, async (req, res) => {
             AND m.end_date BETWEEN CURRENT_DATE AND (CURRENT_DATE + INTERVAL '7 days')
           ORDER BY m.end_date ASC LIMIT 15`,
       ),
+      pool.query(
+        `SELECT bm.*, u.display_name AS user_name FROM booking_movements bm
+         LEFT JOIN users u ON u.id=bm.user_id
+         WHERE bm.happened_at > $1 AND bm.status IN ('confirmed','cancelled','waitlist')
+         ORDER BY bm.happened_at DESC,bm.id DESC LIMIT 100`, [cutoff30]),
     ]);
 
     const items = [
+      ...bookingEvents.rows.map((r) => ({
+        id: `booking_${r.id}`,
+        category: r.status === "cancelled" ? "booking_cancelled" : "booking_created",
+        title: r.status === "cancelled" ? "Reserva cancelada" : r.event_type === "class_updated" || (r.previous_class_id && r.previous_class_id !== r.class_id) ? "Reserva modificada" : r.status === "waitlist" ? "Nueva lista de espera" : "Nueva reserva",
+        body: `${r.user_name || "Persona"} · ${r.class_name || "Clase"} · ${r.class_date ? new Date(r.class_date).toLocaleDateString("es-MX") : ""} ${String(r.start_time || "").slice(0,5)}`,
+        time: r.happened_at,
+        link: `/admin/clients/${r.user_id}`,
+      })),
       ...users.rows.map((r) => ({
         id: `u_${r.id}`,
         category: "new_user",
@@ -5747,6 +5770,7 @@ app.get("/api/admin/notifications/unread-count", adminMiddleware, async (req, re
     const cutoff = lastReadAt || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const r = await pool.query(
       `SELECT
+        (SELECT COUNT(*)::int FROM booking_movements WHERE happened_at > $1 AND status IN ('confirmed','cancelled','waitlist')) +
         (SELECT COUNT(*)::int FROM users WHERE role='client' AND created_at > $1) +
         (SELECT COUNT(*)::int FROM orders WHERE status IN ('pending_verification', 'pending_payment') AND created_at > $1) +
         (SELECT COUNT(*)::int FROM loyalty_milestone_awards WHERE awarded_at > $1) +
@@ -10382,46 +10406,17 @@ async function findOrCreateGuestUser(guestProfile, db = pool) {
     : null;
   const syntheticEmail = syntheticGuestEmail(guestProfile.id);
   const emailToUse = realEmail || syntheticEmail;
-  try {
+  // ON CONFLICT keeps the enclosing sale/booking transaction usable.
+  for (const [email, phone] of [[emailToUse, guestProfile.phone || null], [emailToUse, null], [syntheticEmail, null]]) {
     const ins = await db.query(
-      `INSERT INTO users (display_name, email, phone, role, guest_profile_id, accepts_terms, password_hash)
-       VALUES ($1, $2, $3, 'guest', $4, true, NULL)
-       RETURNING *`,
-      [guestProfile.display_name, emailToUse, guestProfile.phone || null, guestProfile.id]
-    );
-    return ins.rows[0];
-  } catch (err) {
-    if (err && err.code === "23505") {
-      // unique_violation — intenta sin phone (la causa más común). Si el
-      // choque fue por email real (raro: dos guests con el mismo email),
-      // usamos el sintético.
-      const emailFallback = err.constraint && /email/i.test(err.constraint)
-        ? syntheticEmail
-        : emailToUse;
-      try {
-        const ins2 = await db.query(
-          `INSERT INTO users (display_name, email, phone, role, guest_profile_id, accepts_terms, password_hash)
-           VALUES ($1, $2, NULL, 'guest', $3, true, NULL)
-           RETURNING *`,
-          [guestProfile.display_name, emailFallback, guestProfile.id]
-        );
-        return ins2.rows[0];
-      } catch (err2) {
-        // último recurso: sintético + sin phone (cubre cualquier UNIQUE residual)
-        if (err2 && err2.code === "23505") {
-          const ins3 = await db.query(
-            `INSERT INTO users (display_name, email, phone, role, guest_profile_id, accepts_terms, password_hash)
-             VALUES ($1, $2, NULL, 'guest', $3, true, NULL)
-             RETURNING *`,
-            [guestProfile.display_name, syntheticEmail, guestProfile.id]
-          );
-          return ins3.rows[0];
-        }
-        throw err2;
-      }
-    }
-    throw err;
+      `INSERT INTO users (display_name,email,phone,role,guest_profile_id,accepts_terms,password_hash)
+       VALUES ($1,$2,$3,'guest',$4,false,NULL) ON CONFLICT DO NOTHING RETURNING *`,
+      [guestProfile.display_name,email,phone,guestProfile.id]);
+    if(ins.rowCount)return ins.rows[0];
+    const existing=await db.query("SELECT * FROM users WHERE guest_profile_id=$1",[guestProfile.id]);
+    if(existing.rowCount)return existing.rows[0];
   }
+  throw new Error("No se pudo crear el perfil de visita");
 }
 
 // GET /api/admin/guest-profiles — lista paginada con búsqueda por nombre/tel.
@@ -10646,7 +10641,6 @@ app.get("/api/admin/guest-profiles/search", adminMiddleware, async (req, res) =>
 // Plan debe tener is_visit_pack=true. Crea/reusa guest_profile + user lite +
 // crea membership con class_limit del plan + orden 'approved' con el método.
 app.post("/api/admin/visit-sale", adminMiddleware, async (req, res) => {
-  if (req.body?.profile?.acceptedWaiver !== true) return res.status(403).json({ code: "WAIVER_REQUIRED", message: "Confirma que la visitante firmó la responsiva y conserva el documento en recepción." });
   const { profile = {}, planId, paymentMethod = "cash", startDate, hostUserId } = req.body || {};
   if (!profile.name) return res.status(400).json({ message: "Nombre requerido" });
   if (!planId) return res.status(400).json({ message: "Plan requerido" });
@@ -10720,15 +10714,19 @@ app.post("/api/admin/visit-sale", adminMiddleware, async (req, res) => {
 // Si la invitada YA tiene pack activo con crédito: solo crea el booking.
 // Si NO tiene pack y viene `sale`: vende el pack y reserva en el mismo paso.
 app.post("/api/admin/classes/:id/walkin-visit", adminMiddleware, async (req, res) => {
-  if (req.body?.profile?.acceptedWaiver !== true) return res.status(403).json({ code: "WAIVER_REQUIRED", message: "Confirma que la visitante firmó la responsiva y conserva el documento en recepción." });
   const { profile = {}, hostUserId, sale } = req.body || {};
   const classId = req.params.id;
   if (!profile.name) return res.status(400).json({ message: "Nombre de la invitada requerido" });
+  const visitorPhone = parsePhoneNumberFromString(String(profile.phone || ""), "MX");
+  if (!visitorPhone?.isValid()) return res.status(400).json({message:"Teléfono inválido: selecciona el país y revisa el número."});
+  profile.phone = visitorPhone.number;
   const dbClient = await pool.connect();
   try {
     await dbClient.query("BEGIN");
     const clsRes = await dbClient.query(
-      "SELECT id, max_capacity, status FROM classes WHERE id = $1 FOR UPDATE",
+      `SELECT c.id, c.max_capacity, c.status, c.date, ct.category AS class_category,
+       ((c.date+c.start_time) AT TIME ZONE '${STUDIO_TIMEZONE}') AS starts_at
+       FROM classes c JOIN class_types ct ON ct.id=c.class_type_id WHERE c.id=$1 FOR UPDATE OF c`,
       [classId]
     );
     if (!clsRes.rows.length) {
@@ -10736,9 +10734,9 @@ app.post("/api/admin/classes/:id/walkin-visit", adminMiddleware, async (req, res
       return res.status(404).json({ message: "Clase no encontrada" });
     }
     const cls = clsRes.rows[0];
-    if (cls.status === "cancelled") {
+    if (cls.status !== "scheduled") {
       await dbClient.query("ROLLBACK");
-      return res.status(400).json({ message: "Esta clase fue cancelada" });
+      return res.status(400).json({ message: "Esta clase no está abierta para reservas" });
     }
     const occupied = await liveBookingCount(classId, dbClient);
     if (occupied >= cls.max_capacity) {
@@ -10779,15 +10777,8 @@ app.post("/api/admin/classes/:id/walkin-visit", adminMiddleware, async (req, res
       // momento). La admin decide.
     }
     if (!memRow) {
-      memRow = (await dbClient.query(
-        `SELECT id, classes_remaining FROM memberships
-          WHERE user_id = $1 AND status = 'active'
-            AND (end_date IS NULL OR end_date >= CURRENT_DATE)
-            AND (classes_remaining IS NULL OR classes_remaining > 0)
-          ORDER BY created_at DESC LIMIT 1
-          FOR UPDATE`,
-        [user.id]
-      )).rows[0] ?? null;
+      memRow = await selectMembershipForClass({userId:user.id,classCategory:cls.class_category,startsAt:cls.starts_at,capacity:cls.max_capacity,client:dbClient});
+      if (memRow) await dbClient.query("SELECT id FROM memberships WHERE id=$1 FOR UPDATE",[memRow.id]);
     }
 
     let saleOrder = null;
@@ -10801,7 +10792,7 @@ app.post("/api/admin/classes/:id/walkin-visit", adminMiddleware, async (req, res
         });
       }
       const planRes = await dbClient.query(
-        "SELECT * FROM plans WHERE id = $1 AND is_active = true AND is_visit_pack = true",
+        "SELECT * FROM plans WHERE id = $1 AND is_active = true",
         [sale.planId]
       );
       if (!planRes.rows.length) {
@@ -10809,6 +10800,11 @@ app.post("/api/admin/classes/:id/walkin-visit", adminMiddleware, async (req, res
         return res.status(404).json({ message: "Plan de visita no encontrado" });
       }
       const plan = planRes.rows[0];
+      const startDay = todayInStudio();
+      if (!membershipAllowsSession({...plan,start_date:startDay,end_date:calcMembershipEndDate(startDay,plan)},cls.starts_at,cls.max_capacity) || !isMembershipCategoryCompatible(plan.class_category,cls.class_category)) {
+        await dbClient.query("ROLLBACK");
+        return res.status(400).json({message:"El plan no incluye el horario, disciplina o fecha de esta clase. Elige otro plan."});
+      }
       const _gen = await getSettingValueWithDefaults("general_settings");
       const _eff = resolveEffectivePrice(plan, _gen?.opening_pricing_active !== false);
       const pm = normalizePaymentMethod(sale.paymentMethod);
@@ -10836,6 +10832,15 @@ app.post("/api/admin/classes/:id/walkin-visit", adminMiddleware, async (req, res
       memRow = memIns.rows[0];
     }
 
+    const locked = (await dbClient.query("SELECT classes_remaining FROM memberships WHERE id=$1 FOR UPDATE",[memRow.id])).rows[0];
+    if (!(chargedHostUserId && memRow.rules?.guest_passes > 0) && locked.classes_remaining !== null && Number(locked.classes_remaining) <= 0) {
+      await dbClient.query("ROLLBACK");
+      return res.status(409).json({message:"El paquete ya no tiene créditos disponibles."});
+    }
+    if (!chargedHostUserId) {
+      const eligibility = await checkWeeklyClassLimit(dbClient,user.id,memRow.id,cls.date);
+      if (!eligibility.ok) { await dbClient.query("ROLLBACK"); return res.status(403).json({message:eligibility.message}); }
+    }
     // Crear booking confirmed + descontar crédito + actualizar contador.
     const bookingIns = await dbClient.query(
       `INSERT INTO bookings (class_id, user_id, membership_id, guest_profile_id, status)
@@ -10844,10 +10849,7 @@ app.post("/api/admin/classes/:id/walkin-visit", adminMiddleware, async (req, res
     );
     if (chargedHostUserId && memRow.rules?.guest_passes > 0) await dbClient.query("UPDATE bookings SET partner_metadata=partner_metadata || '{\"hive_guest_pass\":true}'::jsonb WHERE id=$1", [bookingIns.rows[0].id]);
     if (memRow.classes_remaining !== null && !(chargedHostUserId && memRow.rules?.guest_passes > 0)) {
-      await dbClient.query(
-        "UPDATE memberships SET classes_remaining = GREATEST(classes_remaining - 1, 0), updated_at = NOW() WHERE id = $1",
-        [memRow.id]
-      );
+      await consumeMembershipCredit(dbClient,memRow.id,classId);
     }
     // Cupo: lo mantiene el trigger update_class_booking_count (auditoría 2026-09-08, P1-6).
     await dbClient.query("COMMIT");
@@ -10923,12 +10925,8 @@ app.post("/api/bookings/with-guest", authMiddleware, async (req, res) => {
   if (!classId) return res.status(400).json({ message: "classId requerido" });
   if (!isUuid(classId)) return res.status(400).json({ message: "Identificador inválido" });
   // Gate: la anfitriona (quien reserva) debe tener su propia responsiva firmada.
-  if (!(await hasSignedWaiver(pool, req.userId))) {
-    return res.status(403).json({ code: "WAIVER_REQUIRED", message: WAIVER_REQUIRED_MSG });
-  }
   if (!guest.name) return res.status(400).json({ message: "Nombre de la acompañante requerido" });
   if (!guest.phone) return res.status(400).json({ message: "Teléfono de la acompañante requerido" });
-  if (!guest.acceptedWaiver) return res.status(400).json({ message: "Confirma el waiver de la acompañante" });
 
   const dbClient = await pool.connect();
   try {
@@ -12629,7 +12627,9 @@ app.put("/api/settings/:key", adminMiddleware, async (req, res) => {
     if (value === undefined) {
       return res.status(400).json({ message: "Falta `value` en el body" });
     }
-    const merged = mergeSettingsWithDefaults(req.params.key, value);
+    if(req.params.key==="notification_settings" && value?.reminder_hours_before!==undefined && (!Number.isFinite(Number(value.reminder_hours_before)) || Number(value.reminder_hours_before)<0.25 || Number(value.reminder_hours_before)>72))return res.status(400).json({message:"El recordatorio debe estar entre 0.25 y 72 horas antes."});
+    const previous = ["notification_templates","notification_settings"].includes(req.params.key) ? await getSettingsValue(req.params.key,{}) : {};
+    const merged = mergeSettingsWithDefaults(req.params.key, isPlainObject(value) ? deepMerge(previous,value) : value);
     if (req.params.key === "general_settings" && typeof merged.venue_media_url === "string" && merged.venue_media_url.startsWith("data:image/")) merged.venue_media_url = await storePhotoReference(merged.venue_media_url);
     await pool.query(
       "INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value=$2, updated_at=NOW()",
@@ -12748,6 +12748,10 @@ app.put("/api/admin/bank-info", ownerMiddleware, async (req, res) => {
 // Variables disponibles por template — usado por admin UI para mostrar chips
 // de placeholders y validar al guardar.
 const TEMPLATE_VARIABLES = {
+  client_invite: ["firstName", "link"],
+  admin_booking_cancelled: ["clientName", "class", "date", "time"],
+  booking_waitlisted: ["firstName", "class", "date", "time"],
+  waitlist_promoted: ["firstName", "class", "date", "time"],
   admin_new_booking: ["clientName", "class", "date", "time"],
   welcome: ["firstName"],
   password_reset: ["firstName", "link"],
@@ -12807,7 +12811,8 @@ app.put("/api/admin/whatsapp-templates", adminMiddleware, async (req, res) => {
     if (!templates || typeof templates !== "object") {
       return res.status(400).json({ message: "Falta `templates` en el body" });
     }
-    const merged = mergeSettingsWithDefaults("notification_templates", templates);
+    const current = await getSettingsValue("notification_templates",DEFAULT_NOTIFICATION_TEMPLATES);
+    const merged = mergeSettingsWithDefaults("notification_templates", deepMerge(current,templates));
     await pool.query(
       "INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value=$2, updated_at=NOW()",
       ["notification_templates", JSON.stringify(merged)]
@@ -12848,7 +12853,9 @@ app.put("/api/admin/notification-settings", adminMiddleware, async (req, res) =>
           return true;
         });
     }
-    const merged = mergeSettingsWithDefaults("notification_settings", updates);
+    if (updates.reminder_hours_before !== undefined && (!Number.isFinite(Number(updates.reminder_hours_before)) || Number(updates.reminder_hours_before)<0.25 || Number(updates.reminder_hours_before)>72)) return res.status(400).json({message:"El recordatorio debe estar entre 0.25 y 72 horas antes."});
+    const current = await getSettingsValue("notification_settings", DEFAULT_NOTIFICATION_SETTINGS);
+    const merged = mergeSettingsWithDefaults("notification_settings", {...current,...updates});
     await pool.query(
       "INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value=$2, updated_at=NOW()",
       ["notification_settings", JSON.stringify(merged)]
@@ -13042,7 +13049,7 @@ async function getSettingsValue(key, fallback = null) {
   try {
     const r = await pool.query("SELECT value FROM settings WHERE key = $1 LIMIT 1", [key]);
     if (!r.rows.length || r.rows[0].value == null) return fallback;
-    return r.rows[0].value;
+    return ["notification_templates","notification_settings"].includes(key) ? mergeSettingsWithDefaults(key,r.rows[0].value) : r.rows[0].value;
   } catch (_) {
     return fallback;
   }
@@ -13083,6 +13090,8 @@ async function sendConfiguredWhatsAppTemplate({ templateKey, phone, vars = {}, f
 //   2) Fallback: users con role IN ('admin','super_admin'), phone no nulo,
 //      is_active=true — para no quedarse mudo si nunca se configuró la lista.
 async function notifyAdminsByTemplate(templateKey, vars = {}, fallbackMessage = "") {
+  // Booking events belong exclusively to the admin bell, captured transactionally.
+  if (["admin_new_booking", "admin_booking_cancelled"].includes(templateKey)) return;
   try {
     const notificationSettings = await getSettingsValue("notification_settings", DEFAULT_NOTIFICATION_SETTINGS);
     if (notificationSettings?.whatsapp_reminders === false) return;
@@ -14063,8 +14072,7 @@ app.post("/api/memberships", adminMiddleware, async (req, res) => {
     if (!userId || !planId) return res.status(400).json({ message: "userId y planId requeridos" });
     if (!isUuid(userId) || !isUuid(planId)) return res.status(400).json({ message: "Identificador inválido" });
     await saleClient.query("SELECT id FROM users WHERE id=$1 FOR UPDATE",[userId]);
-    if (!(await hasSignedWaiver(saleClient, userId))) return res.status(403).json({ code: "WAIVER_REQUIRED", message: WAIVER_REQUIRED_MSG });
-    const anonConflict = await anonymizedSaleConflict(userId,saleClient);
+      const anonConflict = await anonymizedSaleConflict(userId,saleClient);
     if (anonConflict) return res.status(409).json(anonConflict);
     // El método de pago se exige explícito: el default anterior ("efectivo") ni
     // siquiera era un valor del enum payment_method y reventaba con 500, además
@@ -14982,13 +14990,7 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
   const overrideReason = typeof override?.reason === "string" ? override.reason.trim() : "";
   if (override && overrideReason.length < 5) return res.status(400).json({ message: "Escribe el motivo (mínimo 5 caracteres)." });
   const signed = await hasSignedWaiver(pool, userId);
-  if (!signed && !override) {
-    return res.status(403).json({ code: "WAIVER_REQUIRED", message: "Este usuario no ha firmado su responsiva." });
-  }
   const withGuest = guest && typeof guest === "object" && guest.name && guest.phone;
-  if (withGuest && !guest.acceptedWaiver) {
-    return res.status(400).json({ message: "Confirma el waiver de la acompañante" });
-  }
   const hasGuestSale = withGuest && guestSale && typeof guestSale === "object" && guestSale.planId;
   // La política se lee antes de tomar el cliente de la transacción, igual que
   // en POST /api/bookings: de aquí sale cancelWindowHours para el correo.
@@ -15030,11 +15032,11 @@ app.post("/api/admin/bookings/assign", adminMiddleware, async (req, res) => {
       userId,
       classCategory: clsCategory,
       startsAt: cls.starts_at, capacity: cls.max_capacity,
-      client,
+      client, includeIneligible: true,
     });
     if (!membership) {
       await client.query("ROLLBACK");
-      return res.status(403).json({ message: "El usuario no tiene membresía activa con créditos para esta clase" });
+      return res.status(403).json({ code: "NO_ELIGIBLE_MEMBERSHIP", message: "No hay un paquete con créditos, vigencia y horario compatibles con esta clase." });
     }
 
     // Vigencia revisada bajo candado, como en POST /api/bookings.
@@ -15750,7 +15752,7 @@ app.get("/api/classes/:id/roster", adminMiddleware, async (req, res) => {
 
 // POST /api/admin/clients/manual — crea clienta + membresía en un solo paso (sin que use la app)
 app.post("/api/admin/clients/manual", adminMiddleware, async (req, res) => {
-  if (req.body?.planId) return res.status(403).json({ code: "WAIVER_REQUIRED", message: "Primero crea el perfil y recoge su firma. Después vende el plan desde Pagos." });
+  if (req.body?.planId) return res.status(400).json({ message: "Crea el perfil y vende el plan desde Cobros o Vender paquete e inscribir." });
   const client = await pool.connect();
   try {
     const {
@@ -16491,7 +16493,8 @@ app.post("/api/admin/orders/:id/refunds", ownerMiddleware, async (req, res) => {
   }
 });
 
-registerClientInvites(app,{pool,adminMiddleware,bcrypt,signToken,mapUser,appPublicUrl:APP_PUBLIC_URL,whatsappChannelState,queueWhatsAppSend,normalisePhone,privacyVersion:PRIVACY_NOTICE_VERSION});
+registerCalendarOperations(app,{pool,adminMiddleware,onSeatReleased});
+registerClientInvites(app,{pool,adminMiddleware,bcrypt,signToken,mapUser,appPublicUrl:APP_PUBLIC_URL,whatsappChannelState,queueWhatsAppSend,normalisePhone,sendConfiguredWhatsAppTemplate,privacyVersion:PRIVACY_NOTICE_VERSION});
 const communicationService = registerCommunications(app, { pool, ownerMiddleware, queueWhatsAppSend, normalisePhone, whatsappChannelState, appPublicUrl: APP_PUBLIC_URL, recordAudit });
 registerVelanParity(app, { pool, ownerMiddleware, authMiddleware, restoreMembershipCredit,
   recordAudit, triggerWalletPassSync, onSeatReleased, camelRow, isDay, reasonProblem, getBookingPolicy, bookingLeadHours: BOOKING_LEAD_HOURS, cancelClassInTx, notifyClassCancelled, applyCancellationRollback });
@@ -18304,13 +18307,16 @@ async function runMembershipExpiredCron() {
 }
 
 /**
- * Runs every 10 minutes.
- * Finds bookings whose class starts in ~2 hours (105–135 min from now, UTC)
+ * Runs every minute.
+ * Uses the configured lead time in the studio timezone with a two-minute overlap.
  * and sends a WhatsApp pre-class reminder + triggers APNS wallet push.
  * Deduplicates via wallet_notification_logs (reason = 'class_reminder_<bookingId>').
  */
 async function runClassReminderCron() {
   try {
+    const config = await getSettingsValue("notification_settings",DEFAULT_NOTIFICATION_SETTINGS);
+    if(config.whatsapp_reminders===false)return;
+    const leadMinutes = Math.min(4320,Math.max(15,Number(config.reminder_hours_before??2)*60));
     const res = await pool.query(`
       SELECT
         b.id           AS booking_id,
@@ -18327,9 +18333,9 @@ async function runClassReminderCron() {
         AND u.receive_reminders IS NOT FALSE
         AND u.phone IS NOT NULL
         AND (c.date + c.start_time) AT TIME ZONE '${STUDIO_TIMEZONE}'
-              BETWEEN NOW() + INTERVAL '105 minutes'
-                  AND NOW() + INTERVAL '135 minutes'
-    `);
+              BETWEEN NOW() + ($1::int-2) * INTERVAL '1 minute'
+                  AND NOW() + $1::int * INTERVAL '1 minute'
+    `,[Math.round(leadMinutes)]);
 
     if (res.rows.length === 0) return;
     console.log(`[Cron] Class reminder — ${res.rows.length} upcoming bookings`);
@@ -18416,12 +18422,14 @@ function scheduleEmailCrons() {
   scheduleAt("barrido de membresias vencidas", { hour: 10, minute: 0 }, () =>
     runMembershipExpiredCron(), opciones);
 
-  // Pre-class reminder: every 10 minutes, find classes starting in ~2 hours
+  // Prevent overlapping runs when the WhatsApp queue is slow.
+  let classReminderRunning = false;
   setInterval(async () => {
-    await runClassReminderCron().catch((e) =>
-      console.error("[Cron] class_reminder interval error:", e?.message),
-    );
-  }, 10 * 60 * 1000); // every 10 minutes
+    if (classReminderRunning) return;
+    classReminderRunning = true;
+    try { await runClassReminderCron(); }
+    finally { classReminderRunning = false; }
+  }, 60 * 1000); // configured lead time, checked every minute
 
   // ── Lista de espera: barrido de respaldo (auditoría 2026-09-27, P1-1) ──
   // APAGADO por defecto: sólo se programa si WAITLIST_SWEEP_MINUTES es un
@@ -18474,6 +18482,7 @@ function scheduleEmailCrons() {
 async function bootServer() {
   await ensureSchema();
   // Never serve financial/queued-write routes with a partially applied schema.
+  await pool.query(CALENDAR_OPERATIONS_SCHEMA);
   await pool.query('SELECT order_id,preference_id,idempotency_key FROM mp_retired_wallet_attempts LIMIT 0');
   await pool.query(`SELECT mp_payment_choice,mp_wallet_preference_id,paid_at,provider_synced_at,mp_sync_claim,mp_sync_lease_until,
     mp_sync_attempted_at,mp_sync_error,mp_method_id,mp_type_id FROM orders LIMIT 0`);

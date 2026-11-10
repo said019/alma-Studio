@@ -30,7 +30,7 @@ interface ApiResponse {
 // Categorías para agrupar templates
 const CATEGORIES: { id: string; label: string; keys: string[] }[] = [
   { id: "onboarding", label: "Onboarding", keys: ["welcome", "password_reset"] },
-  { id: "bookings", label: "Reservas", keys: ["booking_confirmed", "booking_cancelled", "class_reminder", "class_attended", "admin_new_booking"] },
+  { id: "bookings", label: "Reservas", keys: ["booking_confirmed", "booking_cancelled", "class_reminder", "class_attended"] },
   { id: "membership", label: "Membresía", keys: ["membership_activated", "membership_expiring_today", "membership_expiring_tomorrow", "membership_expiring_n_days", "membership_expired", "renewal_reminder", "transfer_rejected"] },
   { id: "loyalty", label: "Lealtad", keys: ["rings_closed", "points_earned", "reward_redeemed", "milestone_classes_5", "milestone_classes_10", "milestone_classes_25", "milestone_classes_50", "milestone_classes_100"] },
   { id: "events", label: "Eventos", keys: ["event_registered"] },
@@ -408,7 +408,7 @@ const WhatsAppTemplatesPage = () => {
   };
 
   const handleSave = async (key: string, t: Template) => {
-    await updateMutation.mutateAsync({ ...templates, [key]: t });
+    await updateMutation.mutateAsync({ ...templates, [key]: { ...templates[key], ...t } });
   };
 
   const handleResetOne = async (key: string) => {
@@ -436,7 +436,7 @@ const WhatsAppTemplatesPage = () => {
   };
 
   // Agrupar templates no listados explícitamente bajo "Otros"
-  const allKeys = Object.keys(templates);
+  const allKeys = Object.keys(templates).filter(key=>!key.startsWith("admin_"));
   const categorized = new Set(CATEGORIES.flatMap((c) => c.keys));
   const others = allKeys.filter((k) => !categorized.has(k));
   const allCategories = others.length > 0
@@ -473,58 +473,7 @@ const WhatsAppTemplatesPage = () => {
             </Button>
           </div>
 
-          {/* ── Destinatarios de avisos administrativos ───────────────── */}
-          <div className="rounded-xl border border-line bg-sunken p-5 mb-6">
-            <p className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-ink/60 mb-1">
-              Avisos a la dueña / staff
-            </p>
-            <p className="text-xs text-ink/70 mb-3">
-              Teléfonos que reciben los WhatsApps administrativos (ej. <code className="font-mono">admin_new_booking</code>). Agrega tu número y el de quien quieras que reciba estas alertas. Formato: <code className="font-mono nums">+524441234567</code>.
-            </p>
-            <div className="flex gap-2">
-              <Input
-                value={phoneInput}
-                onChange={(e) => setPhoneInput(e.target.value)}
-                placeholder="+524441234567"
-                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addAdminPhone(); } }}
-                className="bg-canvas nums"
-              />
-              <Button
-                onClick={addAdminPhone}
-                disabled={!phoneInput.trim() || updatePhonesMutation.isPending}
-                size="sm"
-                className="bg-ink text-canvas hover:bg-inverse"
-              >
-                Agregar
-              </Button>
-            </div>
-            {phonesError ? (
-              <p className="mt-3 text-xs text-destructive">
-                No pudimos cargar los teléfonos.{" "}
-                <button type="button" className="underline underline-offset-2" onClick={() => refetchSettings()}>Reintentar</button>
-              </p>
-            ) : adminPhones.length === 0 ? (
-              <p className="mt-3 text-xs text-ink/55">
-                Sin teléfonos configurados. Mientras tanto, los avisos van a usuarias con rol admin que tengan teléfono.
-              </p>
-            ) : (
-              <div className="mt-3 flex flex-wrap gap-2">
-                {adminPhones.map((p) => (
-                  <span key={p} className="inline-flex items-center gap-1.5 rounded-full border border-line bg-canvas px-2.5 py-1 text-xs text-ink">
-                    <code className="font-mono nums">{p}</code>
-                    <button
-                      type="button"
-                      onClick={() => removeAdminPhone(p)}
-                      className="text-ink/45 transition-colors hover:text-destructive"
-                      aria-label={`Quitar ${p}`}
-                    >
-                      <X size={12} />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
+          <p className="mb-6 rounded-xl border border-line p-4 text-sm text-ink/70">Las reservas y cancelaciones para administración aparecen en la campanita de notificaciones. Los mensajes de esta pantalla se envían a clientes.</p>
 
           {isError ? (
             <ErrorState

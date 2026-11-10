@@ -1,7 +1,6 @@
 import api from "@/lib/api";
 import { internationalPhone, phoneCountries } from "@/lib/internationalPhone";
 import { useState, useEffect } from "react";
-import { ResponsivaDialog } from "@/components/app/ResponsivaDialog";
 import { useForm } from "react-hook-form";
 import { FEATURES } from "@/config/features";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -73,7 +72,6 @@ type FormValues = {
 
 const Register = () => {
   const [birth, setBirth] = useState({ day: "", month: "", year: "" });
-  const [registration, setRegistration] = useState<FormValues | null>(null);
   const { register: registerUser, isLoading, error, clearError } = useAuthStore();
   const navigate = useNavigate();
   const [params] = useSearchParams();
@@ -120,21 +118,12 @@ const Register = () => {
         healthConsent: data.healthConsent,
         ...(refCode ? { referralCode: refCode } : {}),
       } as any);
-      // La inscripción continúa con la firma del documento vigente.
-      setRegistration({ ...data, phone });
+      navigate(FEATURES.onboarding ? withReturnUrl("/auth/onboarding", returnUrl) : (returnUrl ?? "/app"));
     } catch {
       // El error del store se muestra en el AuthErrorBanner, único canal de error.
     }
   };
 
-  if (registration) return (
-    <AuthShell brandEyebrow="HIVE Pilates Studio" brandHeadline="Bienvenida/o a HIVE" formEyebrow="Último paso" formHeadline="Firma tu" formHeadlineItalic="responsiva.">
-      <p className="text-ink-muted">Tu cuenta está creada. Completa la firma para terminar tu inscripción y adquirir tus clases.</p>
-      <ResponsivaDialog open onClose={() => navigate(FEATURES.onboarding ? withReturnUrl("/auth/onboarding", returnUrl) : (returnUrl ?? "/app"))} defaultName={registration.displayName}
-        defaultEmail={registration.email} defaultPhone={registration.phone}
-        onSigned={() => navigate(FEATURES.onboarding ? withReturnUrl("/auth/onboarding", returnUrl) : (returnUrl ?? "/app"))} />
-    </AuthShell>
-  );
 
   return (
     <AuthShell

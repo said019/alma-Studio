@@ -512,12 +512,12 @@ const NotificationTemplates = () => {
     if (raw && !configLoaded) { setConfig(raw); setConfigLoaded(true); }
   }, [configData, configLoaded]);
 
-  const templates: Record<string, { subject?: string; body: string }> = tplData?.data ?? {};
+  const templates: Record<string, { subject?: string; body: string; enabled?: boolean }> = tplData?.data ?? {};
   const walletLogs: any[] = walletLogsData?.data ?? [];
 
   const saveTplMutation = useMutation({
     mutationFn: ({ key, subject, body }: { key: string; subject: string; body: string }) => {
-      const updated = { ...templates, [key]: { subject, body } };
+      const updated = { ...templates, [key]: { ...templates[key], subject, body } };
       return api.put("/settings/notification_templates", { value: updated });
     },
     onSuccess: () => {
@@ -536,6 +536,7 @@ const NotificationTemplates = () => {
       refetchConfig();
       toast({ title: "Configuración guardada" });
     },
+    onError: (err:any) => toast({title:"No se pudo guardar",description:err?.response?.data?.message||"Intenta de nuevo.",variant:"destructive"}),
   });
 
   const openEdit = (key: string) => {
@@ -545,7 +546,8 @@ const NotificationTemplates = () => {
     setEditingKey(key);
   };
 
-  const currentTpl = NOTIFICATION_TEMPLATES.find((t) => t.key === editingKey);
+  const catalog = Object.entries(templates).filter(([key])=>!key.startsWith("admin_")).map(([key,tpl]:[string,any])=>NOTIFICATION_TEMPLATES.find(t=>t.key===key)??{key,label:tpl.subject||key,icon:MessageSquare,hint:"Mensaje automático configurable"});
+  const currentTpl = catalog.find((t) => t.key === editingKey);
 
   return (
     <div className="space-y-6 max-w-xl">
@@ -580,6 +582,7 @@ const NotificationTemplates = () => {
               <Label>Horas antes del recordatorio</Label>
               <Input
                 type="number"
+                min={0.25} max={72} step={0.25}
                 className="w-28 bg-canvas nums"
                 value={config.reminder_hours_before ?? 2}
                 onChange={(e) => setConfig((p) => ({ ...p, reminder_hours_before: Number(e.target.value) }))}
@@ -658,7 +661,7 @@ const NotificationTemplates = () => {
             ))}
           </div>
         ) : (
-          NOTIFICATION_TEMPLATES.map((t) => {
+          catalog.map((t) => {
             const tpl = templates[t.key];
             const Icon = t.icon;
             return (
@@ -672,6 +675,7 @@ const NotificationTemplates = () => {
                     {tpl?.body ? tpl.body.slice(0, 80) + (tpl.body.length > 80 ? "…" : "") : <span className="italic text-ink/45">Sin personalizar (usa plantilla por defecto)</span>}
                   </p>
                 </div>
+                <Switch aria-label={`Envío automático: ${t.label}`} checked={tpl?.enabled!==false} onCheckedChange={async(enabled)=>{try{await api.put("/admin/whatsapp-templates",{templates:{[t.key]:{...tpl,enabled}}});qc.invalidateQueries({queryKey:["settings","notification_templates"]});}catch{toast({title:"No se pudo guardar",variant:"destructive"});}}} />
                 <Button size="icon" variant="ghost" className="shrink-0" onClick={() => openEdit(t.key)} aria-label={`Editar plantilla ${t.label}`}>
                   <Pencil size={13} />
                 </Button>

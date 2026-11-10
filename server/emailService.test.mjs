@@ -9,7 +9,7 @@ for (const k of ["EMAIL_FROM", "SITE_URL", "APP_URL", "RESEND_API_KEY", "STUDIO_
 const mail = await import("./emailService.js");
 
 const DEFAULT_FROM = "HIVE Pilates Studio <noreply@agendafull.com.mx>";
-const LOGO = "https://hivestudio.com.mx/email/hive-mark.png";
+const LOGO = "https://hivestudio.com.mx/api/drive/image/1iW5vQ0pyOGGZvjHjqtNmkDbo9CIb8sT8";
 const FORBIDDEN = [/Alma/, /alma-movement/i, /Move with intention/i, /Juriquilla/i];
 
 const render = (s) => mail[s.render](s.opts);
@@ -47,7 +47,7 @@ for (const s of EMAIL_SAMPLES) {
     assert.equal(msg.subject, s.subject);
     assert.match(msg.html, /HIVE/);
     assert.ok(msg.html.includes(`src="${LOGO}"`), "falta la URL del logo");
-    assert.match(msg.html, /<img src="[^"]+" width="40" height="46" alt="HIVE"/);
+    assert.match(msg.html, /<img src="[^"]+" width="208" height="61" alt="HIVE"/);
     const text = visibleText(msg.html);
     assert.match(text, /MOVIMIENTO · BIENESTAR · COMUNIDAD/);
     assert.ok(text.includes("Cuauhtémoc #68, Del Carmen, Coyoacán, C.P. 04100, CDMX"), "falta la dirección");
@@ -177,12 +177,12 @@ test("los datos del estudio coinciden con src/lib/studio.ts", () => {
   assert.equal(mail.STUDIO.instagram, campo("instagram"));
 });
 
-test("public/email/hive-mark.png: PNG con transparencia a 3× del tamaño en el correo", () => {
+test("public/email/hive-mark.png: isotipo local de respaldo con transparencia", () => {
   const png = fs.readFileSync(new URL("../public/email/hive-mark.png", import.meta.url));
   assert.equal(png.subarray(1, 4).toString("ascii"), "PNG");
   assert.equal(png.subarray(12, 16).toString("ascii"), "IHDR");
-  assert.equal(png.readUInt32BE(16), mail.LOGO_W * 3);
-  assert.equal(png.readUInt32BE(20), mail.LOGO_H * 3);
+  assert.equal(png.readUInt32BE(16), 120);
+  assert.equal(png.readUInt32BE(20), 138);
   assert.equal(png[25], 6, "color RGBA (con canal alfa)");
   assert.ok(fs.existsSync(new URL("../public/email-logo.png", import.meta.url)), "email-logo.png se conserva");
 });

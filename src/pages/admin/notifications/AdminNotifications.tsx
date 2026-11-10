@@ -18,7 +18,7 @@ import {
 
 type Category =
   | "new_user" | "order_pending" | "milestone" | "checkin"
-  | "campaign" | "order_rejected" | "expiring";
+  | "campaign" | "order_rejected" | "expiring" | "booking_created" | "booking_cancelled";
 
 interface Notif {
   id: string;
@@ -31,6 +31,8 @@ interface Notif {
 }
 
 const ICON: Record<Category, React.ReactNode> = {
+  booking_created: <CheckCircle2 size={16} />,
+  booking_cancelled: <XCircle size={16} />,
   new_user: <UserPlus size={16} />,
   order_pending: <ShoppingBag size={16} />,
   milestone: <Trophy size={16} />,
@@ -55,6 +57,8 @@ function formatTime(iso: string): string {
 }
 
 const CATEGORY_LABEL: Record<Category, string> = {
+  booking_created: "Reservas",
+  booking_cancelled: "Cancelaciones",
   new_user: "Nuevas alumnas",
   order_pending: "Órdenes pendientes",
   milestone: "Logros otorgados",

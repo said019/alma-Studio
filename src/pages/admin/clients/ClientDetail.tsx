@@ -1,3 +1,4 @@
+import {BookingMovements} from "@/components/admin/BookingMovements";
 import { ResponsivaDialog } from "@/components/app/ResponsivaDialog";
 import { UserCommunications } from "@/components/admin/UserCommunications";
 import { CreditHistory } from "@/components/admin/CreditHistory";
@@ -704,6 +705,7 @@ const ClientDetail = () => {
 
                 {/* ── Reservas ── */}
                 <TabsContent value="bookings" className="mt-4">
+                  <BookingMovements userId={id!} />
                   {bookingsError ? (
                     <ErrorState title="No pudimos cargar las reservas" onRetry={() => refetchBookings()} />
                   ) : bookingRows.length === 0 ? (

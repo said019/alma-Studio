@@ -4,6 +4,10 @@
 // Extraído de server/index.js para poder probarse por separado
 // (ver server/lib/brandResidue.test.js).
 export const DEFAULT_NOTIFICATION_TEMPLATES = {
+  client_invite: {subject:"Acceso para completar perfil",body:"Hola {firstName}, HIVE te invita a completar tu perfil y crear tu contraseña: {link} El enlace es personal y vence en 72 horas."},
+  admin_booking_cancelled: {subject:"Reserva cancelada · administración",body:"{clientName} canceló {class} del {date} a las {time}."},
+  booking_waitlisted: {subject:"Lista de espera",body:"{firstName}, estás en lista de espera para {class} el {date} a las {time}. Te avisaremos si se libera un lugar."},
+  waitlist_promoted: {subject:"Lugar confirmado",body:"{firstName}, se liberó tu lugar en {class} el {date} a las {time}. Tu reserva está confirmada."},
   // ── Onboarding y cuenta ─────────────────────────────────────────
   welcome: {
     subject: "Bienvenida a HIVE",

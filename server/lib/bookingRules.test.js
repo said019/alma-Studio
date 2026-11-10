@@ -32,7 +32,7 @@ test("ventana matutina: permite <=10am, bloquea tarde (hora Mexico City)", () =>
 });
 test("categoryLabel para mensajes", () => {
   assert.equal(categoryLabel("studio"), "Studio");
-  assert.equal(categoryLabel("reformer_tower"), "Reformer/Tower");
+  assert.equal(categoryLabel("reformer_tower"), "Pilates Reformer");
 });
 test("mixto: bucket por categoría de clase", () => {
   assert.equal(mixtoBucketField("studio"), "studio_remaining");

@@ -301,8 +301,8 @@ const Checkout = () => {
   const stepperCurrent: Step =
     step === "bank" || step === "cash" || step === "card" || step === "external-card" ? "method" : step;
   const recurringPlan = Boolean(selectedPlan?.rules?.auto_renew);
-  const resolvedPaymentUrl = selectedPlan && Object.hasOwn(selectedPlan, "paymentUrl") ? selectedPlan.paymentUrl
-    : selectedPlan && Object.hasOwn(selectedPlan, "payment_url") ? selectedPlan.payment_url
+  const resolvedPaymentUrl = selectedPlan && Object.prototype.hasOwnProperty.call(selectedPlan, "paymentUrl") ? selectedPlan.paymentUrl
+    : selectedPlan && Object.prototype.hasOwnProperty.call(selectedPlan, "payment_url") ? selectedPlan.payment_url
     : (selectedPlan?.rules?.promotion_mode ?? "studio") === "studio"
       ? (selectedPlan?.openingActive ?? selectedPlan?.opening_active) ? selectedPlan?.rules?.opening_payment_url : selectedPlan?.rules?.payment_url
       : selectedEffective === Number(selectedPlan?.price) ? selectedPlan?.rules?.payment_url : selectedPlan?.rules?.promotion_payment_url;

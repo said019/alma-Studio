@@ -1,0 +1,7 @@
+import {useQuery} from '@tanstack/react-query';
+import api from '@/lib/api';
+const labels:Record<string,string>={confirmed:'Confirmada',cancelled:'Cancelada',checked_in:'Asistencia',no_show:'Falta',waitlist:'En espera'};
+export function BookingMovements({userId}:{userId:string}) {
+ const {data,isError,isLoading}=useQuery({queryKey:['booking-movements',userId],queryFn:async()=>(await api.get(`/admin/users/${userId}/booking-movements`)).data.data});
+ return <section className="mb-5 rounded-xl border border-line bg-surface p-4"><h3 className="font-bold">Movimientos de reservas</h3><p className="mt-1 text-xs text-ink-muted">Altas, cancelaciones, cambios de clase y asistencia registrados desde la activación de este historial.</p>{isLoading?<p>Cargando…</p>:isError?<p role="alert">No se pudieron cargar los movimientos.</p>:!data?.length?<p className="mt-3 text-sm">Sin movimientos registrados todavía.</p>:<ul className="mt-3 divide-y divide-line">{data.map((m:any)=><li key={m.id} className="py-3 text-sm"><p className="font-semibold">{m.event_type==='class_updated'?'Horario o coach modificado':m.previous_class_id&&m.previous_class_id!==m.class_id?'Cambio de clase':m.previous_status?`${labels[m.previous_status]||m.previous_status} → ${labels[m.status]||m.status}`:`Reserva creada · ${labels[m.status]||m.status}`}</p><p>{m.class_name} · {String(m.class_date).slice(0,10)} · {String(m.start_time).slice(0,5)}</p><p className="text-xs text-ink-muted">{new Date(m.happened_at).toLocaleString('es-MX',{timeZone:'America/Mexico_City'})}</p></li>)}</ul>}</section>;
+}

@@ -115,8 +115,8 @@ test("una reserva que entra a la fila no manda la plantilla de reserva confirmad
   const fila = bookingNotice({ ...base, status: "waitlist" });
   assert.notEqual(fila.templateKey, "booking_confirmed");
   assert.equal(fila.templateKey, WAITLIST_JOINED_TEMPLATE_KEY);
-  assert.equal(Object.hasOwn(DEFAULT_NOTIFICATION_TEMPLATES, WAITLIST_JOINED_TEMPLATE_KEY), false,
-    "sin plantilla por defecto: sale el texto de respaldo");
+  assert.equal(Object.hasOwn(DEFAULT_NOTIFICATION_TEMPLATES, WAITLIST_JOINED_TEMPLATE_KEY), true,
+    "la plantilla de lista de espera se puede editar y desactivar");
   assert.equal(fila.fallbackMessage, `Hola Ana, quedaste en lista de espera para Reformer (30/9/2026 07:00). ${waitlistJoinRule(2)}`);
   assert.doesNotMatch(fila.fallbackMessage, /confirmada/);
 

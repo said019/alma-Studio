@@ -1,3 +1,4 @@
+import {internationalPhone,phoneCountries} from "@/lib/internationalPhone";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { RESPONSIVA_PDF_URL } from "@/components/app/responsivaContent";
@@ -75,6 +76,7 @@ export const VisitAssignDialog = ({ classId, open, onOpenChange, onSuccess }: Pr
 
   // Form
   const [phone, setPhone] = useState("");
+  const [country,setCountry] = useState("MX");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [hasInjury, setHasInjury] = useState(false);
@@ -115,11 +117,11 @@ export const VisitAssignDialog = ({ classId, open, onOpenChange, onSuccess }: Pr
     enabled: open,
   });
   const visitPlans: VisitPlan[] = (Array.isArray(plansData?.data) ? plansData.data : [])
-    .filter((p: any) => p.is_visit_pack === true || p.isVisitPack === true)
+    .filter((p: any) => p.is_active !== false && p.isActive !== false)
     .map((p: any) => ({
       id: p.id,
       name: p.name,
-      price: Number(p.price ?? 0),
+      price: Number(p.effectivePrice ?? p.effective_price ?? p.price ?? 0),
       classLimit: p.class_limit ?? p.classLimit ?? null,
     }));
 
@@ -168,7 +170,7 @@ export const VisitAssignDialog = ({ classId, open, onOpenChange, onSuccess }: Pr
       const body: any = {
         profile: {
           name,
-          phone,
+          phone: internationalPhone(phone,country),
           email: email || undefined,
           hasInjury,
           injuryDetails: hasInjury ? (injuryDetails || null) : null,
@@ -218,7 +220,7 @@ export const VisitAssignDialog = ({ classId, open, onOpenChange, onSuccess }: Pr
   // Si la invitada tiene su pack o viene con anfitriona, no exigimos planId.
   // Si NO trae nada (sin pack ni anfitriona), se vuelve venta obligatoria.
   const canSubmit =
-    !!name.trim() && !!phone.trim() && waiver &&
+    !!name.trim() && !!internationalPhone(phone,country) &&
     (activeMembership || host ? true : !!planId);
 
   return (
@@ -241,19 +243,21 @@ export const VisitAssignDialog = ({ classId, open, onOpenChange, onSuccess }: Pr
         <div className="space-y-3">
           {/* Teléfono + buscar */}
           <div className="space-y-1">
+            <Label htmlFor="visit-country">País</Label>
+            <select id="visit-country" className="w-full rounded-lg border border-line bg-surface p-3" value={country} onChange={e=>{setCountry(e.target.value);setActiveMembership(null);setFoundGuest(null);}}>{phoneCountries.map(c=><option key={c.code} value={c.code}>{c.name} (+{c.dial})</option>)}</select>
             <Label>Teléfono *</Label>
             <div className="flex gap-2">
               <Input
                 value={phone}
-                onChange={(e) => { setPhone(e.target.value); setSearched(false); }}
+                onChange={(e) => { setPhone(e.target.value); setSearched(false); setActiveMembership(null); setFoundGuest(null); }}
                 placeholder="ej. 4441234567"
                 autoComplete="off"
               />
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => searchMutation.mutate(phone)}
-                disabled={!phone.trim() || searchMutation.isPending}
+                onClick={() => searchMutation.mutate(internationalPhone(phone,country)!)}
+                disabled={!internationalPhone(phone,country) || searchMutation.isPending}
               >
                 {searchMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
               </Button>
@@ -392,7 +396,7 @@ export const VisitAssignDialog = ({ classId, open, onOpenChange, onSuccess }: Pr
 
             <div className="flex items-start justify-between gap-3 border-t border-line pt-3">
               <Label className="text-xs">
-                Confirmo que la visitante leyó y firmó presencialmente el consentimiento informado y la responsiva original de HIVE. El estudio conserva el documento firmado.
+                Opcional: confirmo que la visitante leyó y firmó presencialmente el consentimiento informado y la responsiva original de HIVE. El estudio conserva el documento firmado.
               </Label>
               <Switch aria-label="Responsiva firmada presencialmente" checked={waiver} onCheckedChange={setWaiver} />
             </div>
@@ -409,10 +413,10 @@ export const VisitAssignDialog = ({ classId, open, onOpenChange, onSuccess }: Pr
                 Venta de pack en este momento
               </p>
               <div className="space-y-1">
-                <Label className="text-sm">Plan de visita</Label>
+                <Label className="text-sm">Clase o paquete</Label>
                 <Select value={planId} onValueChange={setPlanId}>
                   <SelectTrigger>
-                    <SelectValue placeholder={visitPlans.length === 0 ? "Sin planes (márcalos en /planes)" : "Seleccionar plan"} />
+                    <SelectValue placeholder={visitPlans.length === 0 ? "Sin planes activos" : "Seleccionar plan"} />
                   </SelectTrigger>
                   <SelectContent>
                     {visitPlans.map((p) => (
@@ -431,7 +435,7 @@ export const VisitAssignDialog = ({ classId, open, onOpenChange, onSuccess }: Pr
                   </p>
                 ) : visitPlans.length === 0 ? (
                   <p className="text-[11px] text-destructive">
-                    Marca al menos un plan como "Paquete de visitas" en <strong>Planes</strong>.
+                    Activa una clase o paquete en <strong>Planes</strong>.
                   </p>
                 ) : null}
               </div>

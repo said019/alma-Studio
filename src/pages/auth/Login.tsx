@@ -1,3 +1,4 @@
+import { internationalPhone, phoneCountries } from "@/lib/internationalPhone";
 import { homePathForRole } from "@/lib/roleRoutes";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -20,7 +21,7 @@ import {
 } from "@/components/auth/AuthShell";
 
 const schema = z.object({
-  email: z.string().email("Email inválido"),
+  email: z.string().trim().min(1, "Escribe tu correo o teléfono"),
   password: z.string().min(1, "Requerido"),
 });
 type FormValues = { email: string; password: string };
@@ -33,12 +34,14 @@ const Login = () => {
 
   // Instalar como app (PWA): el modal con pasos por plataforma. El botón queda
   // siempre visible en móvil para quien quiera instalarla desde el login.
+  const [country, setCountry] = useState("MX");
+  const [identifierError, setIdentifierError] = useState("");
   const [showInstall, setShowInstall] = useState(false);
   const [device] = useState(getDevice);
   const [standalone] = useState(isStandalone);
   const canInstall = device !== "desktop" && !standalone;
 
-  const { register, handleSubmit, formState: { errors } } = useForm<FormValues>({
+  const { register, handleSubmit, watch, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(schema),
   });
 
@@ -62,10 +65,17 @@ const Login = () => {
     }
   }, [isAuthenticated, role, onboardingDone]);
 
+  const identifier = watch("email") || "";
+  const phoneMode = /^[+\d(]/.test(identifier.trim());
   const onSubmit = async (data: FormValues) => {
     clearError();
+    setIdentifierError("");
+    const value = data.email.includes("@") ? data.email.trim() : internationalPhone(data.email, country);
+    if (!value || (data.email.includes("@") && !z.string().email().safeParse(value).success)) {
+      setIdentifierError("Escribe un correo válido o selecciona el país e ingresa tu teléfono."); return;
+    }
     try {
-      await login(data);
+      await login({...data, email:value});
       const { user: authedUser } = useAuthStore.getState();
       const returnUrl = safeReturnUrl(params.get("returnUrl"), ["/app", "/admin", "/staff"]);
       if (returnUrl) { navigate(returnUrl, { replace: true }); return; }
@@ -97,15 +107,19 @@ const Login = () => {
 
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-5">
           <AuthField
-            label="Email"
-            type="email"
-            inputMode="email"
-            autoComplete="email"
-            placeholder="tu@email.com"
-            error={errors.email?.message}
+            label="Correo o número de WhatsApp"
+            type="text"
+            autoComplete="username"
+            placeholder="tu@email.com o tu teléfono"
+            error={identifierError || errors.email?.message}
             {...register("email")}
           />
 
+          {phoneMode && <label className="text-sm">País del teléfono
+            <select aria-label="País del teléfono" className="mt-2 w-full rounded-xl border border-border bg-background p-3" value={country} onChange={e=>setCountry(e.target.value)}>
+              {phoneCountries.map(c=><option key={c.code} value={c.code}>{c.name} (+{c.dial})</option>)}
+            </select>
+          </label>}
           <AuthPasswordField
             label="Contraseña"
             autoComplete="current-password"

@@ -44,18 +44,16 @@ describe("Personas · Usuarios", () => {
     expect(screen.getByText((_, el) => el?.textContent === "2 usuarios registrados")).toBeInTheDocument();
   });
 
-  it("el alta manual crea la cuenta y solicita firma antes de ofrecer una venta", async () => {
-    mockApi.post.mockResolvedValueOnce({ data: { data: { user: CAMILA } } });
-    renderAdmin(<ClientsList />, { route: "/admin/clients" });
-    fireEvent.click(screen.getByRole("button", { name: /Nuevo usuario/ }));
-    fireEvent.change(screen.getByPlaceholderText("Ana García"), { target: { value: "Camila Torres" } });
-    fireEvent.change(screen.getByPlaceholderText("ana@email.com"), { target: { value: "camila@correo.com" } });
-    expect(screen.queryByText("Membresía (opcional)")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Registrar y solicitar firma" }));
-    await waitFor(() => expect(mockApi.post).toHaveBeenCalledWith("/admin/clients/manual", expect.objectContaining({ displayName: "Camila Torres" })));
-    expect(mockApi.post.mock.calls[0][1]).not.toHaveProperty("planId");
-    expect(await screen.findByText("HIVE Pilates Studio — Carta de Consentimiento Informado y Responsiva")).toBeInTheDocument();
-    expect(screen.getByLabelText("Nombre completo *")).toHaveValue("Camila Torres");
+  it("registra por nombre y teléfono internacional sin exigir correo ni consentimiento", async () => {
+    mockApi.post.mockResolvedValueOnce({data:{data:{delivery:"manual",link:"https://hive.invalid/invite",shareUrl:"https://wa.me/525512345678"}}});
+    renderAdmin(<ClientsList />, {route:"/admin/clients"});
+    fireEvent.click(screen.getByRole("button",{name:/Nuevo usuario/}));
+    fireEvent.change(screen.getByLabelText("Nombre completo"),{target:{value:"Camila Torres"}});
+    fireEvent.change(screen.getByLabelText("Teléfono con WhatsApp"),{target:{value:"5512345678"}});
+    expect(screen.getByLabelText("País")).toHaveValue("MX");
+    fireEvent.click(screen.getByRole("button",{name:"Registrar y enviar acceso"}));
+    await waitFor(()=>expect(mockApi.post).toHaveBeenCalledWith("/admin/clients/invite",{displayName:"Camila Torres",phone:"+525512345678"}));
+    expect(await screen.findByText(/Completará su perfil/)).toBeInTheDocument();
   });
 
   it("muestra también una cuenta administradora en Usuarios", async () => {

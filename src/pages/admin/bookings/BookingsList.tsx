@@ -184,6 +184,8 @@ export const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: strin
   const [visitOpen, setVisitOpen] = useState(false);
   const [saleOpen, setSaleOpen] = useState(false);
   const [saleBusy, setSaleBusy] = useState(false);
+  const [saleUser, setSaleUser] = useState<ClientOption | undefined>();
+  const [noCreditsUser, setNoCreditsUser] = useState<ClientOption | null>(null);
   const [memberSearch, setMemberSearch] = useState("");
   const debouncedMemberSearch = useDebounce(memberSearch, 250);
 
@@ -384,6 +386,9 @@ export const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: strin
         setWaiverBlocked(true);
         return;
       }
+      if (e?.response?.data?.code === "NO_ELIGIBLE_MEMBERSHIP") {
+        setNoCreditsUser(userOptions.find(u => u.id === assignMutation.variables?.userId) ?? null);
+      }
       toast({ title: e?.response?.data?.message ?? "Error al asignar reserva", variant: "destructive" });
     },
   });
@@ -455,7 +460,7 @@ export const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: strin
       <Dialog open={saleOpen} onOpenChange={(open) => { if (!saleBusy) setSaleOpen(open); }}>
         <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-5xl" onInteractOutside={(e) => e.preventDefault()}>
           <DialogHeader><DialogTitle>Vender paquete e inscribir en esta clase</DialogTitle></DialogHeader>
-          {canManageFinance && <CashAssignment classId={classId} onBusyChange={setSaleBusy} onBooked={() => setSaleOpen(false)} />}
+          {canManageFinance && <CashAssignment initialUser={saleUser} classId={classId} onBusyChange={setSaleBusy} onBooked={() => setSaleOpen(false)} />}
         </DialogContent>
       </Dialog>
       <Panel aria-label="Lista de la clase" className="overflow-hidden">
@@ -475,7 +480,7 @@ export const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: strin
                 <UserPlus size={16} aria-hidden="true" />
                 Asignar socia
               </Button>
-              {canManageFinance && <Button variant="outline" onClick={() => setSaleOpen(true)}>Vender paquete e inscribir</Button>}
+              {canManageFinance && <Button variant="outline" onClick={() => { setSaleUser(undefined); setSaleOpen(true); }}>Vender paquete e inscribir</Button>}
               {FEATURES.visits && (
                 <Button variant="outline" onClick={() => setVisitOpen(true)}>Asignar visitante</Button>
               )}
@@ -625,6 +630,10 @@ export const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: strin
               </div>
             )}
 
+            {canManageFinance && noCreditsUser && <div className="space-y-2 rounded-xl border border-line p-3">
+              <p>{noCreditsUser.displayName} no tiene un paquete disponible para esta clase.</p>
+              <Button onClick={() => { setSaleUser(noCreditsUser); setNoCreditsUser(null); setAssignOpen(false); setSaleOpen(true); }}>Vender clase o paquete e inscribir</Button>
+            </div>}
             {/* Paso 1: elegir socia */}
             {(!assignWithGuest || !selectedMember) && (
               <div className="space-y-3">
@@ -650,6 +659,7 @@ export const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: strin
                         disabled={assignMutation.isPending}
                         onClick={() => {
                           resetWaiverState();
+                          setNoCreditsUser(null);
                           if (assignWithGuest) {
                             setSelectedMember(u);
                           } else {
@@ -890,7 +900,7 @@ export const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: strin
                         : undefined,
                     })}
                     disabled={
-                      !agGuestName.trim() || !agGuestPhone.trim() || !agGuestWaiver ||
+                      !agGuestName.trim() || !agGuestPhone.trim() ||
                       (guestChargeMode === "guest_sale" && !guestSalePlanId) ||
                       assignMutation.isPending
                     }

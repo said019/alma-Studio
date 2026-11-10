@@ -1,3 +1,4 @@
+import {ManualSeats} from "@/components/admin/ManualSeats";
 import { ClassRoster } from "../bookings/BookingsList";
 import { QuickClientInvite } from "@/components/admin/QuickClientInvite";
 import { ClassOperations } from "@/components/admin/ClassOperations";
@@ -206,6 +207,7 @@ function CalendarView({
     },
   });
   const classes = Array.isArray(classesQuery.data?.data) ? classesQuery.data.data : [];
+  useEffect(()=>{setSelectedClass(current=>current ? classesQuery.data?.data.find(c=>c.id===current.id)??current : null);},[classesQuery.data]);
   const isLoadingClasses = classesQuery.isLoading;
 
   const form = useForm<ClassFormData>({ resolver: zodResolver(classSchema) });
@@ -785,6 +787,7 @@ function CalendarView({
                   </div>
                 );
               })()}
+              {!selectedClass.isCancelled && !selectedClass.isClosed && <ManualSeats classId={selectedClass.id} />}
               {selectedClass.notes && <div><span className="font-medium">Notas:</span> {selectedClass.notes}</div>}
 
               {/* ── Inscritas (vista rápida; la gestión vive en Reservas) ── */}
@@ -837,8 +840,15 @@ function CalendarView({
                           return (
                             <li key={r.bookingId ?? r.booking_id ?? i} className="flex items-center justify-between gap-3 rounded-xl border border-line bg-canvas px-4 py-3">
                               <div className="min-w-0">
-                                <p className="truncate text-sm font-medium text-ink">{name}</p>
-                                {planLabel && <p className="truncate text-[11px] text-ink/55">{planLabel}</p>}
+                                <p className="break-words text-sm font-medium text-ink">{name}</p>
+                                {planLabel && <p className="text-xs text-ink/65">{planLabel}</p>}
+                                <div className="my-1 flex flex-wrap gap-1">
+                                  {r.firstVisit && <span className="rounded-md bg-sunken px-2 py-1 text-xs">Primera visita</span>}
+                                  {r.hasInjury && <span className="rounded-md bg-red-50 px-2 py-1 text-xs text-red-800">Lesión: {r.injuryDetails || r.healthNotes || "Consultar con recepción"}</span>}
+                                </div>
+                                {(r as any).phone && <p className="break-words text-xs text-ink/65">{(r as any).phone}</p>}
+                                {(r as any).classesRemaining != null && <p className="text-xs text-ink/65">{(r as any).classesRemaining} clases restantes</p>}
+                                {(r as any).userId && <Link className="text-xs underline" to={`/admin/clients/${(r as any).userId}`}>Ver perfil e historial</Link>}
                               </div>
                               <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${statusClr}`}>
                                 {statusLabel}
