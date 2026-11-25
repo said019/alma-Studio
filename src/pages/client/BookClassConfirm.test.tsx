@@ -57,6 +57,12 @@ beforeEach(() => {
 });
 
 describe("Detalle de clase · política y fila (P0-4 · P1-1)", () => {
+  it("muestra foto y biografía de la coach antes de reservar", async () => {
+    montar({ ...CLASE, instructor_photo: "/api/drive/image/coach", instructor_bio: "Especialista en Pilates Reformer." });
+    expect(await screen.findByText("Especialista en Pilates Reformer.")).toBeVisible();
+    expect(screen.getByRole("img", { name: "Foto de Ana" })).toHaveAttribute("src", "/api/drive/image/coach");
+  });
+
   it("las reglas son las de la política configurada, iguales a /legal/cancelacion, y dice cuántas le quedan", async () => {
     montar();
     const reglas = await screen.findByRole("list", { name: "Reglas de cancelación" });

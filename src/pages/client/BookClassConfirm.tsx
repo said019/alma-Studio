@@ -16,7 +16,6 @@ import {
   ErrorState,
 } from "@/components/app/AppShell";
 import { BackLink, StatusPill, StickyCta } from "@/components/app/widgets";
-import { HexPedestal } from "@/components/brand/HexPedestal";
 import { useToast } from "@/hooks/use-toast";
 import { ResponsivaDialog } from "@/components/app/ResponsivaDialog";
 import { cancellationRules, cancellationsLeftText, horasTexto, useBookingPolicy, waitlistRule } from "@/lib/booking-policy";
@@ -173,9 +172,22 @@ const BookClassConfirm = () => {
           />
         ) : cls ? (
           <>
-            <div className="flex justify-center py-2">
-              <HexPedestal size="lg" />
-            </div>
+            {(cls.instructor_photo || cls.instructor_bio?.trim()) && (
+              <Section title="Tu coach">
+                <div className="flex items-start gap-4">
+                  {cls.instructor_photo && (
+                    <img src={cls.instructor_photo} alt={`Foto de ${cls.instructor_name || "tu coach"}`}
+                      className="h-16 w-16 shrink-0 rounded-full object-cover" />
+                  )}
+                  <div className="min-w-0">
+                    <p className="font-semibold text-ink">{cls.instructor_name}</p>
+                    {cls.instructor_bio?.trim() && (
+                      <p className="mt-1 whitespace-pre-line break-words text-sm leading-relaxed text-ink-muted">{cls.instructor_bio}</p>
+                    )}
+                  </div>
+                </div>
+              </Section>
+            )}
 
             <Section title="Al confirmar">
               {membershipLoading ? (
