@@ -53,6 +53,24 @@ describe("Reservas · Semana", () => {
     expect(screen.getByRole("region", { name: "Clases de la semana" })).toBeInTheDocument();
   });
 
+  it("gestiona la reserva de TotalPass por su canal y deja la validación de asistencia a la app de TotalPass", async () => {
+    routeApi(mockApi, {
+      "/classes?start=": semana,
+      "/classes/c11/roster": roster([{ ...r("tp1", "confirmed", "Ana López"), channel: "totalpass" }])
+    });
+    const confirm = vi.spyOn(window, "confirm").mockReturnValueOnce(false).mockReturnValueOnce(true);
+    try {
+      vi.mocked(api.post).mockResolvedValue({data:{message:"Cancelación confirmada"}});
+      renderAdmin(<BookingsList />, {route:"/admin/bookings?clase=c11",path:"/admin/bookings"});
+      const cancel = await screen.findByRole("button", {name:"Cancelar en TotalPass"});
+      expect(screen.queryByRole("button",{name:"Check-in de Ana López"})).toBeNull();
+      fireEvent.click(cancel);
+      expect(api.post).not.toHaveBeenCalledWith("/admin/partner-bookings/tp1/action",{action:"cancel"});
+      fireEvent.click(cancel);
+      await waitFor(()=>expect(api.post).toHaveBeenCalledWith("/admin/partner-bookings/tp1/action",{action:"cancel"}));
+    } finally { confirm.mockRestore(); }
+  });
+
   it("una reserva en lista de espera no ofrece Check-in: la regla del servidor la rechaza", async () => {
     renderAdmin(<BookingsList />, { route: "/admin/bookings?clase=c11", path: "/admin/bookings" });
     const lista = await screen.findByRole("region", { name: "Lista de la clase" });

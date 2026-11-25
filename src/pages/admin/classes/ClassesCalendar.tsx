@@ -82,6 +82,7 @@ type RosterEntry = {
   booking_id?: string;
   displayName?: string;
   display_name?: string;
+  channel?: string;
   guestName?: string;
   guest_name?: string;
 };
@@ -417,8 +418,8 @@ function CalendarView({
       title: "¿Cancelar esta clase?",
       description:
         occupied > 0
-          ? `Hay ${occupied} ${occupied === 1 ? "reserva activa" : "reservas activas"}. La clase quedará cancelada y habrá que avisar a los usuarios inscritos.`
-          : "La clase quedará cancelada y dejará de aceptar reservas.",
+          ? `Hay ${occupied} ${occupied === 1 ? "reserva activa" : "reservas activas"}. La clase quedará cancelada y la sincronización solicitará también la cancelación en TotalPass si está publicada.`
+          : "La clase quedará cancelada. Si está publicada en TotalPass, se solicitará también su cancelación.",
       confirmLabel: "Cancelar clase",
       destructive: true,
     });
@@ -824,7 +825,7 @@ function CalendarView({
                         {roster.map((r, i) => {
                           const isWalkIn = !r.userId && !r.user_id;
                           const name = r.displayName ?? r.display_name ?? r.guestName ?? r.guest_name ?? "Sin nombre";
-                          const planLabel = isWalkIn ? "Walk-in" : (r.planName ?? r.plan_name ?? "");
+                          const planLabel = r.channel === "totalpass" ? "TotalPass" : isWalkIn ? "Walk-in" : (r.planName ?? r.plan_name ?? "");
                           const status = r.status;
                           const statusLabel =
                             status === "confirmed" ? "Confirmada"

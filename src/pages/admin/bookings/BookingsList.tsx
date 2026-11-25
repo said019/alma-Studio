@@ -1,3 +1,4 @@
+import { TotalPassBookingActions } from "./TotalPassBookingActions";
 import { CashAssignment } from "../payments/PaymentsPage";
 import { ClassOperations } from "@/components/admin/ClassOperations";
 import { useCanSeeFinance } from "@/lib/roles";
@@ -42,6 +43,8 @@ import ReservasTabs from "./ReservasTabs";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 interface RosterEntry {
+  channel?: string;
+  guestName?: string;
   bookingId: string;
   status: string;
   checkedInAt: string | null;
@@ -432,7 +435,7 @@ export const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: strin
     if (reason === null) return;
     const ok = await confirm({
       title: "¿Cancelar la clase completa?",
-      description: `Se cancela${total === 1 ? "" : "n"} ${total} reserva${total === 1 ? "" : "s"}, se devuelve${confirmed === 1 ? "" : "n"} ${confirmed} crédito${confirmed === 1 ? "" : "s"} y se avisa por WhatsApp a cada alumna.`,
+      description: `Se cancelarán las reservas de esta clase (${total}). Los créditos se devuelven a quienes reservaron con paquete. Si la clase está publicada en TotalPass, se solicitará también su cancelación.`,
       destructive: true,
       confirmLabel: "Cancelar clase",
       cancelLabel: "Volver",
@@ -521,7 +524,9 @@ export const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: strin
               const canNoShow = entry.status === "confirmed";
               const canCancel = entry.status === "confirmed" || entry.status === "waitlist";
               const unlimited = entry.classesRemaining == null || entry.classesRemaining >= 9999;
-              const plan = entry.planName
+              const totalPass = entry.channel === "totalpass";
+              const displayName = entry.displayName || entry.guestName || "Visitante";
+              const plan = totalPass ? "TotalPass" : entry.planName
                 ? `${entry.planName} · ${unlimited ? "Ilimitado" : `${entry.classesRemaining} ${entry.classesRemaining === 1 ? "restante" : "restantes"}`}`
                 : "Sin plan";
               return (
@@ -529,15 +534,19 @@ export const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: strin
                   {entry.status === "checked_in" ? (
                     <span aria-hidden="true" className="grid h-10 w-10 place-items-center rounded-full bg-success text-canvas"><Check size={18} /></span>
                   ) : (
-                    <Avatar name={entry.displayName} size={40} />
+                    <Avatar name={displayName} size={40} />
                   )}
                   <span className="min-w-0 leading-snug">
-                    <span className="block break-words text-sm font-extrabold">{entry.displayName}</span>
+                    <span className="block break-words text-sm font-extrabold">{displayName}</span>
                     <HealthBadges hasInjury={entry.hasInjury} injuryDetails={entry.injuryDetails} healthNotes={entry.healthNotes} firstVisit={entry.firstVisit} />
                     <span className="block break-words text-xs text-ink-muted">{[plan, entry.phone].filter(Boolean).join(" · ")}</span>
                   </span>
                   <span className="col-start-2"><RosterStatus status={entry.status} /></span>
                   <span className="col-span-2 flex flex-wrap items-center gap-2 pt-2 [&>button]:rounded-xl">
+                    {totalPass ? <TotalPassBookingActions bookingId={entry.bookingId} name={displayName} status={entry.status} onChanged={() => {
+                      void qc.invalidateQueries({queryKey:["roster",classId]});
+                      invalidateWeek();
+                    }} /> : <>
                     {canManageFinance && entry.status === "checked_in" && <ClassOperations bookingId={entry.bookingId} />}
                     {canCheckin && (
                       <Button variant="outline" aria-label={`Check-in de ${entry.displayName}`} onClick={() => checkinMutation.mutate(entry.bookingId)} disabled={checkinMutation.isPending}>
@@ -561,6 +570,7 @@ export const ClassRoster = ({ classId, onBack, onClassLoaded }: { classId: strin
                         </DropdownMenuContent>
                       </DropdownMenu>
                     )}
+                    </>}
                   </span>
                 </li>
               );

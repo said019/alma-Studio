@@ -1,3 +1,4 @@
+import TotalPassSettings from "./TotalPassSettings";
 import {isEssentialNotification} from "@/lib/essentialNotifications.js";
 import { StripeStatus } from "@/components/admin/StripeStatus";
 import { useState, useEffect, useRef } from "react";
@@ -1031,6 +1032,7 @@ const SETTINGS_TABS = [
   { value: "notifications", label: "Notificaciones", icon: Bell },
   { value: "policies", label: "Políticas", icon: FileText },
   { value: "whatsapp", label: "WhatsApp", icon: MessageCircle },
+  { value: "totalpass", label: "TotalPass", icon: Store },
   { value: "security", label: "Seguridad", icon: Shield },
 ] as const;
 
@@ -1039,7 +1041,7 @@ const SettingsPage = () => {
   // /admin/bank-info es ownerMiddleware y a recepción le sale un falso
   // "revisa tu conexión". Un ?tab=payments escrito a mano cae a General.
   const canSeeFinance = useCanSeeFinance();
-  const visibleTabs = SETTINGS_TABS.filter((t) => t.value !== "payments" || canSeeFinance);
+  const visibleTabs = SETTINGS_TABS.filter((t) => !["payments", "totalpass"].includes(t.value) || canSeeFinance);
   const [tabParam, setTab] = useSearchParamState("tab");
   const tab = visibleTabs.some((t) => t.value === tabParam) ? tabParam! : "general";
   return (
@@ -1103,6 +1105,7 @@ const SettingsPage = () => {
                 <WhatsAppSettings />
               </TabsContent>
 
+              <TabsContent value="totalpass"><TotalPassSettings /></TabsContent>
               <TabsContent value="security">
                 <div className="max-w-md">
                   <h2 className="text-lg font-semibold text-ink mb-1">Cambiar mi contraseña</h2>
