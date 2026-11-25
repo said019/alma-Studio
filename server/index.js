@@ -1,3 +1,4 @@
+import {registerHiveTotalPass} from "./totalpass/install.mjs";
 import {shouldRetryWhatsApp} from "./lib/whatsappRetry.js";
 import {isEssentialNotification,essentialNotificationSettings} from "../src/lib/essentialNotifications.js";
 import {CALENDAR_OPERATIONS_SCHEMA,registerCalendarOperations} from "./lib/calendarOperations.js";
@@ -2114,13 +2115,13 @@ app.use(createSimpleRateLimiter({
 app.use((req, res, next) => {
   if (req.path.startsWith("/api/drive/upload-chunk/")) return next();
   if (req.path === "/api/stripe/webhook") return next();
-  if (req.path.startsWith("/webhooks/wellhub")) return next();
+  if (req.path.startsWith("/webhooks/wellhub") || req.path.startsWith("/webhooks/totalpass/checkin/")) return next();
   express.json({ limit: "20mb" })(req, res, next);
 });
 app.use((req, res, next) => {
   if (req.path.startsWith("/api/drive/upload-chunk/")) return next();
   if (req.path === "/api/stripe/webhook") return next();
-  if (req.path.startsWith("/webhooks/wellhub")) return next();
+  if (req.path.startsWith("/webhooks/wellhub") || req.path.startsWith("/webhooks/totalpass/checkin/")) return next();
   express.urlencoded({ extended: true, limit: "20mb" })(req, res, next);
 });
 
@@ -3333,6 +3334,11 @@ function adminMiddleware(req, res, next) {
 function ownerMiddleware(req, res, next) {
   return roleGuard(OWNER_ROLES)(req, res, next);
 }
+
+const startHiveTotalPass = registerHiveTotalPass(app, {
+  pool, ownerMiddleware, adminMiddleware, authMiddleware, getBookingPolicy, jwtSecret: JWT_SECRET,
+  limiter: createSimpleRateLimiter({windowMs: 60_000, max: 120, keyPrefix: "totalpass-checkin", shouldApply: () => true}),
+});
 
 registerPaymentNoticeRoute(app, { authMiddleware, pool });
 
@@ -5657,7 +5663,8 @@ app.get("/api/admin/notifications", adminMiddleware, async (req, res) => {
           ORDER BY m.end_date ASC LIMIT 15`,
       ),
       pool.query(
-        `SELECT bm.*, u.display_name AS user_name FROM booking_movements bm
+        `SELECT bm.*, COALESCE(u.display_name, b.guest_name) AS user_name FROM booking_movements bm
+         LEFT JOIN bookings b ON b.id=bm.booking_id
          LEFT JOIN users u ON u.id=bm.user_id
          WHERE bm.happened_at > $1 AND bm.status IN ('confirmed','cancelled','waitlist')
          ORDER BY bm.happened_at DESC,bm.id DESC LIMIT 100`, [cutoff30]),
@@ -5670,7 +5677,7 @@ app.get("/api/admin/notifications", adminMiddleware, async (req, res) => {
         title: r.status === "cancelled" ? "Reserva cancelada" : r.event_type === "class_updated" || (r.previous_class_id && r.previous_class_id !== r.class_id) ? "Reserva modificada" : r.status === "waitlist" ? "Nueva lista de espera" : "Nueva reserva",
         body: `${r.user_name || "Persona"} · ${r.class_name || "Clase"} · ${r.class_date ? new Date(r.class_date).toLocaleDateString("es-MX") : ""} ${String(r.start_time || "").slice(0,5)}`,
         time: r.happened_at,
-        link: `/admin/clients/${r.user_id}`,
+        link: r.user_id ? `/admin/clients/${r.user_id}` : "/admin/bookings",
       })),
       ...users.rows.map((r) => ({
         id: `u_${r.id}`,
@@ -15712,7 +15719,8 @@ app.get("/api/classes/:id/roster", adminMiddleware, async (req, res) => {
   try {
     const r = await pool.query(
       `SELECT b.id AS booking_id, b.status, b.checked_in_at,
-              u.id AS user_id, u.display_name, u.email, u.phone,
+              b.channel,b.partner_provider,b.partner_external_id,b.guest_name,
+              u.id AS user_id, COALESCE(u.display_name,b.guest_name) AS display_name, u.email, u.phone,
               m.plan_id, p.name AS plan_name, m.classes_remaining,
               COALESCE(u.has_injury, false) AS has_injury, u.injury_details, u.health_notes,
               NOT EXISTS (SELECT 1 FROM bookings pb WHERE pb.user_id = b.user_id AND pb.checked_in_at IS NOT NULL AND pb.id <> b.id) AS first_visit
@@ -15722,7 +15730,7 @@ app.get("/api/classes/:id/roster", adminMiddleware, async (req, res) => {
                      AND (w.created_at, w.id) < (b.created_at, b.id)
                 ) END AS waitlist_position
        FROM bookings b
-       JOIN users u ON b.user_id = u.id
+       LEFT JOIN users u ON b.user_id = u.id
        LEFT JOIN memberships m ON b.membership_id = m.id
        LEFT JOIN plans p ON m.plan_id = p.id
        WHERE b.class_id = $1 AND b.status != 'cancelled'
@@ -18486,6 +18494,7 @@ async function bootServer() {
   await ensureSchema();
   // Never serve financial/queued-write routes with a partially applied schema.
   await pool.query(CALENDAR_OPERATIONS_SCHEMA);
+  await startHiveTotalPass();
   await pool.query(REMINDER_CLAIMS_SCHEMA);
   await pool.query('SELECT order_id,preference_id,idempotency_key FROM mp_retired_wallet_attempts LIMIT 0');
   await pool.query(`SELECT mp_payment_choice,mp_wallet_preference_id,paid_at,provider_synced_at,mp_sync_claim,mp_sync_lease_until,

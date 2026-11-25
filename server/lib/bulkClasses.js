@@ -96,6 +96,13 @@ export function registerBulkClasses(app, { pool, adminMiddleware, recordAudit, o
           AND date=ANY($2::date[])`,
       [ids, [...new Set(rows.map(r => r.date))]])).rows : [];
       const result = assessBulkClasses({ ids, rows, changes: { ...changes, ...names }, now, occupied, reserved, otherClasses });
+      if (Object.hasOwn(changes, 'start_time')) {
+        const changedIds = rows.filter(r => String(r.start_time).slice(0,5) !== changes.start_time.slice(0,5)).map(r=>r.id);
+        if (changedIds.length) {
+          const links = await db.query("SELECT class_id FROM partner_class_links WHERE provider='totalpass' AND class_id=ANY($1::uuid[])", [changedIds]);
+          for(const link of links.rows) result.conflicts.push({id:link.class_id,message:'TotalPass no permite reprogramar esta clase publicada. Cancela la clase y crea otra con el nuevo horario.'});
+        }
+      }
       result.data.expectedVersions = expectedVersions;
       if (result.conflicts.length) {
         await db.query('ROLLBACK');

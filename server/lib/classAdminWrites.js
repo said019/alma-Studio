@@ -49,7 +49,7 @@ export function registerClassAdminWrites(app,{pool,adminMiddleware,recordAudit,o
       const result=await handler(db,req);await db.query('COMMIT');committed=true;db.release();db=null;
       if(result.freed){try{result.body.waitlist_promoted=await onSeatReleased([result.freed],{source:'class_edit'});}catch{result.body.warning='Los cambios se guardaron. Revisa la lista de espera.';}}
       return res.status(result.status??200).json(result.body);
-    }catch(error){if(db&&!committed)await db.query('ROLLBACK').catch(()=>{});const busy=['55P03','40P01','40001'].includes(error.code);return res.status(error.status??(busy?409:500)).json({message:error.status?error.message:busy?'Hay otra operación en curso. Intenta de nuevo.':'No se pudo guardar la clase.'});}finally{db?.release();}
+    }catch(error){if(db&&!committed)await db.query('ROLLBACK').catch(()=>{});if(error.constraint==='totalpass_linked_class_time')return res.status(409).json({message:error.message});const busy=['55P03','40P01','40001'].includes(error.code);return res.status(error.status??(busy?409:500)).json({message:error.status?error.message:busy?'Hay otra operación en curso. Intenta de nuevo.':'No se pudo guardar la clase.'});}finally{db?.release();}
   };
   app.post('/api/classes',adminMiddleware,run(async(db,req)=>{
     const v=classWriteValues(req.body??{});await assertClassActor(db,req,v.instructorId);await activeReferences(db,v);
