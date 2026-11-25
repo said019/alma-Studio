@@ -28,11 +28,11 @@ describe("landing de HIVE", () => {
     fireEvent.click(control);
     expect(document.querySelector(".hive-landing")).not.toHaveClass("hive-motion-paused");
   });
-  it("pide sólo horario y paquetes; la oferta editorial no depende de catálogos heredados", async () => {
+  it("muestra horario, coaches y paquetes; la oferta editorial no depende de catálogos heredados", async () => {
     vi.mocked(api.get).mockImplementation(respuestas({
       "/plans": { data: PLANES },
       "/class-types": { data: [{ id: "r", name: "Reformer", durationMin: 50 }] },
-      "/public/instructors": { data: [{ id: "c", displayName: "Ana" }] },
+      "/public/instructors": { data: [{ id: "c", displayName: "Ana", photoUrl: "/foto.jpg", bio: "Coach de Reformer"  }] },
       "/classes": { data: [] },
     }) as never);
     renderPage(<Landing />, "/");
@@ -41,7 +41,9 @@ describe("landing de HIVE", () => {
     for (const id of ["clases", "horario", "paquetes", "contacto"]) expect(document.getElementById(id)).not.toBeNull();
     expect(screen.getAllByRole("link", { name: "Paquetes" }).length).toBeGreaterThan(0);
     expect(vi.mocked(api.get).mock.calls.map(([u]) => String(u).split("?")[0]).sort())
-      .toEqual(["/classes", "/plans"]);
+      .toEqual(["/classes", "/plans", "/public/instructors"]);
+    expect(screen.getByRole("img",{name:"Ana"})).toHaveAttribute("src","/foto.jpg");
+    expect(screen.getByText("Coach de Reformer")).toBeVisible();
   });
   it("sin paquetes activos: no hay sección ni liga de Paquetes", async () => {
     vi.mocked(api.get).mockImplementation(respuestas({ "/plans": { data: [] } }) as never);
@@ -71,7 +73,7 @@ describe("landing de HIVE", () => {
     fireEvent.click(within(document.getElementById("paquetes")!).getByRole("button", { name: "Reintentar" }));
     await waitFor(() => expect(pedidos()).toBe(2));
   });
-  it("no consulta coaches ni muestra sus fotos aunque su servicio falle", async () => {
+  it("oculta el apartado de coaches si su servicio falla", async () => {
     vi.mocked(api.get).mockImplementation(respuestas({
       "/class-types": { data: [{ id: "r", name: "Reformer", durationMin: 50 }] },
       "/public/instructors": new Error("500"),

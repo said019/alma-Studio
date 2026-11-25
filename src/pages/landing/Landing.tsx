@@ -10,7 +10,7 @@ import { Contact } from "@/components/landing/Contact";
 import { LandingFooter } from "@/components/landing/LandingFooter";
 import {
   normalizeClasses, splitPlans, studioClock, weekDays, weekStartFor,
-  type ApiClass, type PlanRow,
+  type ApiClass, type CoachRow, type PlanRow,
 } from "@/components/landing/landingData";
 
 const lista = <T,>(data: unknown): T[] => (Array.isArray(data) ? data : ((data as { data?: T[] })?.data ?? []));
@@ -61,6 +61,11 @@ export default function Landing() {
     queryFn: async () => lista<ApiClass>((await api.get(`/classes?start=${from}&end=${to}`)).data),
     staleTime: 1000 * 60 * 2,
   });
+  const coachesQ = useQuery({
+    queryKey: ["public-instructors"],
+    queryFn: async () => lista<CoachRow>((await api.get("/public/instructors")).data),
+  });
+  const coaches = (coachesQ.data ?? []).filter(coach => coach.photoUrl || coach.bio?.trim());
   const plansQ = useQuery({
     queryKey: ["plans-public"],
     queryFn: async () => lista<PlanRow>((await api.get("/plans?active=true")).data),
@@ -74,6 +79,7 @@ export default function Landing() {
 
   const links = [
     { href: "#clases", label: "Clases" },
+    ...(coaches.length ? [{ href: "#coaches", label: "Coaches" }] : []),
     { href: "#horario", label: "Horario" },
     ...(showPlans ? [{ href: "#paquetes", label: "Paquetes" }] : []),
     { href: "#contacto", label: "Contacto" },
@@ -87,6 +93,19 @@ export default function Landing() {
         <Reveal>
           <ClassesCoaches />
         </Reveal>
+        {coaches.length > 0 && <Reveal>
+          <section id="coaches" aria-labelledby="coaches-title" className="mx-auto max-w-[1120px] scroll-mt-20 px-5 py-16 sm:px-8">
+            <h2 id="coaches-title" className="font-display text-3xl text-ink sm:text-4xl">Coaches</h2>
+            <ul aria-label="Coaches" className="mt-8 grid gap-10">
+              {coaches.map(coach => <li key={coach.id} className="grid items-center gap-6 sm:grid-cols-[minmax(12rem,20rem)_1fr]">
+                {coach.photoUrl && <img loading="lazy" src={coach.photoUrl} alt={coach.displayName} className="aspect-[4/5] w-full rounded-xl object-cover" style={{objectPosition: `${coach.photoFocusX ?? 50}% ${coach.photoFocusY ?? 50}%`}} />}
+                <div><h3 className="font-display text-2xl">{coach.displayName}</h3>
+                  {coach.bio && <p className="mt-3 max-w-prose whitespace-pre-line leading-relaxed text-ink-muted">{coach.bio}</p>}
+                </div>
+              </li>)}
+            </ul>
+          </section>
+        </Reveal>}
         <Reveal>
           <WeekSchedule
             days={days}

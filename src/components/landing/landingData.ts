@@ -167,7 +167,7 @@ export type ClassTypeRow = {
   durationMin?: number | null; durationMinutes?: number | null;
 };
 export type CoachRow = {
-  id: string; displayName: string; specialties?: unknown; photoUrl?: string | null;
+  id: string; displayName: string; bio?: string | null; specialties?: unknown; photoUrl?: string | null;
   /** Encuadre de la foto que fija el panel, 0–100 (50/50 si no hay). */
   photoFocusX?: number | null; photoFocusY?: number | null;
 };
