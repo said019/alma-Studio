@@ -1,3 +1,4 @@
+import { useCanSeeFinance } from "@/lib/roles";
 import { useMutation } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,7 @@ export function TotalPassBookingActions({
   status,
   onChanged,
 }: Props) {
+  const canManage = useCanSeeFinance();
   const { toast } = useToast();
   const mutation = useMutation({
     mutationFn: (action: Action) =>
@@ -48,14 +50,14 @@ export function TotalPassBookingActions({
           El check-in se registra desde la app de TotalPass.
         </span>
       )}
-      <Button
+      {canManage && <Button
         variant="ghost"
         disabled={mutation.isPending}
         onClick={() => confirm("no_show")}
       >
         Registrar falta en HIVE
-      </Button>
-      {status === "confirmed" && (
+      </Button>}
+      {canManage && status === "confirmed" && (
         <Button
           variant="outline"
           disabled={mutation.isPending}

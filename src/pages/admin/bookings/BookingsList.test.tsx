@@ -71,6 +71,18 @@ describe("Reservas · Semana", () => {
     } finally { confirm.mockRestore(); }
   });
 
+  it("recepción puede ver el canal de una reserva sin acciones exclusivas de la administradora", async () => {
+    loginAs("reception");
+    routeApi(mockApi, {
+      "/classes?start=": semana,
+      "/classes/c11/roster": roster([{ ...r("tp1", "confirmed", "Ana López"), channel: "totalpass" }])
+    });
+    renderAdmin(<BookingsList />, {route:"/admin/bookings?clase=c11",path:"/admin/bookings"});
+    expect(await screen.findByText("El check-in se registra desde la app de TotalPass.")).toBeInTheDocument();
+    expect(screen.queryByRole("button",{name:"Cancelar en TotalPass"})).toBeNull();
+    expect(screen.queryByRole("button",{name:"Registrar falta en HIVE"})).toBeNull();
+  });
+
   it("una reserva en lista de espera no ofrece Check-in: la regla del servidor la rechaza", async () => {
     renderAdmin(<BookingsList />, { route: "/admin/bookings?clase=c11", path: "/admin/bookings" });
     const lista = await screen.findByRole("region", { name: "Lista de la clase" });
