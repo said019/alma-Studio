@@ -18,6 +18,7 @@ const base = { days, todayIso: "2026-09-23", loading: false, error: false, onRet
 describe("horario", () => {
   it("tira de 7 días con el de hoy elegido y sus clases", () => {
     renderPage(<WeekSchedule {...base} classes={CLASES} />, "/");
+    expect(screen.getAllByText("Con Ana")).toHaveLength(3);
     const tira = screen.getByRole("group", { name: "Días de la semana" });
     expect(within(tira).getAllByRole("button")).toHaveLength(7);
     const elegido = within(tira).getByRole("button", { pressed: true });

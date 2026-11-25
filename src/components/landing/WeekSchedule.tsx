@@ -97,7 +97,11 @@ export function WeekSchedule({ days, classes, todayIso, loading, error, onRetry 
                     </div>
                     <div className={"min-w-0 " + dim}>
                       <p className="truncate text-[0.9rem] font-bold text-ink">{c.name}</p>
-                      <p className="truncate text-[0.8rem] text-ink-muted">{c.durationMin ? `${c.durationMin} min` : ""}</p>
+                      <div className="my-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.8rem] text-ink-muted">
+                        {c.coachPhoto && <img src={c.coachPhoto} alt="" loading="lazy" className="h-7 w-7 shrink-0 rounded-full object-cover" />}
+                        <span>{c.coach === "Por confirmar" ? "Coach por confirmar" : `Con ${c.coach}`}</span>
+                        {c.durationMin && <span>{c.durationMin} min</span>}
+                      </div>
                       <p className={"text-[0.75rem] font-bold " + (a.full ? "text-ink-muted" : "text-accent")}>{a.label}</p>
                     </div>
                     {c.bookingClosed ? (

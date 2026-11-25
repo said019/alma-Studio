@@ -21,11 +21,11 @@ export function heroCta(user: SessionUser, isAuthenticated: boolean): { to: stri
 /* ── Clases ─────────────────────────────────────────────────────────── */
 export type ApiClass = {
   id: string; date?: string; class_date?: string; start_time?: string; end_time?: string;
-  class_type_name?: string; instructor_name?: string; capacity?: number; max_capacity?: number;
+  class_type_name?: string; instructor_name?: string; instructor_photo?: string | null; capacity?: number; max_capacity?: number;
   current_bookings?: number; status?: string;
 };
 export type LandingClass = {
-  id: string; day: string; start: string; end: string; name: string; coach: string;
+  id: string; day: string; start: string; end: string; name: string; coach: string; coachPhoto?: string;
   durationMin: number | null; capacity: number; remaining: number; bookingClosed?: boolean;
 };
 
@@ -68,7 +68,7 @@ export function normalizeClasses(raw: ApiClass[], now: Date): LandingClass[] {
       const capacity = Math.max(0, c.capacity ?? c.max_capacity ?? 0);
       return {
         id: c.id, day, start, end,
-        name: c.class_type_name!, coach: c.instructor_name || "Por confirmar",
+        name: c.class_type_name!, coach: c.instructor_name?.trim() || "Por confirmar", coachPhoto: c.instructor_photo || undefined,
         durationMin: Number.isFinite(dur) && dur > 0 ? dur : null,
         capacity, remaining: Math.max(0, capacity - (c.current_bookings ?? 0)),
         // Matches the server's fixed booking/waitlist lead time; exactly two hours remains open.
