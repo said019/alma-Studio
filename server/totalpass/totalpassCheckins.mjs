@@ -55,7 +55,7 @@ export function createTotalpassCheckins({pool,secret,request=globalThis.fetch}){
   if(typeof auth?.token!=='string')throw fail('TOTALPASS_AUTH_INVALID');
   const headers={authorization:`Bearer ${auth.token}`,accept:'application/json'};
   const place=await providerCall(BOOKING+'/partner/plans',{headers});
-  if(String(place?.identifier)!==row.config.unitId)throw fail('TOTALPASS_UNIT_MISMATCH',409);
+  if(String(place?.identifier)!==(row.config.bookingUnitId ?? row.config.unitId))throw fail('TOTALPASS_UNIT_MISMATCH',409);
   const url=ORIGIN+checkinPath(secret,row.config.unitId);
   const list=body=>Array.isArray(body)?body:Array.isArray(body?.data)?body.data:body?.webhook?[body.webhook]:body?.webhook_url?[body]:null;
   const before=list(await providerCall(GYM+'/partner/webhook/get',{headers}));
@@ -93,7 +93,7 @@ export function createTotalpassCheckins({pool,secret,request=globalThis.fetch}){
   if(typeof pathKey!=='string'||!(/^[a-f0-9]{64}$/.test(pathKey))||!crypto.timingSafeEqual(Buffer.from(pathKey),Buffer.from(expected)))throw fail('NOT_FOUND',404);
   if(!payload||typeof payload!=='object'||Array.isArray(payload))throw fail('CHECKIN_INVALID',400);
   const unit=payload.place?.identifier??payload.unit_id??payload.unitId;
-  if(unit!=null&&String(unit)!==row.config.unitId)throw fail('TOTALPASS_UNIT_MISMATCH',403);
+  if(unit!=null&&![row.config.unitId,row.config.bookingUnitId].includes(String(unit)))throw fail('TOTALPASS_UNIT_MISMATCH',403);
   const url=confirmationUrl(payload);if(!url)throw fail('CHECKIN_CONFIRMATION_INVALID',400);
   const identity=checkinIdentity(payload);
   const eventHash=hash(row.config.unitId+':'+new URL(url).pathname);

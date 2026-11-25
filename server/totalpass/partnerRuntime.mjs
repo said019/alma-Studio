@@ -54,7 +54,7 @@ export function createPartnerRuntime({pool,secret,getPolicies,adapters={totalpas
       const config=row.config,policies=await getPolicies();
       const today=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Mexico_City',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
       const from=dayOffset(today,-7),to=dayOffset(today,Math.min(config.horizonDays,policies.maxAdvanceDays));
-      const adapter=adapters[provider]({credentials:decryptCredentials(provider,row.credentials_encrypted,secret),unitId:config.unitId,config});
+      const adapter=adapters[provider]({credentials:decryptCredentials(provider,row.credentials_encrypted,secret),unitId:config.bookingUnitId ?? config.unitId,config});
       const catalog=await adapter.catalog({from,to});
       if(!catalog.complete||!Array.isArray(catalog.classes)||!Array.isArray(catalog.bookings))throw Error('PARTNER_CATALOG_INCOMPLETE');
       for(const warning of catalog.issues||[])await problem(`provider:${warning.key}`,warning.code,warning.detail||{});

@@ -15,7 +15,7 @@ export async function testPartnerConnection(provider, credentials, config, reque
     if (!place.ok) throw new Error('TOTALPASS_ACCESS_FAILED');
     const data = await place.json();
     const identifier = data?.identifier ?? data?.place?.identifier;
-    if (String(identifier ?? '') !== config.unitId) throw new Error('TOTALPASS_UNIT_MISMATCH');
+    if (String(identifier ?? '') !== (config.bookingUnitId ?? config.unitId)) throw new Error('TOTALPASS_UNIT_MISMATCH');
     const plans = Array.isArray(data?.Plans) ? data.Plans : data?.plans;
     if (!Array.isArray(plans) || plans.length === 0) throw new Error('TOTALPASS_RESPONSE_INVALID');
     return;

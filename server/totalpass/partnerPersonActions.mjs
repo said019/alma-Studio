@@ -37,7 +37,7 @@ export function createPartnerPersonActions({ pool, secret, adapters = { totalpas
       if (scope === 'provider') {
         const config = (await db.query('SELECT * FROM partner_integration_config WHERE provider=$1', [provider])).rows[0];
         if (config?.connection_status !== 'verified') throw fail('Verifica primero la conexión de la plataforma.');
-        adapter = adapters[provider]({ credentials: decryptCredentials(provider, config.credentials_encrypted, secret), unitId: config.config.unitId, config: config.config });
+        adapter = adapters[provider]({ credentials: decryptCredentials(provider, config.credentials_encrypted, secret), unitId: config.config.bookingUnitId ?? config.config.unitId, config: config.config });
       }
       if (previous && ['pending', 'uncertain'].includes(previous.state)) {
         if (previous.action !== action || scope !== 'provider') throw fail('Hay una acción pendiente de verificar. Revisa la plataforma antes de continuar.');
