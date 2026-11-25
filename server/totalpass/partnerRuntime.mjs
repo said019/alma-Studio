@@ -21,8 +21,16 @@ export function normalizePartnerTitle(value) {
 }
 const dateKey=value=>value instanceof Date?value.toISOString().slice(0,10):String(value).slice(0,10);
 export function matchPartnerClass(remote, locals) {
-  const matching=locals.filter(c=>normalizePartnerTitle(c.title)===normalizePartnerTitle(remote.title)
-    &&dateKey(c.date)===remote.date&&c.time.slice(0,5)===remote.time.slice(0,5));
+  const title = normalizePartnerTitle(remote.title);
+  const legacyCoach = /^clases? ([a-z]+)$/.exec(title)?.[1];
+  const matching = locals.filter(local => {
+    if (dateKey(local.date) !== remote.date || local.time.slice(0,5) !== remote.time.slice(0,5)) return false;
+    if (normalizePartnerTitle(local.title) === title) return true;
+    // HIVE's original TotalPass calendar used the coach's first name as the class title.
+    return legacyCoach && normalizePartnerTitle(local.title) === 'pilates reformer'
+      && normalizePartnerTitle(remote.coach).split(' ')[0] === legacyCoach
+      && normalizePartnerTitle(local.coach).split(' ')[0] === legacyCoach;
+  });
   return matching.length===1?matching[0]:null;
 }
 export function sharedPartnerCapacity({capacity,totalBooked,channelBooked,remoteBooked,maxSpots,buffer,otherHeld=0}) {
@@ -151,6 +159,10 @@ export function createPartnerRuntime({pool,secret,getPolicies,adapters={totalpas
         if(!future(original)&&original.status!=='cancelled')continue;
         if(processedClasses>=maxClasses)break;
         const link=byLocal.get(original.id),remote=link?.external_id?external.get(link.external_id):null;
+        if (!link?.external_id && catalog.classes.some(c => c.date === original.date && c.time === original.time)) {
+          await problem(`class:${original.id}`, 'EXISTING_TIME_REQUIRES_REVIEW', {title:original.title,date:original.date,time:original.time});
+          continue;
+        }
         // Cancellation is acknowledged by a verified delete or a complete
         // catalog confirming absence after local cancellation.
         if(original.status==='cancelled'&&link?.state==='cancelled')continue;
