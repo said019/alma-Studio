@@ -33,6 +33,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight, Plus, CalendarDays, Loader2, ArrowRight } from "lucide-react";
 import { resolveClassColor, classTint, CLASSES_SECTION_TABS } from "./palette";
+import { TotalPassClassQuota } from "./TotalPassClassQuota";
 import { Avatar } from "@/components/admin/PersonCell";
 import WeekHourGrid from "./WeekHourGrid";
 import { FEATURES } from "@/config/features";
@@ -788,6 +789,7 @@ function CalendarView({
                   </div>
                 );
               })()}
+              {isOwner && !selectedClass.isCancelled && !selectedClass.isClosed && <TotalPassClassQuota key={selectedClass.id} classId={selectedClass.id} />}
               {!selectedClass.isCancelled && !selectedClass.isClosed && <ManualSeats classId={selectedClass.id} />}
               {selectedClass.notes && <div><span className="font-medium">Notas:</span> {selectedClass.notes}</div>}
 

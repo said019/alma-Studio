@@ -276,7 +276,22 @@ async function recount(db,classId){await db.query(`UPDATE classes SET current_bo
 export function installPartnerRuntime(app,{pool,adminMiddleware,runtime}) {
   const base='/api/admin/partner-integrations/:provider/runtime';
   const wrap=fn=>async(req,res)=>{try{assertPartner(req.params.provider);await fn(req,res);}catch(e){res.status(e.status||500).json({message:cleanError(e)});}};
-  app.put('/api/admin/classes/:classId/platforms/:provider/quota',adminMiddleware,wrap(async(req,res)=>{
+  const quotaPath = '/api/admin/classes/:classId/platforms/:provider/quota';
+  app.get(quotaPath,adminMiddleware,wrap(async(req,res)=>{
+    const {rows:[state]} = await pool.query(`
+      SELECT COALESCE(q.quota,(p.config->>'maxSpots')::int,0) AS quota,
+             c.max_capacity AS capacity, p.sync_enabled AS syncing,
+             GREATEST(COALESCE(l.remote_booked,0),(SELECT COUNT(*)::int FROM bookings b
+               WHERE b.class_id=c.id AND b.partner_provider=p.provider AND b.status IN ('confirmed','checked_in'))) AS booked,
+             EXISTS (SELECT 1 FROM partner_sync_issues s WHERE s.provider=p.provider AND s.issue_key='class:'||c.id::text
+               AND s.code='EXISTING_TIME_REQUIRES_REVIEW' AND s.resolved_at IS NULL) AS pending
+      FROM classes c JOIN partner_integration_config p ON p.provider=$2 AND p.connection_status='verified'
+      LEFT JOIN partner_class_quotas q ON q.class_id=c.id AND q.provider=p.provider
+      LEFT JOIN partner_class_links l ON l.class_id=c.id AND l.provider=p.provider
+      WHERE c.id=$1`,[req.params.classId,req.params.provider]);
+    res.json({data:state??null});
+  }));
+  app.put(quotaPath,adminMiddleware,wrap(async(req,res)=>{
     const {quota,expectedQuota}=req.body||{};
     if(!Number.isSafeInteger(quota)||quota<0||!Number.isSafeInteger(expectedQuota)||expectedQuota<0)
       return res.status(400).json({message:'Indica un tope entero válido.'});
@@ -288,6 +303,8 @@ export function installPartnerRuntime(app,{pool,adminMiddleware,runtime}) {
       if(!c){await db.query('ROLLBACK');return res.status(404).json({message:'Clase no encontrada.'});}
       const p=(await db.query('SELECT config FROM partner_integration_config WHERE provider=$1',[req.params.provider])).rows[0];
       if(!p||c.status!=='scheduled'||quota>c.max_capacity){await db.query('ROLLBACK');return res.status(409).json({message:'Revisa el estado y el cupo de esta clase.'});}
+      const pending=await db.query("SELECT 1 FROM partner_sync_issues WHERE provider=$1 AND issue_key=$2 AND code='EXISTING_TIME_REQUIRES_REVIEW' AND resolved_at IS NULL",[req.params.provider,`class:${req.params.classId}`]);
+      if(pending.rowCount){await db.query('ROLLBACK');return res.status(409).json({message:'Clase pendiente de vincular.'});}
       const current=(await db.query('SELECT quota FROM partner_class_quotas WHERE class_id=$1 AND provider=$2',[req.params.classId,req.params.provider])).rows[0]?.quota??Number(p.config.maxSpots||0);
       const booked=Number((await db.query(`SELECT GREATEST((SELECT COUNT(*) FROM bookings WHERE class_id=$1 AND partner_provider=$2 AND status IN ('confirmed','checked_in')),COALESCE((SELECT remote_booked FROM partner_class_links WHERE class_id=$1 AND provider=$2),0)) AS n`,[req.params.classId,req.params.provider])).rows[0].n);
       if(current!==expectedQuota||quota<booked){await db.query('ROLLBACK');return res.status(409).json({message:'El cupo cambió o ya tiene reservas. Actualiza la agenda.'});}
