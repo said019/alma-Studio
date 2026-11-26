@@ -30,7 +30,9 @@ export function TotalPassClassQuota({ classId }: { classId: string }) {
   return (
     <section aria-label="Lugares de TotalPass" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-surface px-4 py-3">
       <div>
-        <h3 className="font-semibold">TotalPass</h3>
+        <h3 className="mb-1.5 w-fit rounded-md bg-neutral-950 px-3 py-2">
+          <img src="/partners/totalpass.svg" alt="TotalPass" width="144" height="16" />
+        </h3>
         <p className="text-sm text-ink-muted">Cupo asignado <strong className="nums text-ink">{limit}</strong> · Reservados {data.booked}</p>
         {data.pending ? <p className="text-xs">Clase pendiente de vincular</p> : !data.syncing && <p className="text-xs">Sincronización pausada</p>}
       </div>
