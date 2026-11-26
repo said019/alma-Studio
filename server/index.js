@@ -14446,6 +14446,9 @@ app.put("/api/memberships/:id", adminMiddleware, async (req, res) => {
     // dato sin motivo ni bitácora.
     const n = plan.next;
     const changed = new Set(plan.changes.changed);
+    if (changed.has("start_date") || changed.has("end_date")) {
+      await client.query("SELECT set_config('hive.admin_validity_membership', $1, true)", [before.id]);
+    }
     const val = (key) => (changed.has(key) ? n[key] ?? null : null);
     const r = await client.query(
       `UPDATE memberships SET

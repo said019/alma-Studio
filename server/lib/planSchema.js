@@ -19,7 +19,8 @@ BEGIN
    bought:=COALESCE(bought,(NOW() AT TIME ZONE 'America/Mexico_City')::date);
    NEW.start_date:=bought;
    NEW.end_date:=bought + (COALESCE(p.duration_days,30)-1);
- ELSIF COALESCE((p.rules->>'extendable')::boolean,true)=false AND
+ ELSIF current_setting('hive.admin_validity_membership', true) IS DISTINCT FROM NEW.id::text AND
+   COALESCE((p.rules->>'extendable')::boolean,true)=false AND
    (NEW.start_date IS DISTINCT FROM OLD.start_date OR (OLD.end_date IS NOT NULL AND (NEW.end_date IS NULL OR NEW.end_date>OLD.end_date))) THEN
    RAISE EXCEPTION 'HIVE_PLAN: El paquete no admite prórrogas ni cambios de fecha de compra.';
  END IF;
