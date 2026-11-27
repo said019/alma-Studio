@@ -15722,6 +15722,7 @@ app.get("/api/classes/:id/roster", adminMiddleware, async (req, res) => {
   try {
     const r = await pool.query(
       `SELECT b.id AS booking_id, b.status, b.checked_in_at,
+              COALESCE(b.partner_metadata->>'manual_seat'='true',false) AS manual_seat,
               b.channel,b.partner_provider,b.partner_external_id,b.guest_name,
               u.id AS user_id, COALESCE(u.display_name,b.guest_name) AS display_name, u.email, u.phone,
               m.plan_id, p.name AS plan_name, m.classes_remaining,

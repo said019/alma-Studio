@@ -1,4 +1,4 @@
-import {ManualSeats} from "@/components/admin/ManualSeats";
+import { ManualSeats, ReleaseManualSeat } from "@/components/admin/ManualSeats";
 import { ClassRoster } from "../bookings/BookingsList";
 import { QuickClientInvite } from "@/components/admin/QuickClientInvite";
 import { ClassOperations } from "@/components/admin/ClassOperations";
@@ -790,7 +790,7 @@ function CalendarView({
                 );
               })()}
               {isOwner && !selectedClass.isCancelled && !selectedClass.isClosed && <TotalPassClassQuota key={selectedClass.id} classId={selectedClass.id} />}
-              {!selectedClass.isCancelled && !selectedClass.isClosed && <ManualSeats classId={selectedClass.id} />}
+              {!selectedClass.isCancelled && !selectedClass.isClosed && <ManualSeats key={selectedClass.id} classId={selectedClass.id} />}
               {selectedClass.notes && <div><span className="font-medium">Notas:</span> {selectedClass.notes}</div>}
 
               {/* ── Inscritas (vista rápida; la gestión vive en Reservas) ── */}
@@ -823,7 +823,7 @@ function CalendarView({
                         Sin reservas aún
                       </p>
                     ) : (
-                      <ul className="space-y-1.5">
+                      <ul className="divide-y divide-line border-y border-line">
                         {roster.map((r, i) => {
                           const isWalkIn = !r.userId && !r.user_id;
                           const name = r.displayName ?? r.display_name ?? r.guestName ?? r.guest_name ?? "Sin nombre";
@@ -841,21 +841,24 @@ function CalendarView({
                             : status === "no_show" ? "border-destructive/30 bg-destructive/10 text-destructive"
                             : "border-line bg-sunken/60 text-ink";
                           return (
-                            <li key={r.bookingId ?? r.booking_id ?? i} className="flex items-center justify-between gap-3 rounded-xl border border-line bg-canvas px-4 py-3">
+                            <li key={r.bookingId ?? r.booking_id ?? i} className="flex flex-wrap items-center justify-between gap-2 py-2.5">
                               <div className="min-w-0">
-                                <p className="break-words text-sm font-medium text-ink">{name}</p>
-                                {planLabel && <p className="text-xs text-ink/65">{planLabel}</p>}
+                                <p className="break-words text-sm font-semibold text-ink">{r.userId
+                                  ? <Link className="hover:underline" aria-label={`Ver perfil de ${name}`} to={`/admin/clients/${r.userId}`}>{name}</Link>
+                                  : name}</p>
+                                {r.manualSeat ? <p className="text-xs text-ink-muted">Lugar manual</p> : planLabel && <p className="text-xs text-ink/65">{planLabel}</p>}
                                 <div className="my-1 flex flex-wrap gap-1">
-                                  {r.firstVisit && <span className="rounded-md bg-sunken px-2 py-1 text-xs">Primera visita</span>}
+                                  {!r.manualSeat && r.firstVisit && <span className="rounded-md bg-sunken px-2 py-1 text-xs">Primera visita</span>}
                                   {r.hasInjury && <span className="rounded-md bg-red-50 px-2 py-1 text-xs text-red-800">Lesión: {r.injuryDetails || r.healthNotes || "Consultar con recepción"}</span>}
                                 </div>
                                 {(r as any).phone && <p className="break-words text-xs text-ink/65">{(r as any).phone}</p>}
                                 {(r as any).classesRemaining != null && <p className="text-xs text-ink/65">{(r as any).classesRemaining} clases restantes</p>}
-                                {(r as any).userId && <Link className="text-xs underline" to={`/admin/clients/${(r as any).userId}`}>Ver perfil e historial</Link>}
                               </div>
-                              <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${statusClr}`}>
+                              {r.manualSeat && status === "confirmed" && !selectedClass.isCancelled && !selectedClass.isClosed
+                                ? <ReleaseManualSeat classId={selectedClass.id} bookingId={r.bookingId} name={name} />
+                                : <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${statusClr}`}>
                                 {statusLabel}
-                              </span>
+                              </span>}
                             </li>
                           );
                         })}

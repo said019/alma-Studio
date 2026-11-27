@@ -1,11 +1,41 @@
-import {useState} from 'react';
-import {useMutation,useQuery,useQueryClient} from '@tanstack/react-query';
-import api from '@/lib/api';
-import {Button} from '@/components/ui/button';
-import {Input} from '@/components/ui/input';
-export function ManualSeats({classId}:{classId:string}) {
- const [name,setName]=useState('');const qc=useQueryClient();
- const {data}=useQuery({queryKey:['manual-seats',classId],queryFn:async()=>(await api.get(`/admin/classes/${classId}/manual-seats`)).data.data});
- const update=useMutation({mutationFn:(id?:string)=>id?api.delete(`/admin/classes/${classId}/manual-seats/${id}`):api.post(`/admin/classes/${classId}/manual-seats`,{name}),onSuccess:()=>{setName('');for(const k of ['manual-seats','classes','roster','class-roster-sheet','admin-classes-week'])qc.invalidateQueries({queryKey:[k]});}});
- return <section className="space-y-3 rounded-xl border border-line p-4"><h3 className="font-bold">Lugar manual</h3><p className="text-xs text-ink-muted">Ocupa un lugar sin vender un paquete ni descontar créditos. Puedes liberarlo después.</p><Input aria-label="Nombre del lugar manual" placeholder="Nombre o referencia (opcional)" value={name} onChange={e=>setName(e.target.value)} maxLength={150}/><Button disabled={update.isPending} onClick={()=>update.mutate(undefined)}>Ocupar un lugar</Button>{update.isError&&<p role="alert">{(update.error as any)?.response?.data?.message||'No se pudo guardar.'}</p>}{(data||[]).map((s:any)=><div key={s.id} className="flex flex-wrap items-center justify-between gap-2"><span>{s.name}</span><Button variant="outline" disabled={update.isPending} onClick={()=>update.mutate(s.id)}>Liberar lugar</Button></div>)}</section>;
+import { useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Plus } from "lucide-react";
+import api from "@/lib/api";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { useToast } from "@/hooks/use-toast";
+
+function useSeatChange(classId: string, change: () => Promise<unknown>, onSaved?: () => void) {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: change,
+    onSuccess: async () => {
+      onSaved?.();
+      await Promise.all([["class-roster-sheet", classId], ["classes"], ["roster"], ["admin-classes-week"]]
+        .map(queryKey => qc.invalidateQueries({ queryKey })));
+    },
+    onError: (error: any) => toast({ title: error.response?.data?.message ?? "No se pudo actualizar el lugar", variant: "destructive" }),
+  });
+}
+
+export function ManualSeats({ classId }: { classId: string }) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+  const close = () => { setOpen(false); setName(""); };
+  const add = useSeatChange(classId, () => api.post(`/admin/classes/${classId}/manual-seats`, { name }), close);
+  if (!open) return <Button variant="outline" onClick={() => setOpen(true)}><Plus size={16} /> Lugar manual</Button>;
+  return <form className="space-y-2" onSubmit={e => { e.preventDefault(); if (!add.isPending) add.mutate(); }}>
+    <Input autoFocus aria-label="Nombre o referencia (opcional)" placeholder="Nombre o referencia (opcional)" value={name} onChange={e => setName(e.target.value)} maxLength={150} />
+    <div className="flex gap-2">
+      <Button type="submit" disabled={add.isPending}>Ocupar lugar</Button>
+      <Button type="button" variant="ghost" onClick={close} disabled={add.isPending}>Cancelar</Button>
+    </div>
+  </form>;
+}
+
+export function ReleaseManualSeat({ classId, bookingId, name }: { classId: string; bookingId: string; name: string }) {
+  const release = useSeatChange(classId, () => api.delete(`/admin/classes/${classId}/manual-seats/${bookingId}`));
+  return <Button type="button" variant="ghost" size="sm" disabled={release.isPending} aria-label={`Liberar lugar de ${name}`} onClick={() => release.mutate()}>Liberar</Button>;
 }

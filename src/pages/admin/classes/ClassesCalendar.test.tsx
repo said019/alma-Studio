@@ -22,7 +22,7 @@ beforeEach(() => {
       start_time: "2026-09-25T11:00:00", end_time: "2026-09-25T11:50:00", max_capacity: 8, current_bookings: 8, status: "scheduled",
     }] },
     "/classes/c11/roster": { data: { class: {}, roster: [
-      { status: "confirmed", displayName: "Camila Torres" },
+      { status: "confirmed", displayName: "Camila Torres", manualSeat: true, bookingId: "b1", userId: "u1" },
       { status: "waitlist", displayName: "Regina López" },
     ] } },
     "/partners/wellhub/class-status/c11": { data: { published: false, maxSpots: 0, bookedSpots: 0, externalSlotId: null } },
@@ -43,6 +43,16 @@ describe("Clases · Calendario", () => {
     fireEvent.click(screen.getByRole("button", { name: "Gestionar personas y reservas" }));
     expect(await screen.findByRole("dialog", { name: "Personas y reservas de la clase" })).toBeInTheDocument();
     expect(await screen.findByRole("button", { name: /Asignar socia/ })).toBeInTheDocument();
+  });
+
+  it("muestra el lugar manual una sola vez y lo libera desde la fila", async () => {
+    renderAdmin(<ClassesCalendar />, { route: "/admin/classes" });
+    fireEvent.click(await screen.findByRole("button", { name: /Reformer Intermedio.*8 de 8/ }));
+    const release = await screen.findByRole("button", { name: "Liberar lugar de Camila Torres" });
+    expect(screen.getAllByText("Camila Torres")).toHaveLength(1);
+    expect(screen.queryByPlaceholderText("Nombre o referencia (opcional)")).toBeNull();
+    fireEvent.click(release);
+    await waitFor(() => expect(api.delete).toHaveBeenCalledWith("/admin/classes/c11/manual-seats/b1"));
   });
 
   it("abre la edición masiva desde la barra cuando la carga de clases es exitosa", async () => {
