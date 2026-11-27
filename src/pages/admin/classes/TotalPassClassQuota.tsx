@@ -4,7 +4,7 @@ import api from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 
-type Quota = { quota: number; capacity: number; booked: number; pending: boolean; syncing: boolean };
+type Quota = { quota: number; capacity: number; booked: number; available: number; pending: boolean; syncing: boolean };
 
 export function TotalPassClassQuota({ classId }: { classId: string }) {
   const path = `/admin/classes/${classId}/platforms/totalpass/quota`;
@@ -13,6 +13,7 @@ export function TotalPassClassQuota({ classId }: { classId: string }) {
     queryKey: ["totalpass-quota", classId],
     queryFn: async () => (await api.get<{ data: Quota | null }>(path)).data.data,
     staleTime: 0,
+    refetchInterval: 10_000,
   });
   const save = useMutation({
     mutationFn: (change: { quota: number; expectedQuota: number }) => api.put(path, change),
@@ -33,7 +34,8 @@ export function TotalPassClassQuota({ classId }: { classId: string }) {
         <h3 className="mb-1.5 w-fit rounded-md bg-neutral-950 px-3 py-2">
           <img src="/partners/totalpass.svg" alt="TotalPass" width="144" height="16" />
         </h3>
-        <p className="text-sm text-ink-muted">Cupo asignado <strong className="nums text-ink">{limit}</strong> · Reservados {data.booked}</p>
+        {!data.pending && data.syncing && <p className="font-semibold text-ink">{data.available} {data.available === 1 ? "lugar disponible" : "lugares disponibles"}</p>}
+        <p className="text-xs text-ink-muted">Tope TotalPass {limit} · Reservas TotalPass {data.booked}</p>
         {data.pending ? <p className="text-xs">Clase pendiente de vincular</p> : !data.syncing && <p className="text-xs">Sincronización pausada</p>}
       </div>
       <div className="flex gap-1">

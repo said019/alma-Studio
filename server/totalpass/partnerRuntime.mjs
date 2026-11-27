@@ -35,7 +35,8 @@ export function matchPartnerClass(remote, locals) {
 }
 export function sharedPartnerCapacity({capacity,totalBooked,channelBooked,remoteBooked,maxSpots,buffer,otherHeld=0}) {
   const pending=Math.max(0,remoteBooked-channelBooked);
-  return Math.max(remoteBooked,partnerAvailability({capacity,totalBooked:totalBooked+pending+otherHeld,channelBooked:remoteBooked,maxSpots,buffer}).capacityToPublish);
+  const booked=Math.max(channelBooked,remoteBooked);
+  return Math.max(booked,partnerAvailability({capacity,totalBooked:totalBooked+pending+otherHeld,channelBooked:booked,maxSpots,buffer}).capacityToPublish);
 }
 function cleanError(e){for(const v of [e?.code,e?.message])if(/^[A-Z][A-Z0-9_]{2,80}$/.test(v||''))return v;if(/^[0-9A-Z]{5}$/.test(e?.code||''))return `DATABASE_${e.code}`;return 'PARTNER_OPERATION_FAILED';}
 function hash(value){return crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex');}
@@ -281,15 +282,29 @@ export function installPartnerRuntime(app,{pool,adminMiddleware,runtime}) {
     const {rows:[state]} = await pool.query(`
       SELECT COALESCE(q.quota,(p.config->>'maxSpots')::int,0) AS quota,
              c.max_capacity AS capacity, p.sync_enabled AS syncing,
-             GREATEST(COALESCE(l.remote_booked,0),(SELECT COUNT(*)::int FROM bookings b
-               WHERE b.class_id=c.id AND b.partner_provider=p.provider AND b.status IN ('confirmed','checked_in'))) AS booked,
+             COALESCE(l.remote_booked,0) AS remote, COALESCE((p.config->>'buffer')::int,0) AS buffer,
+             counts.total, counts.channel, c.status,
+             (SELECT COALESCE(SUM(GREATEST(ol.remote_booked-(SELECT COUNT(*) FROM bookings ob
+                WHERE ob.class_id=c.id AND ob.partner_provider=ol.provider AND ob.status IN ('confirmed','checked_in')),0)),0)::int
+              FROM partner_class_links ol WHERE ol.class_id=c.id AND ol.provider<>p.provider) AS other_held,
              EXISTS (SELECT 1 FROM partner_sync_issues s WHERE s.provider=p.provider AND s.issue_key='class:'||c.id::text
                AND s.code='EXISTING_TIME_REQUIRES_REVIEW' AND s.resolved_at IS NULL) AS pending
       FROM classes c JOIN partner_integration_config p ON p.provider=$2 AND p.connection_status='verified'
       LEFT JOIN partner_class_quotas q ON q.class_id=c.id AND q.provider=p.provider
       LEFT JOIN partner_class_links l ON l.class_id=c.id AND l.provider=p.provider
+      CROSS JOIN LATERAL (
+        SELECT COALESCE(SUM(CASE WHEN b.user_id IS NOT NULL AND NULLIF(b.guest_name,'') IS NOT NULL THEN 2 ELSE 1 END),0)::int AS total,
+               COUNT(*) FILTER(WHERE b.partner_provider=p.provider)::int AS channel
+        FROM bookings b WHERE b.class_id=c.id AND b.status IN ('confirmed','checked_in')
+      ) counts
       WHERE c.id=$1`,[req.params.classId,req.params.provider]);
-    res.json({data:state??null});
+    if (!state) return res.json({data:null});
+    const {capacity,quota,syncing,pending} = state;
+    const booked = Math.max(state.channel,state.remote);
+    const ceiling = sharedPartnerCapacity({capacity,totalBooked:state.total,channelBooked:state.channel,
+      remoteBooked:state.remote,maxSpots:quota,buffer:state.buffer,otherHeld:state.other_held});
+    const available = state.status === 'scheduled' ? Math.max(0,ceiling-booked) : 0;
+    res.json({data:{capacity,quota,syncing,pending,booked,available}});
   }));
   app.put(quotaPath,adminMiddleware,wrap(async(req,res)=>{
     const {quota,expectedQuota}=req.body||{};

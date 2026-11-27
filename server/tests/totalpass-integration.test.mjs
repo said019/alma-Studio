@@ -8,7 +8,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import pg from 'pg';
 import EmbeddedPostgres from 'embedded-postgres';
-import { createPartnerRuntime } from '../totalpass/partnerRuntime.mjs';
+import { createPartnerRuntime, sharedPartnerCapacity } from '../totalpass/partnerRuntime.mjs';
 import { createPartnerPersonActions } from '../totalpass/partnerPersonActions.mjs';
 import { checkinPath,createTotalpassCheckins } from '../totalpass/totalpassCheckins.mjs';
 import { encryptCredentials } from '../totalpass/partnerConfiguration.mjs';
@@ -133,4 +133,15 @@ test('HIVE imports TotalPass bookings once, shares occupancy, edits classes and 
   const memberBooking=(await pool.query("INSERT INTO bookings(user_id,class_id,status) VALUES($1,$2,'confirmed') RETURNING id",[direct.id,currentClass.id])).rows[0];
   await pool.query("UPDATE bookings SET status='checked_in' WHERE id=$1",[memberBooking.id]);
   assert.equal((await pool.query('SELECT id FROM review_requests WHERE booking_id=$1',[memberBooking.id])).rowCount,1);
+});
+
+test('shared availability follows reservations and cancellations without changing the configured limit', () => {
+  const free = (totalBooked,channelBooked=0,remoteBooked=0,maxSpots=6) =>
+    sharedPartnerCapacity({capacity:6,totalBooked,channelBooked,remoteBooked,maxSpots,buffer:0}) - Math.max(channelBooked,remoteBooked);
+  assert.equal(free(2),4);
+  assert.equal(free(1),5);
+  assert.equal(free(6),0);
+  assert.equal(free(2,0,1),3);
+  assert.equal(free(3,1,1),3);
+  assert.equal(free(3,1,0,2),1);
 });
